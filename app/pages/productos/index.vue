@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import type { TableColumn } from '@nuxt/ui'
+import type { TableColumn, TableRow } from '@nuxt/ui'
 import type { SiigoProduct } from '~/types/siigo'
 
 const filter = ref('')
 const page = ref(1)
 const pageSize = 25
+const router = useRouter()
 
 watch(filter, () => {
   page.value = 1
@@ -52,6 +53,14 @@ const columns: TableColumn<SiigoProduct>[] = [{
   accessorKey: 'name',
   header: 'Producto'
 }, {
+  id: 'unit',
+  header: 'Unidad',
+  cell: ({ row }) => row.original.unit || '—'
+}, {
+  id: 'brand',
+  header: 'Marca',
+  cell: ({ row }) => row.original.additional_fields?.brand || '—'
+}, {
   accessorKey: 'type',
   header: 'Tipo',
   cell: ({ row }) => row.getValue('type') || 'Producto'
@@ -77,6 +86,10 @@ const message = computed(() => error.value?.data?.statusMessage || 'No fue posib
 const totalProducts = computed(() => filteredProducts.value.length)
 const firstProduct = computed(() => totalProducts.value ? ((page.value - 1) * pageSize) + 1 : 0)
 const lastProduct = computed(() => Math.min(page.value * pageSize, totalProducts.value))
+
+function openProduct(_: Event, row: TableRow<SiigoProduct>) {
+  router.push(`/productos/${encodeURIComponent(row.original.id)}`)
+}
 </script>
 
 <template>
@@ -131,6 +144,7 @@ const lastProduct = computed(() => Math.min(page.value * pageSize, totalProducts
         :loading="status === 'pending'"
         empty="No hay productos para mostrar."
         class="shrink-0"
+        :meta="{ class: { tr: 'cursor-pointer transition-colors hover:bg-elevated/50' } }"
         :ui="{
           base: 'table-fixed border-separate border-spacing-0',
           thead: '[&>tr]:bg-elevated/50 [&>tr]:after:content-none',
@@ -139,6 +153,7 @@ const lastProduct = computed(() => Math.min(page.value * pageSize, totalProducts
           td: 'border-b border-default',
           separator: 'h-0'
         }"
+        @select="openProduct"
       >
         <template #loading>
           <div class="flex items-center justify-center gap-2 text-muted" role="status">

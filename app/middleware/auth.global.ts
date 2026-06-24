@@ -1,5 +1,7 @@
 export default defineNuxtRouteMiddleware(async (to) => {
-  if (to.path === '/lista-precios') return
+  const path = to.path.replace(/\/+$/, '') || '/'
+
+  if (path === '/lista-precios') return
 
   const { fetchSession } = useAuth()
   const user = await fetchSession()

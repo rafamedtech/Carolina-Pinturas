@@ -4,6 +4,18 @@
 @theme static {
   --font-sans: 'Public Sans', sans-serif;
 
+  --color-brand-50: #000000;
+  --color-brand-100: #000000;
+  --color-brand-200: #000000;
+  --color-brand-300: #000000;
+  --color-brand-400: #000000;
+  --color-brand-500: #000000;
+  --color-brand-600: #000000;
+  --color-brand-700: #000000;
+  --color-brand-800: #000000;
+  --color-brand-900: #000000;
+  --color-brand-950: #000000;
+
   --color-green-50: #EFFDF5;
   --color-green-100: #D9FBE8;
   --color-green-200: #B3F5D1;

@@ -15,6 +15,37 @@ export interface SiigoProduct {
   stock_control?: boolean
   available_quantity?: number
   reference?: string
+  description?: string
+  unit?: string
+  tax_included?: boolean
+  account_group?: {
+    id?: string | number
+    name?: string
+  }
+  additional_fields?: {
+    barcode?: string
+    brand?: string
+  }
+  taxes?: Array<{
+    id?: string | number
+    name?: string
+    percentage?: number
+    type?: string
+  }>
+  warehouses?: Array<{
+    id?: string | number
+    name?: string
+    quantity?: number
+  }>
+  components?: Array<{
+    id?: string
+    name?: string
+    quantity?: number
+  }>
+  metadata?: {
+    created?: string
+    last_updated?: string | null
+  }
   price?: number | string
   prices?: Array<{
     currency_code?: string
@@ -63,11 +94,61 @@ export interface SiigoInvoice {
   name: string
   date: string
   customer?: {
+    id?: string
     identification?: string
+    rfc_id?: string
     name?: string
   }
   total?: number
   status?: string
+}
+
+export interface SiigoInvoiceDetail extends SiigoInvoice {
+  document?: {
+    id?: number
+  }
+  number?: number
+  customer?: {
+    id?: string
+    identification?: string
+    rfc_id?: string
+    name?: string
+    branch_office?: number
+  }
+  balance?: number
+  seller?: number
+  use?: {
+    code?: string
+    name?: string
+  }
+  observations?: string
+  items?: Array<{
+    id?: string
+    code?: string
+    description?: string
+    quantity?: number
+    price?: number
+    total?: number
+    discount?: {
+      percentage?: number
+      value?: number
+    }
+  }>
+  payment?: {
+    method?: string
+    cfdi?: string
+    paid?: boolean
+    conditions?: Array<{
+      id?: number
+      name?: string
+      value?: number
+      due_date?: string
+    }>
+  }
+  metadata?: {
+    created?: string
+    last_updated?: string | null
+  }
 }
 
 export interface SiigoListResponse<T> {
