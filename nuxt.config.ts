@@ -12,9 +12,27 @@ export default defineNuxtConfig({
 
   css: ['~/assets/css/main.css'],
 
+  runtimeConfig: {
+    appSessionSecret: '',
+    appUsers: '',
+    appUsersBase64: '',
+    siigo: {
+      apiUrl: 'https://api.siigo.mx',
+      username: '',
+      accessKey: '',
+      applicationId: 'CarolinaPinturas'
+    }
+  },
+
   routeRules: {
     '/api/**': {
-      cors: true
+      cors: false,
+      headers: {
+        'Cache-Control': 'no-store',
+        'X-Content-Type-Options': 'nosniff',
+        'X-Frame-Options': 'DENY',
+        'Referrer-Policy': 'same-origin'
+      }
     }
   },
 

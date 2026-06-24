@@ -8,7 +8,8 @@
     "preview": "nuxt preview",
     "postinstall": "nuxt prepare",
     "lint": "eslint .",
-    "typecheck": "nuxt typecheck"
+    "typecheck": "nuxt typecheck",
+    "auth:hash": "node scripts/hash-password.mjs"
   },
   "dependencies": {
     "@iconify-json/lucide": "^1.2.114",
@@ -29,6 +30,7 @@
   },
   "devDependencies": {
     "@nuxt/eslint": "^1.16.0",
+    "@types/node": "^26.0.0",
     "eslint": "^10.5.0",
     "typescript": "^6.0.3",
     "vue-tsc": "^3.3.5"

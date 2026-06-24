@@ -1,98 +1,76 @@
 <script setup lang="ts">
-import type { Period, Range, Stat } from '~/types'
-
-const props = defineProps<{
-  period: Period
-  range: Range
-}>()
-
-function formatCurrency(value: number): string {
-  return value.toLocaleString('en-US', {
-    style: 'currency',
-    currency: 'USD',
-    maximumFractionDigits: 0
-  })
+interface Summary {
+  products: number
+  customers: number
+  invoices: number
+  vouchers: number
 }
 
-const baseStats = [{
-  title: 'Customers',
-  icon: 'i-lucide-users',
-  minValue: 400,
-  maxValue: 1000,
-  minVariation: -15,
-  maxVariation: 25
-}, {
-  title: 'Conversions',
-  icon: 'i-lucide-chart-pie',
-  minValue: 1000,
-  maxValue: 2000,
-  minVariation: -10,
-  maxVariation: 20
-}, {
-  title: 'Revenue',
-  icon: 'i-lucide-circle-dollar-sign',
-  minValue: 200000,
-  maxValue: 500000,
-  minVariation: -20,
-  maxVariation: 30,
-  formatter: formatCurrency
-}, {
-  title: 'Orders',
-  icon: 'i-lucide-shopping-cart',
-  minValue: 100,
-  maxValue: 300,
-  minVariation: -5,
-  maxVariation: 15
-}]
-
-const { data: stats } = await useAsyncData<Stat[]>('stats', async () => {
-  return baseStats.map((stat) => {
-    const value = randomInt(stat.minValue, stat.maxValue)
-    const variation = randomInt(stat.minVariation, stat.maxVariation)
-
-    return {
-      title: stat.title,
-      icon: stat.icon,
-      value: stat.formatter ? stat.formatter(value) : value,
-      variation
-    }
-  })
-}, {
-  watch: [() => props.period, () => props.range],
-  default: () => []
+const { data, status, error, refresh } = await useFetch<Summary>('/api/siigo/summary', {
+  lazy: true
 })
+
+const stats = computed(() => [{
+  title: 'Productos',
+  icon: 'i-lucide-package',
+  value: data.value?.products
+}, {
+  title: 'Clientes',
+  icon: 'i-lucide-users',
+  value: data.value?.customers
+}, {
+  title: 'Facturas',
+  icon: 'i-lucide-receipt-text',
+  value: data.value?.invoices
+}, {
+  title: 'Cobros',
+  icon: 'i-lucide-receipt',
+  value: data.value?.vouchers
+}])
+
+const message = computed(() => error.value?.data?.statusMessage || 'No fue posible cargar el resumen de Siigo.')
 </script>
 
 <template>
-  <UPageGrid class="lg:grid-cols-4 gap-4 sm:gap-6 lg:gap-px">
-    <UPageCard
-      v-for="(stat, index) in stats"
-      :key="index"
-      :icon="stat.icon"
-      :title="stat.title"
-      to="/customers"
+  <div class="space-y-4">
+    <UAlert
+      v-if="error"
+      color="warning"
       variant="subtle"
-      :ui="{
-        container: 'gap-y-1.5',
-        wrapper: 'items-start',
-        leading: 'p-2.5 rounded-full bg-primary/10 ring ring-inset ring-primary/25 flex-col',
-        title: 'font-normal text-muted text-xs uppercase'
-      }"
-      class="lg:rounded-none first:rounded-l-lg last:rounded-r-lg hover:z-1"
+      title="Siigo aún no está conectado"
+      :description="message"
+      icon="i-lucide-plug-zap"
     >
-      <div class="flex items-center gap-2">
-        <span class="text-2xl font-semibold text-highlighted">
-          {{ stat.value }}
-        </span>
+      <template #actions>
+        <UButton
+          label="Reintentar"
+          color="warning"
+          variant="soft"
+          size="xs"
+          @click="() => refresh()"
+        />
+      </template>
+    </UAlert>
 
-        <UBadge
-          :color="stat.variation > 0 ? 'success' : 'error'"
-          variant="subtle"
-          class="text-xs"
-        >
-          {{ stat.variation > 0 ? '+' : '' }}{{ stat.variation }}%
-        </UBadge>
-      </div>
-    </UPageCard>
-  </UPageGrid>
+    <UPageGrid class="lg:grid-cols-4 gap-4 sm:gap-6 lg:gap-px">
+      <UPageCard
+        v-for="stat in stats"
+        :key="stat.title"
+        :icon="stat.icon"
+        :title="stat.title"
+        variant="subtle"
+        :ui="{
+          container: 'gap-y-1.5',
+          wrapper: 'items-start',
+          leading: 'p-2.5 rounded-full bg-primary/10 ring ring-inset ring-primary/25 flex-col',
+          title: 'font-normal text-muted text-xs uppercase'
+        }"
+        class="lg:rounded-none first:rounded-l-lg last:rounded-r-lg"
+      >
+        <span class="text-2xl font-semibold text-highlighted">
+          {{ status === 'pending' ? '—' : (stat.value ?? '—') }}
+        </span>
+      </UPageCard>
+    </UPageGrid>
+  </div>
 </template>
