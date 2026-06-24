@@ -1,10 +1,12 @@
 <script setup lang="ts">
 import type { TableColumn, TableRow } from '@nuxt/ui'
-import type { SiigoCustomer, SiigoListResponse } from '~/types/siigo'
+import type { SiigoCustomer } from '~/types/siigo'
 
 const filter = ref('')
 const router = useRouter()
-const { data, status, error, refresh } = useLazyFetch<SiigoListResponse<SiigoCustomer>>('/api/siigo/customers')
+const { data, status, error, refresh } = useCustomersCatalog()
+
+await callOnce('customers-catalog', refresh)
 
 const customers = computed(() => {
   const value = filter.value.trim().toLowerCase()
@@ -109,7 +111,14 @@ function openCustomer(_: Event, row: TableRow<SiigoCustomer>) {
           separator: 'h-0'
         }"
         @select="openCustomer"
-      />
+      >
+        <template #loading>
+          <div class="flex items-center justify-center gap-2 text-muted" role="status">
+            <UIcon name="i-lucide-loader-circle" class="size-5 animate-spin text-primary" />
+            <span>Cargando clientes…</span>
+          </div>
+        </template>
+      </UTable>
     </template>
   </UDashboardPanel>
 </template>

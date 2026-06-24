@@ -38,12 +38,17 @@ const formattedPrice = computed(() => {
   <UModal
     v-if="product"
     v-model:open="open"
-    :title="product.name"
-    description="Detalle del producto"
+    title="Detalle del producto"
     :ui="{ content: 'max-w-lg' }"
   >
     <template #body>
       <div class="space-y-6">
+        <div>
+          <p class="text-lg font-semibold leading-snug text-highlighted">
+            {{ product.name }}
+          </p>
+        </div>
+
         <div class="rounded-xl bg-primary/10 p-4">
           <p class="text-sm font-medium text-primary">
             Precio de referencia

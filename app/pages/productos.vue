@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { TableColumn } from '@nuxt/ui'
-import type { SiigoListResponse, SiigoProduct } from '~/types/siigo'
+import type { SiigoProduct } from '~/types/siigo'
 
 const filter = ref('')
 const page = ref(1)
@@ -10,10 +10,9 @@ watch(filter, () => {
   page.value = 1
 })
 
-const { data, status, error, refresh } = await useFetch<SiigoListResponse<SiigoProduct>>('/api/siigo/products', {
-  query: { all: 'true' },
-  lazy: true
-})
+const { data, status, error, refresh } = useProductsCatalog()
+
+await callOnce('products-catalog', refresh)
 
 const catalog = computed(() => data.value?.results || [])
 const normalizedFilter = computed(() => filter.value.trim().toLocaleLowerCase())
@@ -140,7 +139,14 @@ const lastProduct = computed(() => Math.min(page.value * pageSize, totalProducts
           td: 'border-b border-default',
           separator: 'h-0'
         }"
-      />
+      >
+        <template #loading>
+          <div class="flex items-center justify-center gap-2 text-muted" role="status">
+            <UIcon name="i-lucide-loader-circle" class="size-5 animate-spin text-primary" />
+            <span>Cargando productos…</span>
+          </div>
+        </template>
+      </UTable>
 
       <div
         v-if="!error && totalProducts > 0"
