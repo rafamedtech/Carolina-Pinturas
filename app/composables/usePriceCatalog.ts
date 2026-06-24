@@ -1,14 +1,4 @@
-interface CatalogPrice {
-  code: string
-  name: string
-  price: number | null
-  currency: string
-}
-
-interface PriceCatalogResponse {
-  updatedAt: string
-  products: CatalogPrice[]
-}
+import type { PriceCatalogResponse } from '~/types/catalog'
 
 export function usePriceCatalog() {
   const query = shallowRef('')

@@ -1,12 +1,6 @@
 import type { SiigoListResponse, SiigoProduct } from '~/types/siigo'
+import type { CatalogPrice } from '~/types/catalog'
 import { siigoRequest } from '../../utils/siigo'
-
-interface CatalogPrice {
-  code: string
-  name: string
-  price: number | null
-  currency: string
-}
 
 const SIIGO_PAGE_SIZE = 25
 
@@ -47,6 +41,10 @@ export default defineCachedEventHandler(async () => {
     .map(product => ({
       code: product.code,
       name: product.name,
+      reference: product.reference,
+      type: product.type,
+      availableQuantity: product.available_quantity,
+      stockControl: product.stock_control,
       ...productPrice(product)
     }))
     .sort((a, b) => a.name.localeCompare(b.name, 'es-MX'))

@@ -1,5 +1,9 @@
 <script setup lang="ts">
+import type { CatalogPrice } from '~/types/catalog'
+
 const { error, products, query, status, totalProducts, updatedAt } = usePriceCatalog()
+const selectedProduct = shallowRef<CatalogPrice | null>(null)
+const detailOpen = shallowRef(false)
 
 const formattedUpdate = computed(() => {
   if (!updatedAt.value) return null
@@ -11,6 +15,11 @@ const formattedUpdate = computed(() => {
 })
 
 const errorMessage = computed(() => error.value?.data?.statusMessage || 'No fue posible consultar los precios. Intenta de nuevo más tarde.')
+
+function showProductDetails(product: CatalogPrice) {
+  selectedProduct.value = product
+  detailOpen.value = true
+}
 </script>
 
 <template>
@@ -35,7 +44,10 @@ const errorMessage = computed(() => error.value?.data?.statusMessage || 'No fue 
       :products="products"
       :loading="status === 'pending'"
       :query="query"
+      @select-product="showProductDetails"
     />
+
+    <PricesPriceDetailModal v-model:open="detailOpen" :product="selectedProduct" />
 
     <p v-if="formattedUpdate && !error" class="text-center text-xs text-muted">
       Precios actualizados: {{ formattedUpdate }}

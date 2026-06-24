@@ -7,12 +7,12 @@ defineProps<{
 <template>
   <UButton
     label="Carolina Pinturas"
-    icon="i-lucide-paint-roller"
+    :avatar="{ src: '/carolina-logo.jpg', alt: 'Carolina Pinturas' }"
     color="neutral"
     variant="ghost"
     block
     :square="collapsed"
     class="py-2"
-    :ui="{ leadingIcon: 'text-primary' }"
+    :ui="{ leadingAvatar: 'ring-1 ring-default' }"
   />
 </template>

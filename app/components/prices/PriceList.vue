@@ -1,15 +1,14 @@
 <script setup lang="ts">
-interface CatalogPrice {
-  code: string
-  name: string
-  price: number | null
-  currency: string
-}
+import type { CatalogPrice } from '~/types/catalog'
 
 const props = defineProps<{
   products: CatalogPrice[]
   loading: boolean
   query: string
+}>()
+
+const emit = defineEmits<{
+  selectProduct: [product: CatalogPrice]
 }>()
 
 function formatPrice(product: CatalogPrice) {
@@ -34,23 +33,25 @@ const emptyMessage = computed(() => props.query
     </div>
 
     <div v-else-if="products.length" class="divide-y divide-default">
-      <article
+      <button
         v-for="product in products"
         :key="`${product.code}-${product.name}`"
-        class="flex items-center justify-between gap-5 px-5 py-4 transition-colors hover:bg-elevated/50 sm:px-6"
+        type="button"
+        class="flex w-full flex-col items-start gap-3 px-5 py-4 text-left transition-colors hover:bg-elevated/50 focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-primary sm:flex-row sm:items-start sm:justify-between sm:gap-5 sm:px-6"
+        @click="emit('selectProduct', product)"
       >
-        <div class="min-w-0">
-          <p class="truncate text-base font-medium text-highlighted">
+        <div class="w-full sm:min-w-0 sm:flex-1">
+          <p class="text-base font-medium text-highlighted">
             {{ product.name }}
           </p>
           <p class="mt-1 font-mono text-xs tracking-wide text-muted">
             {{ product.code || 'Sin código' }}
           </p>
         </div>
-        <p class="shrink-0 text-right text-base font-bold tabular-nums text-primary sm:text-lg">
+        <p class="shrink-0 text-base font-bold tabular-nums text-primary sm:text-right sm:text-lg">
           {{ formatPrice(product) }}
         </p>
-      </article>
+      </button>
     </div>
 
     <div v-else class="px-6 py-16 text-center">
