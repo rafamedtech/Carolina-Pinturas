@@ -1,0 +1,265 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model OrderStatus {
+  key        String   @id @db.VarChar(32)
+  label      String   @db.VarChar(64)
+  sortOrder  Int      @unique @map("sort_order")
+  color      String   @default("neutral") @db.VarChar(24)
+  isTerminal Boolean  @default(false) @map("is_terminal")
+  isActive   Boolean  @default(true) @map("is_active")
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt  DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  orders      SalesOrder[]
+  historyFrom SalesOrderStatusHistory[] @relation("status_history_from")
+  historyTo   SalesOrderStatusHistory[] @relation("status_history_to")
+
+  @@map("order_statuses")
+}
+
+model SiigoProduct {
+  id                String    @id @db.Uuid
+  code              String    @db.VarChar(100)
+  name              String
+  accountGroupId    Int?      @map("account_group_id")
+  accountGroupName  String?   @map("account_group_name")
+  type              String?   @db.VarChar(64)
+  stockControl      Boolean?  @map("stock_control")
+  active            Boolean?
+  taxIncluded       Boolean?  @map("tax_included")
+  unitCode          String?   @map("unit_code") @db.VarChar(32)
+  unitName          String?   @map("unit_name")
+  keyCode           String?   @map("key_code") @db.VarChar(32)
+  keyName           String?   @map("key_name")
+  reference         String?
+  description       String?
+  barcode           String?
+  brand             String?
+  availableQuantity Decimal?  @map("available_quantity") @db.Decimal(20, 6)
+  siigoCreatedAt    DateTime? @map("siigo_created_at") @db.Timestamptz(6)
+  siigoUpdatedAt    DateTime? @map("siigo_updated_at") @db.Timestamptz(6)
+  rawPayload        Json      @map("raw_payload") @db.JsonB
+  syncedAt          DateTime  @default(now()) @map("synced_at") @db.Timestamptz(6)
+  createdAt         DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt         DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  prices     SiigoProductPrice[]
+  taxes      SiigoProductTax[]
+  warehouses SiigoProductWarehouse[]
+  components SiigoProductComponent[]
+  orderItems SalesOrderItem[]
+
+  @@index([code])
+  @@index([name])
+  @@map("siigo_products")
+}
+
+model SiigoProductPrice {
+  id           BigInt  @id @default(autoincrement())
+  productId    String  @map("product_id") @db.Uuid
+  currencyCode String  @map("currency_code") @db.VarChar(3)
+  position     Int
+  name         String?
+  value        Decimal @db.Decimal(20, 6)
+  rawPayload   Json    @map("raw_payload") @db.JsonB
+
+  product SiigoProduct @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([productId, currencyCode, position])
+  @@map("siigo_product_prices")
+}
+
+model SiigoProductTax {
+  productId  String   @map("product_id") @db.Uuid
+  siigoTaxId Int      @map("siigo_tax_id")
+  name       String?
+  type       String?  @db.VarChar(32)
+  percentage Decimal? @db.Decimal(9, 6)
+  rawPayload Json     @map("raw_payload") @db.JsonB
+
+  product SiigoProduct @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@id([productId, siigoTaxId])
+  @@map("siigo_product_taxes")
+}
+
+model SiigoProductWarehouse {
+  productId        String   @map("product_id") @db.Uuid
+  siigoWarehouseId Int      @map("siigo_warehouse_id")
+  name             String?
+  quantity         Decimal? @db.Decimal(20, 6)
+  rawPayload       Json     @map("raw_payload") @db.JsonB
+
+  product SiigoProduct @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@id([productId, siigoWarehouseId])
+  @@map("siigo_product_warehouses")
+}
+
+model SiigoProductComponent {
+  id               BigInt   @id @default(autoincrement())
+  productId        String   @map("product_id") @db.Uuid
+  siigoComponentId String?  @map("siigo_component_id")
+  name             String?
+  quantity         Decimal? @db.Decimal(20, 6)
+  rawPayload       Json     @map("raw_payload") @db.JsonB
+
+  product SiigoProduct @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([productId])
+  @@map("siigo_product_components")
+}
+
+model SiigoCustomer {
+  id                    String   @id @db.Uuid
+  name                  Json     @db.JsonB
+  displayName           String   @map("display_name")
+  personType            String?  @map("person_type") @db.VarChar(32)
+  type                  String?  @db.VarChar(32)
+  identification        String?
+  rfcId                 String?  @map("rfc_id")
+  fiscalRegime          String?  @map("fiscal_regime")
+  active                Boolean?
+  addressStreet         String?  @map("address_street")
+  addressInteriorNumber String?  @map("address_interior_number")
+  addressExteriorNumber String?  @map("address_exterior_number")
+  addressColony         String?  @map("address_colony")
+  addressLocality       String?  @map("address_locality")
+  addressCityName       String?  @map("address_city_name")
+  addressStateName      String?  @map("address_state_name")
+  addressPostalCode     String?  @map("address_postal_code")
+  rawPayload            Json     @map("raw_payload") @db.JsonB
+  syncedAt              DateTime @default(now()) @map("synced_at") @db.Timestamptz(6)
+  createdAt             DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt             DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  phones   SiigoCustomerPhone[]
+  contacts SiigoCustomerContact[]
+  orders   SalesOrder[]
+
+  @@index([displayName])
+  @@index([rfcId])
+  @@map("siigo_customers")
+}
+
+model SiigoCustomerPhone {
+  id         BigInt  @id @default(autoincrement())
+  customerId String  @map("customer_id") @db.Uuid
+  position   Int
+  number     String?
+  rawPayload Json    @map("raw_payload") @db.JsonB
+
+  customer SiigoCustomer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@unique([customerId, position])
+  @@map("siigo_customer_phones")
+}
+
+model SiigoCustomerContact {
+  id         BigInt  @id @default(autoincrement())
+  customerId String  @map("customer_id") @db.Uuid
+  position   Int
+  firstName  String? @map("first_name")
+  lastName   String? @map("last_name")
+  email      String?
+  phone      String?
+  rawPayload Json    @map("raw_payload") @db.JsonB
+
+  customer SiigoCustomer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@unique([customerId, position])
+  @@map("siigo_customer_contacts")
+}
+
+model SalesOrder {
+  id                   String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  folio                Int       @unique @default(autoincrement())
+  statusKey            String    @default("borrador") @map("status_key") @db.VarChar(32)
+  customerId           String    @map("customer_id") @db.Uuid
+  customerNameSnapshot String    @map("customer_name_snapshot")
+  customerRfcSnapshot  String?   @map("customer_rfc_snapshot")
+  customerPayload      Json      @map("customer_payload") @db.JsonB
+  orderDate            DateTime  @default(dbgenerated("CURRENT_DATE")) @map("order_date") @db.Date
+  promisedDate         DateTime? @map("promised_date") @db.Date
+  observations         String?
+  currencyCode         String    @default("MXN") @map("currency_code") @db.VarChar(3)
+  subtotal             Decimal   @default(0) @db.Decimal(20, 6)
+  discountTotal        Decimal   @default(0) @map("discount_total") @db.Decimal(20, 6)
+  taxTotal             Decimal   @default(0) @map("tax_total") @db.Decimal(20, 6)
+  total                Decimal   @default(0) @db.Decimal(20, 6)
+  siigoReference       String?   @map("siigo_reference")
+  registeredInSiigoAt  DateTime? @map("registered_in_siigo_at") @db.Timestamptz(6)
+  createdByName        String    @map("created_by_name")
+  createdByEmail       String    @map("created_by_email")
+  createdByRole        String    @map("created_by_role") @db.VarChar(32)
+  updatedByEmail       String    @map("updated_by_email")
+  version              Int       @default(1)
+  createdAt            DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt            DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  status        OrderStatus               @relation(fields: [statusKey], references: [key], onDelete: Restrict)
+  customer      SiigoCustomer             @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  items         SalesOrderItem[]
+  statusHistory SalesOrderStatusHistory[]
+
+  @@index([statusKey, orderDate])
+  @@index([customerId, orderDate])
+  @@index([createdAt])
+  @@map("sales_orders")
+}
+
+model SalesOrderItem {
+  id                         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  orderId                    String   @map("order_id") @db.Uuid
+  position                   Int
+  productId                  String   @map("product_id") @db.Uuid
+  productCodeSnapshot        String   @map("product_code_snapshot")
+  productNameSnapshot        String   @map("product_name_snapshot")
+  productDescriptionSnapshot String?  @map("product_description_snapshot")
+  productReferenceSnapshot   String?  @map("product_reference_snapshot")
+  unitCodeSnapshot           String?  @map("unit_code_snapshot")
+  unitNameSnapshot           String?  @map("unit_name_snapshot")
+  productPayload             Json     @map("product_payload") @db.JsonB
+  quantity                   Decimal  @db.Decimal(20, 6)
+  unitPrice                  Decimal  @map("unit_price") @db.Decimal(20, 6)
+  discountPercentage         Decimal  @default(0) @map("discount_percentage") @db.Decimal(9, 6)
+  discountAmount             Decimal  @default(0) @map("discount_amount") @db.Decimal(20, 6)
+  taxPayload                 Json     @map("tax_payload") @db.JsonB
+  subtotal                   Decimal  @db.Decimal(20, 6)
+  taxAmount                  Decimal  @default(0) @map("tax_amount") @db.Decimal(20, 6)
+  total                      Decimal  @db.Decimal(20, 6)
+  createdAt                  DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  order   SalesOrder   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product SiigoProduct @relation(fields: [productId], references: [id], onDelete: Restrict)
+
+  @@unique([orderId, position])
+  @@index([productId])
+  @@map("sales_order_items")
+}
+
+model SalesOrderStatusHistory {
+  id             BigInt   @id @default(autoincrement())
+  orderId        String   @map("order_id") @db.Uuid
+  fromStatusKey  String?  @map("from_status_key") @db.VarChar(32)
+  toStatusKey    String   @map("to_status_key") @db.VarChar(32)
+  note           String?
+  changedByName  String   @map("changed_by_name")
+  changedByEmail String   @map("changed_by_email")
+  changedByRole  String   @map("changed_by_role") @db.VarChar(32)
+  changedAt      DateTime @default(now()) @map("changed_at") @db.Timestamptz(6)
+
+  order      SalesOrder   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  fromStatus OrderStatus? @relation("status_history_from", fields: [fromStatusKey], references: [key], onDelete: Restrict)
+  toStatus   OrderStatus  @relation("status_history_to", fields: [toStatusKey], references: [key], onDelete: Restrict)
+
+  @@index([orderId, changedAt])
+  @@map("sales_order_status_history")
+}

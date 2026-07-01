@@ -4,6 +4,7 @@ export function useCustomersCatalog() {
   const catalog = useState<SiigoListResponse<SiigoCustomer> | null>('customers-catalog-data', () => null)
   const { data, status, error, refresh } = useFetch<SiigoListResponse<SiigoCustomer>>('/api/siigo/customers', {
     key: 'customers-catalog-request',
+    query: { all: 'true' },
     immediate: false
   })
 

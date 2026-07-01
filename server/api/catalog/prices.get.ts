@@ -34,7 +34,9 @@ async function getProducts() {
   return products
 }
 
-export default defineCachedEventHandler(async () => {
+export default eventHandler(async (event) => {
+  setResponseHeader(event, 'Cache-Control', 'no-store, max-age=0')
+
   const products = await getProducts()
   const catalog: CatalogPrice[] = products
     .filter(product => product.active !== false)
@@ -53,7 +55,4 @@ export default defineCachedEventHandler(async () => {
     updatedAt: new Date().toISOString(),
     products: catalog
   }
-}, {
-  maxAge: 300,
-  name: 'public-price-catalog'
 })

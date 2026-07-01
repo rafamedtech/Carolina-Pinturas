@@ -2,7 +2,11 @@ import type { PriceCatalogResponse } from '~/types/catalog'
 
 export function usePriceCatalog() {
   const query = shallowRef('')
-  const { data, error, status } = useFetch<PriceCatalogResponse>('/api/catalog/prices')
+  const { data, error, status, refresh } = useFetch<PriceCatalogResponse>('/api/catalog/prices')
+
+  useEventListener('focus', async () => {
+    await refresh()
+  })
 
   const normalizedQuery = computed(() => query.value.trim().toLocaleLowerCase('es-MX'))
   const products = computed(() => data.value?.products || [])

@@ -1,7 +1,9 @@
 allowBuilds:
   '@parcel/watcher': false
+  '@prisma/engines': true
   '@tailwindcss/oxide': false
   esbuild: false
   maplibre-gl: false
+  prisma: true
   unrs-resolver: false
   vue-demi: false

@@ -1,44 +1,57 @@
 <script setup lang="ts">
 import { h, resolveComponent } from 'vue'
 import type { TableColumn } from '@nuxt/ui'
-import type { SiigoInvoice, SiigoListResponse } from '~/types/siigo'
+import type { SalesOrderListItem, SalesOrderListResponse } from '~/types/orders'
 
+const NuxtLink = resolveComponent('NuxtLink')
 const UBadge = resolveComponent('UBadge')
-
-const { data, status, error, refresh } = await useFetch<SiigoListResponse<SiigoInvoice>>('/api/siigo/invoices', {
+const currency = new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' })
+const { data, status, error, refresh } = await useFetch<SalesOrderListResponse>('/api/orders', {
+  query: { page_size: 10 },
   lazy: true
 })
 
-const invoices = computed(() => data.value?.results || [])
-
-const columns: TableColumn<SiigoInvoice>[] = [{
-  accessorKey: 'name',
-  header: 'Documento',
-  cell: ({ row }) => row.getValue('name') || row.original.id
+const orders = computed(() => data.value?.results || [])
+const columns: TableColumn<SalesOrderListItem>[] = [{
+  accessorKey: 'number',
+  header: 'Pedido',
+  cell: ({ row }) => h(
+    NuxtLink,
+    {
+      to: `/ventas/${encodeURIComponent(row.original.id)}`,
+      class: 'font-medium text-primary hover:underline'
+    },
+    () => row.original.number
+  )
 }, {
-  accessorKey: 'date',
+  accessorKey: 'orderDate',
   header: 'Fecha',
-  cell: ({ row }) => row.getValue('date')
-    ? new Date(String(row.getValue('date'))).toLocaleDateString('es-MX')
-    : '—'
+  cell: ({ row }) => row.original.orderDate.split('-').reverse().join('/')
 }, {
   id: 'customer',
   header: 'Cliente',
-  cell: ({ row }) => row.original.customer?.name || row.original.customer?.identification || '—'
+  cell: ({ row }) => row.original.customer.name
 }, {
-  accessorKey: 'status',
+  id: 'status',
   header: 'Estado',
-  cell: ({ row }) => h(UBadge, { color: 'neutral', variant: 'subtle' }, () => row.getValue('status') || 'Registrada')
+  cell: ({ row }) => h(
+    UBadge,
+    { color: 'neutral', variant: 'subtle' },
+    () => row.original.status.label
+  )
 }, {
   accessorKey: 'total',
   header: () => h('div', { class: 'text-right' }, 'Total'),
-  cell: ({ row }) => h('div', { class: 'text-right font-medium' }, new Intl.NumberFormat('es-MX', {
-    style: 'currency',
-    currency: 'MXN'
-  }).format(Number(row.getValue('total') || 0)))
+  cell: ({ row }) => h(
+    'div',
+    { class: 'text-right font-medium' },
+    currency.format(row.original.total)
+  )
 }]
 
-const message = computed(() => error.value?.data?.statusMessage || 'No fue posible cargar las facturas.')
+const message = computed(() =>
+  error.value?.data?.statusMessage || 'No fue posible cargar los pedidos.'
+)
 </script>
 
 <template>
@@ -47,14 +60,14 @@ const message = computed(() => error.value?.data?.statusMessage || 'No fue posib
       <div class="flex items-center justify-between gap-3">
         <div>
           <h2 class="font-semibold text-highlighted">
-            Facturas recientes
+            Pedidos recientes
           </h2>
           <p class="text-sm text-muted">
-            Datos consultados directamente desde Siigo.
+            Datos guardados en PostgreSQL.
           </p>
         </div>
         <UButton
-          label="Ver ventas"
+          label="Ver pedidos"
           to="/ventas"
           color="neutral"
           variant="outline"
@@ -83,10 +96,10 @@ const message = computed(() => error.value?.data?.statusMessage || 'No fue posib
 
     <UTable
       v-else
-      :data="invoices"
+      :data="orders"
       :columns="columns"
       :loading="status === 'pending'"
-      empty="No hay facturas para mostrar."
+      empty="No hay pedidos para mostrar."
       class="shrink-0"
       :ui="{
         base: 'table-fixed border-separate border-spacing-0',

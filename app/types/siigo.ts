@@ -16,7 +16,14 @@ export interface SiigoProduct {
   available_quantity?: number
   reference?: string
   description?: string
-  unit?: string
+  unit?: {
+    code?: string
+    name?: string
+  }
+  key?: {
+    code?: string
+    name?: string
+  }
   tax_included?: boolean
   account_group?: {
     id?: string | number
@@ -51,6 +58,7 @@ export interface SiigoProduct {
     currency_code?: string
     price_list?: Array<{
       position?: number
+      name?: string
       value?: number | string
     }>
   }>
@@ -61,6 +69,7 @@ export interface SiigoCustomer {
   name: string[]
   person_type?: string
   type?: string
+  identification?: string
   rfc_id?: string
   fiscal_regime?: string
   active?: boolean
@@ -87,6 +96,10 @@ export interface SiigoCustomer {
       number?: string
     }
   }>
+  metadata?: {
+    created?: string
+    last_updated?: string | null
+  }
 }
 
 export interface SiigoInvoice {
@@ -136,7 +149,10 @@ export interface SiigoInvoiceDetail extends SiigoInvoice {
   }>
   payment?: {
     method?: string
-    cfdi?: string
+    cfdi?: {
+      code?: string
+      name?: string
+    }
     paid?: boolean
     conditions?: Array<{
       id?: number

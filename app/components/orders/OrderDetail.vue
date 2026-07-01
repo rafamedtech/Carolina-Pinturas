@@ -1,0 +1,257 @@
+<script setup lang="ts">
+import type { OrderStatus, SalesOrderDetail } from '~/types/orders'
+
+const props = defineProps<{
+  orderId: string
+}>()
+
+const selectedStatus = shallowRef('')
+const statusNote = shallowRef('')
+const savingStatus = shallowRef(false)
+const toast = useToast()
+const {
+  data: order,
+  status,
+  error,
+  refresh
+} = await useFetch<SalesOrderDetail>(
+  () => `/api/orders/${encodeURIComponent(props.orderId)}`,
+  { key: `sales-order-${props.orderId}` }
+)
+const { data: statuses } = await useFetch<OrderStatus[]>('/api/orders/statuses', {
+  key: 'order-statuses',
+  default: () => []
+})
+
+watch(() => order.value?.status.key, (value) => {
+  selectedStatus.value = value || ''
+}, { immediate: true })
+
+const currency = computed(() => new Intl.NumberFormat('es-MX', {
+  style: 'currency',
+  currency: order.value?.currencyCode || 'MXN'
+}))
+const errorMessage = computed(() =>
+  error.value?.data?.statusMessage || 'No fue posible cargar el pedido.'
+)
+
+function formatCurrency(value: number | undefined) {
+  return currency.value.format(value || 0)
+}
+
+function formatDate(value: string | null | undefined) {
+  if (!value) return '—'
+  return value.split('-').reverse().join('/')
+}
+
+async function updateStatus() {
+  if (!order.value || selectedStatus.value === order.value.status.key) return
+  savingStatus.value = true
+
+  try {
+    order.value = await $fetch<SalesOrderDetail>(
+      `/api/orders/${encodeURIComponent(props.orderId)}/status`,
+      {
+        method: 'PATCH',
+        body: {
+          statusKey: selectedStatus.value,
+          note: statusNote.value || null,
+          version: order.value.version
+        }
+      }
+    )
+    statusNote.value = ''
+    toast.add({
+      title: 'Estado actualizado',
+      description: `El pedido ahora está ${order.value.status.label.toLowerCase()}.`,
+      color: 'success',
+      icon: 'i-lucide-circle-check'
+    })
+  } catch (fetchError: unknown) {
+    const response = fetchError as { data?: { statusMessage?: string }, message?: string }
+    toast.add({
+      title: 'No se pudo actualizar el estado',
+      description: response.data?.statusMessage || response.message || 'Intenta de nuevo.',
+      color: 'error',
+      icon: 'i-lucide-circle-alert'
+    })
+    await refresh()
+  } finally {
+    savingStatus.value = false
+  }
+}
+</script>
+
+<template>
+  <UDashboardPanel id="order-detail">
+    <template #header>
+      <UDashboardNavbar :title="order?.number || 'Detalle del pedido'">
+        <template #leading>
+          <UButton
+            to="/ventas"
+            icon="i-lucide-arrow-left"
+            color="neutral"
+            variant="ghost"
+            aria-label="Volver a pedidos"
+          />
+        </template>
+        <template #right>
+          <UButton
+            label="Actualizar"
+            icon="i-lucide-refresh-cw"
+            color="neutral"
+            variant="outline"
+            :loading="status === 'pending'"
+            @click="() => refresh()"
+          />
+        </template>
+      </UDashboardNavbar>
+    </template>
+
+    <template #body>
+      <UAlert
+        v-if="error"
+        color="warning"
+        variant="subtle"
+        title="Pedido no disponible"
+        :description="errorMessage"
+        icon="i-lucide-database-zap"
+      />
+
+      <template v-else-if="order">
+        <div class="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <p class="text-sm text-muted">
+              Pedido
+            </p>
+            <h1 class="text-xl font-semibold text-highlighted">
+              {{ order.number }}
+            </h1>
+            <p class="mt-1 text-sm text-muted">
+              {{ formatDate(order.orderDate) }}
+            </p>
+          </div>
+          <div class="text-right">
+            <p class="text-sm text-muted">
+              Total
+            </p>
+            <p class="text-xl font-semibold text-highlighted">
+              {{ formatCurrency(order.total) }}
+            </p>
+            <UBadge class="mt-2" color="neutral" variant="subtle">
+              {{ order.status.label }}
+            </UBadge>
+          </div>
+        </div>
+
+        <div class="grid gap-4 lg:grid-cols-2">
+          <UCard>
+            <template #header>
+              <h2 class="font-semibold text-highlighted">
+                Cliente y entrega
+              </h2>
+            </template>
+            <dl class="grid gap-4 sm:grid-cols-2">
+              <div>
+                <dt class="text-sm text-muted">
+                  Cliente
+                </dt>
+                <dd class="mt-1 font-medium">
+                  {{ order.customer.name }}
+                </dd>
+              </div>
+              <div>
+                <dt class="text-sm text-muted">
+                  RFC
+                </dt>
+                <dd class="mt-1 font-medium">
+                  {{ order.customer.rfc || '—' }}
+                </dd>
+              </div>
+              <div>
+                <dt class="text-sm text-muted">
+                  Fecha del pedido
+                </dt>
+                <dd class="mt-1 font-medium">
+                  {{ formatDate(order.orderDate) }}
+                </dd>
+              </div>
+              <div>
+                <dt class="text-sm text-muted">
+                  Fecha prometida
+                </dt>
+                <dd class="mt-1 font-medium">
+                  {{ formatDate(order.promisedDate) }}
+                </dd>
+              </div>
+            </dl>
+            <div v-if="order.observations" class="mt-4 border-t border-default pt-4">
+              <p class="text-sm text-muted">
+                Observaciones
+              </p>
+              <p class="mt-1 whitespace-pre-wrap">
+                {{ order.observations }}
+              </p>
+            </div>
+          </UCard>
+
+          <OrdersOrderStatusPanel
+            v-model:status-key="selectedStatus"
+            v-model:note="statusNote"
+            :order="order"
+            :statuses="statuses"
+            :saving="savingStatus"
+            @update="updateStatus"
+          />
+        </div>
+
+        <OrdersOrderDetailItems
+          :items="order.items"
+          :currency-code="order.currencyCode"
+        />
+
+        <div class="grid gap-4 lg:grid-cols-2">
+          <UCard>
+            <template #header>
+              <h2 class="font-semibold text-highlighted">
+                Totales
+              </h2>
+            </template>
+            <dl class="space-y-3">
+              <div class="flex justify-between gap-4">
+                <dt class="text-muted">
+                  Subtotal
+                </dt>
+                <dd class="font-medium">
+                  {{ formatCurrency(order.subtotal) }}
+                </dd>
+              </div>
+              <div class="flex justify-between gap-4">
+                <dt class="text-muted">
+                  Impuestos
+                </dt>
+                <dd class="font-medium">
+                  {{ formatCurrency(order.taxTotal) }}
+                </dd>
+              </div>
+              <div class="flex justify-between gap-4 border-t border-default pt-3">
+                <dt class="font-semibold">
+                  Total
+                </dt>
+                <dd class="font-semibold">
+                  {{ formatCurrency(order.total) }}
+                </dd>
+              </div>
+            </dl>
+          </UCard>
+
+          <OrdersOrderHistory :entries="order.statusHistory" />
+        </div>
+      </template>
+
+      <div v-else-if="status === 'pending'" class="flex justify-center py-12">
+        <UIcon name="i-lucide-loader-circle" class="size-6 animate-spin text-muted" />
+      </div>
+    </template>
+  </UDashboardPanel>
+</template>

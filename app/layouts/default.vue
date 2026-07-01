@@ -25,8 +25,8 @@ const links = [[{
     open.value = false
   }
 }, {
-  label: 'Ventas',
-  icon: 'i-lucide-receipt-text',
+  label: 'Pedidos',
+  icon: 'i-lucide-shopping-cart',
   to: '/ventas',
   onSelect: () => {
     open.value = false

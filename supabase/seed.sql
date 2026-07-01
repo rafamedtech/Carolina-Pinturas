@@ -1,0 +1,1 @@
+-- Intentionally empty. Required reference data is inserted by the schema migration.

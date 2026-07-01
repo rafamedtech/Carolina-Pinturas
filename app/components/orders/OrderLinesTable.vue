@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import { h, resolveComponent } from 'vue'
 import type { TableColumn } from '@nuxt/ui'
-import type { DraftOrderLine } from '~/composables/useMockOrder'
+import type { DraftOrderLine } from '~/composables/useOrderDraft'
 
 const props = defineProps<{
-  lines: DraftOrderLine[]
+  lines: readonly DraftOrderLine[]
   total: number
 }>()
 
@@ -14,6 +14,7 @@ const emit = defineEmits<{
 
 const UButton = resolveComponent('UButton')
 const currency = new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' })
+const tableLines = computed(() => [...props.lines])
 const columns: TableColumn<DraftOrderLine>[] = [{
   accessorKey: 'code',
   header: 'Código'
@@ -31,7 +32,13 @@ const columns: TableColumn<DraftOrderLine>[] = [{
 }, {
   id: 'total',
   header: () => h('div', { class: 'text-right' }, 'Importe'),
-  cell: ({ row }) => h('div', { class: 'text-right font-medium' }, currency.format(row.original.quantity * row.original.unitPrice))
+  cell: ({ row }) => {
+    const listedTotal = row.original.quantity * row.original.unitPrice
+    const total = row.original.taxIncluded
+      ? listedTotal
+      : listedTotal * (1 + row.original.taxPercentage / 100)
+    return h('div', { class: 'text-right font-medium' }, currency.format(total))
+  }
 }, {
   id: 'actions',
   header: '',
@@ -65,7 +72,7 @@ const columns: TableColumn<DraftOrderLine>[] = [{
     </template>
 
     <UTable
-      :data="props.lines"
+      :data="tableLines"
       :columns="columns"
       empty="Agrega productos para iniciar el pedido."
       :ui="{
