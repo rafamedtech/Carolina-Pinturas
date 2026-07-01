@@ -11,12 +11,17 @@ const { data: fetchedProduct, status, error } = useLazyFetch<SiigoProduct>(
 )
 
 const product = computed(() => fetchedProduct.value ?? props.product)
-const prices = computed(() => product.value.prices?.flatMap(price =>
-  (price.price_list || []).map(item => ({
-    ...item,
-    currency: price.currency_code || 'MXN'
-  }))
-) || [])
+const salePrice = computed(() => {
+  const price = product.value.prices?.find(item =>
+    item.currency_code === 'MXN'
+    && item.price_list?.some(entry => entry.position === 1)
+  ) ?? product.value.prices?.find(item =>
+    item.price_list?.some(entry => entry.position === 1)
+  )
+  const value = price?.price_list?.find(item => item.position === 1)?.value
+
+  return formatCurrency(value, price?.currency_code || 'MXN')
+})
 const details = computed(() => [
   {
     label: 'Unidad',
@@ -70,13 +75,24 @@ function formatCurrency(value?: number | string, currencyCode = 'MXN') {
       </UBadge>
     </div>
 
-    <div class="mt-4 rounded-lg bg-primary/10 p-3">
-      <p class="text-xs font-medium text-primary">
-        Existencia disponible
-      </p>
-      <p class="mt-1 text-lg font-semibold tabular-nums text-highlighted">
-        {{ availability }}
-      </p>
+    <div class="mt-4 grid gap-3 sm:grid-cols-2">
+      <div class="rounded-lg bg-primary/10 p-3">
+        <p class="text-xs font-medium text-primary">
+          Existencia disponible
+        </p>
+        <p class="mt-1 text-lg font-semibold tabular-nums text-highlighted">
+          {{ availability }}
+        </p>
+      </div>
+
+      <div class="rounded-lg bg-primary/10 p-3">
+        <p class="text-xs font-medium text-primary">
+          Precio de venta
+        </p>
+        <p class="mt-1 text-lg font-semibold tabular-nums text-highlighted">
+          {{ salePrice }}
+        </p>
+      </div>
     </div>
 
     <p v-if="status === 'pending'" class="mt-3 flex items-center gap-2 text-xs text-muted">
@@ -97,26 +113,6 @@ function formatCurrency(value?: number | string, currencyCode = 'MXN') {
         </dd>
       </div>
     </dl>
-
-    <div v-if="prices.length" class="mt-4 border-t border-default pt-4">
-      <h4 class="text-sm font-medium text-highlighted">
-        Listas de precios
-      </h4>
-      <ul class="mt-2 grid gap-2 sm:grid-cols-2">
-        <li
-          v-for="price in prices"
-          :key="`${price.currency}-${price.position}-${price.name}`"
-          class="flex items-center justify-between gap-3 rounded-lg border border-default px-3 py-2 text-sm"
-        >
-          <span class="truncate text-muted">
-            {{ price.name || `Lista ${price.position || '—'}` }}
-          </span>
-          <span class="shrink-0 font-medium tabular-nums text-highlighted">
-            {{ formatCurrency(price.value, price.currency) }}
-          </span>
-        </li>
-      </ul>
-    </div>
 
     <div v-if="product.warehouses?.length" class="mt-4 border-t border-default pt-4">
       <h4 class="text-sm font-medium text-highlighted">
