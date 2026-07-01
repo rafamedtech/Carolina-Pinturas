@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { OrderStatus, SalesOrderDetail } from '~/types/orders'
+import type { OrderStatus, Repartidor, SalesOrderDetail } from '~/types/orders'
 
 const props = defineProps<{
   orderId: string
@@ -10,6 +10,8 @@ const statusNote = shallowRef('')
 const savingStatus = shallowRef(false)
 const remisionDraft = shallowRef('')
 const savingRemision = shallowRef(false)
+const selectedRepartidor = shallowRef('')
+const savingRepartidor = shallowRef(false)
 const toast = useToast()
 const {
   data: order,
@@ -24,6 +26,13 @@ const { data: statuses } = await useFetch<OrderStatus[]>('/api/orders/statuses',
   key: 'order-statuses',
   default: () => []
 })
+const {
+  data: repartidores,
+  refresh: refreshRepartidores,
+  addToCatalog: addRepartidor
+} = useRepartidoresCatalog()
+
+await callOnce('repartidores-catalog', refreshRepartidores)
 
 watch(() => order.value?.status.key, (value) => {
   selectedStatus.value = value || ''
@@ -33,7 +42,12 @@ watch(() => order.value?.remision, (value) => {
   remisionDraft.value = value || ''
 }, { immediate: true })
 
+watch(() => order.value?.repartidor.id, (value) => {
+  selectedRepartidor.value = value || ''
+}, { immediate: true })
+
 const remisionUnchanged = computed(() => remisionDraft.value === (order.value?.remision || ''))
+const repartidorUnchanged = computed(() => selectedRepartidor.value === (order.value?.repartidor.id || ''))
 
 const currency = computed(() => new Intl.NumberFormat('es-MX', {
   style: 'currency',
@@ -50,6 +64,17 @@ function formatCurrency(value: number | undefined) {
 function formatDate(value: string | null | undefined) {
   if (!value) return '—'
   return value.split('-').reverse().join('/')
+}
+
+const repartidorOptions = computed(() => repartidores.value.map(repartidor => ({
+  label: repartidor.nombre,
+  description: repartidor.telefono || undefined,
+  value: repartidor.id
+})))
+
+function onRepartidorCreated(repartidor: Repartidor) {
+  addRepartidor(repartidor)
+  selectedRepartidor.value = repartidor.id
 }
 
 async function updateRemision() {
@@ -83,6 +108,40 @@ async function updateRemision() {
     await refresh()
   } finally {
     savingRemision.value = false
+  }
+}
+
+async function updateRepartidor() {
+  if (!order.value || repartidorUnchanged.value || !selectedRepartidor.value) return
+  savingRepartidor.value = true
+
+  try {
+    order.value = await $fetch<SalesOrderDetail>(
+      `/api/orders/${encodeURIComponent(props.orderId)}/repartidor`,
+      {
+        method: 'PATCH',
+        body: {
+          repartidorId: selectedRepartidor.value,
+          version: order.value.version
+        }
+      }
+    )
+    toast.add({
+      title: 'Repartidor actualizado',
+      color: 'success',
+      icon: 'i-lucide-circle-check'
+    })
+  } catch (fetchError: unknown) {
+    const response = fetchError as { data?: { statusMessage?: string }, message?: string }
+    toast.add({
+      title: 'No se pudo actualizar el repartidor',
+      description: response.data?.statusMessage || response.message || 'Intenta de nuevo.',
+      color: 'error',
+      icon: 'i-lucide-circle-alert'
+    })
+    await refresh()
+  } finally {
+    savingRepartidor.value = false
   }
 }
 
@@ -259,15 +318,28 @@ async function updateStatus() {
                   {{ order.vendedor.email }}
                 </dd>
               </div>
-              <div>
+              <div class="sm:col-span-2">
                 <dt class="text-sm text-muted">
                   Repartidor
                 </dt>
-                <dd class="mt-1 font-medium">
-                  {{ order.repartidor.name }}
-                </dd>
-                <dd class="text-sm text-muted">
-                  {{ order.repartidor.telefono || '—' }}
+                <dd class="mt-1 flex flex-wrap items-center gap-2">
+                  <USelectMenu
+                    v-model="selectedRepartidor"
+                    :items="repartidorOptions"
+                    value-key="value"
+                    :disabled="savingRepartidor"
+                    placeholder="Selecciona un repartidor"
+                    class="w-full max-w-xs"
+                  />
+                  <UButton
+                    label="Guardar"
+                    icon="i-lucide-save"
+                    size="sm"
+                    :loading="savingRepartidor"
+                    :disabled="savingRepartidor || repartidorUnchanged"
+                    @click="updateRepartidor"
+                  />
+                  <OrdersOrderRepartidorAddModal @created="onRepartidorCreated" />
                 </dd>
               </div>
             </dl>

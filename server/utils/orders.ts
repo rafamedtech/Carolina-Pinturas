@@ -2,7 +2,12 @@ import Decimal from 'decimal.js'
 import type { Prisma, SalesOrder } from '../../generated/prisma/client'
 import type { AppUser, SiigoCustomer, SiigoProduct } from '~/types/siigo'
 import type { SalesOrderDetail, SalesOrderListItem } from '~/types/orders'
-import type { CreateOrderInput, UpdateOrderRemisionInput, UpdateOrderStatusInput } from './order-validation'
+import type {
+  CreateOrderInput,
+  UpdateOrderRemisionInput,
+  UpdateOrderRepartidorInput,
+  UpdateOrderStatusInput
+} from './order-validation'
 import { usePrisma } from './prisma'
 import {
   siigoCustomerDisplayName,
@@ -450,6 +455,51 @@ export async function updateOrderRemision(
     where: { id, version: input.version },
     data: {
       remision: input.remision || null,
+      updatedByEmail: user.email,
+      version: { increment: 1 }
+    }
+  })
+  if (result.count !== 1) {
+    throw createError({
+      statusCode: 409,
+      statusMessage: 'El pedido cambió mientras se actualizaba. Intenta de nuevo.'
+    })
+  }
+
+  return getOrder(id)
+}
+
+export async function updateOrderRepartidor(
+  id: string,
+  input: UpdateOrderRepartidorInput,
+  user: AppUser
+) {
+  const prisma = usePrisma()
+
+  const [order, repartidor] = await Promise.all([
+    prisma.salesOrder.findUnique({ where: { id }, select: { version: true } }),
+    prisma.repartidor.findUnique({ where: { id: input.repartidorId } })
+  ])
+
+  if (!order) {
+    throw createError({ statusCode: 404, statusMessage: 'No se encontró el pedido.' })
+  }
+  if (!repartidor) {
+    throw createError({ statusCode: 422, statusMessage: 'El repartidor seleccionado no está disponible.' })
+  }
+  if (order.version !== input.version) {
+    throw createError({
+      statusCode: 409,
+      statusMessage: 'El pedido cambió desde que lo abriste. Actualiza la página e intenta de nuevo.'
+    })
+  }
+
+  const result = await prisma.salesOrder.updateMany({
+    where: { id, version: input.version },
+    data: {
+      repartidorId: repartidor.id,
+      repartidorNombreSnapshot: repartidor.nombre,
+      repartidorTelefonoSnapshot: repartidor.telefono,
       updatedByEmail: user.email,
       version: { increment: 1 }
     }

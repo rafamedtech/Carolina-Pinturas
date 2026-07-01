@@ -27,6 +27,12 @@ export const updateOrderRemisionSchema = z.object({
   version: z.number().int().positive()
 })
 
+export const updateOrderRepartidorSchema = z.object({
+  repartidorId: z.string().uuid('Selecciona un repartidor válido.'),
+  version: z.number().int().positive()
+})
+
 export type CreateOrderInput = z.output<typeof createOrderSchema>
 export type UpdateOrderStatusInput = z.output<typeof updateOrderStatusSchema>
 export type UpdateOrderRemisionInput = z.output<typeof updateOrderRemisionSchema>
+export type UpdateOrderRepartidorInput = z.output<typeof updateOrderRepartidorSchema>
