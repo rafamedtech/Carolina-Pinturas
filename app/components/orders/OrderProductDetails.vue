@@ -18,7 +18,6 @@ const prices = computed(() => product.value.prices?.flatMap(price =>
   }))
 ) || [])
 const details = computed(() => [
-  { label: 'Referencia', value: product.value.reference || '—' },
   {
     label: 'Unidad',
     value: product.value.unit?.name || product.value.unit?.code || '—'
@@ -26,28 +25,8 @@ const details = computed(() => [
   { label: 'Tipo', value: product.value.type || '—' },
   { label: 'Marca', value: product.value.additional_fields?.brand || '—' },
   {
-    label: 'Código de barras',
-    value: product.value.additional_fields?.barcode || '—'
-  },
-  {
     label: 'Grupo contable',
     value: product.value.account_group?.name || '—'
-  },
-  {
-    label: 'Control de inventario',
-    value: product.value.stock_control ? 'Controlado' : 'Sin control'
-  },
-  {
-    label: 'Impuestos incluidos',
-    value: product.value.tax_included ? 'Sí' : 'No'
-  },
-  {
-    label: 'Creado',
-    value: formatDate(product.value.metadata?.created)
-  },
-  {
-    label: 'Última actualización',
-    value: formatDate(product.value.metadata?.last_updated)
   }
 ])
 const availability = computed(() => {
@@ -65,12 +44,6 @@ function formatCurrency(value?: number | string, currencyCode = 'MXN') {
     style: 'currency',
     currency: currencyCode
   }).format(amount)
-}
-
-function formatDate(value?: string | null) {
-  if (!value) return '—'
-
-  return new Date(value).toLocaleDateString('es-MX')
 }
 </script>
 
@@ -158,24 +131,6 @@ function formatDate(value?: string | null) {
           <span class="text-muted">{{ warehouse.name || 'Almacén' }}</span>
           <span class="font-medium tabular-nums text-highlighted">
             {{ warehouse.quantity?.toLocaleString('es-MX') ?? '—' }}
-          </span>
-        </li>
-      </ul>
-    </div>
-
-    <div v-if="product.taxes?.length" class="mt-4 border-t border-default pt-4">
-      <h4 class="text-sm font-medium text-highlighted">
-        Impuestos
-      </h4>
-      <ul class="mt-2 space-y-2">
-        <li
-          v-for="tax in product.taxes"
-          :key="String(tax.id || tax.name)"
-          class="flex items-center justify-between gap-3 text-sm"
-        >
-          <span class="text-muted">{{ tax.name || tax.type || 'Impuesto' }}</span>
-          <span class="font-medium tabular-nums text-highlighted">
-            {{ tax.percentage ?? 0 }}%
           </span>
         </li>
       </ul>
