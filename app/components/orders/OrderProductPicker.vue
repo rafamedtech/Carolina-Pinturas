@@ -16,21 +16,26 @@ const quantity = shallowRef(1)
 
 const productOptions = computed(() => props.products.map(product => ({
   label: product.name,
-  description: product.code,
+  description: product.code ? `Código: ${product.code}` : 'Sin código',
+  code: product.code,
+  reference: product.reference,
+  barcode: product.additional_fields?.barcode,
   value: product.id
 })))
+const selectedProduct = computed(() =>
+  props.products.find(product => product.id === selectedProductId.value) ?? null
+)
 const canAdd = computed(() =>
-  Boolean(selectedProductId.value)
+  Boolean(selectedProduct.value)
   && Number.isFinite(quantity.value)
   && quantity.value > 0
   && !props.disabled
 )
 
 function addProduct() {
-  const product = props.products.find(item => item.id === selectedProductId.value)
-  if (!product || !canAdd.value) return
+  if (!selectedProduct.value || !canAdd.value) return
 
-  emit('add', product, quantity.value)
+  emit('add', selectedProduct.value, quantity.value)
   selectedProductId.value = ''
   quantity.value = 1
 }
@@ -50,9 +55,11 @@ function addProduct() {
           v-model="selectedProductId"
           :items="productOptions"
           value-key="value"
+          :filter-fields="['label', 'code', 'reference', 'barcode']"
+          :search-input="{ placeholder: 'Buscar por nombre o código' }"
           :loading="loading"
           :disabled="disabled"
-          placeholder="Buscar producto"
+          placeholder="Buscar por nombre o código"
           class="w-full"
         />
       </UFormField>
@@ -74,5 +81,12 @@ function addProduct() {
         @click="addProduct"
       />
     </div>
+
+    <OrdersOrderProductDetails
+      v-if="selectedProduct"
+      :key="selectedProduct.id"
+      :product="selectedProduct"
+      class="mt-5"
+    />
   </UCard>
 </template>
