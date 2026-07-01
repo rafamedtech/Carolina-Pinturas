@@ -166,14 +166,6 @@ async function submitOrder(event: FormSubmitEvent<Schema>) {
 
     <template #body>
       <UAlert
-        color="info"
-        variant="subtle"
-        title="Pedido interno"
-        description="Se guardará en PostgreSQL. No se enviará ni modificará información en Siigo."
-        icon="i-lucide-database"
-      />
-
-      <UAlert
         v-if="catalogError"
         color="warning"
         variant="subtle"
