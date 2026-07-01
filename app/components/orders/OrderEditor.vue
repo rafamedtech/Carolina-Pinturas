@@ -9,6 +9,7 @@ const schema = z.object({
   statusKey: z.string().min(1, 'Selecciona un estado.'),
   orderDate: z.string().min(1, 'Selecciona la fecha del pedido.'),
   promisedDate: z.string(),
+  remision: z.string().max(100),
   observations: z.string().max(5000)
 })
 
@@ -38,6 +39,7 @@ const state = reactive<Schema>({
   statusKey: 'ingresado',
   orderDate: localDate(),
   promisedDate: '',
+  remision: '',
   observations: ''
 })
 const saving = shallowRef(false)
@@ -116,6 +118,7 @@ async function submitOrder(event: FormSubmitEvent<Schema>) {
       body: {
         ...event.data,
         promisedDate: event.data.promisedDate || null,
+        remision: event.data.remision || null,
         observations: event.data.observations || null,
         lines: lines.value.map(line => ({
           productId: line.productId,
@@ -191,6 +194,7 @@ async function submitOrder(event: FormSubmitEvent<Schema>) {
             v-model:status-key="state.statusKey"
             v-model:order-date="state.orderDate"
             v-model:promised-date="state.promisedDate"
+            v-model:remision="state.remision"
             v-model:observations="state.observations"
             :customers="customers?.results || []"
             :statuses="statuses"

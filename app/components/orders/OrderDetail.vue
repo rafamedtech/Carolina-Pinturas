@@ -184,6 +184,36 @@ async function updateStatus() {
                   {{ formatDate(order.promisedDate) }}
                 </dd>
               </div>
+              <div>
+                <dt class="text-sm text-muted">
+                  Remisión física
+                </dt>
+                <dd class="mt-1 font-medium">
+                  {{ order.remision || '—' }}
+                </dd>
+              </div>
+              <div>
+                <dt class="text-sm text-muted">
+                  Vendedor
+                </dt>
+                <dd class="mt-1 font-medium">
+                  {{ order.vendedor.name }}
+                </dd>
+                <dd class="text-sm text-muted">
+                  {{ order.vendedor.email }}
+                </dd>
+              </div>
+              <div>
+                <dt class="text-sm text-muted">
+                  Repartidor
+                </dt>
+                <dd class="mt-1 font-medium">
+                  {{ order.repartidor.name }}
+                </dd>
+                <dd class="text-sm text-muted">
+                  {{ order.repartidor.email }}
+                </dd>
+              </div>
             </dl>
             <div v-if="order.observations" class="mt-4 border-t border-default pt-4">
               <p class="text-sm text-muted">

@@ -70,6 +70,7 @@ export interface SalesOrderStatusHistoryItem {
 
 export interface SalesOrderDetail extends SalesOrderListItem {
   observations: string | null
+  remision: string | null
   currencyCode: string
   subtotal: number
   discountTotal: number
@@ -77,6 +78,14 @@ export interface SalesOrderDetail extends SalesOrderListItem {
   siigoReference: string | null
   registeredInSiigoAt: string | null
   version: number
+  vendedor: {
+    name: string
+    email: string
+  }
+  repartidor: {
+    name: string
+    email: string
+  }
   createdBy: {
     name: string
     email: string

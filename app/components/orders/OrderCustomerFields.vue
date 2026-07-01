@@ -13,6 +13,7 @@ const customerId = defineModel<string>('customerId', { required: true })
 const statusKey = defineModel<string>('statusKey', { required: true })
 const orderDate = defineModel<string>('orderDate', { required: true })
 const promisedDate = defineModel<string>('promisedDate', { required: true })
+const remision = defineModel<string>('remision', { required: true })
 const observations = defineModel<string>('observations', { required: true })
 
 function customerName(customer: SiigoCustomer) {
@@ -80,6 +81,16 @@ const statusOptions = computed(() => props.statuses.map(status => ({
           v-model="promisedDate"
           type="date"
           :disabled="disabled"
+          class="w-full"
+        />
+      </UFormField>
+
+      <UFormField name="remision" label="Remisión física">
+        <UInput
+          v-model="remision"
+          :disabled="disabled"
+          maxlength="100"
+          placeholder="Número de remisión"
           class="w-full"
         />
       </UFormField>

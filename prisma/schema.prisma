@@ -189,6 +189,7 @@ model SalesOrder {
   orderDate            DateTime  @default(dbgenerated("CURRENT_DATE")) @map("order_date") @db.Date
   promisedDate         DateTime? @map("promised_date") @db.Date
   observations         String?
+  remision             String?
   currencyCode         String    @default("MXN") @map("currency_code") @db.VarChar(3)
   subtotal             Decimal   @default(0) @db.Decimal(20, 6)
   discountTotal        Decimal   @default(0) @map("discount_total") @db.Decimal(20, 6)
@@ -196,6 +197,10 @@ model SalesOrder {
   total                Decimal   @default(0) @db.Decimal(20, 6)
   siigoReference       String?   @map("siigo_reference")
   registeredInSiigoAt  DateTime? @map("registered_in_siigo_at") @db.Timestamptz(6)
+  vendedorNombre       String    @map("vendedor_nombre")
+  vendedorEmail        String    @map("vendedor_email")
+  repartidorNombre     String    @map("repartidor_nombre")
+  repartidorEmail      String    @map("repartidor_email")
   createdByName        String    @map("created_by_name")
   createdByEmail       String    @map("created_by_email")
   createdByRole        String    @map("created_by_role") @db.VarChar(32)
@@ -211,6 +216,8 @@ model SalesOrder {
 
   @@index([statusKey, orderDate])
   @@index([customerId, orderDate])
+  @@index([vendedorEmail])
+  @@index([repartidorEmail])
   @@index([createdAt])
   @@map("sales_orders")
 }

@@ -133,6 +133,7 @@ function detail(order: OrderDetailRecord): SalesOrderDetail {
   return {
     ...base,
     observations: order.observations,
+    remision: order.remision,
     currencyCode: order.currencyCode,
     subtotal: number(order.subtotal),
     discountTotal: number(order.discountTotal),
@@ -140,6 +141,14 @@ function detail(order: OrderDetailRecord): SalesOrderDetail {
     siigoReference: order.siigoReference,
     registeredInSiigoAt: order.registeredInSiigoAt?.toISOString() || null,
     version: order.version,
+    vendedor: {
+      name: order.vendedorNombre,
+      email: order.vendedorEmail
+    },
+    repartidor: {
+      name: order.repartidorNombre,
+      email: order.repartidorEmail
+    },
     createdBy: {
       name: order.createdByName,
       email: order.createdByEmail,
@@ -240,11 +249,16 @@ export async function createOrder(
           ? new Date(`${input.promisedDate}T00:00:00.000Z`)
           : null,
         observations: input.observations || null,
+        remision: input.remision || null,
         currencyCode: lines[0]?.currencyCode || 'MXN',
         subtotal: subtotal.toString(),
         discountTotal: discountTotal.toString(),
         taxTotal: taxTotal.toString(),
         total: total.toString(),
+        vendedorNombre: user.name,
+        vendedorEmail: user.email,
+        repartidorNombre: user.name,
+        repartidorEmail: user.email,
         createdByName: user.name,
         createdByEmail: user.email,
         createdByRole: user.role,
@@ -309,6 +323,16 @@ export async function listOrders(options: {
             customerRfcSnapshot: { contains: options.search, mode: 'insensitive' }
           }, {
             observations: { contains: options.search, mode: 'insensitive' }
+          }, {
+            remision: { contains: options.search, mode: 'insensitive' }
+          }, {
+            vendedorNombre: { contains: options.search, mode: 'insensitive' }
+          }, {
+            vendedorEmail: { contains: options.search, mode: 'insensitive' }
+          }, {
+            repartidorNombre: { contains: options.search, mode: 'insensitive' }
+          }, {
+            repartidorEmail: { contains: options.search, mode: 'insensitive' }
           }, ...(folio && Number.isSafeInteger(folio) ? [{ folio }] : [])]
         }
       : {})

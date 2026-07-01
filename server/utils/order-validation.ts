@@ -8,6 +8,7 @@ export const createOrderSchema = z.object({
   orderDate: dateSchema,
   promisedDate: dateSchema.nullable().optional(),
   observations: z.string().trim().max(5000).nullable().optional(),
+  remision: z.string().trim().max(100).nullable().optional(),
   lines: z.array(z.object({
     productId: z.string().uuid('Selecciona un producto válido.'),
     quantity: z.number().positive().max(1_000_000)
