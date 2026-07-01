@@ -4,6 +4,7 @@ const dateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Usa una fecha con fo
 
 export const createOrderSchema = z.object({
   customerId: z.string().uuid('Selecciona un cliente válido.'),
+  repartidorId: z.string().uuid('Selecciona un repartidor válido.'),
   statusKey: z.string().trim().min(1).max(32).default('ingresado'),
   orderDate: dateSchema,
   promisedDate: dateSchema.nullable().optional(),
@@ -21,5 +22,11 @@ export const updateOrderStatusSchema = z.object({
   version: z.number().int().positive()
 })
 
+export const updateOrderRemisionSchema = z.object({
+  remision: z.string().trim().max(100).nullable().optional(),
+  version: z.number().int().positive()
+})
+
 export type CreateOrderInput = z.output<typeof createOrderSchema>
 export type UpdateOrderStatusInput = z.output<typeof updateOrderStatusSchema>
+export type UpdateOrderRemisionInput = z.output<typeof updateOrderRemisionSchema>

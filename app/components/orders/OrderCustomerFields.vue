@@ -1,16 +1,22 @@
 <script setup lang="ts">
-import type { OrderStatus } from '~/types/orders'
+import type { OrderStatus, Repartidor } from '~/types/orders'
 import type { SiigoCustomer } from '~/types/siigo'
 
 const props = defineProps<{
   customers: SiigoCustomer[]
   statuses: OrderStatus[]
+  repartidores: Repartidor[]
   loading: boolean
   disabled: boolean
 }>()
 
+const emit = defineEmits<{
+  repartidorCreated: [repartidor: Repartidor]
+}>()
+
 const customerId = defineModel<string>('customerId', { required: true })
 const statusKey = defineModel<string>('statusKey', { required: true })
+const repartidorId = defineModel<string>('repartidorId', { required: true })
 const orderDate = defineModel<string>('orderDate', { required: true })
 const promisedDate = defineModel<string>('promisedDate', { required: true })
 const remision = defineModel<string>('remision', { required: true })
@@ -29,6 +35,16 @@ const statusOptions = computed(() => props.statuses.map(status => ({
   label: status.label,
   value: status.key
 })))
+const repartidorOptions = computed(() => props.repartidores.map(repartidor => ({
+  label: repartidor.nombre,
+  description: repartidor.telefono || undefined,
+  value: repartidor.id
+})))
+
+function onRepartidorCreated(repartidor: Repartidor) {
+  emit('repartidorCreated', repartidor)
+  repartidorId.value = repartidor.id
+}
 </script>
 
 <template>
@@ -65,6 +81,26 @@ const statusOptions = computed(() => props.statuses.map(status => ({
           :disabled="disabled"
           class="w-full"
         />
+      </UFormField>
+
+      <UFormField
+        name="repartidorId"
+        label="Repartidor"
+        required
+        class="sm:col-span-2"
+      >
+        <div class="flex items-center gap-2">
+          <USelectMenu
+            v-model="repartidorId"
+            :items="repartidorOptions"
+            value-key="value"
+            :loading="loading"
+            :disabled="disabled"
+            placeholder="Selecciona un repartidor"
+            class="w-full"
+          />
+          <OrdersOrderRepartidorAddModal @created="onRepartidorCreated" />
+        </div>
       </UFormField>
 
       <UFormField name="orderDate" label="Fecha del pedido" required>

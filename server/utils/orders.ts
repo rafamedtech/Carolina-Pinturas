@@ -2,7 +2,7 @@ import Decimal from 'decimal.js'
 import type { Prisma, SalesOrder } from '../../generated/prisma/client'
 import type { AppUser, SiigoCustomer, SiigoProduct } from '~/types/siigo'
 import type { SalesOrderDetail, SalesOrderListItem } from '~/types/orders'
-import type { CreateOrderInput, UpdateOrderStatusInput } from './order-validation'
+import type { CreateOrderInput, UpdateOrderRemisionInput, UpdateOrderStatusInput } from './order-validation'
 import { usePrisma } from './prisma'
 import {
   siigoCustomerDisplayName,
@@ -40,7 +40,7 @@ function dateOnly(value: Date | null) {
   return value ? value.toISOString().slice(0, 10) : null
 }
 
-function orderNumber(folio: number) {
+export function orderNumber(folio: number) {
   return `PED-${String(folio).padStart(6, '0')}`
 }
 
@@ -146,8 +146,9 @@ function detail(order: OrderDetailRecord): SalesOrderDetail {
       email: order.vendedorEmail
     },
     repartidor: {
-      name: order.repartidorNombre,
-      email: order.repartidorEmail
+      id: order.repartidorId,
+      name: order.repartidorNombreSnapshot,
+      telefono: order.repartidorTelefonoSnapshot
     },
     createdBy: {
       name: order.createdByName,
@@ -198,7 +199,8 @@ export async function createOrder(
   input: CreateOrderInput,
   user: AppUser,
   customer: SiigoCustomer,
-  products: Map<string, SiigoProduct>
+  products: Map<string, SiigoProduct>,
+  repartidor: { id: string, nombre: string, telefono: string | null }
 ) {
   const prisma = usePrisma()
   const lines = input.lines.map((line, index) => {
@@ -257,8 +259,9 @@ export async function createOrder(
         total: total.toString(),
         vendedorNombre: user.name,
         vendedorEmail: user.email,
-        repartidorNombre: user.name,
-        repartidorEmail: user.email,
+        repartidorId: repartidor.id,
+        repartidorNombreSnapshot: repartidor.nombre,
+        repartidorTelefonoSnapshot: repartidor.telefono,
         createdByName: user.name,
         createdByEmail: user.email,
         createdByRole: user.role,
@@ -330,9 +333,7 @@ export async function listOrders(options: {
           }, {
             vendedorEmail: { contains: options.search, mode: 'insensitive' }
           }, {
-            repartidorNombre: { contains: options.search, mode: 'insensitive' }
-          }, {
-            repartidorEmail: { contains: options.search, mode: 'insensitive' }
+            repartidorNombreSnapshot: { contains: options.search, mode: 'insensitive' }
           }, ...(folio && Number.isSafeInteger(folio) ? [{ folio }] : [])]
         }
       : {})
@@ -419,6 +420,46 @@ export async function updateOrderStatus(
       }
     })
   })
+
+  return getOrder(id)
+}
+
+export async function updateOrderRemision(
+  id: string,
+  input: UpdateOrderRemisionInput,
+  user: AppUser
+) {
+  const prisma = usePrisma()
+
+  const order = await prisma.salesOrder.findUnique({
+    where: { id },
+    select: { version: true }
+  })
+
+  if (!order) {
+    throw createError({ statusCode: 404, statusMessage: 'No se encontró el pedido.' })
+  }
+  if (order.version !== input.version) {
+    throw createError({
+      statusCode: 409,
+      statusMessage: 'El pedido cambió desde que lo abriste. Actualiza la página e intenta de nuevo.'
+    })
+  }
+
+  const result = await prisma.salesOrder.updateMany({
+    where: { id, version: input.version },
+    data: {
+      remision: input.remision || null,
+      updatedByEmail: user.email,
+      version: { increment: 1 }
+    }
+  })
+  if (result.count !== 1) {
+    throw createError({
+      statusCode: 409,
+      statusMessage: 'El pedido cambió mientras se actualizaba. Intenta de nuevo.'
+    })
+  }
 
   return getOrder(id)
 }

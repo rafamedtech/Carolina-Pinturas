@@ -24,6 +24,20 @@ model OrderStatus {
   @@map("order_statuses")
 }
 
+model Repartidor {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  nombre    String
+  telefono  String?
+  activo    Boolean  @default(true)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  orders SalesOrder[]
+
+  @@index([nombre])
+  @@map("repartidores")
+}
+
 model SiigoProduct {
   id                String    @id @db.Uuid
   code              String    @db.VarChar(100)
@@ -199,8 +213,9 @@ model SalesOrder {
   registeredInSiigoAt  DateTime? @map("registered_in_siigo_at") @db.Timestamptz(6)
   vendedorNombre       String    @map("vendedor_nombre")
   vendedorEmail        String    @map("vendedor_email")
-  repartidorNombre     String    @map("repartidor_nombre")
-  repartidorEmail      String    @map("repartidor_email")
+  repartidorId               String  @map("repartidor_id") @db.Uuid
+  repartidorNombreSnapshot   String  @map("repartidor_nombre_snapshot")
+  repartidorTelefonoSnapshot String? @map("repartidor_telefono_snapshot")
   createdByName        String    @map("created_by_name")
   createdByEmail       String    @map("created_by_email")
   createdByRole        String    @map("created_by_role") @db.VarChar(32)
@@ -211,13 +226,14 @@ model SalesOrder {
 
   status        OrderStatus               @relation(fields: [statusKey], references: [key], onDelete: Restrict)
   customer      SiigoCustomer             @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  repartidor    Repartidor                @relation(fields: [repartidorId], references: [id], onDelete: Restrict)
   items         SalesOrderItem[]
   statusHistory SalesOrderStatusHistory[]
 
   @@index([statusKey, orderDate])
   @@index([customerId, orderDate])
   @@index([vendedorEmail])
-  @@index([repartidorEmail])
+  @@index([repartidorId])
   @@index([createdAt])
   @@map("sales_orders")
 }

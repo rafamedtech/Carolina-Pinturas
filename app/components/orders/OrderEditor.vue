@@ -7,6 +7,7 @@ import type { SiigoProduct } from '~/types/siigo'
 const schema = z.object({
   customerId: z.string().uuid('Selecciona un cliente.'),
   statusKey: z.string().min(1, 'Selecciona un estado.'),
+  repartidorId: z.string().uuid('Selecciona un repartidor.'),
   orderDate: z.string().min(1, 'Selecciona la fecha del pedido.'),
   promisedDate: z.string(),
   remision: z.string().max(100),
@@ -37,6 +38,7 @@ function productPrice(product: SiigoProduct) {
 const state = reactive<Schema>({
   customerId: '',
   statusKey: 'ingresado',
+  repartidorId: '',
   orderDate: localDate(),
   promisedDate: '',
   remision: '',
@@ -67,28 +69,39 @@ const {
   immediate: false,
   default: () => []
 })
+const {
+  data: repartidores,
+  status: repartidorStatus,
+  error: repartidorError,
+  refresh: refreshRepartidores,
+  addToCatalog: addRepartidor
+} = useRepartidoresCatalog()
 
 await Promise.all([
   callOnce('customers-catalog', refreshCustomers),
   callOnce('products-catalog', refreshProducts),
-  callOnce('order-statuses', refreshStatuses)
+  callOnce('order-statuses', refreshStatuses),
+  callOnce('repartidores-catalog', refreshRepartidores)
 ])
 
 const catalogError = computed(() =>
   customerError.value?.data?.statusMessage
   || productError.value?.data?.statusMessage
   || statusError.value?.data?.statusMessage
+  || repartidorError.value?.data?.statusMessage
   || ''
 )
 const catalogsLoading = computed(() =>
   customerStatus.value === 'pending'
   || productStatus.value === 'pending'
   || statusStatus.value === 'pending'
+  || repartidorStatus.value === 'pending'
 )
 const formDisabled = computed(() => saving.value || Boolean(catalogError.value))
 const canSubmit = computed(() =>
   Boolean(state.customerId)
   && Boolean(state.statusKey)
+  && Boolean(state.repartidorId)
   && Boolean(state.orderDate)
   && lines.value.length > 0
   && !catalogsLoading.value
@@ -184,14 +197,17 @@ async function submitOrder(event: FormSubmitEvent<Schema>) {
           <OrdersOrderCustomerFields
             v-model:customer-id="state.customerId"
             v-model:status-key="state.statusKey"
+            v-model:repartidor-id="state.repartidorId"
             v-model:order-date="state.orderDate"
             v-model:promised-date="state.promisedDate"
             v-model:remision="state.remision"
             v-model:observations="state.observations"
             :customers="customers?.results || []"
             :statuses="statuses"
+            :repartidores="repartidores"
             :loading="catalogsLoading"
             :disabled="formDisabled"
+            @repartidor-created="addRepartidor"
           />
 
           <OrdersOrderProductPicker

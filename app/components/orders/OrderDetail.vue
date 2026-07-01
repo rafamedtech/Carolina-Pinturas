@@ -8,6 +8,8 @@ const props = defineProps<{
 const selectedStatus = shallowRef('')
 const statusNote = shallowRef('')
 const savingStatus = shallowRef(false)
+const remisionDraft = shallowRef('')
+const savingRemision = shallowRef(false)
 const toast = useToast()
 const {
   data: order,
@@ -27,6 +29,12 @@ watch(() => order.value?.status.key, (value) => {
   selectedStatus.value = value || ''
 }, { immediate: true })
 
+watch(() => order.value?.remision, (value) => {
+  remisionDraft.value = value || ''
+}, { immediate: true })
+
+const remisionUnchanged = computed(() => remisionDraft.value === (order.value?.remision || ''))
+
 const currency = computed(() => new Intl.NumberFormat('es-MX', {
   style: 'currency',
   currency: order.value?.currencyCode || 'MXN'
@@ -42,6 +50,40 @@ function formatCurrency(value: number | undefined) {
 function formatDate(value: string | null | undefined) {
   if (!value) return '—'
   return value.split('-').reverse().join('/')
+}
+
+async function updateRemision() {
+  if (!order.value || remisionUnchanged.value) return
+  savingRemision.value = true
+
+  try {
+    order.value = await $fetch<SalesOrderDetail>(
+      `/api/orders/${encodeURIComponent(props.orderId)}/remision`,
+      {
+        method: 'PATCH',
+        body: {
+          remision: remisionDraft.value || null,
+          version: order.value.version
+        }
+      }
+    )
+    toast.add({
+      title: 'Remisión actualizada',
+      color: 'success',
+      icon: 'i-lucide-circle-check'
+    })
+  } catch (fetchError: unknown) {
+    const response = fetchError as { data?: { statusMessage?: string }, message?: string }
+    toast.add({
+      title: 'No se pudo actualizar la remisión',
+      description: response.data?.statusMessage || response.message || 'Intenta de nuevo.',
+      color: 'error',
+      icon: 'i-lucide-circle-alert'
+    })
+    await refresh()
+  } finally {
+    savingRemision.value = false
+  }
 }
 
 async function updateStatus() {
@@ -184,12 +226,26 @@ async function updateStatus() {
                   {{ formatDate(order.promisedDate) }}
                 </dd>
               </div>
-              <div>
+              <div class="sm:col-span-2">
                 <dt class="text-sm text-muted">
                   Remisión física
                 </dt>
-                <dd class="mt-1 font-medium">
-                  {{ order.remision || '—' }}
+                <dd class="mt-1 flex items-center gap-2">
+                  <UInput
+                    v-model="remisionDraft"
+                    :disabled="savingRemision"
+                    maxlength="100"
+                    placeholder="Número de remisión"
+                    class="w-full max-w-xs"
+                  />
+                  <UButton
+                    label="Guardar"
+                    icon="i-lucide-save"
+                    size="sm"
+                    :loading="savingRemision"
+                    :disabled="savingRemision || remisionUnchanged"
+                    @click="updateRemision"
+                  />
                 </dd>
               </div>
               <div>
@@ -211,7 +267,7 @@ async function updateStatus() {
                   {{ order.repartidor.name }}
                 </dd>
                 <dd class="text-sm text-muted">
-                  {{ order.repartidor.email }}
+                  {{ order.repartidor.telefono || '—' }}
                 </dd>
               </div>
             </dl>

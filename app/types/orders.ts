@@ -1,3 +1,28 @@
+export interface Repartidor {
+  id: string
+  nombre: string
+  telefono: string | null
+  activo: boolean
+  deliveredCount: number
+}
+
+export interface RepartidorDelivery {
+  id: string
+  folio: number
+  number: string
+  customerName: string
+  orderDate: string
+  total: number
+}
+
+export interface RepartidorDetail {
+  id: string
+  nombre: string
+  telefono: string | null
+  activo: boolean
+  deliveredOrders: RepartidorDelivery[]
+}
+
 export interface OrderStatus {
   key: string
   label: string
@@ -83,8 +108,9 @@ export interface SalesOrderDetail extends SalesOrderListItem {
     email: string
   }
   repartidor: {
+    id: string
     name: string
-    email: string
+    telefono: string | null
   }
   createdBy: {
     name: string
