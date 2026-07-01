@@ -140,7 +140,7 @@ export async function upsertSiigoProduct(tx: TransactionClient, product: SiigoPr
     }]
   })
   const components = (product.components || []).map(component => ({
-    siigoComponentId: component.id || null,
+    siigoComponentId: component.id == null ? null : String(component.id),
     name: component.name || null,
     quantity: component.quantity == null ? null : String(component.quantity),
     rawPayload: jsonValue(component)

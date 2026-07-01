@@ -45,7 +45,7 @@ export interface SiigoProduct {
     quantity?: number
   }>
   components?: Array<{
-    id?: string
+    id?: string | number
     name?: string
     quantity?: number
   }>
