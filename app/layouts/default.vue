@@ -32,6 +32,13 @@ const links = [[{
     open.value = false
   }
 }, {
+  label: 'Igualaciones',
+  icon: 'i-lucide-palette',
+  to: '/igualaciones',
+  onSelect: () => {
+    open.value = false
+  }
+}, {
   label: 'Repartidores',
   icon: 'i-lucide-truck',
   to: '/repartidores',

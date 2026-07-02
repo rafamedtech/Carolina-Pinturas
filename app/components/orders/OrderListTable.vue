@@ -3,10 +3,13 @@ import { h, resolveComponent } from 'vue'
 import type { TableColumn } from '@nuxt/ui'
 import type { SalesOrderListItem } from '~/types/orders'
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   orders: readonly SalesOrderListItem[]
   loading: boolean
-}>()
+  igualacion?: boolean
+}>(), {
+  igualacion: false
+})
 
 const OrderStatusBadge = resolveComponent('OrdersOrderStatusBadge')
 const NuxtLink = resolveComponent('NuxtLink')
@@ -18,7 +21,42 @@ function formatDate(value: string | null) {
   return value.split('-').reverse().join('/')
 }
 
-const columns: TableColumn<SalesOrderListItem>[] = [{
+const igualacionColumn: TableColumn<SalesOrderListItem> = {
+  id: 'igualaciones',
+  header: 'Igualaciones',
+  cell: ({ row }) => {
+    const items = row.original.igualacionItems ?? []
+    if (!items.length) return h('span', { class: 'text-muted' }, '—')
+    return h(
+      'div',
+      { class: 'flex flex-col gap-0.5' },
+      items.map(item => h('span', { class: 'text-sm' }, [
+        `${item.quantity} x ${item.code}`,
+        item.observations
+          ? h('span', { class: 'text-muted' }, ` (${item.observations})`)
+          : null
+      ]))
+    )
+  }
+}
+
+const itemsColumn: TableColumn<SalesOrderListItem> = {
+  id: 'items',
+  header: () => h('div', { class: 'text-right' }, 'Partidas'),
+  cell: ({ row }) => h('div', { class: 'text-right' }, String(row.original.itemCount))
+}
+
+const totalColumn: TableColumn<SalesOrderListItem> = {
+  accessorKey: 'total',
+  header: () => h('div', { class: 'text-right' }, 'Total'),
+  cell: ({ row }) => h(
+    'div',
+    { class: 'text-right font-medium' },
+    currency.format(row.original.total)
+  )
+}
+
+const columns = computed<TableColumn<SalesOrderListItem>[]>(() => [{
   accessorKey: 'number',
   header: 'Pedido',
   cell: ({ row }) => h(
@@ -38,23 +76,11 @@ const columns: TableColumn<SalesOrderListItem>[] = [{
   id: 'customer',
   header: 'Cliente',
   cell: ({ row }) => row.original.customer.name
-}, {
-  id: 'items',
-  header: () => h('div', { class: 'text-right' }, 'Partidas'),
-  cell: ({ row }) => h('div', { class: 'text-right' }, String(row.original.itemCount))
-}, {
+}, props.igualacion ? igualacionColumn : itemsColumn, {
   id: 'status',
   header: 'Estado',
   cell: ({ row }) => h(OrderStatusBadge, { status: row.original.status })
-}, {
-  accessorKey: 'total',
-  header: () => h('div', { class: 'text-right' }, 'Total'),
-  cell: ({ row }) => h(
-    'div',
-    { class: 'text-right font-medium' },
-    currency.format(row.original.total)
-  )
-}]
+}, ...(props.igualacion ? [] : [totalColumn])])
 </script>
 
 <template>

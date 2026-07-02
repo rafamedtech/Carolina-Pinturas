@@ -10,9 +10,11 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   remove: [productId: string]
+  observations: [productId: string, value: string]
 }>()
 
 const UButton = resolveComponent('UButton')
+const UInput = resolveComponent('UInput')
 const currency = new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' })
 const tableLines = computed(() => [...props.lines])
 const columns: TableColumn<DraftOrderLine>[] = [{
@@ -21,6 +23,17 @@ const columns: TableColumn<DraftOrderLine>[] = [{
 }, {
   accessorKey: 'name',
   header: 'Producto'
+}, {
+  accessorKey: 'observations',
+  header: 'Observaciones',
+  cell: ({ row }) => h(UInput, {
+    'modelValue': row.original.observations,
+    'placeholder': 'Observaciones…',
+    'size': 'sm',
+    'variant': 'subtle',
+    'aria-label': `Observaciones de ${row.original.name}`,
+    'onUpdate:modelValue': (value: string) => emit('observations', row.original.productId, value)
+  })
 }, {
   accessorKey: 'quantity',
   header: () => h('div', { class: 'text-right' }, 'Cantidad'),

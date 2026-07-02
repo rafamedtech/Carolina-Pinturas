@@ -8,6 +8,7 @@ export interface DraftOrderLine {
   unitPrice: number
   taxIncluded: boolean
   taxPercentage: number
+  observations: string
 }
 
 interface AddOrderProductInput {
@@ -54,12 +55,19 @@ export function useOrderDraft() {
       quantity,
       unitPrice: product.unitPrice,
       taxIncluded: product.taxIncluded,
-      taxPercentage: product.taxPercentage
+      taxPercentage: product.taxPercentage,
+      observations: ''
     }]
   }
 
   function removeProduct(productId: string) {
     internalLines.value = internalLines.value.filter(line => line.productId !== productId)
+  }
+
+  function setObservations(productId: string, observations: string) {
+    internalLines.value = internalLines.value.map(line =>
+      line.productId === productId ? { ...line, observations } : line
+    )
   }
 
   function reset() {
@@ -71,6 +79,7 @@ export function useOrderDraft() {
     total,
     addProduct,
     removeProduct,
+    setObservations,
     reset
   }
 }

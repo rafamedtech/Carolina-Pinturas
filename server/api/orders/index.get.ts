@@ -15,6 +15,7 @@ export default eventHandler(async (event) => {
     page: positiveInteger(query.page, 1, 100_000),
     pageSize: positiveInteger(query.page_size, 25, 100),
     search: typeof query.search === 'string' ? query.search.trim().slice(0, 200) : undefined,
-    statusKey: typeof query.status === 'string' ? query.status.trim().slice(0, 32) : undefined
+    statusKey: typeof query.status === 'string' ? query.status.trim().slice(0, 32) : undefined,
+    igualacion: query.igualacion === 'true' || query.igualacion === '1'
   })
 })

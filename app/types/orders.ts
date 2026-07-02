@@ -45,6 +45,7 @@ export interface SalesOrderListItem {
   promisedDate: string | null
   total: number
   itemCount: number
+  igualacionItems?: { code: string, name: string, quantity: number, observations: string | null }[]
   createdAt: string
   updatedAt: string
 }
@@ -78,6 +79,7 @@ export interface SalesOrderItem {
   subtotal: number
   taxAmount: number
   total: number
+  observations: string | null
 }
 
 export interface SalesOrderStatusHistoryItem {

@@ -49,7 +49,7 @@ const summaryOpen = shallowRef(false)
 const pendingSubmission = shallowRef<Schema | null>(null)
 const toast = useToast()
 const currency = new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' })
-const { lines, total, addProduct, removeProduct } = useOrderDraft()
+const { lines, total, addProduct, removeProduct, setObservations } = useOrderDraft()
 const {
   data: customers,
   status: customerStatus,
@@ -165,7 +165,8 @@ async function confirmSubmit() {
         observations: data.observations || null,
         lines: lines.value.map(line => ({
           productId: line.productId,
-          quantity: line.quantity
+          quantity: line.quantity,
+          observations: line.observations || null
         }))
       }
     })
@@ -251,6 +252,7 @@ async function confirmSubmit() {
           :lines="lines"
           :total="total"
           @remove="removeProduct"
+          @observations="setObservations"
         />
 
         <OrdersOrderFormActions

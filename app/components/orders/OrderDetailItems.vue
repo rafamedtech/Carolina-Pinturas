@@ -20,6 +20,12 @@ const columns: TableColumn<SalesOrderItem>[] = [{
   accessorKey: 'name',
   header: 'Producto'
 }, {
+  accessorKey: 'observations',
+  header: 'Observaciones',
+  cell: ({ row }) => row.original.observations
+    ? h('span', { class: 'text-sm' }, row.original.observations)
+    : h('span', { class: 'text-muted' }, '—')
+}, {
   accessorKey: 'quantity',
   header: () => h('div', { class: 'text-right' }, 'Cantidad'),
   cell: ({ row }) => h('div', { class: 'text-right' }, String(row.original.quantity))

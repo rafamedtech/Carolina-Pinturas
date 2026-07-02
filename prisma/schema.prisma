@@ -258,6 +258,7 @@ model SalesOrderItem {
   subtotal                   Decimal  @db.Decimal(20, 6)
   taxAmount                  Decimal  @default(0) @map("tax_amount") @db.Decimal(20, 6)
   total                      Decimal  @db.Decimal(20, 6)
+  observations               String?  @map("observations")
   createdAt                  DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
 
   order   SalesOrder   @relation(fields: [orderId], references: [id], onDelete: Cascade)

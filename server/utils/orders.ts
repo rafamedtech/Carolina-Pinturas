@@ -63,7 +63,12 @@ function productPrice(product: SiigoProduct) {
   }
 }
 
-function buildLine(product: SiigoProduct, quantityValue: number, position: number) {
+function buildLine(
+  product: SiigoProduct,
+  quantityValue: number,
+  position: number,
+  observations?: string | null
+) {
   const quantity = money(quantityValue)
   const selectedPrice = productPrice(product)
   const percentage = money((product.taxes || []).reduce((sum, tax) =>
@@ -99,13 +104,17 @@ function buildLine(product: SiigoProduct, quantityValue: number, position: numbe
     subtotal: subtotal.toString(),
     taxAmount: taxAmount.toString(),
     total: total.toString(),
+    observations: observations || null,
     currencyCode: selectedPrice.currencyCode
   }
 }
 
+const IGUALACION_MATCH = 'igualacion de color'
+
 function listItem(order: SalesOrder & {
   status: { key: string, label: string, color: string, sortOrder: number, isTerminal: boolean }
   _count: { items: number }
+  items?: { productCodeSnapshot: string, productNameSnapshot: string, quantity: Prisma.Decimal, observations: string | null }[]
 }): SalesOrderListItem {
   return {
     id: order.id,
@@ -127,6 +136,20 @@ function listItem(order: SalesOrder & {
     promisedDate: dateOnly(order.promisedDate),
     total: number(order.total),
     itemCount: order._count.items,
+    ...(order.items
+      ? {
+          igualacionItems: order.items
+            .filter(item =>
+              item.productCodeSnapshot.toLowerCase().includes(IGUALACION_MATCH)
+              || item.productNameSnapshot.toLowerCase().includes(IGUALACION_MATCH))
+            .map(item => ({
+              code: item.productCodeSnapshot,
+              name: item.productNameSnapshot,
+              quantity: number(item.quantity),
+              observations: item.observations
+            }))
+        }
+      : {}),
     createdAt: order.createdAt.toISOString(),
     updatedAt: order.updatedAt.toISOString()
   }
@@ -178,7 +201,8 @@ function detail(order: OrderDetailRecord): SalesOrderDetail {
       discountAmount: number(item.discountAmount),
       subtotal: number(item.subtotal),
       taxAmount: number(item.taxAmount),
-      total: number(item.total)
+      total: number(item.total),
+      observations: item.observations
     })),
     statusHistory: order.statusHistory.map(history => ({
       id: history.id.toString(),
@@ -216,7 +240,7 @@ export async function createOrder(
         statusMessage: `El producto ${line.productId} ya no está disponible en Siigo.`
       })
     }
-    return buildLine(product, line.quantity, index + 1)
+    return buildLine(product, line.quantity, index + 1, line.observations)
   })
   const currencyCodes = new Set(lines.map(line => line.currencyCode))
   if (currencyCodes.size > 1) {
@@ -317,12 +341,25 @@ export async function listOrders(options: {
   pageSize: number
   search?: string
   statusKey?: string
+  igualacion?: boolean
 }) {
   const prisma = usePrisma()
   const folioMatch = options.search?.toUpperCase().match(/^(?:PED-?)?0*(\d+)$/)
   const folio = folioMatch?.[1] ? Number(folioMatch[1]) : null
   const where: Prisma.SalesOrderWhereInput = {
     ...(options.statusKey ? { statusKey: options.statusKey } : {}),
+    ...(options.igualacion
+      ? {
+          items: {
+            some: {
+              OR: [
+                { productCodeSnapshot: { contains: IGUALACION_MATCH, mode: 'insensitive' } },
+                { productNameSnapshot: { contains: IGUALACION_MATCH, mode: 'insensitive' } }
+              ]
+            }
+          }
+        }
+      : {}),
     ...(options.search
       ? {
           OR: [{
@@ -348,7 +385,15 @@ export async function listOrders(options: {
       where,
       include: {
         status: true,
-        _count: { select: { items: true } }
+        _count: { select: { items: true } },
+        ...(options.igualacion
+          ? {
+              items: {
+                select: { productCodeSnapshot: true, productNameSnapshot: true, quantity: true, observations: true },
+                orderBy: { position: 'asc' as const }
+              }
+            }
+          : {})
       },
       orderBy: [{ orderDate: 'desc' }, { folio: 'desc' }],
       skip: (options.page - 1) * options.pageSize,

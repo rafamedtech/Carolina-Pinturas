@@ -12,7 +12,8 @@ export const createOrderSchema = z.object({
   remision: z.string().trim().max(100).nullable().optional(),
   lines: z.array(z.object({
     productId: z.string().uuid('Selecciona un producto válido.'),
-    quantity: z.number().positive().max(1_000_000)
+    quantity: z.number().positive().max(1_000_000),
+    observations: z.string().trim().max(5000).nullable().optional()
   })).min(1, 'Agrega al menos un producto.').max(100)
 })
 

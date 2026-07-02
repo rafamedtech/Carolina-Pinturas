@@ -1,6 +1,14 @@
 <script setup lang="ts">
 import type { OrderStatus, SalesOrderListResponse } from '~/types/orders'
 
+const props = withDefaults(defineProps<{
+  title?: string
+  igualacion?: boolean
+}>(), {
+  title: 'Pedidos',
+  igualacion: false
+})
+
 const filter = shallowRef('')
 const statusKey = shallowRef('all')
 const page = shallowRef(1)
@@ -22,7 +30,8 @@ const {
     page,
     page_size: pageSize,
     search: debouncedFilter,
-    status: computed(() => statusKey.value === 'all' ? undefined : statusKey.value)
+    status: computed(() => statusKey.value === 'all' ? undefined : statusKey.value),
+    igualacion: props.igualacion ? 'true' : undefined
   },
   default: () => ({
     results: [],
@@ -45,9 +54,9 @@ const errorMessage = computed(() =>
 </script>
 
 <template>
-  <UDashboardPanel id="sales-orders">
+  <UDashboardPanel :id="igualacion ? 'igualaciones' : 'sales-orders'">
     <template #header>
-      <UDashboardNavbar title="Pedidos">
+      <UDashboardNavbar :title="title">
         <template #leading>
           <UDashboardSidebarCollapse />
         </template>
@@ -76,6 +85,7 @@ const errorMessage = computed(() =>
         v-else
         :orders="orders.results"
         :loading="status === 'pending'"
+        :igualacion="igualacion"
       />
 
       <OrdersOrderListPagination
