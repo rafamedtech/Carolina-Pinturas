@@ -207,7 +207,6 @@ async function submitOrder(event: FormSubmitEvent<Schema>) {
             :repartidores="repartidores"
             :loading="catalogsLoading"
             :disabled="formDisabled"
-            @repartidor-created="addRepartidor"
           />
 
           <OrdersOrderProductPicker

@@ -14,6 +14,8 @@ const prices = computed(() => product.value?.prices?.flatMap(price =>
 ) || [])
 const message = computed(() => error.value?.data?.statusMessage || 'No fue posible cargar el producto.')
 
+useSeoMeta({ title: () => productName.value })
+
 function formatCurrency(value?: number | string, currencyCode = 'MXN') {
   const amount = typeof value === 'string' ? Number(value) : value
   if (amount === undefined || !Number.isFinite(amount)) return '—'

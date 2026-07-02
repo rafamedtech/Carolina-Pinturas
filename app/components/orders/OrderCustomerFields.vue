@@ -10,10 +10,6 @@ const props = defineProps<{
   disabled: boolean
 }>()
 
-const emit = defineEmits<{
-  repartidorCreated: [repartidor: Repartidor]
-}>()
-
 const customerId = defineModel<string>('customerId', { required: true })
 const statusKey = defineModel<string>('statusKey', { required: true })
 const repartidorId = defineModel<string>('repartidorId', { required: true })
@@ -41,10 +37,6 @@ const repartidorOptions = computed(() => props.repartidores.map(repartidor => ({
   value: repartidor.id
 })))
 
-function onRepartidorCreated(repartidor: Repartidor) {
-  emit('repartidorCreated', repartidor)
-  repartidorId.value = repartidor.id
-}
 </script>
 
 <template>
@@ -83,24 +75,31 @@ function onRepartidorCreated(repartidor: Repartidor) {
         />
       </UFormField>
 
+      <UFormField name="remision" label="Remisión física">
+        <UInput
+          v-model="remision"
+          :disabled="disabled"
+          maxlength="100"
+          placeholder="Número de remisión"
+          class="w-full"
+        />
+      </UFormField>
+
       <UFormField
         name="repartidorId"
         label="Repartidor"
         required
         class="sm:col-span-2"
       >
-        <div class="flex items-center gap-2">
-          <USelectMenu
-            v-model="repartidorId"
-            :items="repartidorOptions"
-            value-key="value"
-            :loading="loading"
-            :disabled="disabled"
-            placeholder="Selecciona un repartidor"
-            class="w-full"
-          />
-          <OrdersOrderRepartidorAddModal @created="onRepartidorCreated" />
-        </div>
+        <USelectMenu
+          v-model="repartidorId"
+          :items="repartidorOptions"
+          value-key="value"
+          :loading="loading"
+          :disabled="disabled"
+          placeholder="Selecciona un repartidor"
+          class="w-full"
+        />
       </UFormField>
 
       <UFormField name="orderDate" label="Fecha del pedido" required>
@@ -117,16 +116,6 @@ function onRepartidorCreated(repartidor: Repartidor) {
           v-model="promisedDate"
           type="date"
           :disabled="disabled"
-          class="w-full"
-        />
-      </UFormField>
-
-      <UFormField name="remision" label="Remisión física">
-        <UInput
-          v-model="remision"
-          :disabled="disabled"
-          maxlength="100"
-          placeholder="Número de remisión"
           class="w-full"
         />
       </UFormField>

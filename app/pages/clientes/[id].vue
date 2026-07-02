@@ -26,6 +26,8 @@ const address = computed(() => {
   ].filter(Boolean).join(', ') || '—'
 })
 const message = computed(() => error.value?.data?.statusMessage || 'No fue posible cargar el cliente.')
+
+useSeoMeta({ title: () => fullName.value })
 </script>
 
 <template>

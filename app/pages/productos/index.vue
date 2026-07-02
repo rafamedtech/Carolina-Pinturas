@@ -2,6 +2,8 @@
 import type { TableColumn, TableRow } from '@nuxt/ui'
 import type { SiigoProduct } from '~/types/siigo'
 
+useSeoMeta({ title: 'Productos' })
+
 const filter = ref('')
 const page = ref(1)
 const pageSize = 25

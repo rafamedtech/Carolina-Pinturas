@@ -13,6 +13,8 @@ const { data: repartidor, status, error, refresh } = useFetch<RepartidorDetail>(
 const currency = new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' })
 const message = computed(() => error.value?.data?.statusMessage || 'No fue posible cargar el repartidor.')
 
+useSeoMeta({ title: () => repartidor.value?.nombre || 'Detalle del repartidor' })
+
 function formatDate(value: string) {
   return value.split('-').reverse().join('/')
 }

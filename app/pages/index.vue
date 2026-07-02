@@ -1,3 +1,7 @@
+<script setup lang="ts">
+useSeoMeta({ title: 'Inicio' })
+</script>
+
 <template>
   <UDashboardPanel id="home">
     <template #header>

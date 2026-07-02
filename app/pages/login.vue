@@ -4,6 +4,8 @@ import type { FormSubmitEvent } from '@nuxt/ui'
 
 definePageMeta({ layout: false })
 
+useSeoMeta({ title: 'Iniciar sesión' })
+
 const schema = z.object({
   email: z.string().email('Escribe un correo válido.'),
   password: z.string().min(8, 'La contraseña debe tener al menos 8 caracteres.')

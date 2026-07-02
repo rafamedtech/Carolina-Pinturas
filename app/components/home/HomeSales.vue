@@ -4,7 +4,7 @@ import type { TableColumn } from '@nuxt/ui'
 import type { SalesOrderListItem, SalesOrderListResponse } from '~/types/orders'
 
 const NuxtLink = resolveComponent('NuxtLink')
-const UBadge = resolveComponent('UBadge')
+const OrderStatusBadge = resolveComponent('OrdersOrderStatusBadge')
 const currency = new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' })
 const { data, status, error, refresh } = await useFetch<SalesOrderListResponse>('/api/orders', {
   query: { page_size: 10 },
@@ -34,11 +34,7 @@ const columns: TableColumn<SalesOrderListItem>[] = [{
 }, {
   id: 'status',
   header: 'Estado',
-  cell: ({ row }) => h(
-    UBadge,
-    { color: 'neutral', variant: 'subtle' },
-    () => row.original.status.label
-  )
+  cell: ({ row }) => h(OrderStatusBadge, { status: row.original.status })
 }, {
   accessorKey: 'total',
   header: () => h('div', { class: 'text-right' }, 'Total'),

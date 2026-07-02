@@ -2,7 +2,7 @@
 definePageMeta({ layout: false })
 
 useSeoMeta({
-  title: 'Lista de precios | Carolina Pinturas',
+  title: 'Lista de precios',
   description: 'Consulta los precios vigentes de Carolina Pinturas.'
 })
 </script>

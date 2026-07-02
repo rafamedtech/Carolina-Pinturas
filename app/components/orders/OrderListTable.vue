@@ -8,18 +8,10 @@ const props = defineProps<{
   loading: boolean
 }>()
 
-const UBadge = resolveComponent('UBadge')
+const OrderStatusBadge = resolveComponent('OrdersOrderStatusBadge')
 const NuxtLink = resolveComponent('NuxtLink')
 const currency = new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' })
 const tableOrders = computed(() => [...props.orders])
-
-function statusColor(value: string) {
-  if (value === 'primary' || value === 'secondary' || value === 'success'
-    || value === 'info' || value === 'warning' || value === 'error') {
-    return value
-  }
-  return 'neutral'
-}
 
 function formatDate(value: string | null) {
   if (!value) return '—'
@@ -53,10 +45,7 @@ const columns: TableColumn<SalesOrderListItem>[] = [{
 }, {
   id: 'status',
   header: 'Estado',
-  cell: ({ row }) => h(UBadge, {
-    color: statusColor(row.original.status.color),
-    variant: 'subtle'
-  }, () => row.original.status.label)
+  cell: ({ row }) => h(OrderStatusBadge, { status: row.original.status })
 }, {
   accessorKey: 'total',
   header: () => h('div', { class: 'text-right' }, 'Total'),

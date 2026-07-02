@@ -239,9 +239,7 @@ async function updateStatus() {
             <p class="text-xl font-semibold text-highlighted">
               {{ formatCurrency(order.total) }}
             </p>
-            <UBadge class="mt-2" color="neutral" variant="subtle">
-              {{ order.status.label }}
-            </UBadge>
+            <OrdersOrderStatusBadge class="mt-2" :status="order.status" />
           </div>
         </div>
 

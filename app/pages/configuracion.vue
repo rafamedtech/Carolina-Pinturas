@@ -4,6 +4,8 @@ interface ConnectionStatus {
 }
 
 const { data, status, refresh } = await useFetch<ConnectionStatus>('/api/siigo/status', { lazy: true })
+
+useSeoMeta({ title: 'Configuración' })
 </script>
 
 <template>

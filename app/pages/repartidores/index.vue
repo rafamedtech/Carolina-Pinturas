@@ -2,6 +2,8 @@
 import type { TableColumn, TableRow } from '@nuxt/ui'
 import type { Repartidor } from '~/types/orders'
 
+useSeoMeta({ title: 'Repartidores' })
+
 const filter = ref('')
 const router = useRouter()
 const { data, status, error, refresh, addToCatalog } = useRepartidoresCatalog({ all: true })

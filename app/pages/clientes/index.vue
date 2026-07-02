@@ -2,6 +2,8 @@
 import type { TableColumn, TableRow } from '@nuxt/ui'
 import type { SiigoCustomer } from '~/types/siigo'
 
+useSeoMeta({ title: 'Clientes' })
+
 const filter = ref('')
 const router = useRouter()
 const { data, status, error, refresh } = useCustomersCatalog()
