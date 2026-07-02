@@ -69,6 +69,7 @@ const errorMessage = computed(() =>
         v-model:status="statusKey"
         :statuses="statuses"
         :loading="status === 'pending'"
+        :igualacion="igualacion"
         @refresh="refresh"
       />
 

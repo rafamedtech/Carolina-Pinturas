@@ -1,10 +1,13 @@
 <script setup lang="ts">
 import type { OrderStatus } from '~/types/orders'
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   statuses: OrderStatus[]
   loading: boolean
-}>()
+  igualacion?: boolean
+}>(), {
+  igualacion: false
+})
 
 const emit = defineEmits<{
   refresh: []
@@ -49,6 +52,7 @@ const statusOptions = computed(() => [{
         @click="emit('refresh')"
       />
       <UButton
+        v-if="!igualacion"
         to="/ventas/nuevo-pedido"
         label="Nuevo pedido"
         icon="i-lucide-shopping-cart"
