@@ -146,7 +146,7 @@ async function submitOrder(event: FormSubmitEvent<Schema>) {
       color: 'success',
       icon: 'i-lucide-circle-check'
     })
-    await navigateTo(`/ventas/${encodeURIComponent(order.id)}`)
+    await navigateTo('/ventas')
   } catch (error: unknown) {
     const fetchError = error as { data?: { statusMessage?: string }, message?: string }
     toast.add({

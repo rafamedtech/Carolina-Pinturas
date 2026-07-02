@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { OrderStatus, Repartidor, SalesOrderDetail } from '~/types/orders'
+import type { OrderStatus, SalesOrderDetail } from '~/types/orders'
 
 const props = defineProps<{
   orderId: string
@@ -28,8 +28,7 @@ const { data: statuses } = await useFetch<OrderStatus[]>('/api/orders/statuses',
 })
 const {
   data: repartidores,
-  refresh: refreshRepartidores,
-  addToCatalog: addRepartidor
+  refresh: refreshRepartidores
 } = useRepartidoresCatalog()
 
 await callOnce('repartidores-catalog', refreshRepartidores)
@@ -48,6 +47,10 @@ watch(() => order.value?.repartidor.id, (value) => {
 
 const remisionUnchanged = computed(() => remisionDraft.value === (order.value?.remision || ''))
 const repartidorUnchanged = computed(() => selectedRepartidor.value === (order.value?.repartidor.id || ''))
+const statusUnchanged = computed(() => selectedStatus.value === (order.value?.status.key || ''))
+
+const savingChanges = computed(() => savingRemision.value || savingRepartidor.value || savingStatus.value)
+const hasChanges = computed(() => !remisionUnchanged.value || !repartidorUnchanged.value || !statusUnchanged.value)
 
 const currency = computed(() => new Intl.NumberFormat('es-MX', {
   style: 'currency',
@@ -71,11 +74,6 @@ const repartidorOptions = computed(() => repartidores.value.map(repartidor => ({
   description: repartidor.telefono || undefined,
   value: repartidor.id
 })))
-
-function onRepartidorCreated(repartidor: Repartidor) {
-  addRepartidor(repartidor)
-  selectedRepartidor.value = repartidor.id
-}
 
 async function updateRemision() {
   if (!order.value || remisionUnchanged.value) return
@@ -181,6 +179,14 @@ async function updateStatus() {
     savingStatus.value = false
   }
 }
+
+async function saveChanges() {
+  if (!hasChanges.value || savingChanges.value) return
+
+  await updateRemision()
+  await updateRepartidor()
+  await updateStatus()
+}
 </script>
 
 <template>
@@ -232,14 +238,23 @@ async function updateStatus() {
               {{ formatDate(order.orderDate) }}
             </p>
           </div>
-          <div class="text-right">
-            <p class="text-sm text-muted">
-              Total
-            </p>
-            <p class="text-xl font-semibold text-highlighted">
-              {{ formatCurrency(order.total) }}
-            </p>
-            <OrdersOrderStatusBadge class="mt-2" :status="order.status" />
+          <div class="flex items-center gap-4">
+            <UButton
+              label="Guardar cambios"
+              icon="i-lucide-save"
+              :loading="savingChanges"
+              :disabled="savingChanges || !hasChanges"
+              @click="saveChanges"
+            />
+            <div class="text-right">
+              <p class="text-sm text-muted">
+                Total
+              </p>
+              <p class="text-xl font-semibold text-highlighted">
+                {{ formatCurrency(order.total) }}
+              </p>
+              <OrdersOrderStatusBadge class="mt-2" :status="order.status" />
+            </div>
           </div>
         </div>
 
@@ -287,21 +302,13 @@ async function updateStatus() {
                 <dt class="text-sm text-muted">
                   Remisión física
                 </dt>
-                <dd class="mt-1 flex items-center gap-2">
+                <dd class="mt-1">
                   <UInput
                     v-model="remisionDraft"
                     :disabled="savingRemision"
                     maxlength="100"
                     placeholder="Número de remisión"
                     class="w-full max-w-xs"
-                  />
-                  <UButton
-                    label="Guardar"
-                    icon="i-lucide-save"
-                    size="sm"
-                    :loading="savingRemision"
-                    :disabled="savingRemision || remisionUnchanged"
-                    @click="updateRemision"
                   />
                 </dd>
               </div>
@@ -312,15 +319,12 @@ async function updateStatus() {
                 <dd class="mt-1 font-medium">
                   {{ order.vendedor.name }}
                 </dd>
-                <dd class="text-sm text-muted">
-                  {{ order.vendedor.email }}
-                </dd>
               </div>
-              <div class="sm:col-span-2">
+              <div>
                 <dt class="text-sm text-muted">
                   Repartidor
                 </dt>
-                <dd class="mt-1 flex flex-wrap items-center gap-2">
+                <dd class="mt-1">
                   <USelectMenu
                     v-model="selectedRepartidor"
                     :items="repartidorOptions"
@@ -329,15 +333,6 @@ async function updateStatus() {
                     placeholder="Selecciona un repartidor"
                     class="w-full max-w-xs"
                   />
-                  <UButton
-                    label="Guardar"
-                    icon="i-lucide-save"
-                    size="sm"
-                    :loading="savingRepartidor"
-                    :disabled="savingRepartidor || repartidorUnchanged"
-                    @click="updateRepartidor"
-                  />
-                  <OrdersOrderRepartidorAddModal @created="onRepartidorCreated" />
                 </dd>
               </div>
             </dl>
@@ -357,7 +352,6 @@ async function updateStatus() {
             :order="order"
             :statuses="statuses"
             :saving="savingStatus"
-            @update="updateStatus"
           />
         </div>
 

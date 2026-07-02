@@ -127,6 +127,7 @@ const repartidorOptions = computed(() => props.repartidores.map(repartidor => ({
           :disabled="disabled"
           placeholder="Indicaciones de entrega, referencias o notas internas"
           class="w-full"
+          :ui="{ base: 'resize-none' }"
         />
       </UFormField>
     </div>

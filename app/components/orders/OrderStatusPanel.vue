@@ -7,10 +7,6 @@ const props = defineProps<{
   saving: boolean
 }>()
 
-const emit = defineEmits<{
-  update: []
-}>()
-
 const statusKey = defineModel<string>('statusKey', { required: true })
 const note = defineModel<string>('note', { required: true })
 
@@ -18,7 +14,6 @@ const statusOptions = computed(() => props.statuses.map(status => ({
   label: status.label,
   value: status.key
 })))
-const unchanged = computed(() => statusKey.value === props.order.status.key)
 </script>
 
 <template>
@@ -47,16 +42,9 @@ const unchanged = computed(() => statusKey.value === props.order.status.key)
           :disabled="saving"
           placeholder="Opcional"
           class="w-full"
+          :ui="{ base: 'resize-none' }"
         />
       </UFormField>
-
-      <UButton
-        label="Actualizar estado"
-        icon="i-lucide-refresh-cw"
-        :loading="saving"
-        :disabled="saving || unchanged"
-        @click="emit('update')"
-      />
     </div>
   </UCard>
 </template>
