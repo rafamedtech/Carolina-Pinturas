@@ -45,7 +45,10 @@ const state = reactive<Schema>({
   observations: ''
 })
 const saving = shallowRef(false)
+const summaryOpen = shallowRef(false)
+const pendingSubmission = shallowRef<Schema | null>(null)
 const toast = useToast()
+const currency = new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' })
 const { lines, total, addProduct, removeProduct } = useOrderDraft()
 const {
   data: customers,
@@ -73,8 +76,7 @@ const {
   data: repartidores,
   status: repartidorStatus,
   error: repartidorError,
-  refresh: refreshRepartidores,
-  addToCatalog: addRepartidor
+  refresh: refreshRepartidores
 } = useRepartidoresCatalog()
 
 await Promise.all([
@@ -108,6 +110,23 @@ const canSubmit = computed(() =>
   && !formDisabled.value
 )
 
+const selectedCustomer = computed(() =>
+  customers.value?.results.find(customer => customer.id === state.customerId)
+)
+const selectedCustomerName = computed(() =>
+  selectedCustomer.value?.name?.filter(Boolean).join(' ') || selectedCustomer.value?.rfc_id || '—'
+)
+
+function formatDate(value: string) {
+  if (!value) return '—'
+  return value.split('-').reverse().join('/')
+}
+
+function lineTotal(line: { quantity: number, unitPrice: number, taxIncluded: boolean, taxPercentage: number }) {
+  const listedTotal = line.quantity * line.unitPrice
+  return line.taxIncluded ? listedTotal : listedTotal * (1 + line.taxPercentage / 100)
+}
+
 function addSelectedProduct(product: SiigoProduct, quantity: number) {
   addProduct({
     id: product.id,
@@ -121,18 +140,29 @@ function addSelectedProduct(product: SiigoProduct, quantity: number) {
   })
 }
 
-async function submitOrder(event: FormSubmitEvent<Schema>) {
+function reviewOrder(event: FormSubmitEvent<Schema>) {
   if (!canSubmit.value) return
+  pendingSubmission.value = event.data
+  summaryOpen.value = true
+}
+
+function editOrder() {
+  summaryOpen.value = false
+}
+
+async function confirmSubmit() {
+  if (!pendingSubmission.value || !canSubmit.value) return
+  const data = pendingSubmission.value
   saving.value = true
 
   try {
     const order = await $fetch<SalesOrderDetail>('/api/orders', {
       method: 'POST',
       body: {
-        ...event.data,
-        promisedDate: event.data.promisedDate || null,
-        remision: event.data.remision || null,
-        observations: event.data.observations || null,
+        ...data,
+        promisedDate: data.promisedDate || null,
+        remision: data.remision || null,
+        observations: data.observations || null,
         lines: lines.value.map(line => ({
           productId: line.productId,
           quantity: line.quantity
@@ -191,7 +221,7 @@ async function submitOrder(event: FormSubmitEvent<Schema>) {
         :schema="schema"
         :state="state"
         class="contents"
-        @submit="submitOrder"
+        @submit="reviewOrder"
       >
         <div class="grid gap-4 lg:grid-cols-2">
           <OrdersOrderCustomerFields
@@ -228,6 +258,87 @@ async function submitOrder(event: FormSubmitEvent<Schema>) {
           :disabled="!canSubmit"
         />
       </UForm>
+
+      <UModal v-model:open="summaryOpen" title="Resumen del pedido">
+        <template #body>
+          <div v-if="pendingSubmission" class="space-y-4">
+            <div>
+              <p class="text-sm text-muted">
+                Cliente
+              </p>
+              <p class="font-medium">
+                {{ selectedCustomerName }}
+              </p>
+            </div>
+            <div>
+              <p class="text-sm text-muted">
+                Fecha prometida
+              </p>
+              <p class="font-medium">
+                {{ formatDate(pendingSubmission.promisedDate) }}
+              </p>
+            </div>
+            <div>
+              <p class="text-sm text-muted">
+                Observaciones
+              </p>
+              <p class="font-medium whitespace-pre-wrap">
+                {{ pendingSubmission.observations || '—' }}
+              </p>
+            </div>
+            <div>
+              <p class="mb-2 text-sm text-muted">
+                Partidas
+              </p>
+              <ul class="divide-y divide-default rounded-lg border border-default">
+                <li
+                  v-for="line in lines"
+                  :key="line.productId"
+                  class="flex items-center justify-between gap-4 px-3 py-2"
+                >
+                  <div>
+                    <p class="font-medium">
+                      {{ line.name }}
+                    </p>
+                    <p class="text-sm text-muted">
+                      {{ line.quantity }} × {{ currency.format(line.unitPrice) }}
+                    </p>
+                  </div>
+                  <p class="font-medium">
+                    {{ currency.format(lineTotal(line)) }}
+                  </p>
+                </li>
+              </ul>
+            </div>
+            <div class="flex items-center justify-between border-t border-default pt-4">
+              <p class="font-semibold">
+                Total
+              </p>
+              <p class="text-lg font-semibold">
+                {{ currency.format(total) }}
+              </p>
+            </div>
+          </div>
+        </template>
+
+        <template #footer>
+          <div class="flex w-full justify-end gap-2">
+            <UButton
+              label="Editar pedido"
+              color="neutral"
+              variant="outline"
+              :disabled="saving"
+              @click="editOrder"
+            />
+            <UButton
+              label="Enviar pedido"
+              icon="i-lucide-send"
+              :loading="saving"
+              @click="confirmSubmit"
+            />
+          </div>
+        </template>
+      </UModal>
     </template>
   </UDashboardPanel>
 </template>
