@@ -1,4 +1,13 @@
-const VALID_BADGE_COLORS = new Set([
+export type BadgeColor =
+  | 'primary'
+  | 'secondary'
+  | 'success'
+  | 'info'
+  | 'warning'
+  | 'error'
+  | 'neutral'
+
+const VALID_BADGE_COLORS = new Set<BadgeColor>([
   'primary',
   'secondary',
   'success',
@@ -8,6 +17,6 @@ const VALID_BADGE_COLORS = new Set([
   'neutral'
 ])
 
-export function orderStatusBadgeColor(value: string) {
-  return VALID_BADGE_COLORS.has(value) ? value : 'neutral'
+export function orderStatusBadgeColor(value: string): BadgeColor {
+  return VALID_BADGE_COLORS.has(value as BadgeColor) ? value as BadgeColor : 'neutral'
 }

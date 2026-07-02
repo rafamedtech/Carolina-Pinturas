@@ -139,16 +139,15 @@ function listItem(order: SalesOrder & {
     itemCount: order._count.items,
     ...(order.items
       ? {
-          igualacionItems: order.items
-            .filter(item =>
+          partidas: order.items.map(item => ({
+            code: item.productCodeSnapshot,
+            name: item.productNameSnapshot,
+            quantity: number(item.quantity),
+            observations: item.observations,
+            isIgualacion:
               item.productCodeSnapshot.toLowerCase().includes(IGUALACION_MATCH)
-              || item.productNameSnapshot.toLowerCase().includes(IGUALACION_MATCH))
-            .map(item => ({
-              code: item.productCodeSnapshot,
-              name: item.productNameSnapshot,
-              quantity: number(item.quantity),
-              observations: item.observations
-            }))
+              || item.productNameSnapshot.toLowerCase().includes(IGUALACION_MATCH)
+          }))
         }
       : {}),
     createdAt: order.createdAt.toISOString(),

@@ -45,7 +45,7 @@ export interface SalesOrderListItem {
   promisedDate: string | null
   total: number
   itemCount: number
-  igualacionItems?: { code: string, name: string, quantity: number, observations: string | null }[]
+  partidas?: { code: string, name: string, quantity: number, observations: string | null, isIgualacion: boolean }[]
   createdAt: string
   updatedAt: string
 }
