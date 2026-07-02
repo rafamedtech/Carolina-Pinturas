@@ -110,6 +110,7 @@ function buildLine(
 }
 
 const IGUALACION_MATCH = 'igualacion de color'
+const IGUALACION_STATUS_KEYS = ['confirmado', 'surtido', 'en_espera']
 
 function listItem(order: SalesOrder & {
   status: { key: string, label: string, color: string, sortOrder: number, isTerminal: boolean }
@@ -346,8 +347,17 @@ export async function listOrders(options: {
   const prisma = usePrisma()
   const folioMatch = options.search?.toUpperCase().match(/^(?:PED-?)?0*(\d+)$/)
   const folio = folioMatch?.[1] ? Number(folioMatch[1]) : null
+  const statusFilter = options.igualacion
+    ? {
+        statusKey: options.statusKey
+          ? { in: IGUALACION_STATUS_KEYS.filter(key => key === options.statusKey) }
+          : { in: IGUALACION_STATUS_KEYS }
+      }
+    : options.statusKey
+      ? { statusKey: options.statusKey }
+      : {}
   const where: Prisma.SalesOrderWhereInput = {
-    ...(options.statusKey ? { statusKey: options.statusKey } : {}),
+    ...statusFilter,
     ...(options.igualacion
       ? {
           items: {

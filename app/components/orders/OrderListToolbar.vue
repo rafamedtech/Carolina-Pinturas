@@ -16,13 +16,20 @@ const emit = defineEmits<{
 const filter = defineModel<string>('filter', { required: true })
 const status = defineModel<string>('status', { required: true })
 
-const statusOptions = computed(() => [{
-  label: 'Todos los estados',
-  value: 'all'
-}, ...props.statuses.map(item => ({
-  label: item.label,
-  value: item.key
-}))])
+const IGUALACION_STATUS_KEYS = ['confirmado', 'surtido', 'en_espera']
+
+const statusOptions = computed(() => {
+  const statuses = props.igualacion
+    ? props.statuses.filter(item => IGUALACION_STATUS_KEYS.includes(item.key))
+    : props.statuses
+  return [{
+    label: 'Todos los estados',
+    value: 'all'
+  }, ...statuses.map(item => ({
+    label: item.label,
+    value: item.key
+  }))]
+})
 </script>
 
 <template>
