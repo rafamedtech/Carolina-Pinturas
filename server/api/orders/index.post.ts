@@ -18,16 +18,19 @@ export default eventHandler(async (event) => {
   }
 
   const productIds = [...new Set(parsed.data.lines.map(line => line.productId))]
+  const repartidorId = parsed.data.repartidorId
   const [customer, repartidor, ...products] = await Promise.all([
     siigoRequest<SiigoCustomer>(`/v1/customers/${encodeURIComponent(parsed.data.customerId)}`),
-    usePrisma().repartidor.findUnique({ where: { id: parsed.data.repartidorId } }),
+    repartidorId
+      ? usePrisma().repartidor.findUnique({ where: { id: repartidorId } })
+      : Promise.resolve(null),
     ...productIds.map(id =>
       siigoRequest<SiigoProduct>(`/v1/products/${encodeURIComponent(id)}`)
     )
   ])
   const productsById = new Map(products.map(product => [product.id, product]))
 
-  if (!repartidor) {
+  if (repartidorId && !repartidor) {
     throw createError({ statusCode: 422, statusMessage: 'El repartidor seleccionado no está disponible.' })
   }
 

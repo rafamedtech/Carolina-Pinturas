@@ -8,6 +8,7 @@ import type {
   UpdateOrderRepartidorInput,
   UpdateOrderStatusInput
 } from './order-validation'
+import { STATUS_KEYS_REQUIRING_REPARTIDOR } from './order-validation'
 import { usePrisma } from './prisma'
 import {
   siigoCustomerDisplayName,
@@ -173,11 +174,13 @@ function detail(order: OrderDetailRecord): SalesOrderDetail {
       name: order.vendedorNombre,
       email: order.vendedorEmail
     },
-    repartidor: {
-      id: order.repartidorId,
-      name: order.repartidorNombreSnapshot,
-      telefono: order.repartidorTelefonoSnapshot
-    },
+    repartidor: order.repartidorId
+      ? {
+          id: order.repartidorId,
+          name: order.repartidorNombreSnapshot ?? '',
+          telefono: order.repartidorTelefonoSnapshot
+        }
+      : null,
     createdBy: {
       name: order.createdByName,
       email: order.createdByEmail,
@@ -229,7 +232,7 @@ export async function createOrder(
   user: AppUser,
   customer: SiigoCustomer,
   products: Map<string, SiigoProduct>,
-  repartidor: { id: string, nombre: string, telefono: string | null }
+  repartidor: { id: string, nombre: string, telefono: string | null } | null
 ) {
   const prisma = usePrisma()
   const lines = input.lines.map((line, index) => {
@@ -288,9 +291,9 @@ export async function createOrder(
         total: total.toString(),
         vendedorNombre: user.name,
         vendedorEmail: user.email,
-        repartidorId: repartidor.id,
-        repartidorNombreSnapshot: repartidor.nombre,
-        repartidorTelefonoSnapshot: repartidor.telefono,
+        repartidorId: repartidor?.id ?? null,
+        repartidorNombreSnapshot: repartidor?.nombre ?? null,
+        repartidorTelefonoSnapshot: repartidor?.telefono ?? null,
         createdByName: user.name,
         createdByEmail: user.email,
         createdByRole: user.role,
@@ -432,7 +435,7 @@ export async function updateOrderStatus(
   await prisma.$transaction(async (tx) => {
     const order = await tx.salesOrder.findUnique({
       where: { id },
-      select: { statusKey: true, version: true }
+      select: { statusKey: true, version: true, repartidorId: true }
     })
     const status = await tx.orderStatus.findFirst({
       where: { key: input.statusKey, isActive: true }
@@ -448,6 +451,12 @@ export async function updateOrderStatus(
       throw createError({
         statusCode: 409,
         statusMessage: 'El pedido cambió desde que lo abriste. Actualiza la página e intenta de nuevo.'
+      })
+    }
+    if (STATUS_KEYS_REQUIRING_REPARTIDOR.includes(status.key) && !order.repartidorId) {
+      throw createError({
+        statusCode: 422,
+        statusMessage: 'Asigna un repartidor antes de confirmar el pedido.'
       })
     }
     if (order.statusKey === status.key) return

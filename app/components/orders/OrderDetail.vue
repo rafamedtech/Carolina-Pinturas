@@ -41,12 +41,12 @@ watch(() => order.value?.remision, (value) => {
   remisionDraft.value = value || ''
 }, { immediate: true })
 
-watch(() => order.value?.repartidor.id, (value) => {
+watch(() => order.value?.repartidor?.id, (value) => {
   selectedRepartidor.value = value || ''
 }, { immediate: true })
 
 const remisionUnchanged = computed(() => remisionDraft.value === (order.value?.remision || ''))
-const repartidorUnchanged = computed(() => selectedRepartidor.value === (order.value?.repartidor.id || ''))
+const repartidorUnchanged = computed(() => selectedRepartidor.value === (order.value?.repartidor?.id || ''))
 const statusUnchanged = computed(() => selectedStatus.value === (order.value?.status.key || ''))
 
 const savingChanges = computed(() => savingRemision.value || savingRepartidor.value || savingStatus.value)

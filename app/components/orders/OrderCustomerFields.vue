@@ -8,6 +8,7 @@ const props = defineProps<{
   repartidores: Repartidor[]
   loading: boolean
   disabled: boolean
+  repartidorRequired?: boolean
 }>()
 
 const customerId = defineModel<string>('customerId', { required: true })
@@ -88,7 +89,8 @@ const repartidorOptions = computed(() => props.repartidores.map(repartidor => ({
       <UFormField
         name="repartidorId"
         label="Repartidor"
-        required
+        :required="props.repartidorRequired"
+        :hint="props.repartidorRequired ? undefined : 'Opcional hasta confirmar'"
         class="sm:col-span-2"
       >
         <USelectMenu

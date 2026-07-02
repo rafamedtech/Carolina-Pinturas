@@ -213,8 +213,8 @@ model SalesOrder {
   registeredInSiigoAt  DateTime? @map("registered_in_siigo_at") @db.Timestamptz(6)
   vendedorNombre       String    @map("vendedor_nombre")
   vendedorEmail        String    @map("vendedor_email")
-  repartidorId               String  @map("repartidor_id") @db.Uuid
-  repartidorNombreSnapshot   String  @map("repartidor_nombre_snapshot")
+  repartidorId               String? @map("repartidor_id") @db.Uuid
+  repartidorNombreSnapshot   String? @map("repartidor_nombre_snapshot")
   repartidorTelefonoSnapshot String? @map("repartidor_telefono_snapshot")
   createdByName        String    @map("created_by_name")
   createdByEmail       String    @map("created_by_email")
@@ -226,7 +226,7 @@ model SalesOrder {
 
   status        OrderStatus               @relation(fields: [statusKey], references: [key], onDelete: Restrict)
   customer      SiigoCustomer             @relation(fields: [customerId], references: [id], onDelete: Restrict)
-  repartidor    Repartidor                @relation(fields: [repartidorId], references: [id], onDelete: Restrict)
+  repartidor    Repartidor?               @relation(fields: [repartidorId], references: [id], onDelete: Restrict)
   items         SalesOrderItem[]
   statusHistory SalesOrderStatusHistory[]
 

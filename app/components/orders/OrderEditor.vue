@@ -4,14 +4,25 @@ import type { FormSubmitEvent } from '@nuxt/ui'
 import type { OrderStatus, SalesOrderDetail } from '~/types/orders'
 import type { SiigoProduct } from '~/types/siigo'
 
+// Repartidor is optional while the order is borrador/ingresado; required to confirm.
+const STATUS_KEYS_REQUIRING_REPARTIDOR = ['confirmado', 'surtido', 'en_espera']
+
 const schema = z.object({
   customerId: z.string().uuid('Selecciona un cliente.'),
   statusKey: z.string().min(1, 'Selecciona un estado.'),
-  repartidorId: z.string().uuid('Selecciona un repartidor.'),
+  repartidorId: z.string(),
   orderDate: z.string().min(1, 'Selecciona la fecha del pedido.'),
   promisedDate: z.string(),
   remision: z.string().max(100),
   observations: z.string().max(5000)
+}).superRefine((data, ctx) => {
+  if (STATUS_KEYS_REQUIRING_REPARTIDOR.includes(data.statusKey) && !data.repartidorId) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['repartidorId'],
+      message: 'Selecciona un repartidor para confirmar el pedido.'
+    })
+  }
 })
 
 type Schema = z.output<typeof schema>
@@ -100,10 +111,13 @@ const catalogsLoading = computed(() =>
   || repartidorStatus.value === 'pending'
 )
 const formDisabled = computed(() => saving.value || Boolean(catalogError.value))
+const repartidorRequired = computed(() =>
+  STATUS_KEYS_REQUIRING_REPARTIDOR.includes(state.statusKey)
+)
 const canSubmit = computed(() =>
   Boolean(state.customerId)
   && Boolean(state.statusKey)
-  && Boolean(state.repartidorId)
+  && (!repartidorRequired.value || Boolean(state.repartidorId))
   && Boolean(state.orderDate)
   && lines.value.length > 0
   && !catalogsLoading.value
@@ -160,6 +174,7 @@ async function confirmSubmit() {
       method: 'POST',
       body: {
         ...data,
+        repartidorId: data.repartidorId || null,
         promisedDate: data.promisedDate || null,
         remision: data.remision || null,
         observations: data.observations || null,
@@ -238,6 +253,7 @@ async function confirmSubmit() {
             :repartidores="repartidores"
             :loading="catalogsLoading"
             :disabled="formDisabled"
+            :repartidor-required="repartidorRequired"
           />
 
           <OrdersOrderProductPicker

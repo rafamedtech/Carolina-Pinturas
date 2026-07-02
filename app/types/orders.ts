@@ -113,7 +113,7 @@ export interface SalesOrderDetail extends SalesOrderListItem {
     id: string
     name: string
     telefono: string | null
-  }
+  } | null
   createdBy: {
     name: string
     email: string
