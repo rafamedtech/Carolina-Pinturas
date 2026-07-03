@@ -276,6 +276,14 @@ async function saveChanges() {
           </div>
           <div class="flex items-center gap-4">
             <UButton
+              :to="`/ventas/${order.id}/cotizacion`"
+              target="_blank"
+              :label="isQuote ? 'Ver cotización' : 'Imprimir'"
+              icon="i-lucide-printer"
+              color="neutral"
+              variant="outline"
+            />
+            <UButton
               label="Guardar cambios"
               icon="i-lucide-save"
               :loading="savingChanges"
