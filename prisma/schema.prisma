@@ -7,6 +7,19 @@ datasource db {
   provider = "postgresql"
 }
 
+model AppUser {
+  userId    String   @id @map("user_id") @db.Uuid
+  email     String   @unique
+  name      String
+  role      String   @default("vendedor") @db.VarChar(32)
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@index([role, active])
+  @@map("app_users")
+}
+
 model OrderStatus {
   key        String   @id @db.VarChar(32)
   label      String   @db.VarChar(64)

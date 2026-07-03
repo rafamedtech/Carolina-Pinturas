@@ -1,8 +1,8 @@
 import { requireUser } from '../../utils/auth'
 import { getOrder } from '../../utils/orders'
 
-export default eventHandler((event) => {
-  requireUser(event)
+export default eventHandler(async (event) => {
+  await requireUser(event)
   const id = getRouterParam(event, 'id')
 
   if (!id) {

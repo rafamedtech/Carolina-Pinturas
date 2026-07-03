@@ -3,7 +3,7 @@ import { updateOrderRepartidor } from '../../../utils/orders'
 import { updateOrderRepartidorSchema } from '../../../utils/order-validation'
 
 export default eventHandler(async (event) => {
-  const user = requireUser(event)
+  const user = await requireUser(event)
   const id = getRouterParam(event, 'id')
 
   if (!id) {

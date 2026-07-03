@@ -8,7 +8,7 @@ function total(response: SiigoListResponse<unknown>) {
 }
 
 export default eventHandler(async (event) => {
-  requireUser(event)
+  await requireUser(event)
   const prisma = usePrisma()
 
   const [orders, delivered, products, customers] = await Promise.all([

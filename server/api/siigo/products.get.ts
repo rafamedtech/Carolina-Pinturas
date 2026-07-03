@@ -30,7 +30,7 @@ async function getAllProducts() {
 }
 
 export default eventHandler(async (event) => {
-  requireUser(event)
+  await requireUser(event)
   const query = getQuery(event)
 
   if (query.all === 'true') {

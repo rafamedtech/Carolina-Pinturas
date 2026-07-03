@@ -16,8 +16,7 @@
     "postinstall": "prisma generate && nuxt prepare",
     "lint": "eslint . --max-warnings 0",
     "lint:fix": "eslint . --fix",
-    "typecheck": "nuxt typecheck",
-    "auth:hash": "node scripts/hash-password.mjs"
+    "typecheck": "nuxt typecheck"
   },
   "dependencies": {
     "@iconify-json/lucide": "^1.2.114",
@@ -26,6 +25,8 @@
     "@nuxt/ui": "^4.9.0",
     "@prisma/adapter-pg": "7.8.0",
     "@prisma/client": "7.8.0",
+    "@supabase/ssr": "^0.12.0",
+    "@supabase/supabase-js": "^2.110.0",
     "@tanstack/table-core": "^8.21.3",
     "@unovis/ts": "^1.6.6",
     "@unovis/vue": "^1.6.6",

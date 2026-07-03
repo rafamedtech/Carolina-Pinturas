@@ -30,7 +30,7 @@ async function getAllCustomers() {
 }
 
 export default eventHandler(async (event) => {
-  requireUser(event)
+  await requireUser(event)
 
   if (getQuery(event).all === 'true') {
     return getAllCustomers()

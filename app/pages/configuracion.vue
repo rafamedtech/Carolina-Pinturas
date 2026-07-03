@@ -41,8 +41,8 @@ useSeoMeta({ title: 'Configuración' })
       <UAlert
         color="neutral"
         variant="subtle"
-        title="Siguiente configuración"
-        description="Agrega NUXT_APP_SESSION_SECRET, NUXT_APP_USERS y las cuatro variables NUXT_SIIGO_* en Vercel. No ingreses secretos en esta pantalla."
+        title="Configuración del despliegue"
+        description="Configura las variables NUXT_PUBLIC_SUPABASE_*, NUXT_PUBLIC_SITE_URL y NUXT_SIIGO_* en Vercel. Los usuarios y roles se administran desde Supabase."
         icon="i-lucide-lock-keyhole"
       />
     </template>

@@ -8,7 +8,7 @@ function positiveInteger(value: unknown, fallback: number, maximum: number) {
 }
 
 export default eventHandler(async (event) => {
-  requireUser(event)
+  await requireUser(event)
   const query = getQuery(event)
 
   return listOrders({

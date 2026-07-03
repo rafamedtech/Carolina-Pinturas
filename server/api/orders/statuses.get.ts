@@ -2,7 +2,7 @@ import { requireUser } from '../../utils/auth'
 import { usePrisma } from '../../utils/prisma'
 
 export default eventHandler(async (event) => {
-  requireUser(event)
+  await requireUser(event)
 
   const statuses = await usePrisma().orderStatus.findMany({
     where: { isActive: true },

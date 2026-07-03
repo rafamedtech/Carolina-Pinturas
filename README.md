@@ -6,8 +6,8 @@ históricos se guardan en PostgreSQL/Supabase mediante Prisma.
 
 ## Incluido en esta primera base
 
-- Acceso con correo y contraseña para los tres roles: `admin`, `mostrador` y `vendedor`.
-- Sesiones firmadas mediante cookie `HttpOnly`, sin exponer credenciales de Siigo al navegador.
+- Acceso con Supabase Auth para los tres roles: `admin`, `mostrador` y `vendedor`.
+- Sesiones SSR renovables mediante cookies, sin exponer credenciales de Siigo al navegador.
 - Navegación responsive para inicio, productos, clientes y ventas.
 - Rutas de servidor protegidas para leer productos y clientes directamente de Siigo.
 - Pedidos internos persistidos en PostgreSQL con partidas, totales e historial de estados.
@@ -52,25 +52,29 @@ Supabase Studio queda disponible en `http://127.0.0.1:55323`.
 
 ### Usuarios de la aplicación
 
-Genera un hash por contraseña:
+La autenticación usa Supabase Auth con correo y contraseña. El registro público
+permanece deshabilitado: crea usuarios desde Authentication > Users en Supabase.
+Cada usuario genera un registro en `public.app_users` con rol `vendedor`; ajusta
+su nombre, rol (`admin`, `mostrador` o `vendedor`) y estado desde Table Editor.
 
-```bash
-pnpm auth:hash -- "una-contraseña-segura"
-```
-
-Configura los tres usuarios en `NUXT_APP_USERS` como JSON de una sola línea, envuelto entre comillas simples en `.env`:
+Configura estas variables públicas localmente y en Vercel:
 
 ```env
-NUXT_APP_USERS='[{"name":"Administrador","email":"admin@ejemplo.mx","role":"admin","passwordHash":"scrypt$..."},{"name":"Mostrador","email":"mostrador@ejemplo.mx","role":"mostrador","passwordHash":"scrypt$..."},{"name":"Vendedor","email":"vendedor@ejemplo.mx","role":"vendedor","passwordHash":"scrypt$..."}]'
+NUXT_PUBLIC_SITE_URL=http://localhost:3000
+NUXT_PUBLIC_SUPABASE_URL=https://<project-ref>.supabase.co
+NUXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=sb_publishable_...
 ```
 
-En Vercel, usa exactamente el mismo JSON como valor de `NUXT_APP_USERS`, sin saltos de línea. Como alternativa, puedes usar `NUXT_APP_USERS_BASE64` con el JSON codificado en base64url; este formato tiene prioridad y evita problemas de escapado.
+La publishable key puede usarse en el navegador. Nunca configures una llave
+`sb_secret_` o `service_role` como variable `NUXT_PUBLIC_*`.
 
-Genera `NUXT_APP_SESSION_SECRET` con al menos 32 caracteres aleatorios:
+Para recuperación de contraseña en producción configura un servidor SMTP en
+Authentication > Email. El servicio de correo predeterminado de Supabase es
+únicamente para pruebas y tiene restricciones de destinatarios y frecuencia.
 
-```bash
-openssl rand -base64 48
-```
+En Authentication > URL Configuration usa la URL pública como Site URL y
+autoriza `/auth/callback`, `http://localhost:3000/**` y las URLs de Preview que
+se vayan a probar.
 
 ### Conexión Siigo
 
@@ -131,8 +135,9 @@ La revisión visual de la adaptación está documentada en [`design-qa.md`](./de
    supabase db push
    ```
 
-2. En Vercel configura todas las variables `NUXT_APP_*`, `NUXT_SIIGO_*`,
-   `DATABASE_URL` y `DIRECT_URL`.
+2. En Vercel configura `NUXT_PUBLIC_SITE_URL`, las dos variables
+   `NUXT_PUBLIC_SUPABASE_*`, todas las `NUXT_SIIGO_*`, `DATABASE_URL` y
+   `DIRECT_URL`.
 3. Usa en `DATABASE_URL` la conexión Transaction Pooler de Supabase (puerto
    `6543`). Usa en `DIRECT_URL` la conexión directa o Session Pooler (puerto
    `5432`) para comandos de esquema.

@@ -3,7 +3,7 @@ import { createRepartidor } from '../../utils/repartidores'
 import { createRepartidorSchema } from '../../utils/repartidor-validation'
 
 export default eventHandler(async (event) => {
-  requireUser(event)
+  await requireUser(event)
   const parsed = createRepartidorSchema.safeParse(await readBody(event))
 
   if (!parsed.success) {

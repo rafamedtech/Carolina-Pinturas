@@ -9,14 +9,16 @@ export default defineNuxtConfig({
   css: ['~/assets/css/main.css'],
 
   runtimeConfig: {
-    appSessionSecret: '',
-    appUsers: '',
-    appUsersBase64: '',
     siigo: {
       apiUrl: 'https://api.siigo.mx',
       username: '',
       accessKey: '',
       applicationId: 'CarolinaPinturas'
+    },
+    public: {
+      siteUrl: 'http://localhost:3000',
+      supabaseUrl: '',
+      supabasePublishableKey: ''
     }
   },
 

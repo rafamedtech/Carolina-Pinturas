@@ -7,7 +7,7 @@ function customerName(customer: SiigoCustomer) {
 }
 
 export default eventHandler(async (event) => {
-  requireUser(event)
+  await requireUser(event)
 
   const invoices = await siigoRequest<SiigoListResponse<SiigoInvoice>>('/v1/invoices', { query: listQuery(event) })
   const customerIds = [...new Set(invoices.results.map(invoice => invoice.customer?.id).filter((id): id is string => Boolean(id)))]

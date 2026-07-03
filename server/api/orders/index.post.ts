@@ -6,7 +6,7 @@ import { usePrisma } from '../../utils/prisma'
 import { siigoRequest } from '../../utils/siigo'
 
 export default eventHandler(async (event) => {
-  const user = requireUser(event)
+  const user = await requireUser(event)
   const parsed = createOrderSchema.safeParse(await readBody(event))
 
   if (!parsed.success) {

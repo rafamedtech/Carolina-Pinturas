@@ -2,7 +2,7 @@ import { requireUser } from '../../utils/auth'
 import { getRepartidorWithDeliveries } from '../../utils/repartidores'
 
 export default eventHandler(async (event) => {
-  requireUser(event)
+  await requireUser(event)
   const id = getRouterParam(event, 'id')
 
   if (!id) {

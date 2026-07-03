@@ -12,7 +12,7 @@ function total(response: CountableResponse) {
 }
 
 export default eventHandler(async (event) => {
-  requireUser(event)
+  await requireUser(event)
 
   const [products, customers, invoices, vouchers] = await Promise.all([
     siigoRequest<SiigoListResponse<unknown>>('/v1/products'),
