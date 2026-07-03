@@ -22,6 +22,7 @@ export async function listRepartidores(options: { onlyActive?: boolean } = {}) {
     nombre: repartidor.nombre,
     telefono: repartidor.telefono,
     activo: repartidor.activo,
+    esMostrador: repartidor.esMostrador,
     deliveredCount: deliveredByRepartidor.get(repartidor.id) || 0
   }))
 }
@@ -39,6 +40,7 @@ export async function createRepartidor(input: CreateRepartidorInput) {
     nombre: repartidor.nombre,
     telefono: repartidor.telefono,
     activo: repartidor.activo,
+    esMostrador: repartidor.esMostrador,
     deliveredCount: 0
   }
 }
