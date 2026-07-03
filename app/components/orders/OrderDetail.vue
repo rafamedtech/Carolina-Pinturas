@@ -234,6 +234,45 @@ async function saveChanges() {
   await updateRepartidor()
   await updateStatus()
 }
+
+// A quote is presented to the customer as a clean document; converting it turns
+// it into a regular order (ingresado) and brings back the management sections.
+const converting = shallowRef(false)
+async function convertToPedido() {
+  if (!order.value || converting.value) return
+  converting.value = true
+
+  try {
+    order.value = await $fetch<SalesOrderDetail>(
+      `/api/orders/${encodeURIComponent(props.orderId)}/status`,
+      {
+        method: 'PATCH',
+        body: {
+          statusKey: 'ingresado',
+          note: 'Cotización convertida en pedido.',
+          version: order.value.version
+        }
+      }
+    )
+    selectedStatus.value = order.value.status.key
+    toast.add({
+      title: 'Cotización convertida en pedido',
+      color: 'success',
+      icon: 'i-lucide-circle-check'
+    })
+  } catch (fetchError: unknown) {
+    const response = fetchError as { data?: { statusMessage?: string }, message?: string }
+    toast.add({
+      title: 'No se pudo convertir la cotización',
+      description: response.data?.statusMessage || response.message || 'Intenta de nuevo.',
+      color: 'error',
+      icon: 'i-lucide-circle-alert'
+    })
+    await refresh()
+  } finally {
+    converting.value = false
+  }
+}
 </script>
 
 <template>
@@ -297,6 +336,14 @@ async function saveChanges() {
               />
             </UDropdownMenu>
             <UButton
+              v-if="isQuote && mayManageLogistics"
+              label="Convertir en pedido"
+              icon="i-lucide-package-check"
+              :loading="converting"
+              @click="convertToPedido"
+            />
+            <UButton
+              v-if="!isQuote"
               label="Guardar cambios"
               icon="i-lucide-save"
               :loading="savingChanges"
@@ -324,7 +371,7 @@ async function saveChanges() {
           description="Propuesta de precios para el cliente. Los datos de entrega (repartidor, remisión) se asignan al convertirla en pedido."
         />
 
-        <div class="grid gap-4 lg:grid-cols-2">
+        <div :class="isQuote ? 'grid gap-4' : 'grid gap-4 lg:grid-cols-2'">
           <UCard>
             <template #header>
               <h2 class="font-semibold text-highlighted">
@@ -382,7 +429,7 @@ async function saveChanges() {
                   </span>
                 </dd>
               </div>
-              <div>
+              <div v-if="!isQuote">
                 <dt class="text-sm text-muted">
                   Vendedor
                 </dt>
@@ -421,6 +468,7 @@ async function saveChanges() {
           </UCard>
 
           <OrdersOrderStatusPanel
+            v-if="!isQuote"
             v-model:status-key="selectedStatus"
             v-model:note="statusNote"
             :order="order"
@@ -434,7 +482,7 @@ async function saveChanges() {
           :currency-code="order.currencyCode"
         />
 
-        <div class="grid gap-4 lg:grid-cols-2">
+        <div :class="isQuote ? 'grid gap-4' : 'grid gap-4 lg:grid-cols-2'">
           <UCard>
             <template #header>
               <h2 class="font-semibold text-highlighted">
@@ -469,7 +517,7 @@ async function saveChanges() {
             </dl>
           </UCard>
 
-          <OrdersOrderHistory :entries="order.statusHistory" />
+          <OrdersOrderHistory v-if="!isQuote" :entries="order.statusHistory" />
         </div>
       </template>
 
