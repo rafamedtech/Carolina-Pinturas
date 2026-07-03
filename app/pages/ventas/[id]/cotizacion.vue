@@ -5,8 +5,8 @@ definePageMeta({ layout: false })
 
 const route = useRoute()
 const orderId = computed(() => String(route.params.id))
-const documentRef = ref<HTMLElement | null>(null)
 const downloading = shallowRef(false)
+const pdfError = shallowRef('')
 
 const { data: order, status, error } = useLazyFetch<SalesOrderDetail>(
   () => `/api/orders/${encodeURIComponent(orderId.value)}`,
@@ -30,24 +30,198 @@ function formatDate(value: string | null | undefined) {
   return value.split('-').reverse().join('/')
 }
 
-useSeoMeta({ title: () => order.value ? `${docLabel.value} ${order.value.number}` : 'Documento' })
+function formatTaxLabel(tax: SalesOrderDetail['taxBreakdown'][number]) {
+  if (tax.percentage === null) return tax.name
+
+  const name = tax.name.replace(/\s*\d+(?:[.,]\d+)?\s*%\s*$/u, '').trim()
+  return `${name || 'Impuesto'} (${tax.percentage}%)`
+}
+
+const quoteExpiryDate = computed(() => {
+  if (!order.value?.orderDate) return null
+
+  const [year, month, day] = order.value.orderDate.split('-').map(Number)
+  const expiry = new Date(Date.UTC(year!, month! - 1, day!))
+  expiry.setUTCDate(expiry.getUTCDate() + 15)
+  return expiry.toISOString().slice(0, 10)
+})
+
+useSeoMeta({ title: () => order.value ? docLabel.value : 'Documento' })
 
 function printDocument() {
   window.print()
 }
 
+async function imageDataUrl(url: string) {
+  const response = await fetch(url)
+  if (!response.ok) throw new Error(`No fue posible cargar la imagen: ${url}`)
+
+  const blob = await response.blob()
+  return await new Promise<string>((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => resolve(String(reader.result))
+    reader.onerror = () => reject(reader.error)
+    reader.readAsDataURL(blob)
+  })
+}
+
 async function downloadPdf() {
-  if (!documentRef.value || !order.value || downloading.value) return
+  if (!order.value || downloading.value) return
   downloading.value = true
+  pdfError.value = ''
+
   try {
-    const html2pdf = (await import('html2pdf.js')).default
-    await html2pdf().set({
-      margin: 0,
-      filename: `${docLabel.value}-${order.value.number}.pdf`,
-      image: { type: 'jpeg', quality: 0.98 },
-      html2canvas: { scale: 2, useCORS: true, backgroundColor: '#ffffff' },
-      jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
-    }).from(documentRef.value).save()
+    const [{ jsPDF }, logo] = await Promise.all([
+      import('jspdf'),
+      imageDataUrl('/logo-pinturas.png')
+    ])
+    const pdf = new jsPDF({ unit: 'mm', format: 'a4', orientation: 'portrait' })
+    const filename = `${docLabel.value}-${order.value.orderDate}.pdf`
+    const pageWidth = pdf.internal.pageSize.getWidth()
+    const pageHeight = pdf.internal.pageSize.getHeight()
+    const left = 16
+    const right = pageWidth - 16
+    const contentWidth = right - left
+    let y = 12
+
+    pdf.setProperties({ title: docLabel.value, subject: 'Cotización para cliente' })
+    pdf.addImage(logo, 'PNG', left, y, 54, 27)
+    pdf.setTextColor(29, 78, 216)
+    pdf.setFont('helvetica', 'bold')
+    pdf.setFontSize(18)
+    pdf.text(docLabel.value.toUpperCase(), right, y + 9, { align: 'right' })
+    pdf.setTextColor(107, 114, 128)
+    pdf.setFont('helvetica', 'normal')
+    pdf.setFontSize(10)
+    pdf.text(`Fecha de cotización: ${formatDate(order.value.orderDate)}`, right, y + 17, {
+      align: 'right'
+    })
+    pdf.text(`Válida hasta: ${formatDate(quoteExpiryDate.value)}`, right, y + 22, {
+      align: 'right'
+    })
+    y += 32
+    pdf.setDrawColor(17, 24, 39)
+    pdf.setLineWidth(0.7)
+    pdf.line(left, y, right, y)
+
+    y += 8
+    pdf.setTextColor(107, 114, 128)
+    pdf.setFontSize(8)
+    pdf.setFont('helvetica', 'normal')
+    pdf.text('CLIENTE', left, y)
+    y += 6
+    pdf.setTextColor(17, 24, 39)
+    pdf.setFontSize(12)
+    pdf.setFont('helvetica', 'bold')
+    pdf.text(order.value.customer.name, left, y)
+    y += 10
+
+    const drawTableHeader = () => {
+      pdf.setFillColor(243, 244, 246)
+      pdf.rect(left, y, contentWidth, 8, 'F')
+      pdf.setTextColor(55, 65, 81)
+      pdf.setFont('helvetica', 'bold')
+      pdf.setFontSize(8)
+      pdf.text('CÓDIGO', left + 2, y + 5.2)
+      pdf.text('CONCEPTO', left + 34, y + 5.2)
+      pdf.text('CANT.', left + 126, y + 5.2, { align: 'right' })
+      pdf.text('P. UNITARIO', left + 153, y + 5.2, { align: 'right' })
+      pdf.text('IMPORTE', right - 2, y + 5.2, { align: 'right' })
+      y += 8
+    }
+
+    const addItemsPage = () => {
+      pdf.addPage()
+      y = 16
+      drawTableHeader()
+    }
+
+    drawTableHeader()
+    pdf.setFont('helvetica', 'normal')
+
+    for (const item of order.value.items) {
+      const nameLines = pdf.splitTextToSize(item.name, 84) as string[]
+      const rowHeight = Math.max(9, nameLines.length * 4 + 4)
+      if (y + rowHeight > pageHeight - 20) addItemsPage()
+
+      pdf.setTextColor(55, 65, 81)
+      pdf.setFontSize(8.5)
+      pdf.text(item.code, left + 2, y + 5.5)
+      pdf.setTextColor(17, 24, 39)
+      pdf.text(nameLines, left + 34, y + 5.5)
+      pdf.text(String(item.quantity), left + 126, y + 5.5, { align: 'right' })
+      pdf.text(formatCurrency(item.unitPrice), left + 153, y + 5.5, { align: 'right' })
+      pdf.setFont('helvetica', 'bold')
+      pdf.text(formatCurrency(item.total), right - 2, y + 5.5, { align: 'right' })
+      pdf.setFont('helvetica', 'normal')
+      pdf.setDrawColor(229, 231, 235)
+      pdf.setLineWidth(0.2)
+      pdf.line(left, y + rowHeight, right, y + rowHeight)
+      y += rowHeight
+    }
+
+    const totalsHeight = 20 + order.value.taxBreakdown.length * 6
+    if (y + totalsHeight > pageHeight - 25) {
+      pdf.addPage()
+      y = 20
+    } else {
+      y += 7
+    }
+
+    const totalsLabelX = right - 55
+    pdf.setFontSize(9)
+    pdf.setTextColor(107, 114, 128)
+    pdf.text('Subtotal', totalsLabelX, y)
+    pdf.setTextColor(17, 24, 39)
+    pdf.text(formatCurrency(order.value.subtotal), right, y, { align: 'right' })
+
+    for (const tax of order.value.taxBreakdown) {
+      y += 6
+      pdf.setTextColor(107, 114, 128)
+      pdf.text(formatTaxLabel(tax), totalsLabelX, y)
+      pdf.setTextColor(17, 24, 39)
+      pdf.text(formatCurrency(tax.amount), right, y, { align: 'right' })
+    }
+
+    y += 8
+    pdf.setDrawColor(17, 24, 39)
+    pdf.setLineWidth(0.5)
+    pdf.line(totalsLabelX, y - 4, right, y - 4)
+    pdf.setFont('helvetica', 'bold')
+    pdf.setFontSize(12)
+    pdf.text('Total', totalsLabelX, y)
+    pdf.text(formatCurrency(order.value.total), right, y, { align: 'right' })
+
+    y += 18
+    if (y > pageHeight - 28) {
+      pdf.addPage()
+      y = 20
+    }
+    pdf.setFont('helvetica', 'normal')
+    pdf.setFontSize(8.5)
+    pdf.setTextColor(107, 114, 128)
+    const terms = pdf.splitTextToSize(
+      'Cotización válida por 15 días a partir de la fecha de emisión. '
+      + 'Precios sujetos a cambio sin previo aviso.',
+      contentWidth
+    ) as string[]
+    pdf.text(terms, left, y)
+    y += terms.length * 4 + 4
+    pdf.text('Gracias por su preferencia.', left, y)
+
+    const pdfBlob = pdf.output('blob')
+
+    const downloadUrl = URL.createObjectURL(pdfBlob)
+    const downloadLink = document.createElement('a')
+    downloadLink.href = downloadUrl
+    downloadLink.download = filename
+    document.body.appendChild(downloadLink)
+    downloadLink.click()
+    downloadLink.remove()
+    window.setTimeout(() => URL.revokeObjectURL(downloadUrl), 1000)
+  } catch (pdfGenerationError) {
+    console.error('No fue posible generar la cotización en PDF.', pdfGenerationError)
+    pdfError.value = 'No fue posible descargar el PDF. Intenta de nuevo.'
   } finally {
     downloading.value = false
   }
@@ -83,26 +257,42 @@ watch([status, order], () => {
       Cargando documento…
     </p>
 
+    <div v-else-if="order" class="document-actions">
+      <UButton
+        label="Imprimir"
+        icon="i-lucide-printer"
+        color="neutral"
+        variant="outline"
+        @click="printDocument"
+      />
+      <UButton
+        label="Descargar PDF"
+        icon="i-lucide-download"
+        :loading="downloading"
+        @click="downloadPdf"
+      />
+      <p v-if="pdfError" class="pdf-error" role="alert">
+        {{ pdfError }}
+      </p>
+    </div>
+
     <!-- Captured for PDF: plain CSS only (no oklch/Tailwind color utilities). -->
-    <div v-else-if="order" ref="documentRef" class="quote-doc">
+    <div v-if="order" class="quote-doc">
       <header class="doc-head">
-        <div>
-          <p class="brand">
-            Carolina Pinturas
-          </p>
-          <p class="brand-sub">
-            Distribuidor Siigo México
-          </p>
-        </div>
+        <img
+          src="/logo-pinturas.png"
+          alt="Carolina Pinturas"
+          class="brand-logo"
+        >
         <div class="doc-meta">
           <p class="doc-type">
             {{ docLabel === 'Cotización' ? 'COTIZACIÓN' : 'PEDIDO' }}
           </p>
-          <p class="doc-number">
-            {{ order.number }}
-          </p>
           <p class="doc-date">
             {{ isQuote ? 'Fecha de cotización' : 'Fecha del pedido' }}: {{ formatDate(order.orderDate) }}
+          </p>
+          <p class="doc-date">
+            Válida hasta: {{ formatDate(quoteExpiryDate) }}
           </p>
         </div>
       </header>
@@ -113,9 +303,6 @@ watch([status, order], () => {
         </p>
         <p class="party-name">
           {{ order.customer.name }}
-        </p>
-        <p class="party-line">
-          RFC: {{ order.customer.rfc || '—' }}
         </p>
       </section>
 
@@ -146,7 +333,6 @@ watch([status, order], () => {
             </td>
             <td class="c-name">
               {{ item.name }}
-              <span v-if="item.observations" class="item-note">{{ item.observations }}</span>
             </td>
             <td class="c-num">
               {{ item.quantity }}
@@ -172,12 +358,15 @@ watch([status, order], () => {
                 {{ formatCurrency(order.subtotal) }}
               </td>
             </tr>
-            <tr>
+            <tr
+              v-for="tax in order.taxBreakdown"
+              :key="`${tax.name}-${tax.percentage}`"
+            >
               <td class="t-label">
-                Impuestos
+                {{ formatTaxLabel(tax) }}
               </td>
               <td class="t-value">
-                {{ formatCurrency(order.taxTotal) }}
+                {{ formatCurrency(tax.amount) }}
               </td>
             </tr>
             <tr class="t-grand">
@@ -221,8 +410,24 @@ watch([status, order], () => {
   padding: 24px 16px;
 }
 
-/* The printable document uses fixed hex colors so window.print() and
-   html2canvas (PDF) render identically and avoid unsupported oklch colors. */
+.document-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 8px;
+  max-width: 800px;
+  margin: 0 auto 12px;
+}
+
+.pdf-error {
+  flex-basis: 100%;
+  margin: 0;
+  color: #b91c1c;
+  text-align: right;
+}
+
+/* Fixed colors keep the browser print version consistent with the generated PDF. */
 .quote-doc {
   max-width: 800px;
   margin: 0 auto;
@@ -238,22 +443,16 @@ watch([status, order], () => {
 .doc-head {
   display: flex;
   justify-content: space-between;
-  align-items: flex-start;
+  align-items: center;
   gap: 24px;
   border-bottom: 2px solid #111827;
   padding-bottom: 16px;
 }
 
-.brand {
-  font-size: 20px;
-  font-weight: 700;
-  color: #111827;
-}
-
-.brand-sub {
-  font-size: 12px;
-  color: #6b7280;
-  margin-top: 2px;
+.brand-logo {
+  display: block;
+  width: 180px;
+  height: auto;
 }
 
 .doc-meta {
@@ -265,12 +464,6 @@ watch([status, order], () => {
   font-weight: 700;
   letter-spacing: 0.06em;
   color: #1d4ed8;
-}
-
-.doc-number {
-  font-size: 14px;
-  font-weight: 600;
-  margin-top: 2px;
 }
 
 .doc-date {
@@ -294,10 +487,6 @@ watch([status, order], () => {
   font-size: 15px;
   font-weight: 600;
   margin-top: 2px;
-}
-
-.party-line {
-  color: #374151;
 }
 
 .items {
@@ -331,12 +520,6 @@ watch([status, order], () => {
 .c-code {
   white-space: nowrap;
   color: #374151;
-}
-
-.item-note {
-  display: block;
-  font-size: 11px;
-  color: #6b7280;
 }
 
 .totals-wrap {
@@ -411,6 +594,10 @@ watch([status, order], () => {
   .page {
     background: #ffffff;
     padding: 0;
+  }
+
+  .document-actions {
+    display: none;
   }
 
   .quote-doc {

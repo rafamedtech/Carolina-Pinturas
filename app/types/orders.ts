@@ -103,6 +103,11 @@ export interface SalesOrderDetail extends SalesOrderListItem {
   subtotal: number
   discountTotal: number
   taxTotal: number
+  taxBreakdown: Array<{
+    name: string
+    percentage: number | null
+    amount: number
+  }>
   siigoReference: string | null
   registeredInSiigoAt: string | null
   version: number

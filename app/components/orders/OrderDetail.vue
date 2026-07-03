@@ -362,15 +362,6 @@ async function convertToPedido() {
           </div>
         </div>
 
-        <UAlert
-          v-if="isQuote"
-          color="info"
-          variant="subtle"
-          icon="i-lucide-file-text"
-          title="Documento de cotización"
-          description="Propuesta de precios para el cliente. Los datos de entrega (repartidor, remisión) se asignan al convertirla en pedido."
-        />
-
         <div :class="isQuote ? 'grid gap-4' : 'grid gap-4 lg:grid-cols-2'">
           <UCard>
             <template #header>

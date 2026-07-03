@@ -10,9 +10,11 @@ const props = withDefaults(defineProps<{
   disabled: boolean
   repartidorRequired?: boolean
   showStatus?: boolean
+  quoteMode?: boolean
 }>(), {
   repartidorRequired: false,
-  showStatus: true
+  showStatus: true,
+  quoteMode: false
 })
 
 const customerId = defineModel<string>('customerId', { required: true })
@@ -47,7 +49,7 @@ const repartidorOptions = computed(() => props.repartidores.map(repartidor => ({
   <UCard>
     <template #header>
       <h2 class="font-semibold text-highlighted">
-        Datos del pedido
+        Datos de {{ props.quoteMode ? 'la cotización' : 'el pedido' }}
       </h2>
     </template>
 
@@ -85,6 +87,7 @@ const repartidorOptions = computed(() => props.repartidores.map(repartidor => ({
       </UFormField>
 
       <UFormField
+        v-if="!props.quoteMode"
         name="remision"
         label="Remisión física"
         :class="{ 'sm:col-span-2': !props.showStatus }"
@@ -99,6 +102,7 @@ const repartidorOptions = computed(() => props.repartidores.map(repartidor => ({
       </UFormField>
 
       <UFormField
+        v-if="!props.quoteMode"
         name="repartidorId"
         label="Repartidor"
         :required="props.repartidorRequired"
@@ -116,7 +120,12 @@ const repartidorOptions = computed(() => props.repartidores.map(repartidor => ({
         />
       </UFormField>
 
-      <UFormField name="orderDate" label="Fecha del pedido" required>
+      <UFormField
+        name="orderDate"
+        :label="props.quoteMode ? 'Fecha de la cotización' : 'Fecha del pedido'"
+        required
+        :class="{ 'sm:col-span-2': props.quoteMode }"
+      >
         <UInput
           v-model="orderDate"
           type="date"
@@ -125,7 +134,7 @@ const repartidorOptions = computed(() => props.repartidores.map(repartidor => ({
         />
       </UFormField>
 
-      <UFormField name="promisedDate" label="Fecha prometida">
+      <UFormField v-if="!props.quoteMode" name="promisedDate" label="Fecha prometida">
         <UInput
           v-model="promisedDate"
           type="date"

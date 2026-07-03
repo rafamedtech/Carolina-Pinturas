@@ -62,6 +62,14 @@ const statusOptions = computed(() => {
       />
       <UButton
         v-if="!igualacion && canCreate"
+        to="/ventas/nueva-cotizacion"
+        label="Nueva cotización"
+        icon="i-lucide-file-text"
+        color="neutral"
+        variant="outline"
+      />
+      <UButton
+        v-if="!igualacion && canCreate"
         to="/ventas/nuevo-pedido"
         label="Nuevo pedido"
         icon="i-lucide-shopping-cart"

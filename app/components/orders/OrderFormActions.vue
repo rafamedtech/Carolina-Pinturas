@@ -3,6 +3,7 @@ defineProps<{
   saving: boolean
   savingDraft: boolean
   disabled: boolean
+  quoteMode?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -13,7 +14,7 @@ const emit = defineEmits<{
 <template>
   <div class="mt-auto flex flex-col-reverse gap-3 border-t border-default pt-4 sm:flex-row sm:items-center sm:justify-between">
     <p class="text-sm text-muted">
-      Los datos del producto se congelarán en el pedido al guardarlo.
+      Los datos del producto se congelarán en {{ quoteMode ? 'la cotización' : 'el pedido' }} al guardarlo.
     </p>
     <div class="flex gap-2">
       <UButton
@@ -24,7 +25,7 @@ const emit = defineEmits<{
         :disabled="saving"
       />
       <UButton
-        label="Guardar como cotización"
+        :label="quoteMode ? 'Guardar cotización' : 'Guardar como cotización'"
         icon="i-lucide-file-text"
         color="neutral"
         variant="subtle"
@@ -33,6 +34,7 @@ const emit = defineEmits<{
         @click="emit('saveDraft')"
       />
       <UButton
+        v-if="!quoteMode"
         type="submit"
         label="Revisar pedido"
         icon="i-lucide-clipboard-check"

@@ -51,6 +51,67 @@ function dateOnly(value: Date | null) {
   return value ? value.toISOString().slice(0, 10) : null
 }
 
+function orderTaxBreakdown(order: OrderDetailRecord): SalesOrderDetail['taxBreakdown'] {
+  const breakdown = new Map<string, {
+    name: string
+    percentage: number | null
+    amount: Decimal
+  }>()
+
+  for (const item of order.items) {
+    const taxes = Array.isArray(item.taxPayload)
+      ? item.taxPayload.flatMap((tax) => {
+          if (!tax || typeof tax !== 'object' || Array.isArray(tax)) return []
+
+          const percentage = Number(tax.percentage)
+          if (!Number.isFinite(percentage) || percentage <= 0) return []
+
+          const name = typeof tax.name === 'string' && tax.name.trim()
+            ? tax.name.trim()
+            : typeof tax.type === 'string' && tax.type.trim()
+              ? tax.type.trim()
+              : 'Impuesto'
+
+          return [{ name, percentage }]
+        })
+      : []
+    const itemTaxAmount = money(item.taxAmount)
+    const combinedPercentage = taxes.reduce(
+      (total, tax) => total.plus(tax.percentage),
+      money(0)
+    )
+
+    if (!taxes.length || combinedPercentage.isZero()) {
+      if (!itemTaxAmount.isZero()) {
+        const current = breakdown.get('Impuestos|')
+        breakdown.set('Impuestos|', {
+          name: 'Impuestos',
+          percentage: null,
+          amount: (current?.amount || money(0)).plus(itemTaxAmount)
+        })
+      }
+      continue
+    }
+
+    for (const tax of taxes) {
+      const key = `${tax.name}|${tax.percentage}`
+      const current = breakdown.get(key)
+      const amount = itemTaxAmount.mul(tax.percentage).div(combinedPercentage)
+      breakdown.set(key, {
+        name: tax.name,
+        percentage: tax.percentage,
+        amount: (current?.amount || money(0)).plus(amount)
+      })
+    }
+  }
+
+  return [...breakdown.values()].map(tax => ({
+    name: tax.name,
+    percentage: tax.percentage,
+    amount: number(tax.amount)
+  }))
+}
+
 export function orderNumber(folio: number) {
   return `PED-${String(folio).padStart(6, '0')}`
 }
@@ -208,6 +269,7 @@ function detail(order: OrderDetailRecord): SalesOrderDetail {
     subtotal: number(order.subtotal),
     discountTotal: number(order.discountTotal),
     taxTotal: number(order.taxTotal),
+    taxBreakdown: orderTaxBreakdown(order),
     siigoReference: order.siigoReference,
     registeredInSiigoAt: order.registeredInSiigoAt?.toISOString() || null,
     version: order.version,

@@ -3,6 +3,7 @@ import type { DraftOrderLine } from '~/composables/useOrderDraft'
 
 defineProps<{
   lines: readonly DraftOrderLine[]
+  quoteMode?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -106,7 +107,7 @@ function lineTotal(line: DraftOrderLine) {
     >
       <UIcon name="i-lucide-shopping-cart" class="size-8 text-muted" />
       <p class="text-sm text-muted">
-        Agrega productos para iniciar el pedido.
+        Agrega productos para iniciar {{ quoteMode ? 'la cotización' : 'el pedido' }}.
       </p>
     </div>
   </div>

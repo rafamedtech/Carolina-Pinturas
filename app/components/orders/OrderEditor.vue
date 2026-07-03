@@ -5,6 +5,17 @@ import type { OrderStatus, SalesOrderDetail } from '~/types/orders'
 import type { SiigoProduct } from '~/types/siigo'
 import { submittedOrderStatusKey } from '~/utils/roleAccess'
 
+const props = withDefaults(defineProps<{
+  mode?: 'order' | 'quote'
+}>(), {
+  mode: 'order'
+})
+const isQuoteMode = computed(() => props.mode === 'quote')
+const documentNoun = computed(() => isQuoteMode.value ? 'cotización' : 'pedido')
+const documentWithArticle = computed(() => isQuoteMode.value ? 'la cotización' : 'el pedido')
+const documentOf = computed(() => isQuoteMode.value ? 'de la cotización' : 'del pedido')
+const pageTitle = computed(() => isQuoteMode.value ? 'Nueva cotización' : 'Nuevo pedido')
+
 // Repartidor is optional while the order is borrador/ingresado; required to confirm.
 const STATUS_KEYS_REQUIRING_REPARTIDOR = ['confirmado', 'surtido', 'en_espera']
 
@@ -12,7 +23,7 @@ const schema = z.object({
   customerId: z.string().uuid('Selecciona un cliente.'),
   statusKey: z.string().min(1, 'Selecciona un estado.'),
   repartidorId: z.string(),
-  orderDate: z.string().min(1, 'Selecciona la fecha del pedido.'),
+  orderDate: z.string().min(1, `Selecciona la fecha ${documentOf.value}.`),
   promisedDate: z.string(),
   remision: z.string().max(100),
   observations: z.string().max(5000)
@@ -21,7 +32,7 @@ const schema = z.object({
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
       path: ['repartidorId'],
-      message: 'Selecciona un repartidor para confirmar el pedido.'
+      message: `Selecciona un repartidor para confirmar ${documentWithArticle.value}.`
     })
   }
 })
@@ -44,7 +55,9 @@ function productPrice(product: SiigoProduct) {
 const { user } = useAuth()
 const state = reactive<Schema>({
   customerId: '',
-  statusKey: user.value?.role === 'admin' ? 'ingresado' : 'borrador',
+  statusKey: isQuoteMode.value
+    ? 'borrador'
+    : user.value?.role === 'admin' ? 'ingresado' : 'borrador',
   repartidorId: '',
   orderDate: mexicoToday(),
   promisedDate: '',
@@ -171,6 +184,16 @@ function formatDate(value: string) {
   return value.split('-').reverse().join('/')
 }
 
+function documentMessage(message: string) {
+  if (!isQuoteMode.value) return message
+
+  return message
+    .replace(/\bPedidos\b/g, 'Cotizaciones')
+    .replace(/\bpedidos\b/g, 'cotizaciones')
+    .replace(/\bPedido\b/g, 'Cotización')
+    .replace(/\bpedido\b/g, 'cotización')
+}
+
 function lineTotal(line: { quantity: number, unitPrice: number, taxIncluded: boolean, taxPercentage: number }) {
   const listedTotal = line.quantity * line.unitPrice
   return line.taxIncluded ? listedTotal : listedTotal * (1 + line.taxPercentage / 100)
@@ -214,7 +237,7 @@ async function confirmSubmit(statusKey: string) {
   if (STATUS_KEYS_REQUIRING_REPARTIDOR.includes(statusKey) && !pendingSubmission.value.repartidorId) {
     toast.add({
       title: 'Selecciona un repartidor',
-      description: 'El pedido necesita un repartidor antes de guardarse como confirmado.',
+      description: `${isQuoteMode.value ? 'La cotización' : 'El pedido'} necesita un repartidor antes de guardarse como ${isQuoteMode.value ? 'confirmada' : 'confirmado'}.`,
       color: 'warning',
       icon: 'i-lucide-truck'
     })
@@ -243,7 +266,9 @@ async function confirmSubmit(statusKey: string) {
     })
 
     toast.add({
-      title: `Pedido ${order.number} guardado`,
+      title: statusKey === 'borrador'
+        ? `Cotización ${order.number} guardada`
+        : `Pedido ${order.number} guardado`,
       description: 'Las partidas y los datos de Siigo quedaron almacenados en PostgreSQL.',
       color: 'success',
       icon: 'i-lucide-circle-check'
@@ -252,8 +277,10 @@ async function confirmSubmit(statusKey: string) {
   } catch (error: unknown) {
     const fetchError = error as { data?: { statusMessage?: string }, message?: string }
     toast.add({
-      title: 'No se pudo guardar el pedido',
-      description: fetchError.data?.statusMessage || fetchError.message || 'Intenta de nuevo.',
+      title: `No se pudo guardar ${documentWithArticle.value}`,
+      description: documentMessage(
+        fetchError.data?.statusMessage || fetchError.message || 'Intenta de nuevo.'
+      ),
       color: 'error',
       icon: 'i-lucide-circle-alert'
     })
@@ -267,14 +294,14 @@ async function confirmSubmit(statusKey: string) {
 <template>
   <UDashboardPanel id="new-order">
     <template #header>
-      <UDashboardNavbar title="Nuevo pedido">
+      <UDashboardNavbar :title="pageTitle">
         <template #leading>
           <UButton
             to="/ventas"
             icon="i-lucide-arrow-left"
             color="neutral"
             variant="ghost"
-            aria-label="Volver a pedidos"
+            aria-label="Volver a ventas"
           />
         </template>
       </UDashboardNavbar>
@@ -311,7 +338,8 @@ async function confirmSubmit(statusKey: string) {
             :loading="catalogsLoading"
             :disabled="formDisabled"
             :repartidor-required="repartidorRequired"
-            :show-status="mayChooseInitialStatus"
+            :show-status="mayChooseInitialStatus && !isQuoteMode"
+            :quote-mode="isQuoteMode"
           />
 
           <OrdersOrderProductPicker
@@ -325,6 +353,7 @@ async function confirmSubmit(statusKey: string) {
         <OrdersOrderLinesTable
           :lines="lines"
           :total="total"
+          :quote-mode="isQuoteMode"
           @remove="removeProduct"
           @observations="setObservations"
           @quantity="setQuantity"
@@ -334,11 +363,12 @@ async function confirmSubmit(statusKey: string) {
           :saving="saving"
           :saving-draft="savingDraft"
           :disabled="!canSubmit"
+          :quote-mode="isQuoteMode"
           @save-draft="saveAsQuote"
         />
       </UForm>
 
-      <UModal v-model:open="summaryOpen" title="Resumen del pedido">
+      <UModal v-model:open="summaryOpen" :title="`Resumen ${documentOf}`">
         <template #body>
           <div v-if="pendingSubmission" class="space-y-4">
             <div>
@@ -402,7 +432,7 @@ async function confirmSubmit(statusKey: string) {
               color="warning"
               variant="subtle"
               title="Falta seleccionar un repartidor"
-              :description="`Es necesario para enviar el pedido como ${sendStatusLabel.toLowerCase()}.`"
+              :description="`Es necesario para enviar ${documentWithArticle} como ${sendStatusLabel.toLowerCase()}.`"
               icon="i-lucide-truck"
             />
           </div>
@@ -411,7 +441,7 @@ async function confirmSubmit(statusKey: string) {
         <template #footer>
           <div class="flex w-full flex-col-reverse gap-2 sm:flex-row sm:justify-end">
             <UButton
-              label="Editar pedido"
+              :label="`Editar ${documentNoun}`"
               color="neutral"
               variant="outline"
               :disabled="saving"

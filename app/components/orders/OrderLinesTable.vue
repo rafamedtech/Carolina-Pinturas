@@ -7,6 +7,7 @@ import type { DraftOrderLine } from '~/composables/useOrderDraft'
 const props = defineProps<{
   lines: readonly DraftOrderLine[]
   total: number
+  quoteMode?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -92,7 +93,7 @@ const columns: TableColumn<DraftOrderLine>[] = [{
       <div class="flex items-center justify-between gap-3">
         <div>
           <h2 class="font-semibold text-highlighted">
-            Partidas del pedido
+            Partidas de {{ props.quoteMode ? 'la cotización' : 'el pedido' }}
           </h2>
           <p class="mt-1 text-sm text-muted">
             {{ lines.length }} {{ lines.length === 1 ? 'producto agregado' : 'productos agregados' }}
@@ -107,6 +108,7 @@ const columns: TableColumn<DraftOrderLine>[] = [{
 
     <OrderLineCards
       :lines="lines"
+      :quote-mode="props.quoteMode"
       @remove="emit('remove', $event)"
       @observations="updateObservations"
       @quantity="updateQuantity"
@@ -115,7 +117,7 @@ const columns: TableColumn<DraftOrderLine>[] = [{
     <UTable
       :data="tableLines"
       :columns="columns"
-      empty="Agrega productos para iniciar el pedido."
+      :empty="`Agrega productos para iniciar ${props.quoteMode ? 'la cotización' : 'el pedido'}.`"
       class="hidden md:block"
       :ui="{
         base: 'table-fixed border-separate border-spacing-0',
