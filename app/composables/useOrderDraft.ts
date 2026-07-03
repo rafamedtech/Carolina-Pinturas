@@ -70,6 +70,16 @@ export function useOrderDraft() {
     )
   }
 
+  function setQuantity(productId: string, quantity: number) {
+    const normalizedQuantity = Number.isFinite(quantity)
+      ? Math.max(0.000001, quantity)
+      : 0.000001
+
+    internalLines.value = internalLines.value.map(line =>
+      line.productId === productId ? { ...line, quantity: normalizedQuantity } : line
+    )
+  }
+
   function reset() {
     internalLines.value = []
   }
@@ -80,6 +90,7 @@ export function useOrderDraft() {
     addProduct,
     removeProduct,
     setObservations,
+    setQuantity,
     reset
   }
 }

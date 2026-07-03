@@ -12,15 +12,21 @@ const props = defineProps<{
 const emit = defineEmits<{
   remove: [productId: string]
   observations: [productId: string, value: string]
+  quantity: [productId: string, value: number]
 }>()
 
 const UButton = resolveComponent('UButton')
 const UInput = resolveComponent('UInput')
+const UInputNumber = resolveComponent('UInputNumber')
 const currency = new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' })
 const tableLines = computed(() => [...props.lines])
 
 function updateObservations(productId: string, value: string) {
   emit('observations', productId, value)
+}
+
+function updateQuantity(productId: string, value: number) {
+  emit('quantity', productId, value)
 }
 
 const columns: TableColumn<DraftOrderLine>[] = [{
@@ -43,7 +49,16 @@ const columns: TableColumn<DraftOrderLine>[] = [{
 }, {
   accessorKey: 'quantity',
   header: () => h('div', { class: 'text-right' }, 'Cantidad'),
-  cell: ({ row }) => h('div', { class: 'text-right' }, row.getValue('quantity'))
+  cell: ({ row }) => h(UInputNumber, {
+    'modelValue': row.original.quantity,
+    'min': 0.000001,
+    'step': 1,
+    'size': 'sm',
+    'variant': 'subtle',
+    'class': 'ms-auto w-28',
+    'aria-label': `Cantidad de ${row.original.name}`,
+    'onUpdate:modelValue': (value: number) => emit('quantity', row.original.productId, value)
+  })
 }, {
   accessorKey: 'unitPrice',
   header: () => h('div', { class: 'text-right' }, 'Precio unitario'),
@@ -94,6 +109,7 @@ const columns: TableColumn<DraftOrderLine>[] = [{
       :lines="lines"
       @remove="emit('remove', $event)"
       @observations="updateObservations"
+      @quantity="updateQuantity"
     />
 
     <UTable

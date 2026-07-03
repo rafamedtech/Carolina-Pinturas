@@ -20,9 +20,29 @@ export const OPERATIONAL_ROLES = [
 
 const REPARTIDOR_STATUS_KEYS = ['en_espera', 'en_camino', 'entregado'] as const
 const IGUALACIONES_STATUS_KEYS = ['confirmado', 'surtido', 'en_espera'] as const
+const MOSTRADOR_CREATE_STATUS_KEYS = ['borrador', 'confirmado'] as const
+const SALES_CREATE_STATUS_KEYS = ['borrador', 'ingresado'] as const
 
 export function canCreateOrders(role: UserRole) {
   return ORDER_ENTRY_ROLES.includes(role as typeof ORDER_ENTRY_ROLES[number])
+}
+
+export function creatableOrderStatusKeys(role: UserRole): readonly string[] | null {
+  if (role === 'admin') return null
+  if (role === 'mostrador') return MOSTRADOR_CREATE_STATUS_KEYS
+  if (role === 'vendedor' || role === 'repartidor') return SALES_CREATE_STATUS_KEYS
+  return []
+}
+
+export function canCreateOrderWithStatus(role: UserRole, statusKey: string) {
+  const allowedStatusKeys = creatableOrderStatusKeys(role)
+  return allowedStatusKeys === null || allowedStatusKeys.includes(statusKey)
+}
+
+export function submittedOrderStatusKey(role: UserRole, selectedStatusKey: string) {
+  if (role === 'mostrador') return 'confirmado'
+  if (role === 'vendedor' || role === 'repartidor') return 'ingresado'
+  return selectedStatusKey
 }
 
 export function canManageOrderLogistics(role: UserRole) {

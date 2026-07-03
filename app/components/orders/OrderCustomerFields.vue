@@ -2,14 +2,18 @@
 import type { OrderStatus, Repartidor } from '~/types/orders'
 import type { SiigoCustomer } from '~/types/siigo'
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   customers: SiigoCustomer[]
   statuses: OrderStatus[]
   repartidores: Repartidor[]
   loading: boolean
   disabled: boolean
   repartidorRequired?: boolean
-}>()
+  showStatus?: boolean
+}>(), {
+  repartidorRequired: false,
+  showStatus: true
+})
 
 const customerId = defineModel<string>('customerId', { required: true })
 const statusKey = defineModel<string>('statusKey', { required: true })
@@ -37,7 +41,6 @@ const repartidorOptions = computed(() => props.repartidores.map(repartidor => ({
   description: repartidor.telefono || undefined,
   value: repartidor.id
 })))
-
 </script>
 
 <template>
@@ -66,7 +69,12 @@ const repartidorOptions = computed(() => props.repartidores.map(repartidor => ({
         />
       </UFormField>
 
-      <UFormField name="statusKey" label="Estado inicial" required>
+      <UFormField
+        v-if="props.showStatus"
+        name="statusKey"
+        label="Estado inicial"
+        required
+      >
         <USelect
           v-model="statusKey"
           :items="statusOptions"
@@ -76,7 +84,11 @@ const repartidorOptions = computed(() => props.repartidores.map(repartidor => ({
         />
       </UFormField>
 
-      <UFormField name="remision" label="Remisión física">
+      <UFormField
+        name="remision"
+        label="Remisión física"
+        :class="{ 'sm:col-span-2': !props.showStatus }"
+      >
         <UInput
           v-model="remision"
           :disabled="disabled"

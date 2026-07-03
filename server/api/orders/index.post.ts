@@ -1,5 +1,5 @@
 import type { SiigoCustomer, SiigoProduct } from '~/types/siigo'
-import { ORDER_ENTRY_ROLES } from '~/utils/roleAccess'
+import { canCreateOrderWithStatus, ORDER_ENTRY_ROLES } from '~/utils/roleAccess'
 import { requireRole } from '../../utils/auth'
 import { createOrder } from '../../utils/orders'
 import { createOrderSchema } from '../../utils/order-validation'
@@ -15,6 +15,13 @@ export default eventHandler(async (event) => {
       statusCode: 400,
       statusMessage: 'Revisa los datos del pedido.',
       data: parsed.error.flatten()
+    })
+  }
+
+  if (!canCreateOrderWithStatus(user.role, parsed.data.statusKey)) {
+    throw createError({
+      statusCode: 403,
+      statusMessage: 'No tienes permiso para crear un pedido con ese estado.'
     })
   }
 

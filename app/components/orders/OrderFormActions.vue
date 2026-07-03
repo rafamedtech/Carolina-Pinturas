@@ -20,8 +20,8 @@ defineProps<{
       />
       <UButton
         type="submit"
-        label="Guardar pedido"
-        icon="i-lucide-save"
+        label="Revisar pedido"
+        icon="i-lucide-clipboard-check"
         :loading="saving"
         :disabled="disabled"
       />

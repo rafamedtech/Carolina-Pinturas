@@ -3,6 +3,7 @@ import * as z from 'zod'
 import type { FormSubmitEvent } from '@nuxt/ui'
 import type { OrderStatus, SalesOrderDetail } from '~/types/orders'
 import type { SiigoProduct } from '~/types/siigo'
+import { submittedOrderStatusKey } from '~/utils/roleAccess'
 
 // Repartidor is optional while the order is borrador/ingresado; required to confirm.
 const STATUS_KEYS_REQUIRING_REPARTIDOR = ['confirmado', 'surtido', 'en_espera']
@@ -46,9 +47,10 @@ function productPrice(product: SiigoProduct) {
   return Number.isFinite(amount) ? amount : 0
 }
 
+const { user } = useAuth()
 const state = reactive<Schema>({
   customerId: '',
-  statusKey: 'ingresado',
+  statusKey: user.value?.role === 'admin' ? 'ingresado' : 'borrador',
   repartidorId: '',
   orderDate: localDate(),
   promisedDate: '',
@@ -56,12 +58,12 @@ const state = reactive<Schema>({
   observations: ''
 })
 const saving = shallowRef(false)
+const submittingStatusKey = shallowRef<string | null>(null)
 const summaryOpen = shallowRef(false)
 const pendingSubmission = shallowRef<Schema | null>(null)
 const toast = useToast()
-const { user } = useAuth()
 const currency = new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' })
-const { lines, total, addProduct, removeProduct, setObservations } = useOrderDraft()
+const { lines, total, addProduct, removeProduct, setObservations, setQuantity } = useOrderDraft()
 const {
   data: customers,
   status: customerStatus,
@@ -126,8 +128,34 @@ const catalogsLoading = computed(() =>
   || repartidorStatus.value === 'pending'
 )
 const formDisabled = computed(() => saving.value || Boolean(catalogError.value))
+const mayChooseInitialStatus = computed(() => user.value?.role === 'admin')
+const maySaveDraft = computed(() => Boolean(user.value && user.value.role !== 'admin'))
+const sendStatusKey = computed(() =>
+  user.value
+    ? submittedOrderStatusKey(user.value.role, state.statusKey)
+    : state.statusKey
+)
+const sendStatusLabel = computed(() =>
+  statuses.value.find(status => status.key === sendStatusKey.value)?.label
+  || sendStatusKey.value
+)
+const sendButtonLabel = computed(() =>
+  mayChooseInitialStatus.value
+    ? `Guardar como ${sendStatusLabel.value.toLowerCase()}`
+    : `Enviar como ${sendStatusLabel.value.toLowerCase()}`
+)
 const repartidorRequired = computed(() =>
   STATUS_KEYS_REQUIRING_REPARTIDOR.includes(state.statusKey)
+)
+const sendRequiresRepartidor = computed(() =>
+  STATUS_KEYS_REQUIRING_REPARTIDOR.includes(sendStatusKey.value)
+)
+const sendBlockedByRepartidor = computed(() =>
+  Boolean(
+    pendingSubmission.value
+    && sendRequiresRepartidor.value
+    && !pendingSubmission.value.repartidorId
+  )
 )
 const canSubmit = computed(() =>
   Boolean(state.customerId)
@@ -179,10 +207,22 @@ function editOrder() {
   summaryOpen.value = false
 }
 
-async function confirmSubmit() {
+async function confirmSubmit(statusKey: string) {
   if (!pendingSubmission.value || !canSubmit.value) return
-  const data = pendingSubmission.value
+
+  if (STATUS_KEYS_REQUIRING_REPARTIDOR.includes(statusKey) && !pendingSubmission.value.repartidorId) {
+    toast.add({
+      title: 'Selecciona un repartidor',
+      description: 'El pedido necesita un repartidor antes de guardarse como confirmado.',
+      color: 'warning',
+      icon: 'i-lucide-truck'
+    })
+    return
+  }
+
+  const data = { ...pendingSubmission.value, statusKey }
   saving.value = true
+  submittingStatusKey.value = statusKey
 
   try {
     const order = await $fetch<SalesOrderDetail>('/api/orders', {
@@ -218,6 +258,7 @@ async function confirmSubmit() {
     })
   } finally {
     saving.value = false
+    submittingStatusKey.value = null
   }
 }
 </script>
@@ -269,6 +310,7 @@ async function confirmSubmit() {
             :loading="catalogsLoading"
             :disabled="formDisabled"
             :repartidor-required="repartidorRequired"
+            :show-status="mayChooseInitialStatus"
           />
 
           <OrdersOrderProductPicker
@@ -284,6 +326,7 @@ async function confirmSubmit() {
           :total="total"
           @remove="removeProduct"
           @observations="setObservations"
+          @quantity="setQuantity"
         />
 
         <OrdersOrderFormActions
@@ -351,11 +394,19 @@ async function confirmSubmit() {
                 {{ currency.format(total) }}
               </p>
             </div>
+            <UAlert
+              v-if="sendBlockedByRepartidor"
+              color="warning"
+              variant="subtle"
+              title="Falta seleccionar un repartidor"
+              :description="`Es necesario para enviar el pedido como ${sendStatusLabel.toLowerCase()}.`"
+              icon="i-lucide-truck"
+            />
           </div>
         </template>
 
         <template #footer>
-          <div class="flex w-full justify-end gap-2">
+          <div class="flex w-full flex-col-reverse gap-2 sm:flex-row sm:justify-end">
             <UButton
               label="Editar pedido"
               color="neutral"
@@ -364,10 +415,21 @@ async function confirmSubmit() {
               @click="editOrder"
             />
             <UButton
-              label="Enviar pedido"
+              v-if="maySaveDraft"
+              label="Guardar borrador"
+              icon="i-lucide-save"
+              color="neutral"
+              variant="soft"
+              :loading="saving && submittingStatusKey === 'borrador'"
+              :disabled="saving"
+              @click="confirmSubmit('borrador')"
+            />
+            <UButton
+              :label="sendButtonLabel"
               icon="i-lucide-send"
-              :loading="saving"
-              @click="confirmSubmit"
+              :loading="saving && submittingStatusKey === sendStatusKey"
+              :disabled="saving || sendBlockedByRepartidor"
+              @click="confirmSubmit(sendStatusKey)"
             />
           </div>
         </template>

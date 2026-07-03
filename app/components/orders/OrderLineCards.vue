@@ -8,6 +8,7 @@ defineProps<{
 const emit = defineEmits<{
   remove: [productId: string]
   observations: [productId: string, value: string]
+  quantity: [productId: string, value: number]
 }>()
 
 const currency = new Intl.NumberFormat('es-MX', {
@@ -51,23 +52,32 @@ function lineTotal(line: DraftOrderLine) {
         />
       </div>
 
-      <dl class="grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
-        <div>
-          <dt class="text-muted">
-            Cantidad
-          </dt>
-          <dd class="font-medium text-highlighted">
-            {{ line.quantity }}
-          </dd>
-        </div>
-        <div class="text-right">
-          <dt class="text-muted">
-            Precio unitario
-          </dt>
-          <dd class="font-medium text-highlighted">
-            {{ currency.format(line.unitPrice) }}
-          </dd>
-        </div>
+      <div class="grid grid-cols-2 items-end gap-4">
+        <UFormField label="Cantidad">
+          <UInputNumber
+            :model-value="line.quantity"
+            :min="0.000001"
+            :step="1"
+            variant="subtle"
+            class="w-full"
+            :aria-label="`Cantidad de ${line.name}`"
+            @update:model-value="emit('quantity', line.productId, $event)"
+          />
+        </UFormField>
+
+        <dl class="text-right text-sm">
+          <div>
+            <dt class="text-muted">
+              Precio unitario
+            </dt>
+            <dd class="font-medium text-highlighted">
+              {{ currency.format(line.unitPrice) }}
+            </dd>
+          </div>
+        </dl>
+      </div>
+
+      <dl class="text-sm">
         <div class="col-span-2 flex items-end justify-between gap-4 border-t border-default pt-3">
           <dt class="text-muted">
             Importe
