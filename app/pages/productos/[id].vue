@@ -25,7 +25,7 @@ function formatCurrency(value?: number | string, currencyCode = 'MXN') {
 
 function formatDate(value?: string | null) {
   if (!value) return '—'
-  return new Date(value).toLocaleDateString('es-MX')
+  return formatMexicoDate(value)
 }
 </script>
 

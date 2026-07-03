@@ -8,10 +8,7 @@ const detailOpen = shallowRef(false)
 const formattedUpdate = computed(() => {
   if (!updatedAt.value) return null
 
-  return new Intl.DateTimeFormat('es-MX', {
-    dateStyle: 'medium',
-    timeStyle: 'short'
-  }).format(new Date(updatedAt.value))
+  return formatMexicoDateTime(updatedAt.value)
 })
 
 const errorMessage = computed(() => error.value?.data?.statusMessage || 'No fue posible consultar los precios. Intenta de nuevo más tarde.')
