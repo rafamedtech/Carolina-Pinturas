@@ -4,6 +4,7 @@ defineProps<{
   savingDraft: boolean
   disabled: boolean
   quoteMode?: boolean
+  cancelTo?: string
 }>()
 
 const emit = defineEmits<{
@@ -18,7 +19,7 @@ const emit = defineEmits<{
     </p>
     <div class="flex gap-2">
       <UButton
-        to="/ventas"
+        :to="cancelTo || '/ventas'"
         label="Cancelar"
         color="neutral"
         variant="outline"

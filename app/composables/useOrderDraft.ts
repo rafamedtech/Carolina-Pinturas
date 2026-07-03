@@ -84,6 +84,10 @@ export function useOrderDraft() {
     internalLines.value = []
   }
 
+  function replaceLines(lines: readonly DraftOrderLine[]) {
+    internalLines.value = lines.map(line => ({ ...line }))
+  }
+
   return {
     lines: readonly(internalLines),
     total,
@@ -91,6 +95,7 @@ export function useOrderDraft() {
     removeProduct,
     setObservations,
     setQuantity,
+    replaceLines,
     reset
   }
 }

@@ -7,14 +7,19 @@ import { submittedOrderStatusKey } from '~/utils/roleAccess'
 
 const props = withDefaults(defineProps<{
   mode?: 'order' | 'quote'
+  orderId?: string
 }>(), {
-  mode: 'order'
+  mode: 'order',
+  orderId: undefined
 })
 const isQuoteMode = computed(() => props.mode === 'quote')
+const isEditing = computed(() => Boolean(props.orderId))
 const documentNoun = computed(() => isQuoteMode.value ? 'cotización' : 'pedido')
 const documentWithArticle = computed(() => isQuoteMode.value ? 'la cotización' : 'el pedido')
 const documentOf = computed(() => isQuoteMode.value ? 'de la cotización' : 'del pedido')
-const pageTitle = computed(() => isQuoteMode.value ? 'Nueva cotización' : 'Nuevo pedido')
+const pageTitle = computed(() => isEditing.value
+  ? 'Editar cotización'
+  : isQuoteMode.value ? 'Nueva cotización' : 'Nuevo pedido')
 
 // Repartidor is optional while the order is borrador/ingresado; required to confirm.
 const STATUS_KEYS_REQUIRING_REPARTIDOR = ['confirmado', 'surtido', 'en_espera']
@@ -70,7 +75,27 @@ const summaryOpen = shallowRef(false)
 const pendingSubmission = shallowRef<Schema | null>(null)
 const toast = useToast()
 const currency = new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' })
-const { lines, total, addProduct, removeProduct, setObservations, setQuantity } = useOrderDraft()
+const {
+  lines,
+  total,
+  addProduct,
+  removeProduct,
+  setObservations,
+  setQuantity,
+  replaceLines
+} = useOrderDraft()
+const {
+  data: existingOrder,
+  status: existingOrderStatus,
+  error: existingOrderError
+} = useFetch<SalesOrderDetail>(
+  () => `/api/orders/${encodeURIComponent(props.orderId || '')}`,
+  {
+    key: `edit-quote-${props.orderId || 'new'}`,
+    lazy: true,
+    immediate: isEditing.value
+  }
+)
 const {
   data: customers,
   status: customerStatus,
@@ -119,19 +144,56 @@ watch(
   { immediate: true }
 )
 
+const existingOrderStatusError = computed(() =>
+  existingOrder.value && existingOrder.value.status.key !== 'borrador'
+    ? 'Este documento ya no es una cotización y no puede editarse.'
+    : ''
+)
 const catalogError = computed(() =>
-  customerError.value?.data?.statusMessage
+  existingOrderStatusError.value
+  || existingOrderError.value?.data?.statusMessage
+  || customerError.value?.data?.statusMessage
   || productError.value?.data?.statusMessage
   || statusError.value?.data?.statusMessage
   || repartidorError.value?.data?.statusMessage
   || ''
 )
 const catalogsLoading = computed(() =>
-  customerStatus.value === 'pending'
+  (isEditing.value && existingOrderStatus.value !== 'success')
+  || customerStatus.value === 'pending'
   || productStatus.value === 'pending'
   || statusStatus.value === 'pending'
   || repartidorStatus.value === 'pending'
 )
+
+const initializedOrderId = shallowRef<string | null>(null)
+watch(existingOrder, (value) => {
+  if (!value || initializedOrderId.value === value.id) return
+
+  state.customerId = value.customer.id
+  state.statusKey = value.status.key
+  state.orderDate = value.orderDate
+  state.observations = value.observations || ''
+  replaceLines(value.items.map((item) => {
+    const listedTotal = item.quantity * item.unitPrice
+    const taxIncluded = Math.abs(listedTotal - item.total) < 0.01
+    const taxPercentage = item.subtotal > 0
+      ? item.taxAmount / item.subtotal * 100
+      : 0
+
+    return {
+      productId: item.productId,
+      code: item.code,
+      name: item.name,
+      quantity: item.quantity,
+      unitPrice: item.unitPrice,
+      taxIncluded,
+      taxPercentage,
+      observations: item.observations || ''
+    }
+  }))
+  initializedOrderId.value = value.id
+}, { immediate: true })
 const formDisabled = computed(() => saving.value || Boolean(catalogError.value))
 const mayChooseInitialStatus = computed(() => user.value?.role === 'admin')
 const maySaveDraft = computed(() => Boolean(user.value && user.value.role !== 'admin'))
@@ -249,31 +311,45 @@ async function confirmSubmit(statusKey: string) {
   submittingStatusKey.value = statusKey
 
   try {
-    const order = await $fetch<SalesOrderDetail>('/api/orders', {
-      method: 'POST',
-      body: {
-        ...data,
-        repartidorId: data.repartidorId || null,
-        promisedDate: data.promisedDate || null,
-        remision: data.remision || null,
-        observations: data.observations || null,
-        lines: lines.value.map(line => ({
-          productId: line.productId,
-          quantity: line.quantity,
-          observations: line.observations || null
-        }))
-      }
-    })
+    const requestLines = lines.value.map(line => ({
+      productId: line.productId,
+      quantity: line.quantity,
+      observations: line.observations || null
+    }))
+    const order = isEditing.value && props.orderId && existingOrder.value
+      ? await $fetch<SalesOrderDetail>(`/api/orders/${encodeURIComponent(props.orderId)}`, {
+          method: 'PUT',
+          body: {
+            customerId: data.customerId,
+            orderDate: data.orderDate,
+            observations: data.observations || null,
+            lines: requestLines,
+            version: existingOrder.value.version
+          }
+        })
+      : await $fetch<SalesOrderDetail>('/api/orders', {
+          method: 'POST',
+          body: {
+            ...data,
+            repartidorId: data.repartidorId || null,
+            promisedDate: data.promisedDate || null,
+            remision: data.remision || null,
+            observations: data.observations || null,
+            lines: requestLines
+          }
+        })
 
     toast.add({
-      title: statusKey === 'borrador'
-        ? `Cotización ${order.number} guardada`
-        : `Pedido ${order.number} guardado`,
+      title: isEditing.value
+        ? `Cotización ${order.number} actualizada`
+        : statusKey === 'borrador'
+          ? `Cotización ${order.number} guardada`
+          : `Pedido ${order.number} guardado`,
       description: 'Las partidas y los datos de Siigo quedaron almacenados en PostgreSQL.',
       color: 'success',
       icon: 'i-lucide-circle-check'
     })
-    await navigateTo('/ventas')
+    await navigateTo(isEditing.value ? `/ventas/${order.id}` : '/ventas')
   } catch (error: unknown) {
     const fetchError = error as { data?: { statusMessage?: string }, message?: string }
     toast.add({
@@ -354,6 +430,7 @@ async function confirmSubmit(statusKey: string) {
           :lines="lines"
           :total="total"
           :quote-mode="isQuoteMode"
+          :cancel-to="isEditing && orderId ? `/ventas/${orderId}` : '/ventas'"
           @remove="removeProduct"
           @observations="setObservations"
           @quantity="setQuantity"

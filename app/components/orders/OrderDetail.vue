@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { OrderStatus, SalesOrderDetail } from '~/types/orders'
 import {
+  canCreateOrders,
   canEditOrderRemision,
   canManageOrderLogistics,
   editableOrderStatusKeys
@@ -73,6 +74,9 @@ const mayEditRemision = computed(() =>
 )
 const mayManageLogistics = computed(() =>
   Boolean(user.value && canManageOrderLogistics(user.value.role))
+)
+const mayEditQuote = computed(() =>
+  Boolean(user.value && canCreateOrders(user.value.role))
 )
 const availableStatuses = computed(() => {
   if (!user.value) return []
@@ -335,6 +339,14 @@ async function convertToPedido() {
                 variant="outline"
               />
             </UDropdownMenu>
+            <UButton
+              v-if="isQuote && mayEditQuote"
+              :to="`/ventas/${order.id}/editar`"
+              label="Editar cotización"
+              icon="i-lucide-pencil"
+              color="neutral"
+              variant="outline"
+            />
             <UButton
               v-if="isQuote && mayManageLogistics"
               label="Convertir en pedido"

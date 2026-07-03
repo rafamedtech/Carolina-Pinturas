@@ -4,6 +4,7 @@ import type { AppUser, SiigoCustomer, SiigoProduct } from '~/types/siigo'
 import type { SalesOrderDetail, SalesOrderListItem } from '~/types/orders'
 import type {
   CreateOrderInput,
+  UpdateQuoteInput,
   UpdateOrderRemisionInput,
   UpdateOrderRepartidorInput,
   UpdateOrderStatusInput
@@ -427,6 +428,114 @@ export async function createOrder(
   })
 
   return detail(created)
+}
+
+export async function updateQuote(
+  id: string,
+  input: UpdateQuoteInput,
+  user: AppUser,
+  customer: SiigoCustomer,
+  products: Map<string, SiigoProduct>
+) {
+  const prisma = usePrisma()
+  const existing = await prisma.salesOrder.findFirst({
+    where: {
+      id,
+      AND: [orderVisibilityFilter(user)]
+    },
+    select: { statusKey: true }
+  })
+
+  if (!existing) {
+    throw createError({ statusCode: 404, statusMessage: 'No se encontró la cotización.' })
+  }
+  if (existing.statusKey !== 'borrador') {
+    throw createError({
+      statusCode: 409,
+      statusMessage: 'Sólo se pueden editar documentos que siguen siendo cotizaciones.'
+    })
+  }
+
+  const lines = input.lines.map((line, index) => {
+    const product = products.get(line.productId)
+    if (!product) {
+      throw createError({
+        statusCode: 422,
+        statusMessage: `El producto ${line.productId} ya no está disponible en Siigo.`
+      })
+    }
+    return buildLine(product, line.quantity, index + 1, line.observations)
+  })
+  const currencyCodes = new Set(lines.map(line => line.currencyCode))
+  if (currencyCodes.size > 1) {
+    throw createError({
+      statusCode: 422,
+      statusMessage: 'Todos los productos de la cotización deben usar la misma moneda.'
+    })
+  }
+
+  const subtotal = lines.reduce((sum, line) => sum.plus(line.subtotal), money(0))
+  const discountTotal = lines.reduce((sum, line) => sum.plus(line.discountAmount), money(0))
+  const taxTotal = lines.reduce((sum, line) => sum.plus(line.taxAmount), money(0))
+  const total = lines.reduce((sum, line) => sum.plus(line.total), money(0))
+  const displayName = siigoCustomerDisplayName(customer)
+
+  const updated = await prisma.$transaction(async (tx) => {
+    await upsertSiigoCustomer(tx, customer)
+    for (const product of products.values()) {
+      await upsertSiigoProduct(tx, product)
+    }
+
+    const result = await tx.salesOrder.updateMany({
+      where: { id, version: input.version, statusKey: 'borrador' },
+      data: {
+        customerId: customer.id,
+        customerNameSnapshot: displayName,
+        customerRfcSnapshot: customer.rfc_id || customer.identification || null,
+        customerPayload: siigoJson(customer),
+        orderDate: new Date(`${input.orderDate}T00:00:00.000Z`),
+        observations: input.observations || null,
+        currencyCode: lines[0]?.currencyCode || 'MXN',
+        subtotal: subtotal.toString(),
+        discountTotal: discountTotal.toString(),
+        taxTotal: taxTotal.toString(),
+        total: total.toString(),
+        updatedByEmail: user.email,
+        version: { increment: 1 }
+      }
+    })
+    if (result.count !== 1) {
+      throw createError({
+        statusCode: 409,
+        statusMessage: 'La cotización cambió mientras la editabas. Recarga e intenta de nuevo.'
+      })
+    }
+
+    await tx.salesOrderItem.deleteMany({ where: { orderId: id } })
+    await tx.salesOrderItem.createMany({
+      data: lines.map(({ currencyCode: _currencyCode, ...line }) => ({
+        orderId: id,
+        ...line
+      }))
+    })
+    await tx.salesOrderStatusHistory.create({
+      data: {
+        orderId: id,
+        toStatusKey: 'borrador',
+        note: 'Cotización actualizada.',
+        changedByName: user.name,
+        changedByEmail: user.email,
+        changedByRole: user.role
+      }
+    })
+
+    return tx.salesOrder.findUniqueOrThrow({
+      where: { id },
+      include: orderDetailInclude
+    })
+  })
+
+  return detail(updated)
 }
 
 export async function getOrder(id: string, user: AppUser) {
