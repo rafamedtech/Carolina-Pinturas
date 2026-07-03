@@ -3,6 +3,7 @@ export interface Repartidor {
   nombre: string
   telefono: string | null
   activo: boolean
+  esMostrador: boolean
   deliveredCount: number
 }
 

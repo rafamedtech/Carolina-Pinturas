@@ -89,15 +89,24 @@ const {
   error: repartidorError
 } = useRepartidoresCatalog()
 
+// Mostrador attends walk-in customers, so the order defaults to the in-store
+// "Mostrador" repartidor; they can still pick a real one for home delivery.
+const defaultRepartidorId = computed(() => {
+  if (user.value?.role === 'mostrador') {
+    return repartidores.value.find(repartidor => repartidor.esMostrador)?.id || ''
+  }
+  return user.value?.repartidorId || ''
+})
+
 watch(
-  [() => user.value?.repartidorId, repartidores],
-  ([repartidorId, availableRepartidores]) => {
+  [defaultRepartidorId, repartidores],
+  ([desiredId, availableRepartidores]) => {
     if (
       !state.repartidorId
-      && repartidorId
-      && availableRepartidores.some(repartidor => repartidor.id === repartidorId)
+      && desiredId
+      && availableRepartidores.some(repartidor => repartidor.id === desiredId)
     ) {
-      state.repartidorId = repartidorId
+      state.repartidorId = desiredId
     }
   },
   { immediate: true }

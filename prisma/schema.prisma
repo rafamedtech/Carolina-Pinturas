@@ -41,10 +41,11 @@ model OrderStatus {
 
 model Repartidor {
   id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  userId    String?  @unique(map: "repartidores_user_id_key") @map("user_id") @db.Uuid
-  nombre    String
-  telefono  String?
-  activo    Boolean  @default(true)
+  userId      String?  @unique(map: "repartidores_user_id_key") @map("user_id") @db.Uuid
+  nombre      String
+  telefono    String?
+  activo      Boolean  @default(true)
+  esMostrador Boolean  @default(false) @map("es_mostrador")
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
 
