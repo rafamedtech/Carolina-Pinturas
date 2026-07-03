@@ -52,40 +52,26 @@ async function downloadPdf() {
     downloading.value = false
   }
 }
+
+// The document tab is opened from the order detail with ?action=print|pdf to
+// trigger the action once the document is rendered. No on-page controls, so the
+// tab is a clean client-facing document.
+const autoRan = shallowRef(false)
+watch([status, order], () => {
+  if (!import.meta.client || autoRan.value) return
+  if (status.value !== 'success' || !order.value) return
+  const action = route.query.action
+  if (action !== 'print' && action !== 'pdf') return
+  autoRan.value = true
+  nextTick(() => action === 'print' ? printDocument() : downloadPdf())
+}, { immediate: true })
 </script>
 
 <template>
   <div class="page">
-    <div class="toolbar">
-      <UButton
-        :to="`/ventas/${orderId}`"
-        icon="i-lucide-arrow-left"
-        color="neutral"
-        variant="ghost"
-        label="Volver"
-      />
-      <div class="flex gap-2">
-        <UButton
-          icon="i-lucide-printer"
-          color="neutral"
-          variant="outline"
-          label="Imprimir"
-          :disabled="!order"
-          @click="printDocument"
-        />
-        <UButton
-          icon="i-lucide-download"
-          label="Descargar PDF"
-          :loading="downloading"
-          :disabled="!order"
-          @click="downloadPdf"
-        />
-      </div>
-    </div>
-
     <UAlert
       v-if="error"
-      class="mx-auto mt-6 max-w-3xl"
+      class="mx-auto max-w-3xl"
       color="warning"
       variant="subtle"
       title="Documento no disponible"
@@ -216,10 +202,12 @@ async function downloadPdf() {
       </section>
 
       <footer class="doc-foot">
-        <p>Atendió: {{ order.vendedor.name }}</p>
         <p v-if="isQuote" class="foot-terms">
           Cotización válida por 15 días a partir de la fecha de emisión. Precios sujetos a
           cambio sin previo aviso.
+        </p>
+        <p class="foot-thanks">
+          Gracias por su preferencia.
         </p>
       </footer>
     </div>
@@ -231,14 +219,6 @@ async function downloadPdf() {
   min-height: 100vh;
   background: #f4f4f5;
   padding: 24px 16px;
-}
-
-.toolbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  max-width: 800px;
-  margin: 0 auto 20px;
 }
 
 /* The printable document uses fixed hex colors so window.print() and
@@ -423,14 +403,14 @@ async function downloadPdf() {
   margin-top: 8px;
 }
 
+.foot-thanks {
+  margin-top: 8px;
+}
+
 @media print {
   .page {
     background: #ffffff;
     padding: 0;
-  }
-
-  .toolbar {
-    display: none;
   }
 
   .quote-doc {
