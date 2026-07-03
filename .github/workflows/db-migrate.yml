@@ -1,0 +1,42 @@
+name: db-migrate
+
+# Applies pending Supabase migrations to production.
+# Runs when migrations change on main, and can be triggered manually to apply
+# a pending migration without waiting for a new push.
+#
+# Required repo secrets (Settings > Secrets and variables > Actions):
+#   SUPABASE_ACCESS_TOKEN  - personal access token (supabase.com/dashboard/account/tokens)
+#   SUPABASE_DB_PASSWORD   - the production database password
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'supabase/migrations/**'
+  workflow_dispatch:
+
+# Never run two migration pushes at once.
+concurrency:
+  group: db-migrate-production
+  cancel-in-progress: false
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+      SUPABASE_PROJECT_REF: xirmbnxgaflcnqlzagqc
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Install Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Link project
+        run: supabase link --project-ref "$SUPABASE_PROJECT_REF"
+
+      - name: Push migrations
+        run: supabase db push
