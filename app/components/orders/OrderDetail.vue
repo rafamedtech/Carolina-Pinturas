@@ -56,6 +56,18 @@ const statusUnchanged = computed(() => selectedStatus.value === (order.value?.st
 const isQuote = computed(() => order.value?.status.key === 'borrador')
 const documentLabel = computed(() => isQuote.value ? 'Cotización' : 'Pedido')
 
+// The document opens in a clean new tab (no controls); ?action triggers print /
+// pdf there so those actions live here, not on the client-facing document.
+function openCotizacion(action?: 'print' | 'pdf') {
+  const query = action ? `?action=${action}` : ''
+  window.open(`/ventas/${props.orderId}/cotizacion${query}`, '_blank', 'noopener')
+}
+const cotizacionMenu = [[
+  { label: 'Ver documento', icon: 'i-lucide-eye', onSelect: () => openCotizacion() },
+  { label: 'Imprimir', icon: 'i-lucide-printer', onSelect: () => openCotizacion('print') },
+  { label: 'Descargar PDF', icon: 'i-lucide-download', onSelect: () => openCotizacion('pdf') }
+]]
+
 const mayEditRemision = computed(() =>
   Boolean(user.value && canEditOrderRemision(user.value.role))
 )
@@ -275,14 +287,15 @@ async function saveChanges() {
             </p>
           </div>
           <div class="flex items-center gap-4">
-            <UButton
-              :to="`/ventas/${order.id}/cotizacion`"
-              target="_blank"
-              :label="isQuote ? 'Ver cotización' : 'Imprimir'"
-              icon="i-lucide-printer"
-              color="neutral"
-              variant="outline"
-            />
+            <UDropdownMenu :items="cotizacionMenu">
+              <UButton
+                :label="documentLabel"
+                icon="i-lucide-file-text"
+                trailing-icon="i-lucide-chevron-down"
+                color="neutral"
+                variant="outline"
+              />
+            </UDropdownMenu>
             <UButton
               label="Guardar cambios"
               icon="i-lucide-save"
