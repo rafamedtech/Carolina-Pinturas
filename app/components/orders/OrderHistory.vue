@@ -19,6 +19,18 @@ function minutesSince(entries: readonly SalesOrderStatusHistoryItem[], index: nu
   const diffMs = new Date(entry.changedAt).getTime() - new Date(previous.changedAt).getTime()
   return Math.round(diffMs / 60000)
 }
+
+function historyNote(entry: SalesOrderStatusHistoryItem, index: number) {
+  if (
+    index === 0
+    && entry.toStatus.key === 'borrador'
+    && entry.note?.trim().toLowerCase() === 'pedido creado.'
+  ) {
+    return 'Cotización creada.'
+  }
+
+  return entry.note
+}
 </script>
 
 <template>
@@ -41,8 +53,8 @@ function minutesSince(entries: readonly SalesOrderStatusHistoryItem[], index: nu
             ({{ minutesSince(entries, index) }} min)
           </span>
         </p>
-        <p v-if="entry.note" class="text-sm">
-          {{ entry.note }}
+        <p v-if="historyNote(entry, index)" class="text-sm">
+          {{ historyNote(entry, index) }}
         </p>
         <p class="text-xs text-muted">
           {{ entry.changedBy.name }} · {{ formatDateTime(entry.changedAt) }}

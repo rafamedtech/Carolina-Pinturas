@@ -473,7 +473,7 @@ async function convertToPedido() {
           :currency-code="order.currencyCode"
         />
 
-        <div :class="isQuote ? 'grid gap-4' : 'grid gap-4 lg:grid-cols-2'">
+        <div class="grid gap-4 lg:grid-cols-2">
           <UCard>
             <template #header>
               <h2 class="font-semibold text-highlighted">
@@ -508,7 +508,7 @@ async function convertToPedido() {
             </dl>
           </UCard>
 
-          <OrdersOrderHistory v-if="!isQuote" :entries="order.statusHistory" />
+          <OrdersOrderHistory :entries="order.statusHistory" />
         </div>
       </template>
 

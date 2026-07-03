@@ -413,7 +413,7 @@ export async function createOrder(
       data: {
         orderId: order.id,
         toStatusKey: status.key,
-        note: 'Pedido creado.',
+        note: status.key === 'borrador' ? 'Cotización creada.' : 'Pedido creado.',
         changedByName: user.name,
         changedByEmail: user.email,
         changedByRole: user.role
