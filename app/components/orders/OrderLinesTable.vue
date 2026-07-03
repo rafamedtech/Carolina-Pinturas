@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { h, resolveComponent } from 'vue'
 import type { TableColumn } from '@nuxt/ui'
+import OrderLineCards from './OrderLineCards.vue'
 import type { DraftOrderLine } from '~/composables/useOrderDraft'
 
 const props = defineProps<{
@@ -17,6 +18,11 @@ const UButton = resolveComponent('UButton')
 const UInput = resolveComponent('UInput')
 const currency = new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' })
 const tableLines = computed(() => [...props.lines])
+
+function updateObservations(productId: string, value: string) {
+  emit('observations', productId, value)
+}
+
 const columns: TableColumn<DraftOrderLine>[] = [{
   accessorKey: 'code',
   header: 'Código'
@@ -84,10 +90,17 @@ const columns: TableColumn<DraftOrderLine>[] = [{
       </div>
     </template>
 
+    <OrderLineCards
+      :lines="lines"
+      @remove="emit('remove', $event)"
+      @observations="updateObservations"
+    />
+
     <UTable
       :data="tableLines"
       :columns="columns"
       empty="Agrega productos para iniciar el pedido."
+      class="hidden md:block"
       :ui="{
         base: 'table-fixed border-separate border-spacing-0',
         thead: '[&>tr]:bg-elevated/50 [&>tr]:after:content-none',
