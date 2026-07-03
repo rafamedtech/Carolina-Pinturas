@@ -51,6 +51,11 @@ const remisionUnchanged = computed(() => remisionDraft.value === (order.value?.r
 const repartidorUnchanged = computed(() => selectedRepartidor.value === (order.value?.repartidor?.id || ''))
 const statusUnchanged = computed(() => selectedStatus.value === (order.value?.status.key || ''))
 
+// A borrador order is a quotation document; once it advances to ingresado /
+// confirmado (or later) it becomes a regular order with delivery logistics.
+const isQuote = computed(() => order.value?.status.key === 'borrador')
+const documentLabel = computed(() => isQuote.value ? 'Cotización' : 'Pedido')
+
 const mayEditRemision = computed(() =>
   Boolean(user.value && canEditOrderRemision(user.value.role))
 )
@@ -258,8 +263,9 @@ async function saveChanges() {
       <template v-else-if="order">
         <div class="flex flex-wrap items-start justify-between gap-4">
           <div>
-            <p class="text-sm text-muted">
-              Pedido
+            <p class="flex items-center gap-1.5 text-sm text-muted">
+              <UIcon v-if="isQuote" name="i-lucide-file-text" class="size-4" />
+              {{ documentLabel }}
             </p>
             <h1 class="text-xl font-semibold text-highlighted">
               {{ order.number }}
@@ -288,11 +294,20 @@ async function saveChanges() {
           </div>
         </div>
 
+        <UAlert
+          v-if="isQuote"
+          color="info"
+          variant="subtle"
+          icon="i-lucide-file-text"
+          title="Documento de cotización"
+          description="Propuesta de precios para el cliente. Los datos de entrega (repartidor, remisión) se asignan al convertirla en pedido."
+        />
+
         <div class="grid gap-4 lg:grid-cols-2">
           <UCard>
             <template #header>
               <h2 class="font-semibold text-highlighted">
-                Cliente y entrega
+                {{ isQuote ? 'Cliente' : 'Cliente y entrega' }}
               </h2>
             </template>
             <dl class="grid gap-4 sm:grid-cols-2">
@@ -314,13 +329,13 @@ async function saveChanges() {
               </div>
               <div>
                 <dt class="text-sm text-muted">
-                  Fecha del pedido
+                  {{ isQuote ? 'Fecha de cotización' : 'Fecha del pedido' }}
                 </dt>
                 <dd class="mt-1 font-medium">
                   {{ formatDate(order.orderDate) }}
                 </dd>
               </div>
-              <div>
+              <div v-if="!isQuote">
                 <dt class="text-sm text-muted">
                   Fecha prometida
                 </dt>
@@ -328,7 +343,7 @@ async function saveChanges() {
                   {{ formatDate(order.promisedDate) }}
                 </dd>
               </div>
-              <div class="sm:col-span-2">
+              <div v-if="!isQuote" class="sm:col-span-2">
                 <dt class="text-sm text-muted">
                   Remisión física
                 </dt>
@@ -354,7 +369,7 @@ async function saveChanges() {
                   {{ order.vendedor.name }}
                 </dd>
               </div>
-              <div>
+              <div v-if="!isQuote">
                 <dt class="text-sm text-muted">
                   Repartidor
                 </dt>
