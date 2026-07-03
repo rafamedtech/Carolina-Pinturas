@@ -79,7 +79,12 @@ async function onSubmit(event: FormSubmitEvent<Schema>) {
           <UInput v-model="state.nombre" :disabled="saving" class="w-full" />
         </UFormField>
         <UFormField label="Teléfono" name="telefono">
-          <UInput v-model="state.telefono" :disabled="saving" maxlength="30" class="w-full" />
+          <UInput
+            v-model="state.telefono"
+            :disabled="saving"
+            maxlength="30"
+            class="w-full"
+          />
         </UFormField>
         <div class="flex justify-end gap-2">
           <UButton

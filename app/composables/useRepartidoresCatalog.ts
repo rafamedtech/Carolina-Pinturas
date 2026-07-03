@@ -8,9 +8,13 @@ export function useRepartidoresCatalog(options: { all?: boolean } = {}) {
   const { data, status, error, refresh } = useFetch<Repartidor[]>('/api/repartidores', {
     key: options.all ? 'repartidores-catalog-all-request' : 'repartidores-catalog-request',
     query: options.all ? { all: 'true' } : undefined,
-    immediate: false,
+    lazy: true,
     default: () => []
   })
+
+  watch(data, (value) => {
+    catalog.value = value || []
+  }, { immediate: true })
 
   async function refreshCatalog() {
     await refresh()

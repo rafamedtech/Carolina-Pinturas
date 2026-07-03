@@ -67,38 +67,27 @@ const { lines, total, addProduct, removeProduct, setObservations, setQuantity } 
 const {
   data: customers,
   status: customerStatus,
-  error: customerError,
-  refresh: refreshCustomers
+  error: customerError
 } = useCustomersCatalog()
 const {
   data: products,
   status: productStatus,
-  error: productError,
-  refresh: refreshProducts
+  error: productError
 } = useProductsCatalog()
 const {
   data: statuses,
   status: statusStatus,
-  error: statusError,
-  refresh: refreshStatuses
+  error: statusError
 } = useFetch<OrderStatus[]>('/api/orders/statuses', {
   key: 'order-statuses',
-  immediate: false,
+  lazy: true,
   default: () => []
 })
 const {
   data: repartidores,
   status: repartidorStatus,
-  error: repartidorError,
-  refresh: refreshRepartidores
+  error: repartidorError
 } = useRepartidoresCatalog()
-
-await Promise.all([
-  callOnce('customers-catalog', refreshCustomers),
-  callOnce('products-catalog', refreshProducts),
-  callOnce('order-statuses', refreshStatuses),
-  callOnce('repartidores-catalog', refreshRepartidores)
-])
 
 watch(
   [() => user.value?.repartidorId, repartidores],

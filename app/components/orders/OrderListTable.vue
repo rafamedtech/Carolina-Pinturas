@@ -118,10 +118,16 @@ const columns = computed<TableColumn<SalesOrderListItem>[]>(() => [numberColumn,
     :loading="loading"
   />
 
+  <AppTableSkeleton
+    v-if="loading"
+    :cols="columns.length"
+    :class="igualacion ? 'shrink-0' : 'hidden shrink-0 md:block'"
+  />
+
   <UTable
+    v-else
     :data="tableOrders"
     :columns="columns"
-    :loading="loading"
     empty="No hay pedidos para mostrar."
     :class="igualacion ? 'shrink-0' : 'hidden shrink-0 md:block'"
     :ui="{
@@ -132,14 +138,7 @@ const columns = computed<TableColumn<SalesOrderListItem>[]>(() => [numberColumn,
       td: 'border-b border-default',
       separator: 'h-0'
     }"
-  >
-    <template #loading>
-      <div class="flex items-center justify-center gap-2 text-muted" role="status">
-        <UIcon name="i-lucide-loader-circle" class="size-5 animate-spin text-primary" />
-        <span>Cargando pedidos…</span>
-      </div>
-    </template>
-  </UTable>
+  />
 
   <UModal
     v-model:open="detailOpen"

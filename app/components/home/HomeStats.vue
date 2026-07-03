@@ -77,8 +77,9 @@ const message = computed(() => error.value?.data?.statusMessage || 'No fue posib
         }"
         class="lg:rounded-none first:rounded-l-lg last:rounded-r-lg"
       >
-        <span class="text-2xl font-semibold text-highlighted">
-          {{ status === 'pending' ? '—' : (stat.value ?? '—') }}
+        <USkeleton v-if="status === 'pending'" class="h-8 w-20" />
+        <span v-else class="text-2xl font-semibold text-highlighted">
+          {{ stat.value ?? '—' }}
         </span>
       </UPageCard>
     </UPageGrid>

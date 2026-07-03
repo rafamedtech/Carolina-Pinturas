@@ -8,7 +8,11 @@ const filter = ref('')
 const router = useRouter()
 const { data, status, error, refresh, addToCatalog } = useRepartidoresCatalog({ all: true })
 
-await callOnce('repartidores-catalog-all', refresh)
+const isHydrated = shallowRef(false)
+onMounted(() => {
+  isHydrated.value = true
+})
+const loading = computed(() => isHydrated.value && status.value === 'pending')
 
 const repartidores = computed(() => {
   const value = filter.value.trim().toLowerCase()
@@ -83,11 +87,12 @@ function openRepartidor(_: Event, row: TableRow<Repartidor>) {
         icon="i-lucide-plug-zap"
       />
 
+      <AppTableSkeleton v-else-if="loading" :cols="columns.length" />
+
       <UTable
         v-else
         :data="repartidores"
         :columns="columns"
-        :loading="status === 'pending'"
         empty="No hay repartidores para mostrar."
         class="shrink-0"
         :meta="{ class: { tr: 'cursor-pointer transition-colors hover:bg-elevated/50' } }"
@@ -100,14 +105,7 @@ function openRepartidor(_: Event, row: TableRow<Repartidor>) {
           separator: 'h-0'
         }"
         @select="openRepartidor"
-      >
-        <template #loading>
-          <div class="flex items-center justify-center gap-2 text-muted" role="status">
-            <UIcon name="i-lucide-loader-circle" class="size-5 animate-spin text-primary" />
-            <span>Cargando repartidores…</span>
-          </div>
-        </template>
-      </UTable>
+      />
     </template>
   </UDashboardPanel>
 </template>

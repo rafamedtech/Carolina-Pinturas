@@ -5,7 +5,7 @@ import type { RepartidorDelivery, RepartidorDetail } from '~/types/orders'
 const route = useRoute()
 const router = useRouter()
 const repartidorId = computed(() => String(route.params.id))
-const { data: repartidor, status, error, refresh } = useFetch<RepartidorDetail>(
+const { data: repartidor, status, error, refresh } = useLazyFetch<RepartidorDetail>(
   () => `/api/repartidores/${encodeURIComponent(repartidorId.value)}`,
   { key: () => `repartidor-${repartidorId.value}` }
 )
@@ -113,9 +113,18 @@ function openOrder(_: Event, row: TableRow<RepartidorDelivery>) {
         </UCard>
       </template>
 
-      <div v-else-if="status === 'pending'" class="flex justify-center py-12">
-        <UIcon name="i-lucide-loader-circle" class="size-6 animate-spin text-muted" />
-      </div>
+      <template v-else-if="status === 'pending'">
+        <div class="flex flex-wrap items-start justify-between gap-4" role="status" aria-busy="true">
+          <div class="flex flex-col gap-2">
+            <USkeleton class="h-4 w-24" />
+            <USkeleton class="h-7 w-48" />
+            <USkeleton class="h-4 w-28" />
+          </div>
+          <USkeleton class="h-8 w-24 rounded-full" />
+        </div>
+        <AppTableSkeleton :rows="5" :cols="columns.length" />
+        <span class="sr-only">Cargando repartidor…</span>
+      </template>
     </template>
   </UDashboardPanel>
 </template>

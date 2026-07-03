@@ -189,8 +189,20 @@ useSeoMeta({ title: () => fullName.value })
         </div>
       </template>
 
-      <div v-else-if="status === 'pending'" class="flex justify-center py-12">
-        <UIcon name="i-lucide-loader-circle" class="size-6 animate-spin text-muted" />
+      <div
+        v-else-if="status === 'pending'"
+        class="flex flex-col gap-6"
+        role="status"
+        aria-busy="true"
+      >
+        <div class="flex flex-col gap-2">
+          <USkeleton class="h-4 w-24" />
+          <USkeleton class="h-7 w-64" />
+          <USkeleton class="h-4 w-40" />
+        </div>
+        <USkeleton class="h-48 w-full rounded-lg" />
+        <USkeleton class="h-32 w-full rounded-lg" />
+        <span class="sr-only">Cargando cliente…</span>
       </div>
     </template>
   </UDashboardPanel>
