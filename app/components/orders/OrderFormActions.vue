@@ -1,7 +1,12 @@
 <script setup lang="ts">
 defineProps<{
   saving: boolean
+  savingDraft: boolean
   disabled: boolean
+}>()
+
+const emit = defineEmits<{
+  saveDraft: []
 }>()
 </script>
 
@@ -19,10 +24,19 @@ defineProps<{
         :disabled="saving"
       />
       <UButton
+        label="Guardar como cotización"
+        icon="i-lucide-file-text"
+        color="neutral"
+        variant="subtle"
+        :loading="savingDraft"
+        :disabled="disabled"
+        @click="emit('saveDraft')"
+      />
+      <UButton
         type="submit"
         label="Revisar pedido"
         icon="i-lucide-clipboard-check"
-        :loading="saving"
+        :loading="saving && !savingDraft"
         :disabled="disabled"
       />
     </div>

@@ -199,6 +199,15 @@ function editOrder() {
   summaryOpen.value = false
 }
 
+const savingDraft = computed(() => saving.value && submittingStatusKey.value === 'borrador')
+
+// Save straight as a quote (borrador) without opening the review summary.
+function saveAsQuote() {
+  if (!canSubmit.value || saving.value) return
+  pendingSubmission.value = { ...state }
+  confirmSubmit('borrador')
+}
+
 async function confirmSubmit(statusKey: string) {
   if (!pendingSubmission.value || !canSubmit.value) return
 
@@ -323,7 +332,9 @@ async function confirmSubmit(statusKey: string) {
 
         <OrdersOrderFormActions
           :saving="saving"
+          :saving-draft="savingDraft"
           :disabled="!canSubmit"
+          @save-draft="saveAsQuote"
         />
       </UForm>
 
@@ -408,7 +419,7 @@ async function confirmSubmit(statusKey: string) {
             />
             <UButton
               v-if="maySaveDraft"
-              label="Guardar borrador"
+              label="Guardar cotización"
               icon="i-lucide-save"
               color="neutral"
               variant="soft"
