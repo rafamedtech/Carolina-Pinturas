@@ -1,5 +1,6 @@
 import type { SiigoListResponse } from '~/types/siigo'
-import { requireUser } from '../../utils/auth'
+import { ORDER_LOGISTICS_ROLES } from '~/utils/roleAccess'
+import { requireRole } from '../../utils/auth'
 import { usePrisma } from '../../utils/prisma'
 import { siigoRequest } from '../../utils/siigo'
 
@@ -8,7 +9,7 @@ function total(response: SiigoListResponse<unknown>) {
 }
 
 export default eventHandler(async (event) => {
-  await requireUser(event)
+  await requireRole(event, ORDER_LOGISTICS_ROLES)
   const prisma = usePrisma()
 
   const [orders, delivered, products, customers] = await Promise.all([

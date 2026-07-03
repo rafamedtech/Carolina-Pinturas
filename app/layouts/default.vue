@@ -1,12 +1,24 @@
 <script setup lang="ts">
 import type { NavigationMenuItem } from '@nuxt/ui'
+import type { UserRole } from '~/types/siigo'
 
-const open = ref(false)
+interface AppNavigationItem {
+  label: string
+  icon: string
+  to: string
+  roles?: readonly UserRole[]
+  onSelect: () => void
+}
 
-const links = [[{
+const open = shallowRef(false)
+const { user } = useAuth()
+const managementRoles = ['admin', 'mostrador', 'vendedor'] as const satisfies readonly UserRole[]
+const orderEntryRoles = [...managementRoles, 'repartidor'] as const satisfies readonly UserRole[]
+const allLinks: AppNavigationItem[] = [{
   label: 'Inicio',
   icon: 'i-lucide-house',
   to: '/',
+  roles: managementRoles,
   onSelect: () => {
     open.value = false
   }
@@ -14,6 +26,7 @@ const links = [[{
   label: 'Productos',
   icon: 'i-lucide-package',
   to: '/productos',
+  roles: managementRoles,
   onSelect: () => {
     open.value = false
   }
@@ -21,6 +34,7 @@ const links = [[{
   label: 'Clientes',
   icon: 'i-lucide-users',
   to: '/clientes',
+  roles: managementRoles,
   onSelect: () => {
     open.value = false
   }
@@ -28,6 +42,7 @@ const links = [[{
   label: 'Pedidos',
   icon: 'i-lucide-shopping-cart',
   to: '/ventas',
+  roles: orderEntryRoles,
   onSelect: () => {
     open.value = false
   }
@@ -35,6 +50,7 @@ const links = [[{
   label: 'Igualaciones',
   icon: 'i-lucide-palette',
   to: '/igualaciones',
+  roles: [...managementRoles, 'igualaciones'],
   onSelect: () => {
     open.value = false
   }
@@ -42,15 +58,26 @@ const links = [[{
   label: 'Repartidores',
   icon: 'i-lucide-truck',
   to: '/repartidores',
+  roles: managementRoles,
   onSelect: () => {
     open.value = false
   }
-}]] satisfies NavigationMenuItem[][]
+}]
+
+const links = computed(() => [
+  allLinks
+    .filter(link => !link.roles || (user.value && link.roles.includes(user.value.role)))
+    .map(({ roles: _roles, ...link }) => link)
+] satisfies NavigationMenuItem[][])
 
 const groups = computed(() => [{
   id: 'links',
   label: 'Ir a',
-  items: links.flat()
+  items: links.value.flat().map(link => ({
+    label: link.label,
+    icon: link.icon,
+    to: link.to
+  }))
 }])
 </script>
 

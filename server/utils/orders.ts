@@ -11,6 +11,11 @@ import type {
 import { STATUS_KEYS_REQUIRING_REPARTIDOR } from './order-validation'
 import { usePrisma } from './prisma'
 import {
+  canEditOrderRemision,
+  canManageOrderLogistics,
+  editableOrderStatusKeys
+} from '~/utils/roleAccess'
+import {
   siigoCustomerDisplayName,
   siigoJson,
   upsertSiigoCustomer,
@@ -112,6 +117,42 @@ function buildLine(
 
 const IGUALACION_MATCH = 'igualacion de color'
 const IGUALACION_STATUS_KEYS = ['confirmado', 'surtido', 'en_espera']
+const igualacionFilter = {
+  items: {
+    some: {
+      OR: [
+        { productCodeSnapshot: { contains: IGUALACION_MATCH, mode: 'insensitive' as const } },
+        { productNameSnapshot: { contains: IGUALACION_MATCH, mode: 'insensitive' as const } }
+      ]
+    }
+  }
+} satisfies Prisma.SalesOrderWhereInput
+
+function orderVisibilityFilter(user: AppUser): Prisma.SalesOrderWhereInput {
+  if (user.role === 'igualaciones') return igualacionFilter
+
+  if (user.role === 'repartidor') {
+    return {
+      OR: [
+        ...(user.repartidorId ? [{ repartidorId: user.repartidorId }] : []),
+        { vendedorEmail: { equals: user.email, mode: 'insensitive' } }
+      ]
+    }
+  }
+
+  return {}
+}
+
+function assertStatusPermission(user: AppUser, statusKey: string) {
+  const editableStatusKeys = editableOrderStatusKeys(user.role)
+
+  if (editableStatusKeys && !editableStatusKeys.includes(statusKey)) {
+    throw createError({
+      statusCode: 403,
+      statusMessage: 'No tienes permiso para asignar ese estado al pedido.'
+    })
+  }
+}
 
 function listItem(order: SalesOrder & {
   status: { key: string, label: string, color: string, sortOrder: number, isTerminal: boolean }
@@ -326,9 +367,12 @@ export async function createOrder(
   return detail(created)
 }
 
-export async function getOrder(id: string) {
-  const order = await usePrisma().salesOrder.findUnique({
-    where: { id },
+export async function getOrder(id: string, user: AppUser) {
+  const order = await usePrisma().salesOrder.findFirst({
+    where: {
+      id,
+      AND: [orderVisibilityFilter(user)]
+    },
     include: orderDetailInclude
   })
 
@@ -345,11 +389,12 @@ export async function listOrders(options: {
   search?: string
   statusKey?: string
   igualacion?: boolean
-}) {
+}, user: AppUser) {
   const prisma = usePrisma()
+  const isIgualacionesView = options.igualacion || user.role === 'igualaciones'
   const folioMatch = options.search?.toUpperCase().match(/^(?:PED-?)?0*(\d+)$/)
   const folio = folioMatch?.[1] ? Number(folioMatch[1]) : null
-  const statusFilter = options.igualacion
+  const statusFilter: Prisma.SalesOrderWhereInput = isIgualacionesView
     ? {
         statusKey: options.statusKey
           ? { in: IGUALACION_STATUS_KEYS.filter(key => key === options.statusKey) }
@@ -358,39 +403,32 @@ export async function listOrders(options: {
     : options.statusKey
       ? { statusKey: options.statusKey }
       : {}
+  const searchFilter: Prisma.SalesOrderWhereInput = options.search
+    ? {
+        OR: [{
+          customerNameSnapshot: { contains: options.search, mode: 'insensitive' }
+        }, {
+          customerRfcSnapshot: { contains: options.search, mode: 'insensitive' }
+        }, {
+          observations: { contains: options.search, mode: 'insensitive' }
+        }, {
+          remision: { contains: options.search, mode: 'insensitive' }
+        }, {
+          vendedorNombre: { contains: options.search, mode: 'insensitive' }
+        }, {
+          vendedorEmail: { contains: options.search, mode: 'insensitive' }
+        }, {
+          repartidorNombreSnapshot: { contains: options.search, mode: 'insensitive' }
+        }, ...(folio && Number.isSafeInteger(folio) ? [{ folio }] : [])]
+      }
+    : {}
   const where: Prisma.SalesOrderWhereInput = {
-    ...statusFilter,
-    ...(options.igualacion
-      ? {
-          items: {
-            some: {
-              OR: [
-                { productCodeSnapshot: { contains: IGUALACION_MATCH, mode: 'insensitive' } },
-                { productNameSnapshot: { contains: IGUALACION_MATCH, mode: 'insensitive' } }
-              ]
-            }
-          }
-        }
-      : {}),
-    ...(options.search
-      ? {
-          OR: [{
-            customerNameSnapshot: { contains: options.search, mode: 'insensitive' }
-          }, {
-            customerRfcSnapshot: { contains: options.search, mode: 'insensitive' }
-          }, {
-            observations: { contains: options.search, mode: 'insensitive' }
-          }, {
-            remision: { contains: options.search, mode: 'insensitive' }
-          }, {
-            vendedorNombre: { contains: options.search, mode: 'insensitive' }
-          }, {
-            vendedorEmail: { contains: options.search, mode: 'insensitive' }
-          }, {
-            repartidorNombreSnapshot: { contains: options.search, mode: 'insensitive' }
-          }, ...(folio && Number.isSafeInteger(folio) ? [{ folio }] : [])]
-        }
-      : {})
+    AND: [
+      statusFilter,
+      orderVisibilityFilter(user),
+      ...(isIgualacionesView ? [igualacionFilter] : []),
+      searchFilter
+    ]
   }
   const [orders, totalResults] = await prisma.$transaction([
     prisma.salesOrder.findMany({
@@ -398,7 +436,7 @@ export async function listOrders(options: {
       include: {
         status: true,
         _count: { select: { items: true } },
-        ...(options.igualacion
+        ...(isIgualacionesView
           ? {
               items: {
                 select: { productCodeSnapshot: true, productNameSnapshot: true, quantity: true, observations: true },
@@ -431,10 +469,14 @@ export async function updateOrderStatus(
   user: AppUser
 ) {
   const prisma = usePrisma()
+  assertStatusPermission(user, input.statusKey)
 
   await prisma.$transaction(async (tx) => {
-    const order = await tx.salesOrder.findUnique({
-      where: { id },
+    const order = await tx.salesOrder.findFirst({
+      where: {
+        id,
+        AND: [orderVisibilityFilter(user)]
+      },
       select: { statusKey: true, version: true, repartidorId: true }
     })
     const status = await tx.orderStatus.findFirst({
@@ -489,7 +531,7 @@ export async function updateOrderStatus(
     })
   })
 
-  return getOrder(id)
+  return getOrder(id, user)
 }
 
 export async function updateOrderRemision(
@@ -499,8 +541,18 @@ export async function updateOrderRemision(
 ) {
   const prisma = usePrisma()
 
-  const order = await prisma.salesOrder.findUnique({
-    where: { id },
+  if (!canEditOrderRemision(user.role)) {
+    throw createError({
+      statusCode: 403,
+      statusMessage: 'No tienes permiso para modificar la remisión.'
+    })
+  }
+
+  const order = await prisma.salesOrder.findFirst({
+    where: {
+      id,
+      AND: [orderVisibilityFilter(user)]
+    },
     select: { version: true }
   })
 
@@ -529,7 +581,7 @@ export async function updateOrderRemision(
     })
   }
 
-  return getOrder(id)
+  return getOrder(id, user)
 }
 
 export async function updateOrderRepartidor(
@@ -539,8 +591,21 @@ export async function updateOrderRepartidor(
 ) {
   const prisma = usePrisma()
 
+  if (!canManageOrderLogistics(user.role)) {
+    throw createError({
+      statusCode: 403,
+      statusMessage: 'No tienes permiso para reasignar el repartidor.'
+    })
+  }
+
   const [order, repartidor] = await Promise.all([
-    prisma.salesOrder.findUnique({ where: { id }, select: { version: true } }),
+    prisma.salesOrder.findFirst({
+      where: {
+        id,
+        AND: [orderVisibilityFilter(user)]
+      },
+      select: { version: true }
+    }),
     prisma.repartidor.findUnique({ where: { id: input.repartidorId } })
   ])
 
@@ -574,5 +639,5 @@ export async function updateOrderRepartidor(
     })
   }
 
-  return getOrder(id)
+  return getOrder(id, user)
 }

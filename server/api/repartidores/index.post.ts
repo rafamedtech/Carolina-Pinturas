@@ -1,9 +1,10 @@
-import { requireUser } from '../../utils/auth'
+import { ORDER_LOGISTICS_ROLES } from '~/utils/roleAccess'
+import { requireRole } from '../../utils/auth'
 import { createRepartidor } from '../../utils/repartidores'
 import { createRepartidorSchema } from '../../utils/repartidor-validation'
 
 export default eventHandler(async (event) => {
-  await requireUser(event)
+  await requireRole(event, ORDER_LOGISTICS_ROLES)
   const parsed = createRepartidorSchema.safeParse(await readBody(event))
 
   if (!parsed.success) {

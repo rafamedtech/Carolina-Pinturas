@@ -1,5 +1,10 @@
 <script setup lang="ts">
 import type { OrderStatus, SalesOrderDetail } from '~/types/orders'
+import {
+  canEditOrderRemision,
+  canManageOrderLogistics,
+  editableOrderStatusKeys
+} from '~/utils/roleAccess'
 
 const props = defineProps<{
   orderId: string
@@ -13,6 +18,7 @@ const savingRemision = shallowRef(false)
 const selectedRepartidor = shallowRef('')
 const savingRepartidor = shallowRef(false)
 const toast = useToast()
+const { user } = useAuth()
 const {
   data: order,
   status,
@@ -49,8 +55,31 @@ const remisionUnchanged = computed(() => remisionDraft.value === (order.value?.r
 const repartidorUnchanged = computed(() => selectedRepartidor.value === (order.value?.repartidor?.id || ''))
 const statusUnchanged = computed(() => selectedStatus.value === (order.value?.status.key || ''))
 
+const mayEditRemision = computed(() =>
+  Boolean(user.value && canEditOrderRemision(user.value.role))
+)
+const mayManageLogistics = computed(() =>
+  Boolean(user.value && canManageOrderLogistics(user.value.role))
+)
+const availableStatuses = computed(() => {
+  if (!user.value) return []
+
+  const editableKeys = editableOrderStatusKeys(user.value.role)
+  if (!editableKeys) return statuses.value
+
+  return statuses.value.filter(status =>
+    status.key === order.value?.status.key || editableKeys.includes(status.key)
+  )
+})
+const backPath = computed(() =>
+  user.value?.role === 'igualaciones' ? '/igualaciones' : '/ventas'
+)
 const savingChanges = computed(() => savingRemision.value || savingRepartidor.value || savingStatus.value)
-const hasChanges = computed(() => !remisionUnchanged.value || !repartidorUnchanged.value || !statusUnchanged.value)
+const hasChanges = computed(() =>
+  (mayEditRemision.value && !remisionUnchanged.value)
+  || (mayManageLogistics.value && !repartidorUnchanged.value)
+  || !statusUnchanged.value
+)
 
 const currency = computed(() => new Intl.NumberFormat('es-MX', {
   style: 'currency',
@@ -76,7 +105,7 @@ const repartidorOptions = computed(() => repartidores.value.map(repartidor => ({
 })))
 
 async function updateRemision() {
-  if (!order.value || remisionUnchanged.value) return
+  if (!mayEditRemision.value || !order.value || remisionUnchanged.value) return
   savingRemision.value = true
 
   try {
@@ -110,7 +139,12 @@ async function updateRemision() {
 }
 
 async function updateRepartidor() {
-  if (!order.value || repartidorUnchanged.value || !selectedRepartidor.value) return
+  if (
+    !mayManageLogistics.value
+    || !order.value
+    || repartidorUnchanged.value
+    || !selectedRepartidor.value
+  ) return
   savingRepartidor.value = true
 
   try {
@@ -195,7 +229,7 @@ async function saveChanges() {
       <UDashboardNavbar :title="order?.number || 'Detalle del pedido'">
         <template #leading>
           <UButton
-            to="/ventas"
+            :to="backPath"
             icon="i-lucide-arrow-left"
             color="neutral"
             variant="ghost"
@@ -304,12 +338,16 @@ async function saveChanges() {
                 </dt>
                 <dd class="mt-1">
                   <UInput
+                    v-if="mayEditRemision"
                     v-model="remisionDraft"
                     :disabled="savingRemision"
                     maxlength="100"
                     placeholder="Número de remisión"
                     class="w-full max-w-xs"
                   />
+                  <span v-else class="font-medium">
+                    {{ order.remision || '—' }}
+                  </span>
                 </dd>
               </div>
               <div>
@@ -326,6 +364,7 @@ async function saveChanges() {
                 </dt>
                 <dd class="mt-1">
                   <USelectMenu
+                    v-if="mayManageLogistics"
                     v-model="selectedRepartidor"
                     :items="repartidorOptions"
                     value-key="value"
@@ -333,6 +372,9 @@ async function saveChanges() {
                     placeholder="Selecciona un repartidor"
                     class="w-full max-w-xs"
                   />
+                  <span v-else class="font-medium">
+                    {{ order.repartidor?.name || 'Sin asignar' }}
+                  </span>
                 </dd>
               </div>
             </dl>
@@ -350,7 +392,7 @@ async function saveChanges() {
             v-model:status-key="selectedStatus"
             v-model:note="statusNote"
             :order="order"
-            :statuses="statuses"
+            :statuses="availableStatuses"
             :saving="savingStatus"
           />
         </div>

@@ -72,11 +72,11 @@ const numberColumn: TableColumn<SalesOrderListItem> = props.igualacion
       cell: ({ row }) => h(
         UButton,
         {
-          variant: 'link',
-          color: 'primary',
-          class: 'p-0 font-medium',
+          'variant': 'link',
+          'color': 'primary',
+          'class': 'p-0 font-medium',
           'aria-label': `Ver pedido ${row.original.number}`,
-          onClick: () => openOrder(row.original)
+          'onClick': () => openOrder(row.original)
         },
         () => row.original.number
       )
@@ -195,6 +195,16 @@ const columns = computed<TableColumn<SalesOrderListItem>[]>(() => [numberColumn,
           </ul>
         </div>
       </div>
+    </template>
+    <template #footer>
+      <UButton
+        v-if="selectedOrder"
+        :to="`/ventas/${encodeURIComponent(selectedOrder.id)}`"
+        label="Atender pedido"
+        icon="i-lucide-arrow-right"
+        trailing
+        @click="detailOpen = false"
+      />
     </template>
   </UModal>
 </template>

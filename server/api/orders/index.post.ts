@@ -1,12 +1,13 @@
 import type { SiigoCustomer, SiigoProduct } from '~/types/siigo'
-import { requireUser } from '../../utils/auth'
+import { ORDER_ENTRY_ROLES } from '~/utils/roleAccess'
+import { requireRole } from '../../utils/auth'
 import { createOrder } from '../../utils/orders'
 import { createOrderSchema } from '../../utils/order-validation'
 import { usePrisma } from '../../utils/prisma'
 import { siigoRequest } from '../../utils/siigo'
 
 export default eventHandler(async (event) => {
-  const user = await requireUser(event)
+  const user = await requireRole(event, ORDER_ENTRY_ROLES)
   const parsed = createOrderSchema.safeParse(await readBody(event))
 
   if (!parsed.success) {

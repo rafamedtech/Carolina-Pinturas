@@ -5,8 +5,10 @@ const props = withDefaults(defineProps<{
   statuses: OrderStatus[]
   loading: boolean
   igualacion?: boolean
+  canCreate?: boolean
 }>(), {
-  igualacion: false
+  igualacion: false,
+  canCreate: false
 })
 
 const emit = defineEmits<{
@@ -59,7 +61,7 @@ const statusOptions = computed(() => {
         @click="emit('refresh')"
       />
       <UButton
-        v-if="!igualacion"
+        v-if="!igualacion && canCreate"
         to="/ventas/nuevo-pedido"
         label="Nuevo pedido"
         icon="i-lucide-shopping-cart"

@@ -4,7 +4,11 @@ import { usePrisma } from './prisma'
 import { getVerifiedSupabaseClaims } from './supabase'
 
 function isRole(role: string): role is UserRole {
-  return role === 'admin' || role === 'mostrador' || role === 'vendedor'
+  return role === 'admin'
+    || role === 'mostrador'
+    || role === 'vendedor'
+    || role === 'repartidor'
+    || role === 'igualaciones'
 }
 
 export async function getAppSession(event: H3Event): Promise<AppUser | null> {
@@ -13,7 +17,17 @@ export async function getAppSession(event: H3Event): Promise<AppUser | null> {
   if (!claims?.sub) return null
 
   const profile = await usePrisma().appUser.findUnique({
-    where: { userId: claims.sub }
+    where: { userId: claims.sub },
+    select: {
+      userId: true,
+      name: true,
+      email: true,
+      role: true,
+      active: true,
+      repartidor: {
+        select: { id: true }
+      }
+    }
   })
 
   if (!profile || !profile.active || !isRole(profile.role)) {
@@ -27,7 +41,8 @@ export async function getAppSession(event: H3Event): Promise<AppUser | null> {
     id: profile.userId,
     name: profile.name,
     email: profile.email,
-    role: profile.role
+    role: profile.role,
+    repartidorId: profile.repartidor?.id ?? null
   }
 }
 
@@ -41,7 +56,7 @@ export async function requireUser(event: H3Event) {
   return user
 }
 
-export async function requireRole(event: H3Event, roles: UserRole[]) {
+export async function requireRole(event: H3Event, roles: readonly UserRole[]) {
   const user = await requireUser(event)
 
   if (!roles.includes(user.role)) {

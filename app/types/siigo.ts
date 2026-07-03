@@ -1,10 +1,11 @@
-export type UserRole = 'admin' | 'mostrador' | 'vendedor'
+export type UserRole = 'admin' | 'mostrador' | 'vendedor' | 'repartidor' | 'igualaciones'
 
 export interface AppUser {
   id: string
   name: string
   email: string
   role: UserRole
+  repartidorId: string | null
 }
 
 export interface SiigoProduct {

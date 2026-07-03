@@ -16,6 +16,8 @@ model AppUser {
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
 
+  repartidor Repartidor?
+
   @@index([role, active])
   @@map("app_users")
 }
@@ -39,13 +41,15 @@ model OrderStatus {
 
 model Repartidor {
   id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId    String?  @unique(map: "repartidores_user_id_key") @map("user_id") @db.Uuid
   nombre    String
   telefono  String?
   activo    Boolean  @default(true)
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  orders SalesOrder[]
+  appUser AppUser?     @relation(fields: [userId], references: [userId], onDelete: SetNull, onUpdate: NoAction)
+  orders  SalesOrder[]
 
   @@index([nombre])
   @@map("repartidores")
@@ -206,40 +210,40 @@ model SiigoCustomerContact {
 }
 
 model SalesOrder {
-  id                   String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  folio                Int       @unique @default(autoincrement())
-  statusKey            String    @default("borrador") @map("status_key") @db.VarChar(32)
-  customerId           String    @map("customer_id") @db.Uuid
-  customerNameSnapshot String    @map("customer_name_snapshot")
-  customerRfcSnapshot  String?   @map("customer_rfc_snapshot")
-  customerPayload      Json      @map("customer_payload") @db.JsonB
-  orderDate            DateTime  @default(dbgenerated("CURRENT_DATE")) @map("order_date") @db.Date
-  promisedDate         DateTime? @map("promised_date") @db.Date
-  observations         String?
-  remision             String?
-  currencyCode         String    @default("MXN") @map("currency_code") @db.VarChar(3)
-  subtotal             Decimal   @default(0) @db.Decimal(20, 6)
-  discountTotal        Decimal   @default(0) @map("discount_total") @db.Decimal(20, 6)
-  taxTotal             Decimal   @default(0) @map("tax_total") @db.Decimal(20, 6)
-  total                Decimal   @default(0) @db.Decimal(20, 6)
-  siigoReference       String?   @map("siigo_reference")
-  registeredInSiigoAt  DateTime? @map("registered_in_siigo_at") @db.Timestamptz(6)
-  vendedorNombre       String    @map("vendedor_nombre")
-  vendedorEmail        String    @map("vendedor_email")
-  repartidorId               String? @map("repartidor_id") @db.Uuid
-  repartidorNombreSnapshot   String? @map("repartidor_nombre_snapshot")
-  repartidorTelefonoSnapshot String? @map("repartidor_telefono_snapshot")
-  createdByName        String    @map("created_by_name")
-  createdByEmail       String    @map("created_by_email")
-  createdByRole        String    @map("created_by_role") @db.VarChar(32)
-  updatedByEmail       String    @map("updated_by_email")
-  version              Int       @default(1)
-  createdAt            DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt            DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  id                         String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  folio                      Int       @unique @default(autoincrement())
+  statusKey                  String    @default("borrador") @map("status_key") @db.VarChar(32)
+  customerId                 String    @map("customer_id") @db.Uuid
+  customerNameSnapshot       String    @map("customer_name_snapshot")
+  customerRfcSnapshot        String?   @map("customer_rfc_snapshot")
+  customerPayload            Json      @map("customer_payload") @db.JsonB
+  orderDate                  DateTime  @default(dbgenerated("CURRENT_DATE")) @map("order_date") @db.Date
+  promisedDate               DateTime? @map("promised_date") @db.Date
+  observations               String?
+  remision                   String?
+  currencyCode               String    @default("MXN") @map("currency_code") @db.VarChar(3)
+  subtotal                   Decimal   @default(0) @db.Decimal(20, 6)
+  discountTotal              Decimal   @default(0) @map("discount_total") @db.Decimal(20, 6)
+  taxTotal                   Decimal   @default(0) @map("tax_total") @db.Decimal(20, 6)
+  total                      Decimal   @default(0) @db.Decimal(20, 6)
+  siigoReference             String?   @map("siigo_reference")
+  registeredInSiigoAt        DateTime? @map("registered_in_siigo_at") @db.Timestamptz(6)
+  vendedorNombre             String    @map("vendedor_nombre")
+  vendedorEmail              String    @map("vendedor_email")
+  repartidorId               String?   @map("repartidor_id") @db.Uuid
+  repartidorNombreSnapshot   String?   @map("repartidor_nombre_snapshot")
+  repartidorTelefonoSnapshot String?   @map("repartidor_telefono_snapshot")
+  createdByName              String    @map("created_by_name")
+  createdByEmail             String    @map("created_by_email")
+  createdByRole              String    @map("created_by_role") @db.VarChar(32)
+  updatedByEmail             String    @map("updated_by_email")
+  version                    Int       @default(1)
+  createdAt                  DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt                  DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   status        OrderStatus               @relation(fields: [statusKey], references: [key], onDelete: Restrict)
   customer      SiigoCustomer             @relation(fields: [customerId], references: [id], onDelete: Restrict)
-  repartidor    Repartidor?               @relation(fields: [repartidorId], references: [id], onDelete: Restrict)
+  repartidor    Repartidor?               @relation(fields: [repartidorId], references: [id], onDelete: NoAction, onUpdate: NoAction)
   items         SalesOrderItem[]
   statusHistory SalesOrderStatusHistory[]
 

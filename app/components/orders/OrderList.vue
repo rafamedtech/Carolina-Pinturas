@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { OrderStatus, SalesOrderListResponse } from '~/types/orders'
+import { canCreateOrders } from '~/utils/roleAccess'
 
 const props = withDefaults(defineProps<{
   title?: string
@@ -14,6 +15,8 @@ const statusKey = shallowRef('all')
 const page = shallowRef(1)
 const pageSize = 25
 const debouncedFilter = refDebounced(filter, 300)
+const { user } = useAuth()
+const canCreate = computed(() => Boolean(user.value && canCreateOrders(user.value.role)))
 
 watch([filter, statusKey], () => {
   page.value = 1
@@ -70,6 +73,7 @@ const errorMessage = computed(() =>
         :statuses="statuses"
         :loading="status === 'pending'"
         :igualacion="igualacion"
+        :can-create="canCreate"
         @refresh="refresh"
       />
 

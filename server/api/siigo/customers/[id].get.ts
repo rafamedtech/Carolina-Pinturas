@@ -1,9 +1,10 @@
 import type { SiigoCustomer } from '~/types/siigo'
-import { requireUser } from '../../../utils/auth'
+import { ORDER_ENTRY_ROLES } from '~/utils/roleAccess'
+import { requireRole } from '../../../utils/auth'
 import { siigoRequest } from '../../../utils/siigo'
 
 export default eventHandler(async (event) => {
-  await requireUser(event)
+  await requireRole(event, ORDER_ENTRY_ROLES)
 
   const id = getRouterParam(event, 'id')
   if (!id) {

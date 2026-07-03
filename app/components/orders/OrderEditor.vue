@@ -59,6 +59,7 @@ const saving = shallowRef(false)
 const summaryOpen = shallowRef(false)
 const pendingSubmission = shallowRef<Schema | null>(null)
 const toast = useToast()
+const { user } = useAuth()
 const currency = new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' })
 const { lines, total, addProduct, removeProduct, setObservations } = useOrderDraft()
 const {
@@ -96,6 +97,20 @@ await Promise.all([
   callOnce('order-statuses', refreshStatuses),
   callOnce('repartidores-catalog', refreshRepartidores)
 ])
+
+watch(
+  [() => user.value?.repartidorId, repartidores],
+  ([repartidorId, availableRepartidores]) => {
+    if (
+      !state.repartidorId
+      && repartidorId
+      && availableRepartidores.some(repartidor => repartidor.id === repartidorId)
+    ) {
+      state.repartidorId = repartidorId
+    }
+  },
+  { immediate: true }
+)
 
 const catalogError = computed(() =>
   customerError.value?.data?.statusMessage

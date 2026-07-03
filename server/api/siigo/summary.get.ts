@@ -1,5 +1,6 @@
 import type { SiigoListResponse } from '~/types/siigo'
-import { requireUser } from '../../utils/auth'
+import { ORDER_LOGISTICS_ROLES } from '~/utils/roleAccess'
+import { requireRole } from '../../utils/auth'
 import { siigoRequest } from '../../utils/siigo'
 
 interface CountableResponse {
@@ -12,7 +13,7 @@ function total(response: CountableResponse) {
 }
 
 export default eventHandler(async (event) => {
-  await requireUser(event)
+  await requireRole(event, ORDER_LOGISTICS_ROLES)
 
   const [products, customers, invoices, vouchers] = await Promise.all([
     siigoRequest<SiigoListResponse<unknown>>('/v1/products'),

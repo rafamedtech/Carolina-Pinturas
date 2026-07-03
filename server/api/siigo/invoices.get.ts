@@ -1,5 +1,6 @@
 import type { SiigoCustomer, SiigoInvoice, SiigoListResponse } from '~/types/siigo'
-import { requireUser } from '../../utils/auth'
+import { ORDER_LOGISTICS_ROLES } from '~/utils/roleAccess'
+import { requireRole } from '../../utils/auth'
 import { listQuery, siigoRequest } from '../../utils/siigo'
 
 function customerName(customer: SiigoCustomer) {
@@ -7,7 +8,7 @@ function customerName(customer: SiigoCustomer) {
 }
 
 export default eventHandler(async (event) => {
-  await requireUser(event)
+  await requireRole(event, ORDER_LOGISTICS_ROLES)
 
   const invoices = await siigoRequest<SiigoListResponse<SiigoInvoice>>('/v1/invoices', { query: listQuery(event) })
   const customerIds = [...new Set(invoices.results.map(invoice => invoice.customer?.id).filter((id): id is string => Boolean(id)))]

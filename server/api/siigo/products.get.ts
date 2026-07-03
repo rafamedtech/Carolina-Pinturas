@@ -1,5 +1,6 @@
 import type { SiigoListResponse, SiigoProduct } from '~/types/siigo'
-import { requireUser } from '../../utils/auth'
+import { ORDER_ENTRY_ROLES } from '~/utils/roleAccess'
+import { requireRole } from '../../utils/auth'
 import { listQuery, siigoRequest } from '../../utils/siigo'
 
 const siigoPageSize = 25
@@ -30,7 +31,7 @@ async function getAllProducts() {
 }
 
 export default eventHandler(async (event) => {
-  await requireUser(event)
+  await requireRole(event, ORDER_ENTRY_ROLES)
   const query = getQuery(event)
 
   if (query.all === 'true') {
