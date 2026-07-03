@@ -90,11 +90,16 @@ const message = computed(() =>
       </template>
     </UAlert>
 
+    <AppTableSkeleton
+      v-else-if="status === 'pending'"
+      :cols="columns.length"
+      class="m-4"
+    />
+
     <UTable
       v-else
       :data="orders"
       :columns="columns"
-      :loading="status === 'pending'"
       empty="No hay pedidos para mostrar."
       class="shrink-0"
       :ui="{

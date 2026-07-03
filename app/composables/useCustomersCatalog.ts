@@ -5,8 +5,12 @@ export function useCustomersCatalog() {
   const { data, status, error, refresh } = useFetch<SiigoListResponse<SiigoCustomer>>('/api/siigo/customers', {
     key: 'customers-catalog-request',
     query: { all: 'true' },
-    immediate: false
+    lazy: true
   })
+
+  watch(data, (value) => {
+    if (value) catalog.value = value
+  }, { immediate: true })
 
   async function refreshCatalog() {
     await refresh()

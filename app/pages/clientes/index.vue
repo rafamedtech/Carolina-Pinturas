@@ -8,7 +8,11 @@ const filter = ref('')
 const router = useRouter()
 const { data, status, error, refresh } = useCustomersCatalog()
 
-await callOnce('customers-catalog', refresh)
+const isHydrated = shallowRef(false)
+onMounted(() => {
+  isHydrated.value = true
+})
+const loading = computed(() => isHydrated.value && status.value === 'pending')
 
 const customers = computed(() => {
   const value = filter.value.trim().toLowerCase()
@@ -96,11 +100,12 @@ function openCustomer(_: Event, row: TableRow<SiigoCustomer>) {
         icon="i-lucide-plug-zap"
       />
 
+      <AppTableSkeleton v-else-if="loading" :cols="columns.length" />
+
       <UTable
         v-else
         :data="customers"
         :columns="columns"
-        :loading="status === 'pending'"
         empty="No hay clientes para mostrar."
         class="shrink-0"
         :meta="{ class: { tr: 'cursor-pointer transition-colors hover:bg-elevated/50' } }"
@@ -113,14 +118,7 @@ function openCustomer(_: Event, row: TableRow<SiigoCustomer>) {
           separator: 'h-0'
         }"
         @select="openCustomer"
-      >
-        <template #loading>
-          <div class="flex items-center justify-center gap-2 text-muted" role="status">
-            <UIcon name="i-lucide-loader-circle" class="size-5 animate-spin text-primary" />
-            <span>Cargando clientes…</span>
-          </div>
-        </template>
-      </UTable>
+      />
     </template>
   </UDashboardPanel>
 </template>

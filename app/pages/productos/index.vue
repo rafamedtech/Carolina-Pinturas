@@ -15,7 +15,11 @@ watch(filter, () => {
 
 const { data, status, error, refresh } = useProductsCatalog()
 
-await callOnce('products-catalog', refresh)
+const isHydrated = shallowRef(false)
+onMounted(() => {
+  isHydrated.value = true
+})
+const loading = computed(() => isHydrated.value && status.value === 'pending')
 
 const catalog = computed(() => data.value?.results || [])
 const normalizedFilter = computed(() => filter.value.trim().toLocaleLowerCase())
@@ -139,11 +143,12 @@ function openProduct(_: Event, row: TableRow<SiigoProduct>) {
         icon="i-lucide-plug-zap"
       />
 
+      <AppTableSkeleton v-else-if="loading" :cols="columns.length" />
+
       <UTable
         v-else
         :data="products"
         :columns="columns"
-        :loading="status === 'pending'"
         empty="No hay productos para mostrar."
         class="shrink-0"
         :meta="{ class: { tr: 'cursor-pointer transition-colors hover:bg-elevated/50' } }"
@@ -156,14 +161,7 @@ function openProduct(_: Event, row: TableRow<SiigoProduct>) {
           separator: 'h-0'
         }"
         @select="openProduct"
-      >
-        <template #loading>
-          <div class="flex items-center justify-center gap-2 text-muted" role="status">
-            <UIcon name="i-lucide-loader-circle" class="size-5 animate-spin text-primary" />
-            <span>Cargando productos…</span>
-          </div>
-        </template>
-      </UTable>
+      />
 
       <div
         v-if="!error && totalProducts > 0"

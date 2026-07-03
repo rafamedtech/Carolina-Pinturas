@@ -1,11 +1,11 @@
-export type BadgeColor =
-  | 'primary'
-  | 'secondary'
-  | 'success'
-  | 'info'
-  | 'warning'
-  | 'error'
-  | 'neutral'
+export type BadgeColor
+  = | 'primary'
+    | 'secondary'
+    | 'success'
+    | 'info'
+    | 'warning'
+    | 'error'
+    | 'neutral'
 
 const VALID_BADGE_COLORS = new Set<BadgeColor>([
   'primary',
