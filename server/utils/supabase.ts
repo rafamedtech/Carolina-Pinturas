@@ -29,6 +29,7 @@ export function useServerSupabase(event: H3Event) {
 
   return createServerClient(url, publishableKey, {
     cookies: {
+      encode: 'tokens-only',
       getAll() {
         return Object.entries(parseCookies(event)).map(([name, value]) => ({
           name,

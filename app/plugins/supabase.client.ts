@@ -1,4 +1,5 @@
 import { createBrowserClient } from '@supabase/ssr'
+import { clearStaleSupabaseAuthCookies } from '~/utils/supabaseCookies'
 
 export default defineNuxtPlugin(() => {
   const config = useRuntimeConfig()
@@ -13,7 +14,13 @@ export default defineNuxtPlugin(() => {
     throw new Error('NUXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY no puede contener una llave secreta.')
   }
 
-  const supabase = createBrowserClient(url, publishableKey)
+  clearStaleSupabaseAuthCookies(url, { onlyIfOversized: true })
+
+  const supabase = createBrowserClient(url, publishableKey, {
+    cookies: {
+      encode: 'tokens-only'
+    }
+  })
 
   return {
     provide: {

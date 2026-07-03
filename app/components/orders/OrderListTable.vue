@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { h, resolveComponent } from 'vue'
 import type { TableColumn } from '@nuxt/ui'
+import OrderListCards from './OrderListCards.vue'
 import type { SalesOrderListItem } from '~/types/orders'
 
 const props = withDefaults(defineProps<{
@@ -111,12 +112,18 @@ const columns = computed<TableColumn<SalesOrderListItem>[]>(() => [numberColumn,
 </script>
 
 <template>
+  <OrderListCards
+    v-if="!igualacion"
+    :orders="orders"
+    :loading="loading"
+  />
+
   <UTable
     :data="tableOrders"
     :columns="columns"
     :loading="loading"
     empty="No hay pedidos para mostrar."
-    class="shrink-0"
+    :class="igualacion ? 'shrink-0' : 'hidden shrink-0 md:block'"
     :ui="{
       base: 'table-fixed border-separate border-spacing-0',
       thead: '[&>tr]:bg-elevated/50 [&>tr]:after:content-none',

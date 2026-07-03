@@ -1,4 +1,5 @@
 import type { AppUser } from '~/types/siigo'
+import { clearStaleSupabaseAuthCookies } from '~/utils/supabaseCookies'
 
 interface SessionResponse {
   user: AppUser | null
@@ -12,6 +13,7 @@ export function useAuth() {
   const loaded = useState('auth:loaded', () => false)
   const disabled = useState('auth:disabled', () => false)
   const nuxtApp = useNuxtApp()
+  const config = useRuntimeConfig()
 
   function browserSupabase() {
     if (import.meta.server) {
@@ -35,6 +37,7 @@ export function useAuth() {
 
   async function login(email: string, password: string) {
     const supabase = browserSupabase()
+    clearStaleSupabaseAuthCookies(config.public.supabaseUrl)
     const { error } = await supabase.auth.signInWithPassword({ email, password })
 
     if (error) {

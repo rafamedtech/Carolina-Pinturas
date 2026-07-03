@@ -17,6 +17,11 @@ const pageSize = 25
 const debouncedFilter = refDebounced(filter, 300)
 const { user } = useAuth()
 const canCreate = computed(() => Boolean(user.value && canCreateOrders(user.value.role)))
+const isHydrated = shallowRef(false)
+
+onMounted(() => {
+  isHydrated.value = true
+})
 
 watch([filter, statusKey], () => {
   page.value = 1
@@ -54,6 +59,7 @@ const { data: statuses } = await useFetch<OrderStatus[]>('/api/orders/statuses',
 const errorMessage = computed(() =>
   error.value?.data?.statusMessage || 'No fue posible cargar los pedidos.'
 )
+const loading = computed(() => isHydrated.value && status.value === 'pending')
 </script>
 
 <template>
@@ -71,7 +77,7 @@ const errorMessage = computed(() =>
         v-model:filter="filter"
         v-model:status="statusKey"
         :statuses="statuses"
-        :loading="status === 'pending'"
+        :loading="loading"
         :igualacion="igualacion"
         :can-create="canCreate"
         @refresh="refresh"
@@ -89,7 +95,7 @@ const errorMessage = computed(() =>
       <OrdersOrderListTable
         v-else
         :orders="orders.results"
-        :loading="status === 'pending'"
+        :loading="loading"
         :igualacion="igualacion"
       />
 
@@ -98,7 +104,7 @@ const errorMessage = computed(() =>
         v-model:page="page"
         :total-results="orders.pagination.totalResults"
         :page-size="orders.pagination.pageSize"
-        :loading="status === 'pending'"
+        :loading="loading"
       />
     </template>
   </UDashboardPanel>

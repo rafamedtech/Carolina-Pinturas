@@ -2,6 +2,16 @@
 export default defineNuxtConfig({
   modules: ['@nuxt/eslint', '@nuxt/ui', '@vueuse/nuxt'],
 
+  $development: {
+    runtimeConfig: {
+      public: {
+        // Local compatibility while existing developer environments migrate
+        // from NUXT_PUBLIC_SUPABASE_KEY to the publishable-key convention.
+        supabasePublishableKey: process.env.NUXT_PUBLIC_SUPABASE_KEY || ''
+      }
+    }
+  },
+
   devtools: {
     enabled: true
   },
