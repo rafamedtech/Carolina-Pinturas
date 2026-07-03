@@ -28,12 +28,6 @@ const schema = z.object({
 
 type Schema = z.output<typeof schema>
 
-function localDate() {
-  const today = new Date()
-  const offset = today.getTimezoneOffset() * 60_000
-  return new Date(today.getTime() - offset).toISOString().slice(0, 10)
-}
-
 function productPrice(product: SiigoProduct) {
   const price = product.prices?.find(item =>
     item.currency_code === 'MXN' && item.price_list?.some(entry => entry.position === 1)
@@ -52,7 +46,7 @@ const state = reactive<Schema>({
   customerId: '',
   statusKey: user.value?.role === 'admin' ? 'ingresado' : 'borrador',
   repartidorId: '',
-  orderDate: localDate(),
+  orderDate: mexicoToday(),
   promisedDate: '',
   remision: '',
   observations: ''

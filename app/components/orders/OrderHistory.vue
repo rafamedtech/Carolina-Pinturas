@@ -6,10 +6,7 @@ defineProps<{
 }>()
 
 function formatDateTime(value: string) {
-  return new Date(value).toLocaleString('es-MX', {
-    dateStyle: 'medium',
-    timeStyle: 'short'
-  })
+  return formatMexicoDateTime(value)
 }
 
 function minutesSince(entries: readonly SalesOrderStatusHistoryItem[], index: number) {
