@@ -2,7 +2,6 @@
 import type { OrderStatus, SalesOrderDetail } from '~/types/orders'
 import {
   canCreateOrders,
-  canEditOrderRemision,
   canManageOrderLogistics,
   editableOrderStatusKeys
 } from '~/utils/roleAccess'
@@ -21,8 +20,6 @@ const props = defineProps<{
 const selectedStatus = shallowRef('')
 const statusNote = shallowRef('')
 const savingStatus = shallowRef(false)
-const remisionDraft = shallowRef('')
-const savingRemision = shallowRef(false)
 const selectedRepartidor = shallowRef('')
 const savingRepartidor = shallowRef(false)
 const selectedPaymentStatus = shallowRef('')
@@ -50,10 +47,6 @@ watch(() => order.value?.status.key, (value) => {
   selectedStatus.value = value || ''
 }, { immediate: true })
 
-watch(() => order.value?.remision, (value) => {
-  remisionDraft.value = value || ''
-}, { immediate: true })
-
 watch(() => order.value?.repartidor?.id, (value) => {
   selectedRepartidor.value = value || ''
 }, { immediate: true })
@@ -66,7 +59,6 @@ watch(() => order.value?.paymentMethod, (value) => {
   selectedPaymentMethod.value = value || ''
 }, { immediate: true })
 
-const remisionUnchanged = computed(() => remisionDraft.value === (order.value?.remision || ''))
 const repartidorUnchanged = computed(() => selectedRepartidor.value === (order.value?.repartidor?.id || ''))
 const statusUnchanged = computed(() => selectedStatus.value === (order.value?.status.key || ''))
 const paymentUnchanged = computed(() =>
@@ -97,9 +89,6 @@ const cotizacionMenu = [[
   { label: 'Impresora de tickets…', icon: 'i-lucide-settings-2', onSelect: () => { printerSettingsOpen.value = true } }
 ]]
 
-const mayEditRemision = computed(() =>
-  Boolean(user.value && canEditOrderRemision(user.value.role))
-)
 const mayManageLogistics = computed(() =>
   Boolean(user.value && canManageOrderLogistics(user.value.role))
 )
@@ -121,11 +110,10 @@ const backPath = computed(() =>
   user.value?.role === 'igualaciones' ? '/igualaciones' : '/ventas'
 )
 const savingChanges = computed(() =>
-  savingRemision.value || savingRepartidor.value || savingPayment.value || savingStatus.value
+  savingRepartidor.value || savingPayment.value || savingStatus.value
 )
 const hasChanges = computed(() =>
-  (mayEditRemision.value && !remisionUnchanged.value)
-  || (mayManageLogistics.value && !repartidorUnchanged.value)
+  (mayManageLogistics.value && !repartidorUnchanged.value)
   || (mayManagePayment.value && !paymentUnchanged.value)
   || !statusUnchanged.value
 )
@@ -161,40 +149,6 @@ const paymentMethodOptions = PAYMENT_METHODS.map(method => ({
   label: method.label,
   value: method.key as string
 }))
-
-async function updateRemision() {
-  if (!mayEditRemision.value || !order.value || remisionUnchanged.value) return
-  savingRemision.value = true
-
-  try {
-    order.value = await $fetch<SalesOrderDetail>(
-      `/api/orders/${encodeURIComponent(props.orderId)}/remision`,
-      {
-        method: 'PATCH',
-        body: {
-          remision: remisionDraft.value || null,
-          version: order.value.version
-        }
-      }
-    )
-    toast.add({
-      title: 'Remisión actualizada',
-      color: 'success',
-      icon: 'i-lucide-circle-check'
-    })
-  } catch (fetchError: unknown) {
-    const response = fetchError as { data?: { statusMessage?: string }, message?: string }
-    toast.add({
-      title: 'No se pudo actualizar la remisión',
-      description: response.data?.statusMessage || response.message || 'Intenta de nuevo.',
-      color: 'error',
-      icon: 'i-lucide-circle-alert'
-    })
-    await refresh()
-  } finally {
-    savingRemision.value = false
-  }
-}
 
 async function updateRepartidor() {
   if (
@@ -310,7 +264,6 @@ async function updateStatus() {
 async function saveChanges() {
   if (!hasChanges.value || savingChanges.value) return
 
-  await updateRemision()
   await updateRepartidor()
   await updatePayment()
   await updateStatus()
@@ -498,24 +451,6 @@ async function convertToPedido() {
                 </dt>
                 <dd class="mt-1 font-medium">
                   {{ formatDate(order.promisedDate) }}
-                </dd>
-              </div>
-              <div v-if="!isQuote" class="sm:col-span-2">
-                <dt class="text-sm text-muted">
-                  Remisión física
-                </dt>
-                <dd class="mt-1">
-                  <UInput
-                    v-if="mayEditRemision"
-                    v-model="remisionDraft"
-                    :disabled="savingRemision"
-                    maxlength="100"
-                    placeholder="Número de remisión"
-                    class="w-full max-w-xs"
-                  />
-                  <span v-else class="font-medium">
-                    {{ order.remision || '—' }}
-                  </span>
                 </dd>
               </div>
               <div v-if="!isQuote">

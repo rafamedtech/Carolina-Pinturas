@@ -22,7 +22,6 @@ const statusKey = defineModel<string>('statusKey', { required: true })
 const repartidorId = defineModel<string>('repartidorId', { required: true })
 const orderDate = defineModel<string>('orderDate', { required: true })
 const promisedDate = defineModel<string>('promisedDate', { required: true })
-const remision = defineModel<string>('remision', { required: true })
 const observations = defineModel<string>('observations', { required: true })
 
 function customerName(customer: SiigoCustomer) {
@@ -82,21 +81,6 @@ const repartidorOptions = computed(() => props.repartidores.map(repartidor => ({
           :items="statusOptions"
           value-key="value"
           :disabled="disabled"
-          class="w-full"
-        />
-      </UFormField>
-
-      <UFormField
-        v-if="!props.quoteMode"
-        name="remision"
-        label="Remisión física"
-        :class="{ 'sm:col-span-2': !props.showStatus }"
-      >
-        <UInput
-          v-model="remision"
-          :disabled="disabled"
-          maxlength="100"
-          placeholder="Número de remisión"
           class="w-full"
         />
       </UFormField>

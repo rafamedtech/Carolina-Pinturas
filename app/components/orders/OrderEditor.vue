@@ -30,7 +30,6 @@ const schema = z.object({
   repartidorId: z.string(),
   orderDate: z.string().min(1, `Selecciona la fecha ${documentOf.value}.`),
   promisedDate: z.string(),
-  remision: z.string().max(100),
   observations: z.string().max(5000)
 }).superRefine((data, ctx) => {
   if (STATUS_KEYS_REQUIRING_REPARTIDOR.includes(data.statusKey) && !data.repartidorId) {
@@ -66,7 +65,6 @@ const state = reactive<Schema>({
   repartidorId: '',
   orderDate: mexicoToday(),
   promisedDate: '',
-  remision: '',
   observations: ''
 })
 const saving = shallowRef(false)
@@ -333,7 +331,6 @@ async function confirmSubmit(statusKey: string) {
             ...data,
             repartidorId: data.repartidorId || null,
             promisedDate: data.promisedDate || null,
-            remision: data.remision || null,
             observations: data.observations || null,
             lines: requestLines
           }
@@ -406,7 +403,6 @@ async function confirmSubmit(statusKey: string) {
             v-model:repartidor-id="state.repartidorId"
             v-model:order-date="state.orderDate"
             v-model:promised-date="state.promisedDate"
-            v-model:remision="state.remision"
             v-model:observations="state.observations"
             :customers="customers?.results || []"
             :statuses="statuses"
