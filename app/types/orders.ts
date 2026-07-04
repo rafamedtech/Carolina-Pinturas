@@ -97,6 +97,10 @@ export interface SalesOrderStatusHistoryItem {
 }
 
 export interface SalesOrderDetail extends SalesOrderListItem {
+  customer: SalesOrderListItem['customer'] & {
+    phone: string | null
+    address: string | null
+  }
   observations: string | null
   remision: string | null
   paymentStatus: string

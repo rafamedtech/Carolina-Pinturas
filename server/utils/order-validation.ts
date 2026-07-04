@@ -63,9 +63,18 @@ export const updateOrderRepartidorSchema = z.object({
   version: z.number().int().positive()
 })
 
+// IPv4 literal only: hostnames are rejected to avoid DNS rebinding on the
+// server-side printer socket (see server/utils/ticket-printer.ts).
+export const ticketPrintSchema = z.object({
+  host: z.string().regex(/^\d{1,3}(?:\.\d{1,3}){3}$/, 'Usa la dirección IP de la impresora.'),
+  port: z.number().int().min(1).max(65535),
+  charsPerLine: z.number().int().min(24).max(64)
+})
+
 export type CreateOrderInput = z.output<typeof createOrderSchema>
 export type UpdateQuoteInput = z.output<typeof updateQuoteSchema>
 export type UpdateOrderStatusInput = z.output<typeof updateOrderStatusSchema>
 export type UpdateOrderRemisionInput = z.output<typeof updateOrderRemisionSchema>
 export type UpdateOrderPaymentInput = z.output<typeof updateOrderPaymentSchema>
 export type UpdateOrderRepartidorInput = z.output<typeof updateOrderRepartidorSchema>
+export type TicketPrintInput = z.output<typeof ticketPrintSchema>

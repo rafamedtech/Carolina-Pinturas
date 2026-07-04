@@ -260,11 +260,31 @@ function listItem(order: SalesOrder & {
   }
 }
 
+// Phone and address live only in the customer snapshot JSON; the ticket and
+// detail views surface them without widening the snapshot columns.
+function customerContact(payload: Prisma.JsonValue): { phone: string | null, address: string | null } {
+  const customer = payload as Partial<SiigoCustomer> | null
+  if (!customer || typeof customer !== 'object') return { phone: null, address: null }
+
+  const phone = customer.phones?.map(entry => entry.number?.trim()).find(Boolean) || null
+
+  const address = customer.address
+  const street = [address?.street, address?.exterior_number].filter(Boolean).join(' ')
+  const interior = address?.interior_number ? `Int. ${address.interior_number}` : ''
+  const colony = address?.colony ? `Col. ${address.colony}` : ''
+  const postal = address?.postal_code ? `C.P. ${address.postal_code}` : ''
+  const city = [address?.city?.city_name, address?.city?.state_name].filter(Boolean).join(', ')
+  const line = [street, interior, colony, postal, city].filter(Boolean).join(', ')
+
+  return { phone, address: line || null }
+}
+
 function detail(order: OrderDetailRecord): SalesOrderDetail {
   const base = listItem({ ...order, _count: { items: order.items.length } })
 
   return {
     ...base,
+    customer: { ...base.customer, ...customerContact(order.customerPayload) },
     observations: order.observations,
     remision: order.remision,
     paymentStatus: order.paymentStatus,

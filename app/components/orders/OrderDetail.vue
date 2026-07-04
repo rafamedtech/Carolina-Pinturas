@@ -85,10 +85,16 @@ function openCotizacion(action?: 'print' | 'pdf') {
   const query = action ? `?action=${action}` : ''
   window.open(`/ventas/${props.orderId}/cotizacion${query}`, '_blank', 'noopener')
 }
+const { printTicket, openTicketPreview } = useTicketPrinter()
+const printerSettingsOpen = shallowRef(false)
 const cotizacionMenu = [[
   { label: 'Ver documento', icon: 'i-lucide-eye', onSelect: () => openCotizacion() },
   { label: 'Imprimir', icon: 'i-lucide-printer', onSelect: () => openCotizacion('print') },
   { label: 'Descargar PDF', icon: 'i-lucide-download', onSelect: () => openCotizacion('pdf') }
+], [
+  { label: 'Imprimir ticket', icon: 'i-lucide-receipt', onSelect: () => { if (order.value) printTicket(order.value) } },
+  { label: 'Ver ticket', icon: 'i-lucide-receipt-text', onSelect: () => openTicketPreview(props.orderId) },
+  { label: 'Impresora de tickets…', icon: 'i-lucide-settings-2', onSelect: () => { printerSettingsOpen.value = true } }
 ]]
 
 const mayEditRemision = computed(() =>
@@ -410,6 +416,7 @@ async function convertToPedido() {
                 variant="outline"
               />
             </UDropdownMenu>
+            <OrdersPrinterSettingsModal v-model:open="printerSettingsOpen" />
             <UButton
               v-if="isQuote && mayEditQuote"
               :to="`/ventas/${order.id}/editar`"
