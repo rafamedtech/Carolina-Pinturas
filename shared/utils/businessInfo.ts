@@ -6,6 +6,7 @@ export interface BusinessInfo {
   email: string
   rfc: string
   footerMessage: string
+  businessHoursLines: string[]
   footerLines: string[]
 }
 
@@ -21,8 +22,12 @@ export const BUSINESS_INFO: BusinessInfo = {
   email: 'carolinapinturas@cvrtransportinc.com',
   rfc: 'VARC970809KW9',
   footerMessage: '¡Gracias por su compra!',
+  businessHoursLines: [
+    'Horario de atención:',
+    'Lunes a Viernes de 8:00 AM a 5:00 PM',
+    'Sábado de 8:00 AM a 1:00 PM'
+  ],
   footerLines: [
-    'Horario de martes a domingo de 9:00 AM a 6:00 PM',
     'No se hace devolución de efectivo'
   ]
 }

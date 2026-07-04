@@ -42,7 +42,7 @@ function formatTaxLabel(tax: SalesOrderDetail['taxBreakdown'][number]) {
 }
 
 function itemUnit(item: SalesOrderDetail['items'][number]) {
-  return item.unit.code || item.unit.name || ''
+  return item.unit.name || item.unit.code || ''
 }
 
 useSeoMeta({ title: () => order.value ? `Ticket ${order.value.number}` : 'Ticket' })
@@ -207,6 +207,11 @@ watch([status, order], () => {
           <p class="t-thanks">
             {{ BUSINESS_INFO.footerMessage }}
           </p>
+          <div class="t-hours">
+            <p v-for="line in BUSINESS_INFO.businessHoursLines" :key="line">
+              {{ line }}
+            </p>
+          </div>
           <p v-for="line in BUSINESS_INFO.footerLines" :key="line">
             {{ line }}
           </p>
@@ -239,6 +244,7 @@ watch([status, order], () => {
   border: 1px solid #e5e7eb;
   padding: 4mm 2mm;
   font-family: 'Courier New', Courier, monospace;
+  font-weight: 600;
   line-height: 1.35;
 }
 
@@ -327,6 +333,11 @@ watch([status, order], () => {
 
 .t-thanks {
   font-weight: 700;
+}
+
+.t-hours {
+  margin: 4px 0;
+  text-align: left;
 }
 
 @media print {

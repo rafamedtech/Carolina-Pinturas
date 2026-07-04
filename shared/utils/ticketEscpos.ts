@@ -51,7 +51,6 @@ export function buildTicketBytes(order: TicketOrder, options: TicketPrintOptions
     .align('center')
     .bold(true)
     .line(BUSINESS_INFO.name.toUpperCase())
-    .bold(false)
     .line(BUSINESS_INFO.legalName)
     .line(`R.F.C. ${BUSINESS_INFO.rfc}`)
 
@@ -62,9 +61,7 @@ export function buildTicketBytes(order: TicketOrder, options: TicketPrintOptions
     .line(`Tel: ${BUSINESS_INFO.phone}`)
     .line(BUSINESS_INFO.email)
     .rule({ style: 'dashed' })
-    .bold(true)
     .line(isQuote ? 'COTIZACIÓN' : 'NOTA DE VENTA')
-    .bold(false)
     .align('left')
     .line(`Folio: ${order.number}`)
     .line(`Fecha: ${formatTicketDate(order.orderDate)}`)
@@ -83,7 +80,7 @@ export function buildTicketBytes(order: TicketOrder, options: TicketPrintOptions
   encoder.rule({ style: 'dashed' })
 
   for (const item of order.items) {
-    const unit = item.unit.code || item.unit.name || ''
+    const unit = item.unit.name || item.unit.code || ''
     const quantityLabel = `${item.quantity}${unit ? ` ${unit}` : ''} x ${money(item.unitPrice)}`
     encoder
       .line(item.name)
@@ -111,7 +108,6 @@ export function buildTicketBytes(order: TicketOrder, options: TicketPrintOptions
     .size(2, 2)
     .line(`TOTAL ${money(order.total)}`)
     .size(1, 1)
-    .bold(false)
     .align('left')
 
   if (!isQuote) {
@@ -132,10 +128,14 @@ export function buildTicketBytes(order: TicketOrder, options: TicketPrintOptions
   encoder
     .newline()
     .align('center')
-    .bold(true)
     .line(BUSINESS_INFO.footerMessage)
-    .bold(false)
 
+  encoder.align('left')
+  for (const businessHoursLine of BUSINESS_INFO.businessHoursLines) {
+    encoder.line(businessHoursLine)
+  }
+
+  encoder.align('center')
   for (const footerLine of BUSINESS_INFO.footerLines) {
     encoder.line(footerLine)
   }
