@@ -223,6 +223,8 @@ model SalesOrder {
   observations               String?
   remision                   String?
   currencyCode               String    @default("MXN") @map("currency_code") @db.VarChar(3)
+  paymentStatus              String    @default("pendiente_pago") @map("payment_status") @db.VarChar(32)
+  paymentMethod              String?   @map("payment_method") @db.VarChar(32)
   subtotal                   Decimal   @default(0) @db.Decimal(20, 6)
   discountTotal              Decimal   @default(0) @map("discount_total") @db.Decimal(20, 6)
   taxTotal                   Decimal   @default(0) @map("tax_total") @db.Decimal(20, 6)

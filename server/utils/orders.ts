@@ -6,6 +6,7 @@ import type {
   CreateOrderInput,
   UpdateQuoteInput,
   UpdateOrderRemisionInput,
+  UpdateOrderPaymentInput,
   UpdateOrderRepartidorInput,
   UpdateOrderStatusInput
 } from './order-validation'
@@ -266,6 +267,8 @@ function detail(order: OrderDetailRecord): SalesOrderDetail {
     ...base,
     observations: order.observations,
     remision: order.remision,
+    paymentStatus: order.paymentStatus,
+    paymentMethod: order.paymentMethod,
     currencyCode: order.currencyCode,
     subtotal: number(order.subtotal),
     discountTotal: number(order.discountTotal),
@@ -741,6 +744,57 @@ export async function updateOrderRemision(
     where: { id, version: input.version },
     data: {
       remision: input.remision || null,
+      updatedByEmail: user.email,
+      version: { increment: 1 }
+    }
+  })
+  if (result.count !== 1) {
+    throw createError({
+      statusCode: 409,
+      statusMessage: 'El pedido cambió mientras se actualizaba. Intenta de nuevo.'
+    })
+  }
+
+  return getOrder(id, user)
+}
+
+export async function updateOrderPayment(
+  id: string,
+  input: UpdateOrderPaymentInput,
+  user: AppUser
+) {
+  const prisma = usePrisma()
+
+  if (!canManageOrderLogistics(user.role)) {
+    throw createError({
+      statusCode: 403,
+      statusMessage: 'No tienes permiso para modificar el pago.'
+    })
+  }
+
+  const order = await prisma.salesOrder.findFirst({
+    where: {
+      id,
+      AND: [orderVisibilityFilter(user)]
+    },
+    select: { version: true }
+  })
+
+  if (!order) {
+    throw createError({ statusCode: 404, statusMessage: 'No se encontró el pedido.' })
+  }
+  if (order.version !== input.version) {
+    throw createError({
+      statusCode: 409,
+      statusMessage: 'El pedido cambió desde que lo abriste. Actualiza la página e intenta de nuevo.'
+    })
+  }
+
+  const result = await prisma.salesOrder.updateMany({
+    where: { id, version: input.version },
+    data: {
+      paymentStatus: input.paymentStatus,
+      paymentMethod: input.paymentMethod ?? null,
       updatedByEmail: user.email,
       version: { increment: 1 }
     }
