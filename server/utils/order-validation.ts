@@ -1,4 +1,5 @@
 import * as z from 'zod'
+import { PAYMENT_STATUS_KEYS, PAYMENT_METHOD_KEYS } from '~/utils/orderPayment'
 
 const dateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Usa una fecha con formato AAAA-MM-DD.')
 
@@ -51,6 +52,12 @@ export const updateOrderRemisionSchema = z.object({
   version: z.number().int().positive()
 })
 
+export const updateOrderPaymentSchema = z.object({
+  paymentStatus: z.enum(PAYMENT_STATUS_KEYS as [string, ...string[]]),
+  paymentMethod: z.enum(PAYMENT_METHOD_KEYS as [string, ...string[]]).nullable().optional(),
+  version: z.number().int().positive()
+})
+
 export const updateOrderRepartidorSchema = z.object({
   repartidorId: z.string().uuid('Selecciona un repartidor válido.'),
   version: z.number().int().positive()
@@ -60,4 +67,5 @@ export type CreateOrderInput = z.output<typeof createOrderSchema>
 export type UpdateQuoteInput = z.output<typeof updateQuoteSchema>
 export type UpdateOrderStatusInput = z.output<typeof updateOrderStatusSchema>
 export type UpdateOrderRemisionInput = z.output<typeof updateOrderRemisionSchema>
+export type UpdateOrderPaymentInput = z.output<typeof updateOrderPaymentSchema>
 export type UpdateOrderRepartidorInput = z.output<typeof updateOrderRepartidorSchema>

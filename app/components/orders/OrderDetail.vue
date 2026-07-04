@@ -6,6 +6,13 @@ import {
   canManageOrderLogistics,
   editableOrderStatusKeys
 } from '~/utils/roleAccess'
+import {
+  PAYMENT_STATUSES,
+  PAYMENT_METHODS,
+  paymentStatusColor,
+  paymentStatusLabel,
+  paymentMethodLabel
+} from '~/utils/orderPayment'
 
 const props = defineProps<{
   orderId: string
@@ -18,6 +25,9 @@ const remisionDraft = shallowRef('')
 const savingRemision = shallowRef(false)
 const selectedRepartidor = shallowRef('')
 const savingRepartidor = shallowRef(false)
+const selectedPaymentStatus = shallowRef('')
+const selectedPaymentMethod = shallowRef('')
+const savingPayment = shallowRef(false)
 const toast = useToast()
 const { user } = useAuth()
 const {
@@ -48,9 +58,21 @@ watch(() => order.value?.repartidor?.id, (value) => {
   selectedRepartidor.value = value || ''
 }, { immediate: true })
 
+watch(() => order.value?.paymentStatus, (value) => {
+  selectedPaymentStatus.value = value || ''
+}, { immediate: true })
+
+watch(() => order.value?.paymentMethod, (value) => {
+  selectedPaymentMethod.value = value || ''
+}, { immediate: true })
+
 const remisionUnchanged = computed(() => remisionDraft.value === (order.value?.remision || ''))
 const repartidorUnchanged = computed(() => selectedRepartidor.value === (order.value?.repartidor?.id || ''))
 const statusUnchanged = computed(() => selectedStatus.value === (order.value?.status.key || ''))
+const paymentUnchanged = computed(() =>
+  selectedPaymentStatus.value === (order.value?.paymentStatus || '')
+  && selectedPaymentMethod.value === (order.value?.paymentMethod || '')
+)
 
 // A borrador order is a quotation document; once it advances to ingresado /
 // confirmado (or later) it becomes a regular order with delivery logistics.
@@ -75,6 +97,7 @@ const mayEditRemision = computed(() =>
 const mayManageLogistics = computed(() =>
   Boolean(user.value && canManageOrderLogistics(user.value.role))
 )
+const mayManagePayment = mayManageLogistics
 const mayEditQuote = computed(() =>
   Boolean(user.value && canCreateOrders(user.value.role))
 )
@@ -91,10 +114,13 @@ const availableStatuses = computed(() => {
 const backPath = computed(() =>
   user.value?.role === 'igualaciones' ? '/igualaciones' : '/ventas'
 )
-const savingChanges = computed(() => savingRemision.value || savingRepartidor.value || savingStatus.value)
+const savingChanges = computed(() =>
+  savingRemision.value || savingRepartidor.value || savingPayment.value || savingStatus.value
+)
 const hasChanges = computed(() =>
   (mayEditRemision.value && !remisionUnchanged.value)
   || (mayManageLogistics.value && !repartidorUnchanged.value)
+  || (mayManagePayment.value && !paymentUnchanged.value)
   || !statusUnchanged.value
 )
 
@@ -120,6 +146,15 @@ const repartidorOptions = computed(() => repartidores.value.map(repartidor => ({
   description: repartidor.telefono || undefined,
   value: repartidor.id
 })))
+
+const paymentStatusOptions = PAYMENT_STATUSES.map(status => ({
+  label: status.label,
+  value: status.key as string
+}))
+const paymentMethodOptions = PAYMENT_METHODS.map(method => ({
+  label: method.label,
+  value: method.key as string
+}))
 
 async function updateRemision() {
   if (!mayEditRemision.value || !order.value || remisionUnchanged.value) return
@@ -194,6 +229,41 @@ async function updateRepartidor() {
   }
 }
 
+async function updatePayment() {
+  if (!mayManagePayment.value || !order.value || paymentUnchanged.value) return
+  savingPayment.value = true
+
+  try {
+    order.value = await $fetch<SalesOrderDetail>(
+      `/api/orders/${encodeURIComponent(props.orderId)}/pago`,
+      {
+        method: 'PATCH',
+        body: {
+          paymentStatus: selectedPaymentStatus.value,
+          paymentMethod: selectedPaymentMethod.value || null,
+          version: order.value.version
+        }
+      }
+    )
+    toast.add({
+      title: 'Pago actualizado',
+      color: 'success',
+      icon: 'i-lucide-circle-check'
+    })
+  } catch (fetchError: unknown) {
+    const response = fetchError as { data?: { statusMessage?: string }, message?: string }
+    toast.add({
+      title: 'No se pudo actualizar el pago',
+      description: response.data?.statusMessage || response.message || 'Intenta de nuevo.',
+      color: 'error',
+      icon: 'i-lucide-circle-alert'
+    })
+    await refresh()
+  } finally {
+    savingPayment.value = false
+  }
+}
+
 async function updateStatus() {
   if (!order.value || selectedStatus.value === order.value.status.key) return
   savingStatus.value = true
@@ -236,6 +306,7 @@ async function saveChanges() {
 
   await updateRemision()
   await updateRepartidor()
+  await updatePayment()
   await updateStatus()
 }
 
@@ -369,7 +440,15 @@ async function convertToPedido() {
               <p class="text-xl font-semibold text-highlighted">
                 {{ formatCurrency(order.total) }}
               </p>
-              <OrdersOrderStatusBadge class="mt-2" :status="order.status" />
+              <div class="mt-2 flex flex-wrap items-center justify-end gap-2">
+                <OrdersOrderStatusBadge :status="order.status" />
+                <UBadge
+                  v-if="!isQuote"
+                  :color="paymentStatusColor(order.paymentStatus)"
+                  variant="subtle"
+                  :label="paymentStatusLabel(order.paymentStatus)"
+                />
+              </div>
             </div>
           </div>
         </div>
@@ -456,6 +535,47 @@ async function convertToPedido() {
                   />
                   <span v-else class="font-medium">
                     {{ order.repartidor?.name || 'Sin asignar' }}
+                  </span>
+                </dd>
+              </div>
+              <div v-if="!isQuote">
+                <dt class="text-sm text-muted">
+                  Estado de pago
+                </dt>
+                <dd class="mt-1">
+                  <USelectMenu
+                    v-if="mayManagePayment"
+                    v-model="selectedPaymentStatus"
+                    :items="paymentStatusOptions"
+                    value-key="value"
+                    :disabled="savingPayment"
+                    placeholder="Estado de pago"
+                    class="w-full max-w-xs"
+                  />
+                  <UBadge
+                    v-else
+                    :color="paymentStatusColor(order.paymentStatus)"
+                    variant="subtle"
+                    :label="paymentStatusLabel(order.paymentStatus)"
+                  />
+                </dd>
+              </div>
+              <div v-if="!isQuote">
+                <dt class="text-sm text-muted">
+                  Método de pago
+                </dt>
+                <dd class="mt-1">
+                  <USelectMenu
+                    v-if="mayManagePayment"
+                    v-model="selectedPaymentMethod"
+                    :items="paymentMethodOptions"
+                    value-key="value"
+                    :disabled="savingPayment"
+                    placeholder="Selecciona un método"
+                    class="w-full max-w-xs"
+                  />
+                  <span v-else class="font-medium">
+                    {{ paymentMethodLabel(order.paymentMethod) }}
                   </span>
                 </dd>
               </div>

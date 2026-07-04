@@ -99,6 +99,8 @@ export interface SalesOrderStatusHistoryItem {
 export interface SalesOrderDetail extends SalesOrderListItem {
   observations: string | null
   remision: string | null
+  paymentStatus: string
+  paymentMethod: string | null
   currencyCode: string
   subtotal: number
   discountTotal: number
