@@ -416,8 +416,10 @@ async function convertToPedido() {
           </div>
         </div>
 
-        <div class="grid gap-4 lg:grid-cols-2">
-          <UCard>
+        <div
+          class="grid gap-4 [grid-template-areas:'cliente'_'items'_'totales'_'seguimiento'] lg:grid-cols-2 lg:[grid-template-areas:'cliente_seguimiento'_'items_items'_'totales_totales']"
+        >
+          <UCard class="[grid-area:cliente]">
             <template #header>
               <h2 class="font-semibold text-highlighted">
                 {{ isQuote ? 'Cliente' : 'Cliente y entrega' }}
@@ -535,59 +537,59 @@ async function convertToPedido() {
             </div>
           </UCard>
 
-          <div :class="isQuote ? 'grid gap-4' : 'grid gap-4 lg:grid-cols-2'">
+          <div class="[grid-area:seguimiento] grid gap-4">
             <OrdersOrderStatusPanel
-              v-if="!isQuote"
               v-model:status-key="selectedStatus"
               v-model:note="statusNote"
               :order="order"
               :statuses="availableStatuses"
               :saving="savingStatus"
+              :entries="order.statusHistory"
+              :editable="!isQuote"
             />
-
-            <OrdersOrderHistory :entries="order.statusHistory" />
           </div>
-        </div>
 
-        <OrdersOrderDetailItems
-          :items="order.items"
-          :currency-code="order.currencyCode"
-        />
+          <OrdersOrderDetailItems
+            class="[grid-area:items]"
+            :items="order.items"
+            :currency-code="order.currencyCode"
+          />
 
-        <div class="grid gap-4 lg:grid-cols-2">
-          <UCard class="lg:col-start-2">
-            <template #header>
-              <h2 class="font-semibold text-highlighted">
-                Totales
-              </h2>
-            </template>
-            <dl class="space-y-3">
-              <div class="flex justify-between gap-4">
-                <dt class="text-muted">
-                  Subtotal
-                </dt>
-                <dd class="font-medium">
-                  {{ formatCurrency(order.subtotal) }}
-                </dd>
-              </div>
-              <div class="flex justify-between gap-4">
-                <dt class="text-muted">
-                  Impuestos
-                </dt>
-                <dd class="font-medium">
-                  {{ formatCurrency(order.taxTotal) }}
-                </dd>
-              </div>
-              <div class="flex justify-between gap-4 border-t border-default pt-3">
-                <dt class="font-semibold">
-                  Total
-                </dt>
-                <dd class="font-semibold">
-                  {{ formatCurrency(order.total) }}
-                </dd>
-              </div>
-            </dl>
-          </UCard>
+          <div class="[grid-area:totales] grid gap-4 lg:grid-cols-2">
+            <UCard class="lg:col-start-2">
+              <template #header>
+                <h2 class="font-semibold text-highlighted">
+                  Totales
+                </h2>
+              </template>
+              <dl class="space-y-3">
+                <div class="flex justify-between gap-4">
+                  <dt class="text-muted">
+                    Subtotal
+                  </dt>
+                  <dd class="font-medium">
+                    {{ formatCurrency(order.subtotal) }}
+                  </dd>
+                </div>
+                <div class="flex justify-between gap-4">
+                  <dt class="text-muted">
+                    Impuestos
+                  </dt>
+                  <dd class="font-medium">
+                    {{ formatCurrency(order.taxTotal) }}
+                  </dd>
+                </div>
+                <div class="flex justify-between gap-4 border-t border-default pt-3">
+                  <dt class="font-semibold">
+                    Total
+                  </dt>
+                  <dd class="font-semibold">
+                    {{ formatCurrency(order.total) }}
+                  </dd>
+                </div>
+              </dl>
+            </UCard>
+          </div>
         </div>
       </template>
 
