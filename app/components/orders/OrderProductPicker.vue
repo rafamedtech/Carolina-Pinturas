@@ -13,6 +13,20 @@ const emit = defineEmits<{
 
 const selectedProductId = shallowRef('')
 const quantity = shallowRef(1)
+const productPickerBody = useTemplateRef<HTMLElement>('productPickerBody')
+
+const productMenuReference = {
+  getBoundingClientRect() {
+    const bodyRect = productPickerBody.value?.getBoundingClientRect()
+    const triggerRect = productPickerBody.value
+      ?.querySelector<HTMLElement>('[data-product-select-trigger]')
+      ?.getBoundingClientRect()
+
+    if (!bodyRect || !triggerRect) return new DOMRect()
+
+    return new DOMRect(bodyRect.left, triggerRect.top, bodyRect.width, triggerRect.height)
+  }
+}
 
 const productOptions = computed(() => props.products.map(product => ({
   label: product.name,
@@ -49,7 +63,10 @@ function addProduct() {
       </h2>
     </template>
 
-    <div class="grid gap-4 sm:grid-cols-[minmax(0,1fr)_8rem_auto] sm:items-end">
+    <div
+      ref="productPickerBody"
+      class="grid gap-4 sm:grid-cols-[minmax(0,1fr)_8rem_auto] sm:items-end"
+    >
       <UFormField name="product" label="Producto">
         <USelectMenu
           v-model="selectedProductId"
@@ -57,9 +74,11 @@ function addProduct() {
           value-key="value"
           :filter-fields="['label', 'code', 'reference', 'barcode']"
           :search-input="{ placeholder: 'Buscar por nombre o código' }"
+          :content="{ align: 'start', reference: productMenuReference }"
           :loading="loading"
           :disabled="disabled"
           placeholder="Buscar por nombre o código"
+          data-product-select-trigger
           class="w-full"
         />
       </UFormField>

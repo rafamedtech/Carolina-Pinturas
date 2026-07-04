@@ -64,7 +64,7 @@ const state = reactive<Schema>({
     : user.value?.role === 'admin' ? 'ingresado' : 'borrador',
   repartidorId: '',
   orderDate: mexicoToday(),
-  promisedDate: '',
+  promisedDate: isQuoteMode.value ? '' : mexicoToday(),
   observations: ''
 })
 const saving = shallowRef(false)
@@ -207,7 +207,7 @@ const sendStatusLabel = computed(() =>
 const sendButtonLabel = computed(() =>
   mayChooseInitialStatus.value
     ? `Guardar como ${sendStatusLabel.value.toLowerCase()}`
-    : `Enviar como ${sendStatusLabel.value.toLowerCase()}`
+    : 'Enviar'
 )
 const repartidorRequired = computed(() =>
   STATUS_KEYS_REQUIRING_REPARTIDOR.includes(state.statusKey)
@@ -342,7 +342,6 @@ async function confirmSubmit(statusKey: string) {
         : statusKey === 'borrador'
           ? `Cotización ${order.number} guardada`
           : `Pedido ${order.number} guardado`,
-      description: 'Las partidas y los datos de Siigo quedaron almacenados en PostgreSQL.',
       color: 'success',
       icon: 'i-lucide-circle-check'
     })

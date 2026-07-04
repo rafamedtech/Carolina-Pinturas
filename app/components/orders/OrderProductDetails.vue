@@ -5,7 +5,7 @@ const props = defineProps<{
   product: SiigoProduct
 }>()
 
-const { data: fetchedProduct, status, error } = useLazyFetch<SiigoProduct>(
+const { data: fetchedProduct, error } = useLazyFetch<SiigoProduct>(
   () => `/api/siigo/products/${encodeURIComponent(props.product.id)}`,
   { key: `order-product-detail-${props.product.id}` }
 )
@@ -101,11 +101,7 @@ function formatCurrency(value?: number | string, currencyCode = 'MXN') {
       </div>
     </div>
 
-    <p v-if="status === 'pending'" class="mt-3 flex items-center gap-2 text-xs text-muted">
-      <UIcon name="i-lucide-loader-circle" class="size-3.5 animate-spin" />
-      Cargando el detalle actualizado…
-    </p>
-    <p v-else-if="error" class="mt-3 text-xs text-warning">
+    <p v-if="error" class="mt-3 text-xs text-warning">
       No fue posible actualizar el detalle; se muestran los datos del catálogo.
     </p>
 

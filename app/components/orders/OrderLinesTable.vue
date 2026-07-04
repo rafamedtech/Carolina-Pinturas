@@ -93,7 +93,7 @@ const columns: TableColumn<DraftOrderLine>[] = [{
       <div class="flex items-center justify-between gap-3">
         <div>
           <h2 class="font-semibold text-highlighted">
-            Partidas de {{ props.quoteMode ? 'la cotización' : 'el pedido' }}
+            {{ props.quoteMode ? 'Partidas de la cotización' : 'Partidas del pedido' }}
           </h2>
           <p class="mt-1 text-sm text-muted">
             {{ lines.length }} {{ lines.length === 1 ? 'producto agregado' : 'productos agregados' }}

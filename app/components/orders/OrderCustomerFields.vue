@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { parseDate } from '@internationalized/date'
+import type { DateValue } from '@internationalized/date'
 import type { OrderStatus, Repartidor } from '~/types/orders'
 import type { SiigoCustomer } from '~/types/siigo'
 
@@ -24,6 +26,19 @@ const orderDate = defineModel<string>('orderDate', { required: true })
 const promisedDate = defineModel<string>('promisedDate', { required: true })
 const observations = defineModel<string>('observations', { required: true })
 
+const orderDateValue = computed<DateValue | undefined>({
+  get: () => orderDate.value ? parseDate(orderDate.value) : undefined,
+  set: (value) => {
+    orderDate.value = value?.toString() ?? ''
+  }
+})
+const promisedDateValue = computed<DateValue | undefined>({
+  get: () => promisedDate.value ? parseDate(promisedDate.value) : undefined,
+  set: (value) => {
+    promisedDate.value = value?.toString() ?? ''
+  }
+})
+
 function customerName(customer: SiigoCustomer) {
   return customer.name?.filter(Boolean).join(' ') || customer.rfc_id || 'Cliente sin nombre'
 }
@@ -48,7 +63,7 @@ const repartidorOptions = computed(() => props.repartidores.map(repartidor => ({
   <UCard>
     <template #header>
       <h2 class="font-semibold text-highlighted">
-        Datos de {{ props.quoteMode ? 'la cotización' : 'el pedido' }}
+        {{ props.quoteMode ? 'Datos de la cotización' : 'Información general' }}
       </h2>
     </template>
 
@@ -90,7 +105,6 @@ const repartidorOptions = computed(() => props.repartidores.map(repartidor => ({
         name="repartidorId"
         label="Repartidor"
         :required="props.repartidorRequired"
-        :hint="props.repartidorRequired ? undefined : 'Opcional hasta confirmar'"
         class="sm:col-span-2"
       >
         <USelectMenu
@@ -110,20 +124,18 @@ const repartidorOptions = computed(() => props.repartidores.map(repartidor => ({
         required
         :class="{ 'sm:col-span-2': props.quoteMode }"
       >
-        <UInput
-          v-model="orderDate"
-          type="date"
+        <OrdersOrderDatePicker
+          v-model="orderDateValue"
           :disabled="disabled"
-          class="w-full"
+          placeholder="Seleccionar fecha del pedido"
         />
       </UFormField>
 
       <UFormField v-if="!props.quoteMode" name="promisedDate" label="Fecha prometida">
-        <UInput
-          v-model="promisedDate"
-          type="date"
+        <OrdersOrderDatePicker
+          v-model="promisedDateValue"
           :disabled="disabled"
-          class="w-full"
+          placeholder="Seleccionar fecha prometida"
         />
       </UFormField>
 

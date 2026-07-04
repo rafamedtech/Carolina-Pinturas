@@ -70,6 +70,7 @@ const paymentUnchanged = computed(() =>
 // confirmado (or later) it becomes a regular order with delivery logistics.
 const isQuote = computed(() => order.value?.status.key === 'borrador')
 const documentLabel = computed(() => isQuote.value ? 'Cotización' : 'Pedido')
+const detailTitle = computed(() => isQuote.value ? 'Detalle de la cotización' : 'Detalle del pedido')
 
 // The document opens in a clean new tab (no controls); ?action triggers print /
 // pdf there so those actions live here, not on the client-facing document.
@@ -79,15 +80,23 @@ function openCotizacion(action?: 'print' | 'pdf') {
 }
 const { printTicket, openTicketPreview } = useTicketPrinter()
 const printerSettingsOpen = shallowRef(false)
-const cotizacionMenu = [[
-  { label: 'Ver documento', icon: 'i-lucide-eye', onSelect: () => openCotizacion() },
-  { label: 'Imprimir', icon: 'i-lucide-printer', onSelect: () => openCotizacion('print') },
-  { label: 'Descargar PDF', icon: 'i-lucide-download', onSelect: () => openCotizacion('pdf') }
-], [
-  { label: 'Imprimir ticket', icon: 'i-lucide-receipt', onSelect: () => { if (order.value) printTicket(order.value) } },
-  { label: 'Ver ticket', icon: 'i-lucide-receipt-text', onSelect: () => openTicketPreview(props.orderId) },
-  { label: 'Impresora de tickets…', icon: 'i-lucide-settings-2', onSelect: () => { printerSettingsOpen.value = true } }
-]]
+const documentOptions = computed(() => {
+  const groups = [[
+    { label: 'Ver documento', icon: 'i-lucide-eye', onSelect: () => openCotizacion() },
+    { label: 'Imprimir', icon: 'i-lucide-printer', onSelect: () => openCotizacion('print') },
+    { label: 'Descargar PDF', icon: 'i-lucide-download', onSelect: () => openCotizacion('pdf') }
+  ]]
+
+  if (!isQuote.value) {
+    groups.push([
+      { label: 'Imprimir ticket', icon: 'i-lucide-receipt', onSelect: () => { if (order.value) printTicket(order.value) } },
+      { label: 'Ver ticket', icon: 'i-lucide-receipt-text', onSelect: () => openTicketPreview(props.orderId) },
+      { label: 'Impresora de tickets…', icon: 'i-lucide-settings-2', onSelect: () => { printerSettingsOpen.value = true } }
+    ])
+  }
+
+  return groups
+})
 
 const mayManageLogistics = computed(() =>
   Boolean(user.value && canManageOrderLogistics(user.value.role))
@@ -312,7 +321,7 @@ async function convertToPedido() {
 <template>
   <UDashboardPanel id="order-detail">
     <template #header>
-      <UDashboardNavbar :title="order?.number || 'Detalle del pedido'">
+      <UDashboardNavbar :title="detailTitle">
         <template #leading>
           <UButton
             :to="backPath"
@@ -328,6 +337,8 @@ async function convertToPedido() {
             icon="i-lucide-refresh-cw"
             color="neutral"
             variant="outline"
+            aria-label="Actualizar"
+            :ui="{ label: 'hidden sm:inline' }"
             :loading="status === 'pending'"
             @click="() => refresh()"
           />
@@ -346,24 +357,33 @@ async function convertToPedido() {
       />
 
       <template v-else-if="order">
-        <div class="flex flex-wrap items-start justify-between gap-4">
+        <div class="flex flex-wrap items-center justify-between gap-4">
           <div>
             <p class="flex items-center gap-1.5 text-sm text-muted">
               <UIcon v-if="isQuote" name="i-lucide-file-text" class="size-4" />
               {{ documentLabel }}
             </p>
-            <h1 class="text-xl font-semibold text-highlighted">
-              {{ order.number }}
-            </h1>
+            <div class="flex flex-wrap items-center gap-2">
+              <h1 class="text-xl font-semibold text-highlighted">
+                {{ order.number }}
+              </h1>
+              <OrdersOrderStatusBadge :status="order.status" />
+              <UBadge
+                v-if="!isQuote"
+                :color="paymentStatusColor(order.paymentStatus)"
+                variant="subtle"
+                :label="paymentStatusLabel(order.paymentStatus)"
+              />
+            </div>
             <p class="mt-1 text-sm text-muted">
               {{ formatDate(order.orderDate) }}
             </p>
           </div>
           <div class="flex items-center gap-4">
-            <UDropdownMenu :items="cotizacionMenu">
+            <UDropdownMenu :items="documentOptions">
               <UButton
-                :label="documentLabel"
-                icon="i-lucide-file-text"
+                label="Opciones"
+                icon="i-lucide-settings"
                 trailing-icon="i-lucide-chevron-down"
                 color="neutral"
                 variant="outline"
@@ -393,27 +413,10 @@ async function convertToPedido() {
               :disabled="savingChanges || !hasChanges"
               @click="saveChanges"
             />
-            <div class="text-right">
-              <p class="text-sm text-muted">
-                Total
-              </p>
-              <p class="text-xl font-semibold text-highlighted">
-                {{ formatCurrency(order.total) }}
-              </p>
-              <div class="mt-2 flex flex-wrap items-center justify-end gap-2">
-                <OrdersOrderStatusBadge :status="order.status" />
-                <UBadge
-                  v-if="!isQuote"
-                  :color="paymentStatusColor(order.paymentStatus)"
-                  variant="subtle"
-                  :label="paymentStatusLabel(order.paymentStatus)"
-                />
-              </div>
-            </div>
           </div>
         </div>
 
-        <div :class="isQuote ? 'grid gap-4' : 'grid gap-4 lg:grid-cols-2'">
+        <div class="grid gap-4 lg:grid-cols-2">
           <UCard>
             <template #header>
               <h2 class="font-semibold text-highlighted">
@@ -532,14 +535,18 @@ async function convertToPedido() {
             </div>
           </UCard>
 
-          <OrdersOrderStatusPanel
-            v-if="!isQuote"
-            v-model:status-key="selectedStatus"
-            v-model:note="statusNote"
-            :order="order"
-            :statuses="availableStatuses"
-            :saving="savingStatus"
-          />
+          <div :class="isQuote ? 'grid gap-4' : 'grid gap-4 lg:grid-cols-2'">
+            <OrdersOrderStatusPanel
+              v-if="!isQuote"
+              v-model:status-key="selectedStatus"
+              v-model:note="statusNote"
+              :order="order"
+              :statuses="availableStatuses"
+              :saving="savingStatus"
+            />
+
+            <OrdersOrderHistory :entries="order.statusHistory" />
+          </div>
         </div>
 
         <OrdersOrderDetailItems
@@ -548,7 +555,7 @@ async function convertToPedido() {
         />
 
         <div class="grid gap-4 lg:grid-cols-2">
-          <UCard>
+          <UCard class="lg:col-start-2">
             <template #header>
               <h2 class="font-semibold text-highlighted">
                 Totales
@@ -581,8 +588,6 @@ async function convertToPedido() {
               </div>
             </dl>
           </UCard>
-
-          <OrdersOrderHistory :entries="order.statusHistory" />
         </div>
       </template>
 

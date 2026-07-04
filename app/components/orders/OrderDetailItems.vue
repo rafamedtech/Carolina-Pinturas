@@ -30,20 +30,16 @@ const columns: TableColumn<SalesOrderItem>[] = [{
   header: () => h('div', { class: 'text-right' }, 'Cantidad'),
   cell: ({ row }) => h('div', { class: 'text-right' }, String(row.original.quantity))
 }, {
+  id: 'unit',
+  header: 'Unidad',
+  cell: ({ row }) => row.original.unit.name || row.original.unit.code || '—'
+}, {
   accessorKey: 'unitPrice',
   header: () => h('div', { class: 'text-right' }, 'Precio unitario'),
   cell: ({ row }) => h(
     'div',
     { class: 'text-right' },
     currency.value.format(row.original.unitPrice)
-  )
-}, {
-  accessorKey: 'taxAmount',
-  header: () => h('div', { class: 'text-right' }, 'Impuestos'),
-  cell: ({ row }) => h(
-    'div',
-    { class: 'text-right' },
-    currency.value.format(row.original.taxAmount)
   )
 }, {
   accessorKey: 'total',
