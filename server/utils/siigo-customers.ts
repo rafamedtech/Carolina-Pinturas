@@ -23,14 +23,17 @@ export interface SiigoCustomerCreateRequest {
     }
     postal_code?: string
   }
-  phones?: {
+  // El blueprint de Siigo México declara ambos como arreglo a nivel de
+  // schema (CustomerIn); enviar un objeto suelto produce
+  // "Invalid data type: contacts" en producción (confirmado 2026-07-06).
+  phones?: Array<{
     number: string
-  }
-  contacts: {
+  }>
+  contacts: Array<{
     first_name: string
     last_name?: string
     email?: string
-  }
+  }>
   comments?: string
 }
 
@@ -57,10 +60,10 @@ export function buildSiigoCustomerPayload(input: CreateCustomerInput): SiigoCust
         city_code: input.address.city.cityCode
       }
     },
-    contacts: {
+    contacts: [{
       // Siigo exige un contacto con first_name; se deriva del propio cliente.
       first_name: input.name[0]!.slice(0, 50)
-    }
+    }]
   }
 
   if (input.fiscalRegime) payload.fiscal_regime = input.fiscalRegime
@@ -68,9 +71,9 @@ export function buildSiigoCustomerPayload(input: CreateCustomerInput): SiigoCust
   if (input.address.interiorNumber) payload.address.interior_number = input.address.interiorNumber
   if (input.address.colony) payload.address.colony = input.address.colony
   if (input.address.postalCode) payload.address.postal_code = input.address.postalCode
-  if (input.phone) payload.phones = { number: input.phone }
-  if (input.name[1]) payload.contacts.last_name = input.name[1].slice(0, 50)
-  if (input.email) payload.contacts.email = input.email
+  if (input.phone) payload.phones = [{ number: input.phone }]
+  if (input.name[1]) payload.contacts[0]!.last_name = input.name[1].slice(0, 50)
+  if (input.email) payload.contacts[0]!.email = input.email
   if (input.comments) payload.comments = input.comments
 
   return payload

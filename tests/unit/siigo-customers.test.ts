@@ -56,8 +56,8 @@ describe('buildSiigoCustomerPayload', () => {
         postal_code: '06000',
         city: { country_code: 'MX', state_code: '9', city_code: '1' }
       },
-      phones: { number: '5512345678' },
-      contacts: { first_name: 'María', last_name: 'López', email: 'maria@example.com' },
+      phones: [{ number: '5512345678' }],
+      contacts: [{ first_name: 'María', last_name: 'López', email: 'maria@example.com' }],
       comments: 'Cliente de mostrador'
     })
   })
@@ -81,7 +81,7 @@ describe('buildSiigoCustomerPayload', () => {
         address: 'Calle 5',
         city: { country_code: 'MX', state_code: '9', city_code: '1' }
       },
-      contacts: { first_name: 'Pinturas Industriales SA de CV' }
+      contacts: [{ first_name: 'Pinturas Industriales SA de CV' }]
     })
     expect(payload).not.toHaveProperty('phones')
     expect(payload).not.toHaveProperty('fiscal_regime')
@@ -110,15 +110,30 @@ describe('buildSiigoCustomerPayload', () => {
 
     expect(payload.person_type).toBe('Foreign')
     expect(payload.name).toBe('Acme Paints LLC')
-    expect(payload.contacts).toEqual({ first_name: 'Acme Paints LLC' })
+    expect(payload.contacts).toEqual([{ first_name: 'Acme Paints LLC' }])
   })
 
   it('recorta el contacto derivado a 50 caracteres', () => {
     const longName = 'A'.repeat(80)
     const payload = buildSiigoCustomerPayload(physicalInput({ name: [longName, longName] }))
 
-    expect(payload.contacts.first_name).toHaveLength(50)
-    expect(payload.contacts.last_name).toHaveLength(50)
+    expect(payload.contacts[0]!.first_name).toHaveLength(50)
+    expect(payload.contacts[0]!.last_name).toHaveLength(50)
+  })
+})
+
+describe('buildSiigoCustomerPayload — forma de phones/contacts', () => {
+  // Regresión: Siigo México rechazó en producción un `contacts` enviado como
+  // objeto suelto con "Invalid data type: contacts". El schema CustomerIn del
+  // blueprint oficial los declara como array[Phone]/array[Contact].
+  it('siempre envía phones y contacts como arreglo, nunca como objeto', () => {
+    const withPhone = buildSiigoCustomerPayload(physicalInput())
+    expect(Array.isArray(withPhone.phones)).toBe(true)
+    expect(Array.isArray(withPhone.contacts)).toBe(true)
+
+    const withoutPhone = buildSiigoCustomerPayload(physicalInput({ phone: undefined }))
+    expect(withoutPhone.phones).toBeUndefined()
+    expect(Array.isArray(withoutPhone.contacts)).toBe(true)
   })
 })
 
