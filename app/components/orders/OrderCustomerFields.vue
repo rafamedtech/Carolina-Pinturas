@@ -19,6 +19,10 @@ const props = withDefaults(defineProps<{
   quoteMode: false
 })
 
+const emit = defineEmits<{
+  customerCreated: [customer: SiigoCustomer]
+}>()
+
 const customerId = defineModel<string>('customerId', { required: true })
 const statusKey = defineModel<string>('statusKey', { required: true })
 const repartidorId = defineModel<string>('repartidorId', { required: true })
@@ -57,6 +61,19 @@ const repartidorOptions = computed(() => props.repartidores.map(repartidor => ({
   description: repartidor.telefono || undefined,
   value: repartidor.id
 })))
+
+const createCustomerOpen = shallowRef(false)
+const createCustomerName = shallowRef('')
+
+function openCreateCustomer(searchTerm: string) {
+  createCustomerName.value = searchTerm.trim()
+  createCustomerOpen.value = true
+}
+
+function onCustomerCreated(customer: SiigoCustomer) {
+  emit('customerCreated', customer)
+  customerId.value = customer.id
+}
 </script>
 
 <template>
@@ -74,16 +91,36 @@ const repartidorOptions = computed(() => props.repartidores.map(repartidor => ({
         required
         class="sm:col-span-2"
       >
+        <!--
+          when:'always' para no esconder "crear cliente" ante coincidencias
+          parciales (nombres/RFC comunes). `position` es obligatorio: en esta
+          versión de Nuxt UI, createItemPosition solo hace fallback a "bottom"
+          cuando createItem NO es objeto; con objeto sin position explícito
+          queda undefined y el ítem nunca se renderiza.
+        -->
         <USelectMenu
           v-model="customerId"
           :items="customerOptions"
           value-key="value"
           :loading="loading"
           :disabled="disabled"
+          :create-item="{ when: 'always', position: 'bottom' }"
           placeholder="Buscar cliente"
           class="w-full"
-        />
+          @create="openCreateCustomer"
+        >
+          <template #create-item-label="{ item }">
+            Crear cliente “{{ item }}”
+          </template>
+        </USelectMenu>
       </UFormField>
+
+      <OrdersOrderCustomerCreateModal
+        v-model:open="createCustomerOpen"
+        :customers="props.customers"
+        :initial-name="createCustomerName"
+        @created="onCustomerCreated"
+      />
 
       <UFormField
         v-if="props.showStatus"

@@ -2,7 +2,7 @@
 import * as z from 'zod'
 import type { FormSubmitEvent } from '@nuxt/ui'
 import type { OrderStatus, SalesOrderDetail } from '~/types/orders'
-import type { SiigoProduct } from '~/types/siigo'
+import type { SiigoCustomer, SiigoProduct } from '~/types/siigo'
 import { submittedOrderStatusKey } from '~/utils/roleAccess'
 
 const props = withDefaults(defineProps<{
@@ -259,6 +259,11 @@ function lineTotal(line: { quantity: number, unitPrice: number, taxIncluded: boo
   return line.taxIncluded ? listedTotal : listedTotal * (1 + line.taxPercentage / 100)
 }
 
+function onCustomerCreated(customer: SiigoCustomer) {
+  customers.value = addCustomerToCatalog(customers.value, customer)
+  state.customerId = customer.id
+}
+
 function addSelectedProduct(product: SiigoProduct, quantity: number) {
   addProduct({
     id: product.id,
@@ -411,6 +416,7 @@ async function confirmSubmit(statusKey: string) {
             :repartidor-required="repartidorRequired"
             :show-status="mayChooseInitialStatus && !isQuoteMode"
             :quote-mode="isQuoteMode"
+            @customer-created="onCustomerCreated"
           />
 
           <OrdersOrderProductPicker

@@ -82,8 +82,12 @@ export interface SiigoCustomer {
     colony?: string
     locality?: string
     city?: {
-      city_name?: string
+      country_code?: string
+      country_name?: string
+      state_code?: string
       state_name?: string
+      city_code?: string
+      city_name?: string
     }
     postal_code?: string
   }

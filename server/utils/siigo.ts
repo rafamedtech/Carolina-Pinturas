@@ -1,4 +1,5 @@
 import type { H3Event } from 'h3'
+import { siigoErrorMessages } from './siigo-errors'
 
 interface AccessToken {
   value: string
@@ -71,17 +72,23 @@ async function getAccessToken() {
   }
 }
 
-export async function siigoRequest<T>(path: string, options: { query?: Record<string, string | undefined> } = {}): Promise<T> {
+export async function siigoRequest<T>(path: string, options: {
+  method?: 'GET' | 'POST' | 'PUT'
+  body?: object
+  query?: Record<string, string | undefined>
+} = {}): Promise<T> {
   const config = getConfig()
   const accessToken = await getAccessToken()
 
   try {
     return await $fetch<unknown>(`${config.apiUrl}${path}`, {
+      method: options.method || 'GET',
       timeout: SIIGO_REQUEST_TIMEOUT_MS,
       headers: {
         'Authorization': accessToken,
         'SiigoAPI-Application-Id': config.applicationId
       },
+      body: options.body,
       query: options.query
     }) as T
   } catch (error: unknown) {
@@ -100,7 +107,7 @@ export async function siigoRequest<T>(path: string, options: { query?: Record<st
       statusCode: timedOut ? 504 : status && status >= 400 && status < 500 ? status : 502,
       statusMessage: timedOut
         ? 'Siigo tardó demasiado en responder. Intenta actualizar de nuevo.'
-        : 'Siigo no pudo completar la consulta.',
+        : siigoErrorMessages(fetchError.data) || 'Siigo no pudo completar la consulta.',
       data: fetchError.data || fetchError.message
     })
   }
