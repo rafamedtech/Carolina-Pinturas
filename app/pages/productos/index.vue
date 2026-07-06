@@ -122,7 +122,7 @@ function openProduct(_: Event, row: TableRow<SiigoProduct>) {
             icon="i-lucide-refresh-cw"
             color="neutral"
             variant="outline"
-            :loading="status === 'pending'"
+            :loading="loading"
             @click="() => refresh()"
           />
           <UButton
@@ -175,7 +175,7 @@ function openProduct(_: Event, row: TableRow<SiigoProduct>) {
           v-model:page="page"
           :total="totalProducts"
           :items-per-page="pageSize"
-          :disabled="status === 'pending'"
+          :disabled="loading"
           show-edges
         />
       </div>

@@ -69,6 +69,16 @@ const state = reactive<Schema>({
 })
 const saving = shallowRef(false)
 const submittingStatusKey = shallowRef<string | null>(null)
+// Los catálogos de clientes/productos se cargan con `server: false` (evita
+// un hydration mismatch cuando el SSR no alcanza a paginar todo el catálogo
+// de Siigo). Eso hace que `status` pase a 'pending' apenas se monta en el
+// cliente, mientras el server nunca lo vio así: sin esta guarda, el spinner
+// de carga del selector aparecería solo en el cliente y produciría el mismo
+// tipo de mismatch un nivel más arriba.
+const isHydrated = shallowRef(false)
+onMounted(() => {
+  isHydrated.value = true
+})
 const summaryOpen = shallowRef(false)
 const pendingSubmission = shallowRef<Schema | null>(null)
 const toast = useToast()
@@ -157,11 +167,14 @@ const catalogError = computed(() =>
   || ''
 )
 const catalogsLoading = computed(() =>
-  (isEditing.value && existingOrderStatus.value !== 'success')
-  || customerStatus.value === 'pending'
-  || productStatus.value === 'pending'
-  || statusStatus.value === 'pending'
-  || repartidorStatus.value === 'pending'
+  isHydrated.value
+  && (
+    (isEditing.value && existingOrderStatus.value !== 'success')
+    || customerStatus.value === 'pending'
+    || productStatus.value === 'pending'
+    || statusStatus.value === 'pending'
+    || repartidorStatus.value === 'pending'
+  )
 )
 
 const initializedOrderId = shallowRef<string | null>(null)
@@ -421,7 +434,7 @@ async function confirmSubmit(statusKey: string) {
 
           <OrdersOrderProductPicker
             :products="products?.results || []"
-            :loading="productStatus === 'pending'"
+            :loading="isHydrated && productStatus === 'pending'"
             :disabled="formDisabled"
             @add="addSelectedProduct"
           />

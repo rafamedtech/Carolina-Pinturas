@@ -5,10 +5,15 @@ export function useRepartidoresCatalog(options: { all?: boolean } = {}) {
     options.all ? 'repartidores-catalog-all-data' : 'repartidores-catalog-data',
     () => []
   )
+  // `lazy` no bloquea el SSR: el HTML puede salir antes de que el fetch
+  // resuelva y el cliente hidrata con datos que el server no alcanzó a
+  // renderizar (hydration mismatch en la tabla). `server: false` lo evita
+  // dejando el fetch fuera del SSR por completo.
   const { data, status, error, refresh } = useFetch<Repartidor[]>('/api/repartidores', {
     key: options.all ? 'repartidores-catalog-all-request' : 'repartidores-catalog-request',
     query: options.all ? { all: 'true' } : undefined,
     lazy: true,
+    server: false,
     default: () => []
   })
 

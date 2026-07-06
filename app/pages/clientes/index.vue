@@ -79,7 +79,7 @@ function openCustomer(_: Event, row: TableRow<SiigoCustomer>) {
             icon="i-lucide-refresh-cw"
             color="neutral"
             variant="outline"
-            :loading="status === 'pending'"
+            :loading="loading"
             @click="() => refresh()"
           />
           <UButton

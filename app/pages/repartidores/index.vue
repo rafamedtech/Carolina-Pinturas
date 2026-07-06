@@ -71,7 +71,7 @@ function openRepartidor(_: Event, row: TableRow<Repartidor>) {
             icon="i-lucide-refresh-cw"
             color="neutral"
             variant="outline"
-            :loading="status === 'pending'"
+            :loading="loading"
             @click="() => refresh()"
           />
           <OrdersOrderRepartidorAddModal @created="addToCatalog" />
