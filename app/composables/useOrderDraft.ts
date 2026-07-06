@@ -4,6 +4,10 @@ export interface DraftOrderLine {
   productId: string
   code: string
   name: string
+  unit: {
+    code: string | null
+    name: string | null
+  }
   quantity: number
   unitPrice: number
   taxIncluded: boolean
@@ -15,6 +19,10 @@ interface AddOrderProductInput {
   id: string
   code: string
   name: string
+  unit: {
+    code: string | null
+    name: string | null
+  }
   quantity: number
   unitPrice: number
   taxIncluded: boolean
@@ -52,6 +60,7 @@ export function useOrderDraft() {
       productId: product.id,
       code: product.code,
       name: product.name,
+      unit: product.unit,
       quantity,
       unitPrice: product.unitPrice,
       taxIncluded: product.taxIncluded,

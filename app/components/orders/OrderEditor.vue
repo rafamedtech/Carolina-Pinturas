@@ -196,6 +196,7 @@ watch(existingOrder, (value) => {
       productId: item.productId,
       code: item.code,
       name: item.name,
+      unit: item.unit,
       quantity: item.quantity,
       unitPrice: item.unitPrice,
       taxIncluded,
@@ -282,6 +283,10 @@ function addSelectedProduct(product: SiigoProduct, quantity: number) {
     id: product.id,
     code: product.code || '—',
     name: product.name,
+    unit: {
+      code: product.unit?.code || null,
+      name: product.unit?.name || null
+    },
     quantity,
     unitPrice: productPrice(product),
     taxIncluded: product.tax_included ?? false,
@@ -501,7 +506,7 @@ async function confirmSubmit(statusKey: string) {
                       {{ line.name }}
                     </p>
                     <p class="text-sm text-muted">
-                      {{ line.quantity }} × {{ currency.format(line.unitPrice) }}
+                      {{ line.quantity }} {{ line.unit.name || line.unit.code || '' }} × {{ currency.format(line.unitPrice) }}
                     </p>
                   </div>
                   <p class="font-medium">

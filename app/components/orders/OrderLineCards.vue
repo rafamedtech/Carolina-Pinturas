@@ -41,6 +41,9 @@ function lineTotal(line: DraftOrderLine) {
           <h3 class="font-semibold text-highlighted">
             {{ line.name }}
           </h3>
+          <p class="text-sm text-muted">
+            Unidad: {{ line.unit.name || line.unit.code || '—' }}
+          </p>
         </div>
 
         <UButton

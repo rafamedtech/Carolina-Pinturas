@@ -37,6 +37,10 @@ const columns: TableColumn<DraftOrderLine>[] = [{
   accessorKey: 'name',
   header: 'Producto'
 }, {
+  id: 'unit',
+  header: 'Unidad',
+  cell: ({ row }) => row.original.unit.name || row.original.unit.code || '—'
+}, {
   accessorKey: 'observations',
   header: 'Observaciones',
   cell: ({ row }) => h(UInput, {
