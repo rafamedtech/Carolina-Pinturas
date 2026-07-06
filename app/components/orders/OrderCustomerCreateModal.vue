@@ -20,7 +20,14 @@ const RFC_MORAL_PATTERN = /^[A-ZÑ&]{3}\d{6}[A-ZÑ0-9]{3}$/
 const RFC_PHYSICAL_PATTERN = /^[A-ZÑ&]{4}\d{6}[A-ZÑ0-9]{3}$/
 const GENERIC_RFC_PHYSICAL = 'XAXX010101000'
 const GENERIC_RFC_FOREIGN = 'XEXX010101000'
+const GENERIC_EMAIL_DOMAIN = 'sincorreo.mx'
 const MANUAL_CITY = 'manual'
+
+// Siigo exige un correo por contacto; si el cliente no proporciona uno se
+// genera a partir del RFC para no bloquear el alta.
+function genericEmailFor(rfc: string) {
+  return `${rfc.trim().toLowerCase()}@${GENERIC_EMAIL_DOMAIN}`
+}
 
 const schema = z.object({
   personType: z.enum(['Physical', 'Moral', 'Foreign']),
@@ -244,7 +251,7 @@ async function onSubmit(event: FormSubmitEvent<Schema>) {
           : [data.razonSocial],
         rfcId: data.rfcId.toUpperCase(),
         fiscalRegime: data.fiscalRegime || undefined,
-        email: data.email || undefined,
+        email: data.email || genericEmailFor(data.rfcId),
         phone: data.phone ? data.phone.replace(/\D/g, '') : undefined,
         address: {
           street: data.street,
@@ -368,7 +375,7 @@ async function onSubmit(event: FormSubmitEvent<Schema>) {
               class="w-full"
             />
           </UFormField>
-          <UFormField label="Correo" name="email" hint="Opcional">
+          <UFormField label="Correo" name="email" hint="Opcional, se genera uno si se deja vacío">
             <UInput
               v-model="state.email"
               type="email"

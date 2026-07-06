@@ -114,6 +114,33 @@ describe('OrderCustomerCreateModal', () => {
     })
   })
 
+  it('genera un correo genérico a partir del RFC cuando se deja vacío', async () => {
+    respond = body => ({ id: 'nuevo-id', ...(body as object) }) as SiigoCustomer
+
+    await mountModal()
+    await fillAndSubmitValidForm()
+
+    await vi.waitFor(() => {
+      if (!receivedBody) throw new Error('Aún no llega la petición.')
+    })
+
+    expect((receivedBody as { email?: string }).email).toBe('loma850101ab1@sincorreo.mx')
+  })
+
+  it('respeta el correo capturado cuando el usuario sí lo llena', async () => {
+    respond = body => ({ id: 'nuevo-id', ...(body as object) }) as SiigoCustomer
+
+    await mountModal()
+    fillInput('Correo', 'contacto@pinturascentro.mx')
+    await fillAndSubmitValidForm()
+
+    await vi.waitFor(() => {
+      if (!receivedBody) throw new Error('Aún no llega la petición.')
+    })
+
+    expect((receivedBody as { email?: string }).email).toBe('contacto@pinturascentro.mx')
+  })
+
   it('muestra el error de Siigo sin cerrar el modal ni perder lo capturado', async () => {
     respond = () => {
       throw createError({ statusCode: 400, statusMessage: 'El RFC no es válido según Siigo.' })
