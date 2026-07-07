@@ -65,9 +65,9 @@ function addProduct() {
 
     <div
       ref="productPickerBody"
-      class="grid gap-4 sm:grid-cols-[minmax(0,1fr)_8rem_auto] sm:items-end"
+      class="grid grid-cols-1 gap-4 sm:grid-cols-[minmax(0,1fr)_8rem_auto] sm:items-end"
     >
-      <UFormField name="product" label="Producto">
+      <UFormField name="product" label="Producto" class="min-w-0">
         <USelectMenu
           v-model="selectedProductId"
           :items="productOptions"
@@ -79,23 +79,24 @@ function addProduct() {
           :disabled="disabled"
           placeholder="Buscar por nombre o código"
           data-product-select-trigger
-          class="w-full"
+          class="w-full min-w-0"
         />
       </UFormField>
 
-      <UFormField name="quantity" label="Cantidad">
+      <UFormField name="quantity" label="Cantidad" class="min-w-0">
         <UInputNumber
           v-model="quantity"
           :min="0.000001"
           :step="1"
           :disabled="disabled"
-          class="w-full"
+          class="w-full min-w-0"
         />
       </UFormField>
 
       <UButton
         label="Agregar"
         icon="i-lucide-plus"
+        class="w-full justify-center sm:w-auto"
         :disabled="!canAdd"
         @click="addProduct"
       />

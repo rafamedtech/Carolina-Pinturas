@@ -55,30 +55,21 @@ function formatCurrency(value?: number | string, currencyCode = 'MXN') {
 
 <template>
   <section class="rounded-xl border border-default bg-elevated/40 p-4">
-    <div class="flex flex-wrap items-start justify-between gap-3">
-      <div class="min-w-0">
-        <p class="text-xs font-medium uppercase tracking-wide text-muted">
-          Detalle del producto
-        </p>
-        <button
-          type="button"
-          class="mt-1 inline-flex items-center gap-1.5 break-words text-left font-semibold text-highlighted hover:text-primary"
-          @click="detailOpen = true"
-        >
-          {{ product.name }}
-          <UIcon name="i-lucide-info" class="size-4 shrink-0 text-muted" />
-        </button>
-        <p class="mt-0.5 text-sm text-muted">
-          Código: {{ product.code || '—' }}
-        </p>
-      </div>
-
-      <UBadge
-        :color="product.active === false ? 'neutral' : 'success'"
-        variant="subtle"
+    <div class="min-w-0">
+      <p class="text-xs font-medium uppercase tracking-wide text-muted">
+        Detalle del producto
+      </p>
+      <button
+        type="button"
+        class="mt-1 inline-flex items-center gap-1.5 break-words text-left font-semibold text-highlighted hover:text-primary"
+        @click="detailOpen = true"
       >
-        {{ product.active === false ? 'Inactivo' : 'Activo' }}
-      </UBadge>
+        {{ product.name }}
+        <UIcon name="i-lucide-info" class="size-4 shrink-0 text-muted" />
+      </button>
+      <p class="mt-0.5 text-sm text-muted">
+        Código: {{ product.code || '—' }}
+      </p>
     </div>
 
     <div class="mt-4 grid gap-3 sm:grid-cols-2">

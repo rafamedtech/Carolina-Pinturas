@@ -24,6 +24,7 @@ const emit = defineEmits<{
         icon="i-lucide-x"
         color="neutral"
         variant="outline"
+        class="justify-center"
         :disabled="saving"
       />
       <UButton
@@ -31,6 +32,7 @@ const emit = defineEmits<{
         icon="i-lucide-file-text"
         color="neutral"
         variant="subtle"
+        class="justify-center"
         :loading="savingDraft"
         :disabled="disabled"
         @click="emit('saveDraft')"
@@ -40,6 +42,7 @@ const emit = defineEmits<{
         type="submit"
         label="Revisar pedido"
         icon="i-lucide-clipboard-check"
+        class="justify-center"
         :loading="saving && !savingDraft"
         :disabled="disabled"
       />

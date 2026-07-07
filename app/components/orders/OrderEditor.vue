@@ -569,6 +569,7 @@ async function confirmSubmit(statusKey: string) {
               icon="i-lucide-pencil"
               color="neutral"
               variant="outline"
+              class="justify-center"
               :disabled="saving"
               @click="editOrder"
             />
@@ -578,6 +579,7 @@ async function confirmSubmit(statusKey: string) {
               icon="i-lucide-save"
               color="neutral"
               variant="soft"
+              class="justify-center"
               :loading="saving && submittingStatusKey === 'borrador'"
               :disabled="saving"
               @click="confirmSubmit('borrador')"
@@ -585,6 +587,7 @@ async function confirmSubmit(statusKey: string) {
             <UButton
               :label="sendButtonLabel"
               icon="i-lucide-send"
+              class="justify-center"
               :loading="saving && submittingStatusKey === sendStatusKey"
               :disabled="saving || sendBlockedByRepartidor"
               @click="confirmSubmit(sendStatusKey)"
