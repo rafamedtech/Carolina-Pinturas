@@ -69,6 +69,16 @@ const loading = computed(() => isHydrated.value && status.value === 'pending')
         <template #leading>
           <UDashboardSidebarCollapse />
         </template>
+        <template #right>
+          <UButton
+            label="Actualizar"
+            icon="i-lucide-refresh-cw"
+            color="neutral"
+            variant="outline"
+            :loading="loading"
+            @click="refresh()"
+          />
+        </template>
       </UDashboardNavbar>
     </template>
 
@@ -77,10 +87,8 @@ const loading = computed(() => isHydrated.value && status.value === 'pending')
         v-model:filter="filter"
         v-model:status="statusKey"
         :statuses="statuses"
-        :loading="loading"
         :igualacion="igualacion"
         :can-create="canCreate"
-        @refresh="refresh"
       />
 
       <UAlert

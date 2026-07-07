@@ -3,17 +3,12 @@ import type { OrderStatus } from '~/types/orders'
 
 const props = withDefaults(defineProps<{
   statuses: OrderStatus[]
-  loading: boolean
   igualacion?: boolean
   canCreate?: boolean
 }>(), {
   igualacion: false,
   canCreate: false
 })
-
-const emit = defineEmits<{
-  refresh: []
-}>()
 
 const filter = defineModel<string>('filter', { required: true })
 const status = defineModel<string>('status', { required: true })
@@ -52,14 +47,6 @@ const statusOptions = computed(() => {
     </div>
 
     <div class="flex gap-2">
-      <UButton
-        label="Actualizar"
-        icon="i-lucide-refresh-cw"
-        color="neutral"
-        variant="outline"
-        :loading="loading"
-        @click="emit('refresh')"
-      />
       <UButton
         v-if="!igualacion && canCreate"
         to="/ventas/nueva-cotizacion"

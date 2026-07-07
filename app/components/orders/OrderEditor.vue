@@ -545,9 +545,10 @@ async function confirmSubmit(statusKey: string) {
         </template>
 
         <template #footer>
-          <div class="flex w-full flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+          <div class="flex w-full flex-col gap-2 sm:flex-row sm:justify-end">
             <UButton
               :label="`Editar ${documentNoun}`"
+              icon="i-lucide-pencil"
               color="neutral"
               variant="outline"
               :disabled="saving"

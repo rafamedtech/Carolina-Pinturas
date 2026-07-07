@@ -18,6 +18,14 @@ export default defineNuxtConfig({
 
   css: ['~/assets/css/main.css'],
 
+  ui: {
+    theme: {
+      defaultVariants: {
+        size: 'lg'
+      }
+    }
+  },
+
   runtimeConfig: {
     siigo: {
       apiUrl: 'https://api.siigo.mx',

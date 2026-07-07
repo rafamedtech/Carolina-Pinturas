@@ -17,10 +17,11 @@ const emit = defineEmits<{
     <p class="text-sm text-muted">
       Los datos del producto se congelarán en {{ quoteMode ? 'la cotización' : 'el pedido' }} al guardarlo.
     </p>
-    <div class="flex gap-2">
+    <div class="flex flex-col gap-2 sm:flex-row">
       <UButton
         :to="cancelTo || '/ventas'"
         label="Cancelar"
+        icon="i-lucide-x"
         color="neutral"
         variant="outline"
         :disabled="saving"
