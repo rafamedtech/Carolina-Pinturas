@@ -211,17 +211,27 @@ function buildLine(
 }
 
 const IGUALACION_MATCH = 'igualacion de color'
+const IGUALACION_CODE_PREFIX = 'bi-'
 const IGUALACION_STATUS_KEYS = ['confirmado', 'surtido', 'en_espera']
 const igualacionFilter = {
   items: {
     some: {
       OR: [
         { productCodeSnapshot: { contains: IGUALACION_MATCH, mode: 'insensitive' as const } },
-        { productNameSnapshot: { contains: IGUALACION_MATCH, mode: 'insensitive' as const } }
+        { productNameSnapshot: { contains: IGUALACION_MATCH, mode: 'insensitive' as const } },
+        { productCodeSnapshot: { startsWith: IGUALACION_CODE_PREFIX, mode: 'insensitive' as const } }
       ]
     }
   }
 } satisfies Prisma.SalesOrderWhereInput
+
+function isIgualacionItem(item: { productCodeSnapshot: string, productNameSnapshot: string }) {
+  const code = item.productCodeSnapshot.toLowerCase()
+
+  return code.includes(IGUALACION_MATCH)
+    || item.productNameSnapshot.toLowerCase().includes(IGUALACION_MATCH)
+    || code.startsWith(IGUALACION_CODE_PREFIX)
+}
 
 function orderVisibilityFilter(user: AppUser): Prisma.SalesOrderWhereInput {
   if (user.role === 'igualaciones') return igualacionFilter
@@ -281,9 +291,7 @@ function listItem(order: SalesOrder & {
             name: item.productNameSnapshot,
             quantity: number(item.quantity),
             observations: item.observations,
-            isIgualacion:
-              item.productCodeSnapshot.toLowerCase().includes(IGUALACION_MATCH)
-              || item.productNameSnapshot.toLowerCase().includes(IGUALACION_MATCH)
+            isIgualacion: isIgualacionItem(item)
           }))
         }
       : {}),
