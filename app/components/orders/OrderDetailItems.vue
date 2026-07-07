@@ -151,10 +151,100 @@ const columns: TableColumn<SalesOrderItem>[] = [{
       </h2>
     </template>
 
+    <div class="flex flex-col gap-3 p-4 md:hidden">
+      <UCard
+        v-for="item in items"
+        :key="item.id"
+        variant="subtle"
+        :ui="{ body: 'flex flex-col gap-4 p-4 sm:p-4' }"
+      >
+        <div class="flex items-start justify-between gap-3">
+          <div class="min-w-0">
+            <p class="text-xs font-medium uppercase tracking-wide text-muted">
+              {{ item.code }}
+            </p>
+            <h3 class="font-semibold text-highlighted">
+              {{ item.name }}
+            </h3>
+            <p class="text-sm text-muted">
+              Unidad: {{ item.unit.name || item.unit.code || '—' }}
+            </p>
+          </div>
+
+          <div class="flex shrink-0 items-center gap-1">
+            <UButton
+              v-if="editable"
+              icon="i-lucide-pencil"
+              color="neutral"
+              variant="ghost"
+              size="sm"
+              :aria-label="`Editar precio de ${item.name}`"
+              @click="openEdit(item)"
+            />
+            <UButton
+              v-if="item.priceHistory.length"
+              icon="i-lucide-history"
+              color="neutral"
+              variant="ghost"
+              size="sm"
+              :aria-label="`Historial de precio de ${item.name}`"
+              @click="openHistory(item)"
+            />
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-4 text-sm">
+          <div>
+            <p class="text-muted">
+              Cantidad
+            </p>
+            <p class="font-medium text-highlighted">
+              {{ item.quantity }} {{ item.unit.name || item.unit.code || '' }}
+            </p>
+          </div>
+          <div class="text-right">
+            <p class="text-muted">
+              Precio unitario
+            </p>
+            <p class="font-medium text-highlighted">
+              {{ currency.format(item.unitPrice) }}
+            </p>
+          </div>
+        </div>
+
+        <div v-if="item.observations">
+          <p class="text-sm text-muted">
+            Observaciones
+          </p>
+          <p class="text-sm whitespace-pre-wrap">
+            {{ item.observations }}
+          </p>
+        </div>
+
+        <div class="flex items-end justify-between gap-4 border-t border-default pt-3">
+          <span class="text-sm text-muted">Total</span>
+          <span class="text-base font-semibold text-highlighted">
+            {{ currency.format(item.total) }}
+          </span>
+        </div>
+      </UCard>
+
+      <div
+        v-if="items.length === 0"
+        class="flex flex-col items-center gap-2 rounded-lg border border-default bg-elevated/50 px-4 py-10 text-center"
+      >
+        <UIcon name="i-lucide-shopping-cart" class="size-8 text-muted" />
+        <p class="text-sm text-muted">
+          El pedido no tiene partidas.
+        </p>
+      </div>
+    </div>
+
     <UTable
       :data="tableItems"
       :columns="columns"
       empty="El pedido no tiene partidas."
+      class="hidden md:block"
     />
 
     <UModal v-model:open="editOpen" title="Editar precio">

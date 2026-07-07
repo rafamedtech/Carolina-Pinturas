@@ -16,6 +16,8 @@ const props = withDefaults(defineProps<{
 const isQuoteMode = computed(() => props.mode === 'quote')
 const isEditing = computed(() => Boolean(props.orderId))
 const documentNoun = computed(() => isQuoteMode.value ? 'cotización' : 'pedido')
+const documentNounCapitalized = computed(() =>
+  documentNoun.value.charAt(0).toUpperCase() + documentNoun.value.slice(1))
 const documentWithArticle = computed(() => isQuoteMode.value ? 'la cotización' : 'el pedido')
 const documentOf = computed(() => isQuoteMode.value ? 'de la cotización' : 'del pedido')
 const pageTitle = computed(() => isEditing.value
@@ -90,6 +92,9 @@ onMounted(() => {
 })
 const summaryOpen = shallowRef(false)
 const pendingSubmission = shallowRef<Schema | null>(null)
+const modalPhase = shallowRef<'review' | 'sending' | 'done'>('review')
+const createdOrder = shallowRef<SalesOrderDetail | null>(null)
+const { printTicket, printingTicket } = useTicketPrinter()
 const toast = useToast()
 const currency = new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' })
 const {
@@ -319,10 +324,13 @@ async function addSelectedProduct(product: SiigoProduct, quantity: number) {
 function reviewOrder(event: FormSubmitEvent<Schema>) {
   if (!canSubmit.value) return
   pendingSubmission.value = event.data
+  modalPhase.value = 'review'
+  createdOrder.value = null
   summaryOpen.value = true
 }
 
 function editOrder() {
+  modalPhase.value = 'review'
   summaryOpen.value = false
 }
 
@@ -351,6 +359,8 @@ async function confirmSubmit(statusKey: string) {
   const data = { ...pendingSubmission.value, statusKey }
   saving.value = true
   submittingStatusKey.value = statusKey
+  modalPhase.value = 'sending'
+  summaryOpen.value = true
 
   try {
     const requestLines = lines.value.map(line => ({
@@ -391,8 +401,14 @@ async function confirmSubmit(statusKey: string) {
       color: 'success',
       icon: 'i-lucide-circle-check'
     })
-    await navigateTo(isEditing.value ? `/ventas/${order.id}` : '/ventas')
+    if (isEditing.value) {
+      await navigateTo(`/ventas/${order.id}`)
+    } else {
+      createdOrder.value = order
+      modalPhase.value = 'done'
+    }
   } catch (error: unknown) {
+    modalPhase.value = 'review'
     const fetchError = error as { data?: { statusMessage?: string }, message?: string }
     toast.add({
       title: `No se pudo guardar ${documentWithArticle.value}`,
@@ -430,6 +446,7 @@ async function confirmSubmit(statusKey: string) {
         v-if="catalogError"
         color="warning"
         variant="subtle"
+        class="shrink-0"
         title="No se pudieron cargar los catálogos"
         :description="catalogError"
         icon="i-lucide-plug-zap"
@@ -492,9 +509,28 @@ async function confirmSubmit(statusKey: string) {
         />
       </UForm>
 
-      <UModal v-model:open="summaryOpen" :title="`Resumen ${documentOf}`">
+      <UModal
+        v-model:open="summaryOpen"
+        :title="modalPhase === 'done' ? `${documentNounCapitalized} enviado` : `Resumen ${documentOf}`"
+        :dismissible="modalPhase !== 'sending'"
+      >
         <template #body>
-          <div v-if="pendingSubmission" class="space-y-4">
+          <div v-if="modalPhase === 'sending'" class="flex flex-col items-center justify-center gap-3 py-10">
+            <UIcon name="i-lucide-loader-circle" class="size-8 animate-spin text-primary" />
+            <p class="text-sm text-muted">
+              Enviando {{ documentWithArticle }}…
+            </p>
+          </div>
+          <div v-else-if="modalPhase === 'done'" class="flex flex-col items-center justify-center gap-3 py-10 text-center">
+            <UIcon name="i-lucide-circle-check" class="size-10 text-success" />
+            <p class="text-lg font-semibold">
+              ¡Enviado con éxito!
+            </p>
+            <p v-if="createdOrder" class="text-sm text-muted">
+              {{ documentNounCapitalized }} {{ createdOrder.number }} guardado.
+            </p>
+          </div>
+          <div v-else-if="pendingSubmission" class="space-y-4">
             <div>
               <p class="text-sm text-muted">
                 Cliente
@@ -562,8 +598,38 @@ async function confirmSubmit(statusKey: string) {
           </div>
         </template>
 
-        <template #footer>
-          <div class="flex w-full flex-col gap-2 sm:flex-row sm:justify-end">
+        <template v-if="modalPhase !== 'sending'" #footer>
+          <div
+            v-if="modalPhase === 'done'"
+            class="flex w-full flex-col gap-2 sm:flex-row sm:justify-end"
+          >
+            <UButton
+              label="Ir a pedidos"
+              icon="i-lucide-list"
+              color="neutral"
+              variant="outline"
+              class="justify-center"
+              @click="navigateTo('/ventas')"
+            />
+            <UButton
+              v-if="createdOrder"
+              label="Ver pedido"
+              icon="i-lucide-eye"
+              color="neutral"
+              variant="soft"
+              class="justify-center"
+              @click="navigateTo(`/ventas/${createdOrder.id}`)"
+            />
+            <UButton
+              v-if="createdOrder"
+              label="Imprimir ticket"
+              icon="i-lucide-printer"
+              class="justify-center"
+              :loading="printingTicket"
+              @click="printTicket(createdOrder)"
+            />
+          </div>
+          <div v-else class="flex w-full flex-col gap-2 sm:flex-row sm:justify-end">
             <UButton
               :label="`Editar ${documentNoun}`"
               icon="i-lucide-pencil"

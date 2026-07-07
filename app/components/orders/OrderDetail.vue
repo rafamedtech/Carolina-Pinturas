@@ -357,8 +357,10 @@ async function convertToPedido() {
       />
 
       <template v-else-if="order">
-        <div class="flex flex-wrap items-center justify-between gap-4">
-          <div>
+        <div
+          class="grid grid-cols-2 items-center gap-4 [grid-template-areas:'info_estados'_'acciones_acciones'] lg:grid-cols-[1fr_auto] lg:[grid-template-areas:'info_acciones']"
+        >
+          <div class="[grid-area:info]">
             <p class="flex items-center gap-1.5 text-sm text-muted">
               <UIcon v-if="isQuote" name="i-lucide-file-text" class="size-4" />
               {{ documentLabel }}
@@ -367,9 +369,10 @@ async function convertToPedido() {
               <h1 class="text-xl font-semibold text-highlighted">
                 {{ order.number }}
               </h1>
-              <OrdersOrderStatusBadge :status="order.status" />
+              <OrdersOrderStatusBadge class="hidden lg:inline-flex" :status="order.status" />
               <UBadge
                 v-if="!isQuote"
+                class="hidden lg:inline-flex"
                 :color="paymentStatusColor(order.paymentStatus)"
                 variant="subtle"
                 :label="paymentStatusLabel(order.paymentStatus)"
@@ -379,7 +382,16 @@ async function convertToPedido() {
               {{ formatDate(order.orderDate) }}
             </p>
           </div>
-          <div class="flex items-center gap-4">
+          <div class="[grid-area:estados] flex flex-col items-end gap-2 lg:hidden">
+            <OrdersOrderStatusBadge :status="order.status" />
+            <UBadge
+              v-if="!isQuote"
+              :color="paymentStatusColor(order.paymentStatus)"
+              variant="subtle"
+              :label="paymentStatusLabel(order.paymentStatus)"
+            />
+          </div>
+          <div class="[grid-area:acciones] flex flex-wrap items-center gap-4 lg:justify-end">
             <UDropdownMenu :items="documentOptions">
               <UButton
                 label="Opciones"
