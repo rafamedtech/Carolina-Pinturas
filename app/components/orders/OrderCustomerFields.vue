@@ -3,6 +3,8 @@ import { parseDate } from '@internationalized/date'
 import type { DateValue } from '@internationalized/date'
 import type { OrderStatus, Repartidor } from '~/types/orders'
 import type { SiigoCustomer } from '~/types/siigo'
+import { PAYMENT_STATUSES, PAYMENT_METHODS } from '~/utils/orderPayment'
+import { siigoCustomerPhone, siigoCustomerAddress } from '~/utils/siigoCustomer'
 
 const props = withDefaults(defineProps<{
   customers: SiigoCustomer[]
@@ -12,10 +14,12 @@ const props = withDefaults(defineProps<{
   disabled: boolean
   repartidorRequired?: boolean
   showStatus?: boolean
+  showPayment?: boolean
   quoteMode?: boolean
 }>(), {
   repartidorRequired: false,
   showStatus: true,
+  showPayment: true,
   quoteMode: false
 })
 
@@ -29,6 +33,9 @@ const repartidorId = defineModel<string>('repartidorId', { required: true })
 const orderDate = defineModel<string>('orderDate', { required: true })
 const promisedDate = defineModel<string>('promisedDate', { required: true })
 const observations = defineModel<string>('observations', { required: true })
+const paymentStatus = defineModel<string>('paymentStatus', { required: true })
+const paymentMethod = defineModel<string>('paymentMethod', { required: true })
+const paymentDate = defineModel<string>('paymentDate', { required: true })
 
 const orderDateValue = computed<DateValue | undefined>({
   get: () => orderDate.value ? parseDate(orderDate.value) : undefined,
@@ -40,6 +47,12 @@ const promisedDateValue = computed<DateValue | undefined>({
   get: () => promisedDate.value ? parseDate(promisedDate.value) : undefined,
   set: (value) => {
     promisedDate.value = value?.toString() ?? ''
+  }
+})
+const paymentDateValue = computed<DateValue | undefined>({
+  get: () => paymentDate.value ? parseDate(paymentDate.value) : undefined,
+  set: (value) => {
+    paymentDate.value = value?.toString() ?? ''
   }
 })
 
@@ -61,6 +74,19 @@ const repartidorOptions = computed(() => props.repartidores.map(repartidor => ({
   description: repartidor.telefono || undefined,
   value: repartidor.id
 })))
+const paymentStatusOptions = PAYMENT_STATUSES.map(status => ({
+  label: status.label,
+  value: status.key as string
+}))
+const paymentMethodOptions = PAYMENT_METHODS.map(method => ({
+  label: method.label,
+  value: method.key as string
+}))
+
+const selectedCustomer = computed(() =>
+  props.customers.find(customer => customer.id === customerId.value))
+const selectedCustomerPhone = computed(() => siigoCustomerPhone(selectedCustomer.value))
+const selectedCustomerAddress = computed(() => siigoCustomerAddress(selectedCustomer.value))
 
 const createCustomerOpen = shallowRef(false)
 const createCustomerName = shallowRef('')
@@ -115,6 +141,28 @@ function onCustomerCreated(customer: SiigoCustomer) {
         </USelectMenu>
       </UFormField>
 
+      <div
+        v-if="selectedCustomer && (selectedCustomerPhone || selectedCustomerAddress)"
+        class="grid gap-4 sm:col-span-2 sm:grid-cols-2"
+      >
+        <div v-if="selectedCustomerPhone">
+          <p class="text-sm text-muted">
+            Teléfono
+          </p>
+          <p class="font-medium">
+            {{ selectedCustomerPhone }}
+          </p>
+        </div>
+        <div v-if="selectedCustomerAddress">
+          <p class="text-sm text-muted">
+            Domicilio
+          </p>
+          <p class="font-medium">
+            {{ selectedCustomerAddress }}
+          </p>
+        </div>
+      </div>
+
       <OrdersOrderCustomerCreateModal
         v-model:open="createCustomerOpen"
         :customers="props.customers"
@@ -168,11 +216,53 @@ function onCustomerCreated(customer: SiigoCustomer) {
         />
       </UFormField>
 
-      <UFormField v-if="!props.quoteMode" name="promisedDate" label="Fecha prometida">
+      <UFormField v-if="!props.quoteMode" name="promisedDate" label="Fecha de entrega">
         <OrdersOrderDatePicker
           v-model="promisedDateValue"
           :disabled="disabled"
-          placeholder="Seleccionar fecha prometida"
+          placeholder="Seleccionar fecha de entrega"
+        />
+      </UFormField>
+
+      <UFormField
+        v-if="!props.quoteMode && props.showPayment"
+        name="paymentStatus"
+        label="Estado de pago"
+        required
+      >
+        <USelect
+          v-model="paymentStatus"
+          :items="paymentStatusOptions"
+          value-key="value"
+          :disabled="disabled"
+          class="w-full"
+        />
+      </UFormField>
+
+      <UFormField
+        v-if="!props.quoteMode && props.showPayment"
+        name="paymentMethod"
+        label="Método de pago"
+      >
+        <USelect
+          v-model="paymentMethod"
+          :items="paymentMethodOptions"
+          value-key="value"
+          :disabled="disabled"
+          placeholder="Selecciona un método"
+          class="w-full"
+        />
+      </UFormField>
+
+      <UFormField
+        v-if="!props.quoteMode && props.showPayment"
+        name="paymentDate"
+        label="Fecha de pago"
+      >
+        <OrdersOrderDatePicker
+          v-model="paymentDateValue"
+          :disabled="disabled"
+          placeholder="Seleccionar fecha de pago"
         />
       </UFormField>
 

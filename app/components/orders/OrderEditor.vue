@@ -3,7 +3,8 @@ import * as z from 'zod'
 import type { FormSubmitEvent } from '@nuxt/ui'
 import type { OrderStatus, SalesOrderDetail } from '~/types/orders'
 import type { SiigoCustomer, SiigoProduct } from '~/types/siigo'
-import { submittedOrderStatusKey } from '~/utils/roleAccess'
+import { submittedOrderStatusKey, canManageOrderLogistics } from '~/utils/roleAccess'
+import { DEFAULT_PAYMENT_STATUS } from '~/utils/orderPayment'
 
 const props = withDefaults(defineProps<{
   mode?: 'order' | 'quote'
@@ -30,6 +31,9 @@ const schema = z.object({
   repartidorId: z.string(),
   orderDate: z.string().min(1, `Selecciona la fecha ${documentOf.value}.`),
   promisedDate: z.string(),
+  paymentStatus: z.string().min(1, 'Selecciona un estado de pago.'),
+  paymentMethod: z.string(),
+  paymentDate: z.string(),
   observations: z.string().max(5000)
 }).superRefine((data, ctx) => {
   if (STATUS_KEYS_REQUIRING_REPARTIDOR.includes(data.statusKey) && !data.repartidorId) {
@@ -65,6 +69,9 @@ const state = reactive<Schema>({
   repartidorId: '',
   orderDate: mexicoToday(),
   promisedDate: isQuoteMode.value ? '' : mexicoToday(),
+  paymentStatus: DEFAULT_PAYMENT_STATUS,
+  paymentMethod: 'efectivo',
+  paymentDate: '',
   observations: ''
 })
 const saving = shallowRef(false)
@@ -208,6 +215,8 @@ watch(existingOrder, (value) => {
 }, { immediate: true })
 const formDisabled = computed(() => saving.value || Boolean(catalogError.value))
 const mayChooseInitialStatus = computed(() => user.value?.role === 'admin')
+const mayManagePayment = computed(() =>
+  Boolean(user.value && canManageOrderLogistics(user.value.role)))
 const maySaveDraft = computed(() => Boolean(user.value && user.value.role !== 'admin'))
 const sendStatusKey = computed(() =>
   user.value
@@ -364,6 +373,8 @@ async function confirmSubmit(statusKey: string) {
             ...data,
             repartidorId: data.repartidorId || null,
             promisedDate: data.promisedDate || null,
+            paymentMethod: data.paymentMethod || null,
+            paymentDate: data.paymentDate || null,
             observations: data.observations || null,
             lines: requestLines
           }
@@ -435,6 +446,9 @@ async function confirmSubmit(statusKey: string) {
             v-model:repartidor-id="state.repartidorId"
             v-model:order-date="state.orderDate"
             v-model:promised-date="state.promisedDate"
+            v-model:payment-status="state.paymentStatus"
+            v-model:payment-method="state.paymentMethod"
+            v-model:payment-date="state.paymentDate"
             v-model:observations="state.observations"
             :customers="customers?.results || []"
             :statuses="statuses"
@@ -443,6 +457,7 @@ async function confirmSubmit(statusKey: string) {
             :disabled="formDisabled"
             :repartidor-required="repartidorRequired"
             :show-status="mayChooseInitialStatus && !isQuoteMode"
+            :show-payment="mayManagePayment"
             :quote-mode="isQuoteMode"
             @customer-created="onCustomerCreated"
           />
@@ -487,7 +502,7 @@ async function confirmSubmit(statusKey: string) {
             </div>
             <div>
               <p class="text-sm text-muted">
-                Fecha prometida
+                Fecha de entrega
               </p>
               <p class="font-medium">
                 {{ formatDate(pendingSubmission.promisedDate) }}

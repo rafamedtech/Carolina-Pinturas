@@ -1,5 +1,6 @@
 export const PAYMENT_STATUSES = [
   { key: 'pendiente_pago', label: 'Pendiente de pago', color: 'warning' },
+  { key: 'abonado', label: 'Abonado', color: 'info' },
   { key: 'pago_recibido', label: 'Pago recibido', color: 'success' }
 ] as const
 

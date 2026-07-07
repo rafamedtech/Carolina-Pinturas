@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { SiigoCustomer } from '~/types/siigo'
+import { siigoCustomerPhone, siigoCustomerAddress } from '~/utils/siigoCustomer'
 
 const route = useRoute()
 const customerId = computed(() => String(route.params.id))
@@ -11,20 +12,8 @@ const { data: customer, status, error, refresh } = useLazyFetch<SiigoCustomer>(
 const fullName = computed(() => customer.value?.name?.filter(Boolean).join(' ') || 'Cliente')
 const contact = computed(() => customer.value?.contacts?.[0])
 const email = computed(() => contact.value?.email || '—')
-const phone = computed(() => customer.value?.phones?.map(item => item.number).filter(Boolean).join(', ') || contact.value?.phone?.number || '—')
-const address = computed(() => {
-  const value = customer.value?.address
-  if (!value) return '—'
-
-  return [
-    [value.street, value.exterior_number, value.interior_number].filter(Boolean).join(' '),
-    value.colony,
-    value.locality,
-    value.city?.city_name,
-    value.city?.state_name,
-    value.postal_code
-  ].filter(Boolean).join(', ') || '—'
-})
+const phone = computed(() => siigoCustomerPhone(customer.value) || '—')
+const address = computed(() => siigoCustomerAddress(customer.value) || '—')
 const message = computed(() => error.value?.data?.statusMessage || 'No fue posible cargar el cliente.')
 
 useSeoMeta({ title: () => fullName.value })

@@ -444,6 +444,22 @@ async function convertToPedido() {
               </div>
               <div>
                 <dt class="text-sm text-muted">
+                  Teléfono
+                </dt>
+                <dd class="mt-1 font-medium">
+                  {{ order.customer.phone || '—' }}
+                </dd>
+              </div>
+              <div>
+                <dt class="text-sm text-muted">
+                  Domicilio
+                </dt>
+                <dd class="mt-1 font-medium">
+                  {{ order.customer.address || '—' }}
+                </dd>
+              </div>
+              <div>
+                <dt class="text-sm text-muted">
                   {{ isQuote ? 'Fecha de cotización' : 'Fecha del pedido' }}
                 </dt>
                 <dd class="mt-1 font-medium">
@@ -452,7 +468,7 @@ async function convertToPedido() {
               </div>
               <div v-if="!isQuote">
                 <dt class="text-sm text-muted">
-                  Fecha prometida
+                  Fecha de entrega
                 </dt>
                 <dd class="mt-1 font-medium">
                   {{ formatDate(order.promisedDate) }}
@@ -471,7 +487,7 @@ async function convertToPedido() {
                   Repartidor
                 </dt>
                 <dd class="mt-1">
-                  <USelectMenu
+                  <USelect
                     v-if="mayManageLogistics"
                     v-model="selectedRepartidor"
                     :items="repartidorOptions"
@@ -490,7 +506,7 @@ async function convertToPedido() {
                   Estado de pago
                 </dt>
                 <dd class="mt-1">
-                  <USelectMenu
+                  <USelect
                     v-if="mayManagePayment"
                     v-model="selectedPaymentStatus"
                     :items="paymentStatusOptions"
@@ -512,7 +528,7 @@ async function convertToPedido() {
                   Método de pago
                 </dt>
                 <dd class="mt-1">
-                  <USelectMenu
+                  <USelect
                     v-if="mayManagePayment"
                     v-model="selectedPaymentMethod"
                     :items="paymentMethodOptions"

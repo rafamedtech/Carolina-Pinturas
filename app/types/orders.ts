@@ -119,6 +119,7 @@ export interface SalesOrderDetail extends SalesOrderListItem {
   remision: string | null
   paymentStatus: string
   paymentMethod: string | null
+  paymentDate: string | null
   currencyCode: string
   subtotal: number
   discountTotal: number

@@ -39,6 +39,9 @@ async function mountFields() {
       repartidorId: '',
       orderDate: '2026-07-06',
       promisedDate: '',
+      paymentStatus: 'pendiente_pago',
+      paymentMethod: '',
+      paymentDate: '',
       observations: ''
     }
   })
