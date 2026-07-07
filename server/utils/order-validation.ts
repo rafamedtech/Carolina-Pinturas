@@ -15,6 +15,7 @@ const orderFieldsSchema = z.object({
   promisedDate: dateSchema.nullable().optional(),
   observations: z.string().trim().max(5000).nullable().optional(),
   remision: z.string().trim().max(100).nullable().optional(),
+  requiresInvoice: z.boolean().default(false),
   paymentStatus: z.enum(PAYMENT_STATUS_KEYS as [string, ...string[]]).default('pendiente_pago'),
   paymentMethod: z.enum(PAYMENT_METHOD_KEYS as [string, ...string[]]).nullable().optional(),
   paymentDate: dateSchema.nullable().optional(),

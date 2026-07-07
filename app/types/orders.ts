@@ -117,6 +117,7 @@ export interface SalesOrderDetail extends SalesOrderListItem {
   }
   observations: string | null
   remision: string | null
+  requiresInvoice: boolean
   paymentStatus: string
   paymentMethod: string | null
   paymentDate: string | null

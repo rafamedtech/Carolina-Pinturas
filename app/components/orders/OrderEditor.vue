@@ -34,6 +34,7 @@ const schema = z.object({
   paymentStatus: z.string().min(1, 'Selecciona un estado de pago.'),
   paymentMethod: z.string(),
   paymentDate: z.string(),
+  requiresInvoice: z.boolean(),
   observations: z.string().max(5000)
 }).superRefine((data, ctx) => {
   if (STATUS_KEYS_REQUIRING_REPARTIDOR.includes(data.statusKey) && !data.repartidorId) {
@@ -71,7 +72,8 @@ const state = reactive<Schema>({
   promisedDate: isQuoteMode.value ? '' : mexicoToday(),
   paymentStatus: DEFAULT_PAYMENT_STATUS,
   paymentMethod: 'efectivo',
-  paymentDate: '',
+  paymentDate: isQuoteMode.value ? '' : mexicoToday(),
+  requiresInvoice: false,
   observations: ''
 })
 const saving = shallowRef(false)
@@ -449,6 +451,7 @@ async function confirmSubmit(statusKey: string) {
             v-model:payment-status="state.paymentStatus"
             v-model:payment-method="state.paymentMethod"
             v-model:payment-date="state.paymentDate"
+            v-model:requires-invoice="state.requiresInvoice"
             v-model:observations="state.observations"
             :customers="customers?.results || []"
             :statuses="statuses"

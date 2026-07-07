@@ -36,6 +36,7 @@ const observations = defineModel<string>('observations', { required: true })
 const paymentStatus = defineModel<string>('paymentStatus', { required: true })
 const paymentMethod = defineModel<string>('paymentMethod', { required: true })
 const paymentDate = defineModel<string>('paymentDate', { required: true })
+const requiresInvoice = defineModel<boolean>('requiresInvoice', { required: true })
 
 const orderDateValue = computed<DateValue | undefined>({
   get: () => orderDate.value ? parseDate(orderDate.value) : undefined,
@@ -264,6 +265,10 @@ function onCustomerCreated(customer: SiigoCustomer) {
           :disabled="disabled"
           placeholder="Seleccionar fecha de pago"
         />
+      </UFormField>
+
+      <UFormField v-if="!props.quoteMode" name="requiresInvoice" label="Facturación">
+        <USwitch v-model="requiresInvoice" :disabled="disabled" label="Requiere factura" />
       </UFormField>
 
       <UFormField name="observations" label="Observaciones" class="sm:col-span-2">

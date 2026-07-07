@@ -42,6 +42,7 @@ async function mountFields() {
       paymentStatus: 'pendiente_pago',
       paymentMethod: '',
       paymentDate: '',
+      requiresInvoice: false,
       observations: ''
     }
   })
