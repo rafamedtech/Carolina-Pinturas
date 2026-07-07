@@ -72,7 +72,6 @@ const statusOptions = computed(() => props.statuses.map(status => ({
 })))
 const repartidorOptions = computed(() => props.repartidores.map(repartidor => ({
   label: repartidor.nombre,
-  description: repartidor.telefono || undefined,
   value: repartidor.id
 })))
 const paymentStatusOptions = PAYMENT_STATUSES.map(status => ({
@@ -193,7 +192,7 @@ function onCustomerCreated(customer: SiigoCustomer) {
         :required="props.repartidorRequired"
         class="sm:col-span-2"
       >
-        <USelectMenu
+        <USelect
           v-model="repartidorId"
           :items="repartidorOptions"
           value-key="value"

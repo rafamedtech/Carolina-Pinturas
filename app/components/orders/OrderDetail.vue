@@ -542,6 +542,18 @@ async function convertToPedido() {
                   </span>
                 </dd>
               </div>
+              <div v-if="!isQuote">
+                <dt class="text-sm text-muted">
+                  Requiere factura
+                </dt>
+                <dd class="mt-1">
+                  <UBadge
+                    :color="order.requiresInvoice ? 'success' : 'neutral'"
+                    variant="subtle"
+                    :label="order.requiresInvoice ? 'Sí' : 'No'"
+                  />
+                </dd>
+              </div>
             </dl>
             <div v-if="order.observations" class="mt-4 border-t border-default pt-4">
               <p class="text-sm text-muted">
