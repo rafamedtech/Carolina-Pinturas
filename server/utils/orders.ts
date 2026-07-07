@@ -8,7 +8,8 @@ import type {
   UpdateOrderRemisionInput,
   UpdateOrderPaymentInput,
   UpdateOrderRepartidorInput,
-  UpdateOrderStatusInput
+  UpdateOrderStatusInput,
+  UpdateOrderItemPriceInput
 } from './order-validation'
 import { STATUS_KEYS_REQUIRING_REPARTIDOR } from './order-validation'
 import { usePrisma } from './prisma'
@@ -28,7 +29,12 @@ const orderDetailInclude = {
   status: true,
   customer: true,
   items: {
-    orderBy: { position: 'asc' }
+    orderBy: { position: 'asc' },
+    include: {
+      priceHistory: {
+        orderBy: { changedAt: 'asc' }
+      }
+    }
   },
   statusHistory: {
     include: {
@@ -132,6 +138,36 @@ function productPrice(product: SiigoProduct) {
   }
 }
 
+function lineAmounts(
+  quantity: Decimal,
+  unitPrice: Decimal,
+  taxPercentage: Decimal,
+  taxIncluded: boolean
+) {
+  const listedTotal = money(quantity.mul(unitPrice))
+  const divisor = money(1).plus(taxPercentage.div(100))
+  const subtotal = taxIncluded && taxPercentage.gt(0)
+    ? money(listedTotal.div(divisor))
+    : listedTotal
+  const taxAmount = taxIncluded
+    ? money(listedTotal.minus(subtotal))
+    : money(subtotal.mul(taxPercentage).div(100))
+  const total = taxIncluded
+    ? listedTotal
+    : money(subtotal.plus(taxAmount))
+
+  return { subtotal, taxAmount, total }
+}
+
+function taxPercentageFromPayload(taxPayload: Prisma.JsonValue): Decimal {
+  const taxes = Array.isArray(taxPayload) ? taxPayload : []
+  return taxes.reduce((sum: Decimal, tax) => {
+    if (!tax || typeof tax !== 'object' || Array.isArray(tax)) return sum
+    const percentage = Number((tax as { percentage?: unknown }).percentage)
+    return Number.isFinite(percentage) ? sum.plus(percentage) : sum
+  }, money(0))
+}
+
 function buildLine(
   product: SiigoProduct,
   quantityValue: number,
@@ -142,17 +178,12 @@ function buildLine(
   const selectedPrice = productPrice(product)
   const percentage = money((product.taxes || []).reduce((sum, tax) =>
     sum + (Number(tax.percentage) || 0), 0))
-  const listedTotal = money(quantity.mul(selectedPrice.value))
-  const divisor = money(1).plus(percentage.div(100))
-  const subtotal = product.tax_included && percentage.gt(0)
-    ? money(listedTotal.div(divisor))
-    : listedTotal
-  const taxAmount = product.tax_included
-    ? money(listedTotal.minus(subtotal))
-    : money(subtotal.mul(percentage).div(100))
-  const total = product.tax_included
-    ? listedTotal
-    : money(subtotal.plus(taxAmount))
+  const { subtotal, taxAmount, total } = lineAmounts(
+    quantity,
+    selectedPrice.value,
+    percentage,
+    product.tax_included ?? false
+  )
   const unit = product.unit && typeof product.unit === 'object' ? product.unit : undefined
 
   return {
@@ -167,6 +198,7 @@ function buildLine(
     productPayload: siigoJson(product),
     quantity: quantity.toString(),
     unitPrice: selectedPrice.value.toString(),
+    taxIncluded: product.tax_included ?? false,
     discountPercentage: '0',
     discountAmount: '0',
     taxPayload: siigoJson(product.taxes || []),
@@ -332,7 +364,19 @@ function detail(order: OrderDetailRecord): SalesOrderDetail {
       subtotal: number(item.subtotal),
       taxAmount: number(item.taxAmount),
       total: number(item.total),
-      observations: item.observations
+      observations: item.observations,
+      priceHistory: item.priceHistory.map(entry => ({
+        id: entry.id.toString(),
+        previousPrice: number(entry.previousPrice),
+        newPrice: number(entry.newPrice),
+        note: entry.note,
+        changedBy: {
+          name: entry.changedByName,
+          email: entry.changedByEmail,
+          role: entry.changedByRole
+        },
+        changedAt: entry.changedAt.toISOString()
+      }))
     })),
     statusHistory: order.statusHistory.map(history => ({
       id: history.id.toString(),
@@ -885,4 +929,114 @@ export async function updateOrderRepartidor(
   }
 
   return getOrder(id, user)
+}
+
+export async function updateOrderItemPrice(
+  orderId: string,
+  itemId: string,
+  input: UpdateOrderItemPriceInput,
+  user: AppUser
+) {
+  const prisma = usePrisma()
+
+  if (!canManageOrderLogistics(user.role)) {
+    throw createError({
+      statusCode: 403,
+      statusMessage: 'No tienes permiso para modificar el precio de esta partida.'
+    })
+  }
+
+  const order = await prisma.salesOrder.findFirst({
+    where: {
+      id: orderId,
+      AND: [orderVisibilityFilter(user)]
+    },
+    select: { statusKey: true, version: true }
+  })
+  if (!order) {
+    throw createError({ statusCode: 404, statusMessage: 'No se encontró el pedido.' })
+  }
+  // Cotizaciones (borrador) se editan completas desde el editor, que vuelve a
+  // consultar Siigo y recrea las partidas: un ajuste puntual aquí se perdería
+  // en el siguiente guardado sin dejar rastro.
+  if (order.statusKey === 'borrador') {
+    throw createError({
+      statusCode: 409,
+      statusMessage: 'Edita el precio desde la cotización mientras sigue siendo un borrador.'
+    })
+  }
+  if (order.version !== input.version) {
+    throw createError({
+      statusCode: 409,
+      statusMessage: 'El pedido cambió desde que lo abriste. Actualiza la página e intenta de nuevo.'
+    })
+  }
+
+  const item = await prisma.salesOrderItem.findFirst({ where: { id: itemId, orderId } })
+  if (!item) {
+    throw createError({ statusCode: 404, statusMessage: 'No se encontró la partida.' })
+  }
+
+  const previousPrice = money(item.unitPrice)
+  const newPrice = money(input.unitPrice)
+  if (previousPrice.equals(newPrice)) {
+    throw createError({
+      statusCode: 422,
+      statusMessage: 'El precio nuevo debe ser diferente al actual.'
+    })
+  }
+
+  const quantity = money(item.quantity)
+  const taxPercentage = taxPercentageFromPayload(item.taxPayload)
+  const { subtotal, taxAmount, total } = lineAmounts(quantity, newPrice, taxPercentage, item.taxIncluded)
+
+  await prisma.$transaction(async (tx) => {
+    await tx.salesOrderItem.update({
+      where: { id: itemId },
+      data: {
+        unitPrice: newPrice.toString(),
+        subtotal: subtotal.toString(),
+        taxAmount: taxAmount.toString(),
+        total: total.toString()
+      }
+    })
+    await tx.salesOrderItemPriceHistory.create({
+      data: {
+        orderItemId: itemId,
+        orderId,
+        previousPrice: previousPrice.toString(),
+        newPrice: newPrice.toString(),
+        note: input.note || null,
+        changedByName: user.name,
+        changedByEmail: user.email,
+        changedByRole: user.role
+      }
+    })
+
+    const items = await tx.salesOrderItem.findMany({ where: { orderId } })
+    const orderSubtotal = items.reduce((sum, current) => sum.plus(current.subtotal), money(0))
+    const orderDiscountTotal = items.reduce((sum, current) => sum.plus(current.discountAmount), money(0))
+    const orderTaxTotal = items.reduce((sum, current) => sum.plus(current.taxAmount), money(0))
+    const orderTotal = items.reduce((sum, current) => sum.plus(current.total), money(0))
+
+    const result = await tx.salesOrder.updateMany({
+      where: { id: orderId, version: input.version },
+      data: {
+        subtotal: orderSubtotal.toString(),
+        discountTotal: orderDiscountTotal.toString(),
+        taxTotal: orderTaxTotal.toString(),
+        total: orderTotal.toString(),
+        updatedByEmail: user.email,
+        version: { increment: 1 }
+      }
+    })
+    if (result.count !== 1) {
+      throw createError({
+        statusCode: 409,
+        statusMessage: 'El pedido cambió mientras se actualizaba. Intenta de nuevo.'
+      })
+    }
+  })
+
+  return getOrder(orderId, user)
 }

@@ -247,8 +247,9 @@ model SalesOrder {
   status        OrderStatus               @relation(fields: [statusKey], references: [key], onDelete: Restrict)
   customer      SiigoCustomer             @relation(fields: [customerId], references: [id], onDelete: Restrict)
   repartidor    Repartidor?               @relation(fields: [repartidorId], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  items         SalesOrderItem[]
-  statusHistory SalesOrderStatusHistory[]
+  items             SalesOrderItem[]
+  statusHistory     SalesOrderStatusHistory[]
+  itemPriceHistory  SalesOrderItemPriceHistory[]
 
   @@index([statusKey, orderDate])
   @@index([customerId, orderDate])
@@ -272,6 +273,7 @@ model SalesOrderItem {
   productPayload             Json     @map("product_payload") @db.JsonB
   quantity                   Decimal  @db.Decimal(20, 6)
   unitPrice                  Decimal  @map("unit_price") @db.Decimal(20, 6)
+  taxIncluded                Boolean  @default(false) @map("tax_included")
   discountPercentage         Decimal  @default(0) @map("discount_percentage") @db.Decimal(9, 6)
   discountAmount             Decimal  @default(0) @map("discount_amount") @db.Decimal(20, 6)
   taxPayload                 Json     @map("tax_payload") @db.JsonB
@@ -281,12 +283,33 @@ model SalesOrderItem {
   observations               String?  @map("observations")
   createdAt                  DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
 
-  order   SalesOrder   @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  product SiigoProduct @relation(fields: [productId], references: [id], onDelete: Restrict)
+  order         SalesOrder                   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product       SiigoProduct                 @relation(fields: [productId], references: [id], onDelete: Restrict)
+  priceHistory  SalesOrderItemPriceHistory[]
 
   @@unique([orderId, position])
   @@index([productId])
   @@map("sales_order_items")
+}
+
+model SalesOrderItemPriceHistory {
+  id             BigInt   @id @default(autoincrement())
+  orderItemId    String   @map("order_item_id") @db.Uuid
+  orderId        String   @map("order_id") @db.Uuid
+  previousPrice  Decimal  @map("previous_price") @db.Decimal(20, 6)
+  newPrice       Decimal  @map("new_price") @db.Decimal(20, 6)
+  note           String?
+  changedByName  String   @map("changed_by_name")
+  changedByEmail String   @map("changed_by_email")
+  changedByRole  String   @map("changed_by_role") @db.VarChar(32)
+  changedAt      DateTime @default(now()) @map("changed_at") @db.Timestamptz(6)
+
+  orderItem SalesOrderItem @relation(fields: [orderItemId], references: [id], onDelete: Cascade)
+  order     SalesOrder     @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderItemId, changedAt])
+  @@index([orderId, changedAt])
+  @@map("sales_order_item_price_history")
 }
 
 model SalesOrderStatusHistory {

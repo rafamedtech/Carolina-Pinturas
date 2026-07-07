@@ -61,6 +61,19 @@ export interface SalesOrderListResponse {
   }
 }
 
+export interface OrderItemPriceHistoryEntry {
+  id: string
+  previousPrice: number
+  newPrice: number
+  note: string | null
+  changedBy: {
+    name: string
+    email: string
+    role: string
+  }
+  changedAt: string
+}
+
 export interface SalesOrderItem {
   id: string
   position: number
@@ -81,6 +94,7 @@ export interface SalesOrderItem {
   taxAmount: number
   total: number
   observations: string | null
+  priceHistory: OrderItemPriceHistoryEntry[]
 }
 
 export interface SalesOrderStatusHistoryItem {

@@ -553,6 +553,10 @@ async function convertToPedido() {
             class="[grid-area:items]"
             :items="order.items"
             :currency-code="order.currencyCode"
+            :order-id="order.id"
+            :version="order.version"
+            :editable="!isQuote && mayManageLogistics"
+            @updated="order = $event"
           />
 
           <div class="[grid-area:totales] grid gap-4 lg:grid-cols-2">
