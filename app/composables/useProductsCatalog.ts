@@ -18,6 +18,8 @@ export function useProductsCatalog() {
     if (value) catalog.value = value
   }, { immediate: true })
 
+  useTrackSiigoLoading(status)
+
   async function refreshCatalog() {
     await refresh()
 
