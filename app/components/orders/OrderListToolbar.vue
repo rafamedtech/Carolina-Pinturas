@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { OrderStatus } from '~/types/orders'
+import { PAYMENT_STATUSES } from '~/utils/orderPayment'
 
 const props = withDefaults(defineProps<{
   statuses: OrderStatus[]
@@ -12,6 +13,7 @@ const props = withDefaults(defineProps<{
 
 const filter = defineModel<string>('filter', { required: true })
 const status = defineModel<string>('status', { required: true })
+const paymentStatus = defineModel<string>('paymentStatus', { required: true })
 
 const IGUALACION_STATUS_KEYS = ['confirmado', 'surtido', 'en_espera']
 
@@ -27,6 +29,14 @@ const statusOptions = computed(() => {
     value: item.key
   }))]
 })
+
+const paymentStatusOptions = [{
+  label: 'Todos los pagos',
+  value: 'all'
+}, ...PAYMENT_STATUSES.map(item => ({
+  label: item.label,
+  value: item.key as string
+}))]
 </script>
 
 <template>
@@ -41,6 +51,12 @@ const statusOptions = computed(() => {
       <USelect
         v-model="status"
         :items="statusOptions"
+        value-key="value"
+        class="w-full sm:hidden"
+      />
+      <USelect
+        v-model="paymentStatus"
+        :items="paymentStatusOptions"
         value-key="value"
         class="w-full sm:w-48"
       />

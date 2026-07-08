@@ -644,6 +644,7 @@ export async function listOrders(options: {
   pageSize: number
   search?: string
   statusKey?: string
+  paymentStatus?: string
   igualacion?: boolean
 }, user: AppUser) {
   const prisma = usePrisma()
@@ -659,6 +660,9 @@ export async function listOrders(options: {
     : options.statusKey
       ? { statusKey: options.statusKey }
       : {}
+  const paymentStatusFilter: Prisma.SalesOrderWhereInput = options.paymentStatus
+    ? { paymentStatus: options.paymentStatus }
+    : {}
   const searchFilter: Prisma.SalesOrderWhereInput = options.search
     ? {
         OR: [{
@@ -681,6 +685,7 @@ export async function listOrders(options: {
   const where: Prisma.SalesOrderWhereInput = {
     AND: [
       statusFilter,
+      paymentStatusFilter,
       orderVisibilityFilter(user),
       ...(isIgualacionesView ? [igualacionFilter] : []),
       searchFilter

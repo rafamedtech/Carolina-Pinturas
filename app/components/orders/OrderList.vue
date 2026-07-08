@@ -12,6 +12,7 @@ const props = withDefaults(defineProps<{
 
 const filter = shallowRef('')
 const statusKey = shallowRef('all')
+const paymentStatusKey = shallowRef('all')
 const page = shallowRef(1)
 const pageSize = 25
 const debouncedFilter = refDebounced(filter, 300)
@@ -23,7 +24,7 @@ onMounted(() => {
   isHydrated.value = true
 })
 
-watch([filter, statusKey], () => {
+watch([filter, statusKey, paymentStatusKey], () => {
   page.value = 1
 })
 
@@ -39,6 +40,7 @@ const {
     page_size: pageSize,
     search: debouncedFilter,
     status: computed(() => statusKey.value === 'all' ? undefined : statusKey.value),
+    payment_status: computed(() => paymentStatusKey.value === 'all' ? undefined : paymentStatusKey.value),
     igualacion: props.igualacion ? 'true' : undefined
   },
   default: () => ({
@@ -60,6 +62,20 @@ const errorMessage = computed(() =>
   error.value?.data?.statusMessage || 'No fue posible cargar los pedidos.'
 )
 const loading = computed(() => isHydrated.value && status.value === 'pending')
+
+const IGUALACION_STATUS_KEYS = ['confirmado', 'surtido', 'en_espera']
+const statusTabItems = computed(() => {
+  const list = props.igualacion
+    ? statuses.value.filter(item => IGUALACION_STATUS_KEYS.includes(item.key))
+    : statuses.value
+  return [{
+    label: 'Todos',
+    value: 'all'
+  }, ...list.map(item => ({
+    label: item.label,
+    value: item.key
+  }))]
+})
 </script>
 
 <template>
@@ -88,9 +104,16 @@ const loading = computed(() => isHydrated.value && status.value === 'pending')
       <OrdersOrderListToolbar
         v-model:filter="filter"
         v-model:status="statusKey"
+        v-model:payment-status="paymentStatusKey"
         :statuses="statuses"
         :igualacion="igualacion"
         :can-create="canCreate"
+      />
+
+      <UTabs
+        v-model="statusKey"
+        :items="statusTabItems"
+        class="hidden w-full sm:block"
       />
 
       <UAlert
