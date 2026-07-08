@@ -303,24 +303,21 @@ function onCustomerCreated(customer: SiigoCustomer) {
 }
 
 async function addSelectedProduct(product: SiigoProduct, quantity: number) {
-  let unit = product.unit
+  let unit = siigoProductUnitParts(product)
 
   // The bulk product list omits the full unit name; fetch the single-product
   // detail (source of truth, same one used on save) to resolve it.
-  if (!unit?.name) {
+  if (!unit.name) {
     const detail = await $fetch<SiigoProduct>(`/api/siigo/products/${encodeURIComponent(product.id)}`)
       .catch(() => null)
-    unit = detail?.unit ?? unit
+    unit = detail ? siigoProductUnitParts(detail) : unit
   }
 
   addProduct({
     id: product.id,
     code: product.code || '—',
     name: product.name,
-    unit: {
-      code: unit?.code || null,
-      name: unit?.name || null
-    },
+    unit,
     quantity,
     unitPrice: productPrice(product),
     taxIncluded: product.tax_included ?? false,

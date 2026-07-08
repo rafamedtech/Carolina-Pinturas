@@ -25,7 +25,7 @@ const salePrice = computed(() => {
 const details = computed(() => [
   {
     label: 'Unidad',
-    value: product.value.unit?.name || product.value.unit?.code || '—'
+    value: siigoProductUnit(product.value) || '—'
   },
   { label: 'Tipo', value: product.value.type || '—' },
   { label: 'Marca', value: product.value.additional_fields?.brand || '—' },

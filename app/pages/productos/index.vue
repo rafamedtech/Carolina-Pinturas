@@ -35,6 +35,18 @@ const products = computed(() => {
   return filteredProducts.value.slice(offset, offset + pageSize)
 })
 
+// El listado masivo de Siigo no trae el nombre de la unidad (`unit: {}`);
+// solo el detalle por producto lo incluye. Se resuelve por página visible.
+const unitsById = reactive(new Map<string, string>())
+watch(products, async (rows) => {
+  const pending = rows.filter(row => !unitsById.has(row.id))
+  await Promise.all(pending.map(async (row) => {
+    const detail = await $fetch<SiigoProduct>(`/api/siigo/products/${encodeURIComponent(row.id)}`)
+      .catch(() => null)
+    unitsById.set(row.id, (detail && siigoProductUnit(detail)) || '—')
+  }))
+}, { immediate: true })
+
 function formatProductPrice(product: SiigoProduct) {
   const priceList = product.prices?.find(price => price.price_list?.some(item => item.position === 1)) ?? product.prices?.[0]
   const value = priceList?.price_list?.find(item => item.position === 1)?.value
@@ -61,7 +73,7 @@ const columns: TableColumn<SiigoProduct>[] = [{
 }, {
   id: 'unit',
   header: 'Unidad',
-  cell: ({ row }) => row.original.unit || '—'
+  cell: ({ row }) => unitsById.get(row.original.id) ?? '…'
 }, {
   id: 'brand',
   header: 'Marca',
@@ -71,10 +83,6 @@ const columns: TableColumn<SiigoProduct>[] = [{
   header: 'Tipo',
   cell: ({ row }) => row.getValue('type') || 'Producto'
 }, {
-  accessorKey: 'stock_control',
-  header: 'Inventario',
-  cell: ({ row }) => row.getValue('stock_control') ? 'Controlado' : 'Sin control'
-}, {
   accessorKey: 'available_quantity',
   header: 'Existencia',
   cell: ({ row }) => row.getValue('available_quantity') ?? '—'
@@ -82,10 +90,6 @@ const columns: TableColumn<SiigoProduct>[] = [{
   id: 'price',
   header: 'Precio',
   cell: ({ row }) => formatProductPrice(row.original)
-}, {
-  accessorKey: 'active',
-  header: 'Estado',
-  cell: ({ row }) => row.getValue('active') === false ? 'Inactivo' : 'Activo'
 }]
 
 const message = computed(() => error.value?.data?.statusMessage || 'No fue posible cargar el catálogo.')

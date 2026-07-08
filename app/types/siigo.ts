@@ -18,7 +18,7 @@ export interface SiigoProduct {
   available_quantity?: number
   reference?: string
   description?: string
-  unit?: {
+  unit?: string | {
     code?: string
     name?: string
   }
