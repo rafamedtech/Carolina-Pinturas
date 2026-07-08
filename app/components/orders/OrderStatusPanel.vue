@@ -23,7 +23,7 @@ const historyModalOpen = shallowRef(false)
 <template>
   <UCard>
     <template #header>
-      <h2 class="font-semibold text-highlighted">
+      <h2 class="font-semibold text-primary">
         Seguimiento
       </h2>
     </template>

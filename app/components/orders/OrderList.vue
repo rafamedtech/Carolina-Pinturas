@@ -75,6 +75,8 @@ const loading = computed(() => isHydrated.value && status.value === 'pending')
             icon="i-lucide-refresh-cw"
             color="neutral"
             variant="outline"
+            aria-label="Actualizar"
+            :ui="{ label: 'hidden sm:inline' }"
             :loading="loading"
             @click="refresh()"
           />

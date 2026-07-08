@@ -96,7 +96,7 @@ const columns: TableColumn<DraftOrderLine>[] = [{
     <template #header>
       <div class="flex items-center justify-between gap-3">
         <div>
-          <h2 class="font-semibold text-highlighted">
+          <h2 class="font-semibold text-primary">
             {{ props.quoteMode ? 'Partidas de la cotización' : 'Partidas del pedido' }}
           </h2>
           <p class="mt-1 text-sm text-muted">
@@ -105,7 +105,7 @@ const columns: TableColumn<DraftOrderLine>[] = [{
         </div>
         <p class="text-right text-sm text-muted">
           Total
-          <span class="ms-2 text-base font-semibold text-highlighted">{{ currency.format(total) }}</span>
+          <span class="ms-2 text-base font-semibold text-primary">{{ currency.format(total) }}</span>
         </p>
       </div>
     </template>

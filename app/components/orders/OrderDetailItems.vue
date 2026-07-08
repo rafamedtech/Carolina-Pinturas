@@ -146,7 +146,7 @@ const columns: TableColumn<SalesOrderItem>[] = [{
 <template>
   <UCard class="shrink-0" :ui="{ body: 'p-0 sm:p-0' }">
     <template #header>
-      <h2 class="font-semibold text-highlighted">
+      <h2 class="font-semibold text-primary">
         Partidas
       </h2>
     </template>

@@ -37,6 +37,7 @@ const schema = z.object({
   paymentMethod: z.string(),
   paymentDate: z.string(),
   requiresInvoice: z.boolean(),
+  tags: z.array(z.string()),
   observations: z.string().max(5000)
 }).superRefine((data, ctx) => {
   if (STATUS_KEYS_REQUIRING_REPARTIDOR.includes(data.statusKey) && !data.repartidorId) {
@@ -76,6 +77,7 @@ const state = reactive<Schema>({
   paymentMethod: 'efectivo',
   paymentDate: isQuoteMode.value ? '' : mexicoToday(),
   requiresInvoice: false,
+  tags: [],
   observations: ''
 })
 const saving = shallowRef(false)
@@ -142,6 +144,11 @@ const {
   status: repartidorStatus,
   error: repartidorError
 } = useRepartidoresCatalog()
+const { data: tagOptions } = useFetch<string[]>('/api/orders/tags', {
+  key: 'order-tags',
+  lazy: true,
+  default: () => []
+})
 
 // Mostrador attends walk-in customers, so the order defaults to the in-store
 // "Mostrador" repartidor; they can still pick a real one for home delivery.
@@ -198,6 +205,7 @@ watch(existingOrder, (value) => {
   state.customerId = value.customer.id
   state.statusKey = value.status.key
   state.orderDate = value.orderDate
+  state.tags = value.tags || []
   state.observations = value.observations || ''
   replaceLines(value.items.map((item) => {
     const listedTotal = item.quantity * item.unitPrice
@@ -375,6 +383,7 @@ async function confirmSubmit(statusKey: string) {
             customerId: data.customerId,
             orderDate: data.orderDate,
             observations: data.observations || null,
+            tags: data.tags,
             lines: requestLines,
             version: existingOrder.value.version
           }
@@ -469,10 +478,12 @@ async function confirmSubmit(statusKey: string) {
             v-model:payment-method="state.paymentMethod"
             v-model:payment-date="state.paymentDate"
             v-model:requires-invoice="state.requiresInvoice"
+            v-model:tags="state.tags"
             v-model:observations="state.observations"
             :customers="customers?.results || []"
             :statuses="statuses"
             :repartidores="repartidores"
+            :tag-options="tagOptions"
             :loading="catalogsLoading"
             :disabled="formDisabled"
             :repartidor-required="repartidorRequired"
@@ -549,6 +560,14 @@ async function confirmSubmit(statusKey: string) {
             </div>
             <div>
               <p class="text-sm text-muted">
+                Etiquetas
+              </p>
+              <p class="font-medium">
+                {{ pendingSubmission.tags.join(', ') || '—' }}
+              </p>
+            </div>
+            <div>
+              <p class="text-sm text-muted">
                 Observaciones
               </p>
               <p class="font-medium whitespace-pre-wrap">
@@ -580,10 +599,10 @@ async function confirmSubmit(statusKey: string) {
               </ul>
             </div>
             <div class="flex items-center justify-between border-t border-default pt-4">
-              <p class="font-semibold">
+              <p class="font-semibold text-primary">
                 Total
               </p>
-              <p class="text-lg font-semibold">
+              <p class="text-lg font-semibold text-primary">
                 {{ currency.format(total) }}
               </p>
             </div>

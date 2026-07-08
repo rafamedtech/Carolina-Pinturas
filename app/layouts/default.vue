@@ -104,6 +104,10 @@ const groups = computed(() => [{
           orientation="vertical"
           tooltip
           popover
+          :ui="{
+            link: 'text-base lg:text-sm',
+            linkLeadingIcon: 'size-6 lg:size-5'
+          }"
         />
       </template>
 

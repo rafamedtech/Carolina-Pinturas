@@ -8,6 +8,7 @@ import type {
   UpdateOrderRemisionInput,
   UpdateOrderPaymentInput,
   UpdateOrderRepartidorInput,
+  UpdateOrderTagsInput,
   UpdateOrderStatusInput,
   UpdateOrderItemPriceInput
 } from './order-validation'
@@ -328,6 +329,7 @@ function detail(order: OrderDetailRecord): SalesOrderDetail {
     observations: order.observations,
     remision: order.remision,
     requiresInvoice: order.requiresInvoice,
+    tags: order.tags,
     paymentStatus: order.paymentStatus,
     paymentMethod: order.paymentMethod,
     paymentDate: dateOnly(order.paymentDate),
@@ -466,6 +468,7 @@ export async function createOrder(
         observations: input.observations || null,
         remision: input.remision || null,
         requiresInvoice: input.requiresInvoice,
+        tags: input.tags,
         paymentStatus: input.paymentStatus,
         paymentMethod: input.paymentMethod ?? null,
         paymentDate: input.paymentDate ? new Date(`${input.paymentDate}T00:00:00.000Z`) : null,
@@ -576,6 +579,7 @@ export async function updateQuote(
         customerPayload: siigoJson(customer),
         orderDate: new Date(`${input.orderDate}T00:00:00.000Z`),
         observations: input.observations || null,
+        tags: input.tags,
         currencyCode: lines[0]?.currencyCode || 'MXN',
         subtotal: subtotal.toString(),
         discountTotal: discountTotal.toString(),
@@ -931,6 +935,56 @@ export async function updateOrderRepartidor(
       repartidorId: repartidor.id,
       repartidorNombreSnapshot: repartidor.nombre,
       repartidorTelefonoSnapshot: repartidor.telefono,
+      updatedByEmail: user.email,
+      version: { increment: 1 }
+    }
+  })
+  if (result.count !== 1) {
+    throw createError({
+      statusCode: 409,
+      statusMessage: 'El pedido cambió mientras se actualizaba. Intenta de nuevo.'
+    })
+  }
+
+  return getOrder(id, user)
+}
+
+export async function updateOrderTags(
+  id: string,
+  input: UpdateOrderTagsInput,
+  user: AppUser
+) {
+  const prisma = usePrisma()
+
+  if (!canManageOrderLogistics(user.role)) {
+    throw createError({
+      statusCode: 403,
+      statusMessage: 'No tienes permiso para modificar las etiquetas.'
+    })
+  }
+
+  const order = await prisma.salesOrder.findFirst({
+    where: {
+      id,
+      AND: [orderVisibilityFilter(user)]
+    },
+    select: { version: true }
+  })
+
+  if (!order) {
+    throw createError({ statusCode: 404, statusMessage: 'No se encontró el pedido.' })
+  }
+  if (order.version !== input.version) {
+    throw createError({
+      statusCode: 409,
+      statusMessage: 'El pedido cambió desde que lo abriste. Actualiza la página e intenta de nuevo.'
+    })
+  }
+
+  const result = await prisma.salesOrder.updateMany({
+    where: { id, version: input.version },
+    data: {
+      tags: input.tags,
       updatedByEmail: user.email,
       version: { increment: 1 }
     }

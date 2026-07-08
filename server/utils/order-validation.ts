@@ -16,6 +16,7 @@ const orderFieldsSchema = z.object({
   observations: z.string().trim().max(5000).nullable().optional(),
   remision: z.string().trim().max(100).nullable().optional(),
   requiresInvoice: z.boolean().default(false),
+  tags: z.array(z.string().trim().min(1).max(50)).max(20).default([]),
   paymentStatus: z.enum(PAYMENT_STATUS_KEYS as [string, ...string[]]).default('pendiente_pago'),
   paymentMethod: z.enum(PAYMENT_METHOD_KEYS as [string, ...string[]]).nullable().optional(),
   paymentDate: dateSchema.nullable().optional(),
@@ -40,6 +41,7 @@ export const updateQuoteSchema = orderFieldsSchema.pick({
   customerId: true,
   orderDate: true,
   observations: true,
+  tags: true,
   lines: true
 }).extend({
   version: z.number().int().positive()
@@ -67,6 +69,11 @@ export const updateOrderRepartidorSchema = z.object({
   version: z.number().int().positive()
 })
 
+export const updateOrderTagsSchema = z.object({
+  tags: z.array(z.string().trim().min(1).max(50)).max(20),
+  version: z.number().int().positive()
+})
+
 export const updateOrderItemPriceSchema = z.object({
   unitPrice: z.number().positive('El precio debe ser mayor a cero.').max(100_000_000),
   note: z.string().trim().max(1000).nullable().optional(),
@@ -87,5 +94,6 @@ export type UpdateOrderStatusInput = z.output<typeof updateOrderStatusSchema>
 export type UpdateOrderRemisionInput = z.output<typeof updateOrderRemisionSchema>
 export type UpdateOrderPaymentInput = z.output<typeof updateOrderPaymentSchema>
 export type UpdateOrderRepartidorInput = z.output<typeof updateOrderRepartidorSchema>
+export type UpdateOrderTagsInput = z.output<typeof updateOrderTagsSchema>
 export type UpdateOrderItemPriceInput = z.output<typeof updateOrderItemPriceSchema>
 export type TicketPrintInput = z.output<typeof ticketPrintSchema>

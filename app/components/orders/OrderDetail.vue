@@ -25,6 +25,8 @@ const savingRepartidor = shallowRef(false)
 const selectedPaymentStatus = shallowRef('')
 const selectedPaymentMethod = shallowRef('')
 const savingPayment = shallowRef(false)
+const selectedTags = shallowRef<string[]>([])
+const savingTags = shallowRef(false)
 const toast = useToast()
 const { user } = useAuth()
 const {
@@ -42,6 +44,11 @@ const { data: statuses } = useFetch<OrderStatus[]>('/api/orders/statuses', {
   default: () => []
 })
 const { data: repartidores } = useRepartidoresCatalog()
+const { data: tagOptions } = useFetch<string[]>('/api/orders/tags', {
+  key: 'order-tags',
+  lazy: true,
+  default: () => []
+})
 
 watch(() => order.value?.status.key, (value) => {
   selectedStatus.value = value || ''
@@ -59,12 +66,25 @@ watch(() => order.value?.paymentMethod, (value) => {
   selectedPaymentMethod.value = value || ''
 }, { immediate: true })
 
+watch(() => order.value?.tags, (value) => {
+  selectedTags.value = value || []
+}, { immediate: true })
+
 const repartidorUnchanged = computed(() => selectedRepartidor.value === (order.value?.repartidor?.id || ''))
 const statusUnchanged = computed(() => selectedStatus.value === (order.value?.status.key || ''))
 const paymentUnchanged = computed(() =>
   selectedPaymentStatus.value === (order.value?.paymentStatus || '')
   && selectedPaymentMethod.value === (order.value?.paymentMethod || '')
 )
+const tagsUnchanged = computed(() =>
+  selectedTags.value.join('|') === (order.value?.tags || []).join('|'))
+const tagItems = computed(() => [...new Set([...(tagOptions.value || []), ...selectedTags.value])])
+
+function onCreateTag(value: string) {
+  const tag = value.trim()
+  if (!tag || selectedTags.value.includes(tag)) return
+  selectedTags.value = [...selectedTags.value, tag]
+}
 
 // A borrador order is a quotation document; once it advances to ingresado /
 // confirmado (or later) it becomes a regular order with delivery logistics.
@@ -119,11 +139,12 @@ const backPath = computed(() =>
   user.value?.role === 'igualaciones' ? '/igualaciones' : '/ventas'
 )
 const savingChanges = computed(() =>
-  savingRepartidor.value || savingPayment.value || savingStatus.value
+  savingRepartidor.value || savingPayment.value || savingStatus.value || savingTags.value
 )
 const hasChanges = computed(() =>
   (mayManageLogistics.value && !repartidorUnchanged.value)
   || (mayManagePayment.value && !paymentUnchanged.value)
+  || (mayManageLogistics.value && !tagsUnchanged.value)
   || !statusUnchanged.value
 )
 
@@ -233,6 +254,40 @@ async function updatePayment() {
   }
 }
 
+async function updateTags() {
+  if (!mayManageLogistics.value || !order.value || tagsUnchanged.value) return
+  savingTags.value = true
+
+  try {
+    order.value = await $fetch<SalesOrderDetail>(
+      `/api/orders/${encodeURIComponent(props.orderId)}/tags`,
+      {
+        method: 'PATCH',
+        body: {
+          tags: selectedTags.value,
+          version: order.value.version
+        }
+      }
+    )
+    toast.add({
+      title: 'Etiquetas actualizadas',
+      color: 'success',
+      icon: 'i-lucide-circle-check'
+    })
+  } catch (fetchError: unknown) {
+    const response = fetchError as { data?: { statusMessage?: string }, message?: string }
+    toast.add({
+      title: 'No se pudieron actualizar las etiquetas',
+      description: response.data?.statusMessage || response.message || 'Intenta de nuevo.',
+      color: 'error',
+      icon: 'i-lucide-circle-alert'
+    })
+    await refresh()
+  } finally {
+    savingTags.value = false
+  }
+}
+
 async function updateStatus() {
   if (!order.value || selectedStatus.value === order.value.status.key) return
   savingStatus.value = true
@@ -275,6 +330,7 @@ async function saveChanges() {
 
   await updateRepartidor()
   await updatePayment()
+  await updateTags()
   await updateStatus()
 }
 
@@ -433,9 +489,17 @@ async function convertToPedido() {
         >
           <UCard class="[grid-area:cliente]">
             <template #header>
-              <h2 class="font-semibold text-highlighted">
-                {{ isQuote ? 'Cliente' : 'Cliente y entrega' }}
-              </h2>
+              <div class="flex items-center justify-between gap-2">
+                <h2 class="font-semibold text-primary">
+                  {{ isQuote ? 'Cliente' : 'Cliente y entrega' }}
+                </h2>
+                <UBadge
+                  v-if="!isQuote"
+                  :color="order.requiresInvoice ? 'success' : 'neutral'"
+                  variant="subtle"
+                  :label="order.requiresInvoice ? 'Requiere factura' : 'No requiere factura'"
+                />
+              </div>
             </template>
             <dl class="grid gap-4 sm:grid-cols-2">
               <div>
@@ -496,21 +560,10 @@ async function convertToPedido() {
               </div>
               <div v-if="!isQuote">
                 <dt class="text-sm text-muted">
-                  Repartidor
+                  Fecha de pago
                 </dt>
-                <dd class="mt-1">
-                  <USelect
-                    v-if="mayManageLogistics"
-                    v-model="selectedRepartidor"
-                    :items="repartidorOptions"
-                    value-key="value"
-                    :disabled="savingRepartidor"
-                    placeholder="Selecciona un repartidor"
-                    class="w-full max-w-xs"
-                  />
-                  <span v-else class="font-medium">
-                    {{ order.repartidor?.name || 'Sin asignar' }}
-                  </span>
+                <dd class="mt-1 font-medium">
+                  {{ formatDate(order.paymentDate) }}
                 </dd>
               </div>
               <div v-if="!isQuote">
@@ -556,14 +609,69 @@ async function convertToPedido() {
               </div>
               <div v-if="!isQuote">
                 <dt class="text-sm text-muted">
-                  Requiere factura
+                  Repartidor
                 </dt>
                 <dd class="mt-1">
-                  <UBadge
-                    :color="order.requiresInvoice ? 'success' : 'neutral'"
-                    variant="subtle"
-                    :label="order.requiresInvoice ? 'Sí' : 'No'"
+                  <USelect
+                    v-if="mayManageLogistics"
+                    v-model="selectedRepartidor"
+                    :items="repartidorOptions"
+                    value-key="value"
+                    :disabled="savingRepartidor"
+                    placeholder="Selecciona un repartidor"
+                    class="w-full max-w-xs"
                   />
+                  <span v-else class="font-medium">
+                    {{ order.repartidor?.name || 'Sin asignar' }}
+                  </span>
+                </dd>
+              </div>
+              <div v-if="!isQuote">
+                <dt class="text-sm text-muted">
+                  Etiquetas
+                </dt>
+                <dd class="mt-1">
+                  <USelectMenu
+                    v-if="mayManageLogistics"
+                    v-model="selectedTags"
+                    :items="tagItems"
+                    multiple
+                    :disabled="savingTags"
+                    :create-item="{ when: 'always', position: 'bottom' }"
+                    placeholder="Agregar etiquetas"
+                    class="w-full max-w-xs"
+                    @create="onCreateTag"
+                  >
+                    <template #default="{ modelValue }">
+                      <span v-if="Array.isArray(modelValue) && modelValue.length" class="flex h-6 items-center gap-2 overflow-hidden">
+                        <UBadge
+                          v-for="tag in modelValue"
+                          :key="tag"
+                          class="shrink-0"
+                          color="neutral"
+                          variant="subtle"
+                          size="md"
+                          :label="tag"
+                        />
+                      </span>
+                      <span v-else class="truncate text-dimmed">Agregar etiquetas</span>
+                    </template>
+                    <template #create-item-label="{ item }">
+                      Crear etiqueta “{{ item }}”
+                    </template>
+                  </USelectMenu>
+                  <template v-else>
+                    <div v-if="order.tags.length" class="flex flex-wrap gap-1.5">
+                      <UBadge
+                        v-for="tag in order.tags"
+                        :key="tag"
+                        color="neutral"
+                        variant="subtle"
+                        :label="tag"
+                      />
+                    </div>
+                    <span v-else class="font-medium">Sin etiquetas</span>
+                  </template>
                 </dd>
               </div>
             </dl>
@@ -602,7 +710,7 @@ async function convertToPedido() {
           <div class="[grid-area:totales] grid gap-4 lg:grid-cols-2">
             <UCard class="lg:col-start-2">
               <template #header>
-                <h2 class="font-semibold text-highlighted">
+                <h2 class="font-semibold text-primary">
                   Totales
                 </h2>
               </template>
@@ -624,10 +732,10 @@ async function convertToPedido() {
                   </dd>
                 </div>
                 <div class="flex justify-between gap-4 border-t border-default pt-3">
-                  <dt class="font-semibold">
+                  <dt class="font-semibold text-primary">
                     Total
                   </dt>
-                  <dd class="font-semibold">
+                  <dd class="font-semibold text-primary">
                     {{ formatCurrency(order.total) }}
                   </dd>
                 </div>

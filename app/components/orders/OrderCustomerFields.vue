@@ -10,6 +10,7 @@ const props = withDefaults(defineProps<{
   customers: SiigoCustomer[]
   statuses: OrderStatus[]
   repartidores: Repartidor[]
+  tagOptions: string[]
   loading: boolean
   disabled: boolean
   repartidorRequired?: boolean
@@ -37,6 +38,7 @@ const paymentStatus = defineModel<string>('paymentStatus', { required: true })
 const paymentMethod = defineModel<string>('paymentMethod', { required: true })
 const paymentDate = defineModel<string>('paymentDate', { required: true })
 const requiresInvoice = defineModel<boolean>('requiresInvoice', { required: true })
+const tags = defineModel<string[]>('tags', { required: true })
 
 const orderDateValue = computed<DateValue | undefined>({
   get: () => orderDate.value ? parseDate(orderDate.value) : undefined,
@@ -83,6 +85,14 @@ const paymentMethodOptions = PAYMENT_METHODS.map(method => ({
   value: method.key as string
 }))
 
+const tagItems = computed(() => [...new Set([...props.tagOptions, ...tags.value])])
+
+function onCreateTag(value: string) {
+  const tag = value.trim()
+  if (!tag || tags.value.includes(tag)) return
+  tags.value = [...tags.value, tag]
+}
+
 const selectedCustomer = computed(() =>
   props.customers.find(customer => customer.id === customerId.value))
 const selectedCustomerPhone = computed(() => siigoCustomerPhone(selectedCustomer.value))
@@ -105,7 +115,7 @@ function onCustomerCreated(customer: SiigoCustomer) {
 <template>
   <UCard>
     <template #header>
-      <h2 class="font-semibold text-highlighted">
+      <h2 class="font-semibold text-primary">
         {{ props.quoteMode ? 'Datos de la cotización' : 'Información general' }}
       </h2>
     </template>
@@ -175,30 +185,13 @@ function onCustomerCreated(customer: SiigoCustomer) {
         name="statusKey"
         label="Estado inicial"
         required
+        class="sm:col-span-2"
       >
         <USelect
           v-model="statusKey"
           :items="statusOptions"
           value-key="value"
           :disabled="disabled"
-          class="w-full"
-        />
-      </UFormField>
-
-      <UFormField
-        v-if="!props.quoteMode"
-        name="repartidorId"
-        label="Repartidor"
-        :required="props.repartidorRequired"
-        class="sm:col-span-2"
-      >
-        <USelect
-          v-model="repartidorId"
-          :items="repartidorOptions"
-          value-key="value"
-          :loading="loading"
-          :disabled="disabled"
-          placeholder="Selecciona un repartidor"
           class="w-full"
         />
       </UFormField>
@@ -213,6 +206,35 @@ function onCustomerCreated(customer: SiigoCustomer) {
           v-model="orderDateValue"
           :disabled="disabled"
           placeholder="Seleccionar fecha del pedido"
+        />
+      </UFormField>
+
+      <UFormField
+        v-if="!props.quoteMode"
+        name="repartidorId"
+        label="Repartidor"
+        :required="props.repartidorRequired"
+      >
+        <USelect
+          v-model="repartidorId"
+          :items="repartidorOptions"
+          value-key="value"
+          :loading="loading"
+          :disabled="disabled"
+          placeholder="Selecciona un repartidor"
+          class="w-full"
+        />
+      </UFormField>
+
+      <UFormField
+        v-if="!props.quoteMode && props.showPayment"
+        name="paymentDate"
+        label="Fecha de pago"
+      >
+        <OrdersOrderDatePicker
+          v-model="paymentDateValue"
+          :disabled="disabled"
+          placeholder="Seleccionar fecha de pago"
         />
       </UFormField>
 
@@ -254,20 +276,41 @@ function onCustomerCreated(customer: SiigoCustomer) {
         />
       </UFormField>
 
-      <UFormField
-        v-if="!props.quoteMode && props.showPayment"
-        name="paymentDate"
-        label="Fecha de pago"
-      >
-        <OrdersOrderDatePicker
-          v-model="paymentDateValue"
-          :disabled="disabled"
-          placeholder="Seleccionar fecha de pago"
-        />
-      </UFormField>
-
       <UFormField v-if="!props.quoteMode" name="requiresInvoice" label="Facturación">
         <USwitch v-model="requiresInvoice" :disabled="disabled" label="Requiere factura" />
+      </UFormField>
+
+      <UFormField name="tags" label="Etiquetas">
+        <!-- Mismo caveat de create-item que el selector de cliente: `position`
+          explícito o el ítem de creación no se renderiza. -->
+        <USelectMenu
+          v-model="tags"
+          :items="tagItems"
+          multiple
+          :disabled="disabled"
+          :create-item="{ when: 'always', position: 'bottom' }"
+          placeholder="Agregar etiquetas"
+          class="w-full"
+          @create="onCreateTag"
+        >
+          <template #default="{ modelValue }">
+            <span v-if="Array.isArray(modelValue) && modelValue.length" class="flex h-6 items-center gap-2 overflow-hidden">
+              <UBadge
+                v-for="tag in modelValue"
+                :key="tag"
+                class="shrink-0"
+                color="neutral"
+                variant="subtle"
+                size="md"
+                :label="tag"
+              />
+            </span>
+            <span v-else class="truncate text-dimmed">Agregar etiquetas</span>
+          </template>
+          <template #create-item-label="{ item }">
+            Crear etiqueta “{{ item }}”
+          </template>
+        </USelectMenu>
       </UFormField>
 
       <UFormField name="observations" label="Observaciones" class="sm:col-span-2">

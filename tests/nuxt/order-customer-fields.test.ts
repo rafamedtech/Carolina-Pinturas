@@ -32,6 +32,7 @@ async function mountFields() {
       customers: [existingCustomer],
       statuses: [],
       repartidores: [],
+      tagOptions: [],
       loading: false,
       disabled: false,
       customerId: '',
@@ -43,6 +44,7 @@ async function mountFields() {
       paymentMethod: '',
       paymentDate: '',
       requiresInvoice: false,
+      tags: [],
       observations: ''
     }
   })

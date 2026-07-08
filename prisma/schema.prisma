@@ -223,6 +223,7 @@ model SalesOrder {
   observations               String?
   remision                   String?
   requiresInvoice            Boolean   @default(false) @map("requires_invoice")
+  tags                       String[]  @default([])
   currencyCode               String    @default("MXN") @map("currency_code") @db.VarChar(3)
   paymentStatus              String    @default("pendiente_pago") @map("payment_status") @db.VarChar(32)
   paymentMethod              String?   @map("payment_method") @db.VarChar(32)

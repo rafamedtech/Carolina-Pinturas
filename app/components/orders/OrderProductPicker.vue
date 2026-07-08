@@ -58,7 +58,7 @@ function addProduct() {
 <template>
   <UCard>
     <template #header>
-      <h2 class="font-semibold text-highlighted">
+      <h2 class="font-semibold text-primary">
         Agregar producto
       </h2>
     </template>
