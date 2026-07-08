@@ -1,9 +1,16 @@
 <script setup lang="ts">
 import type { SalesOrderListItem } from '~/types/orders'
 
-defineProps<{
+withDefaults(defineProps<{
   orders: readonly SalesOrderListItem[]
   loading: boolean
+  igualacion?: boolean
+}>(), {
+  igualacion: false
+})
+
+const emit = defineEmits<{
+  open: [order: SalesOrderListItem]
 }>()
 
 const currency = new Intl.NumberFormat('es-MX', {
@@ -14,6 +21,10 @@ const currency = new Intl.NumberFormat('es-MX', {
 function formatDate(value: string | null) {
   if (!value) return '—'
   return value.split('-').reverse().join('/')
+}
+
+function igualacionItems(order: SalesOrderListItem) {
+  return (order.partidas ?? []).filter(item => item.isIgualacion)
 }
 </script>
 
@@ -50,12 +61,23 @@ function formatDate(value: string | null) {
               Pedido
             </p>
             <NuxtLink
+              v-if="!igualacion"
               :to="`/ventas/${encodeURIComponent(order.id)}`"
               class="text-lg font-semibold text-primary hover:underline"
               :aria-label="`Abrir pedido ${order.number}`"
             >
               {{ order.number }}
             </NuxtLink>
+            <UButton
+              v-else
+              variant="link"
+              color="primary"
+              class="p-0 text-lg font-semibold"
+              :aria-label="`Ver pedido ${order.number}`"
+              @click="emit('open', order)"
+            >
+              {{ order.number }}
+            </UButton>
           </div>
           <OrdersOrderStatusBadge :status="order.status" />
         </div>
@@ -77,7 +99,7 @@ function formatDate(value: string | null) {
               {{ formatDate(order.orderDate) }}
             </dd>
           </div>
-          <div>
+          <div v-if="!igualacion">
             <dt class="text-muted">
               Partidas
             </dt>
@@ -85,7 +107,7 @@ function formatDate(value: string | null) {
               {{ order.itemCount }}
             </dd>
           </div>
-          <div class="col-span-2 flex items-end justify-between gap-4 border-t border-default pt-3">
+          <div v-if="!igualacion" class="col-span-2 flex items-end justify-between gap-4 border-t border-default pt-3">
             <dt class="text-muted">
               Total
             </dt>
@@ -93,15 +115,42 @@ function formatDate(value: string | null) {
               {{ currency.format(order.total) }}
             </dd>
           </div>
+          <div v-else class="col-span-2 flex flex-col gap-1 border-t border-default pt-3">
+            <dt class="text-muted">
+              Igualaciones
+            </dt>
+            <dd v-if="!igualacionItems(order).length" class="text-lg font-semibold text-highlighted">
+              —
+            </dd>
+            <dd
+              v-for="(item, index) in igualacionItems(order)"
+              v-else
+              :key="index"
+              class="flex flex-col text-lg font-semibold text-highlighted"
+            >
+              <span>{{ item.quantity }} x {{ item.code }}</span>
+              <span v-if="item.observations" class="text-sm font-normal text-muted">{{ item.observations }}</span>
+            </dd>
+          </div>
         </dl>
 
         <UButton
+          v-if="!igualacion"
           :to="`/ventas/${encodeURIComponent(order.id)}`"
           label="Ver pedido"
           icon="i-lucide-arrow-right"
           trailing
           block
           variant="soft"
+        />
+        <UButton
+          v-else
+          label="Ver pedido"
+          icon="i-lucide-arrow-right"
+          trailing
+          block
+          variant="soft"
+          @click="emit('open', order)"
         />
       </UCard>
     </template>

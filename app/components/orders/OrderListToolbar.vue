@@ -55,6 +55,7 @@ const paymentStatusOptions = [{
         class="w-full sm:hidden"
       />
       <USelect
+        v-if="!igualacion"
         v-model="paymentStatus"
         :items="paymentStatusOptions"
         value-key="value"

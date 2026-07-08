@@ -113,15 +113,16 @@ const columns = computed<TableColumn<SalesOrderListItem>[]>(() => [numberColumn,
 
 <template>
   <OrderListCards
-    v-if="!igualacion"
     :orders="orders"
     :loading="loading"
+    :igualacion="igualacion"
+    @open="openOrder"
   />
 
   <AppTableSkeleton
     v-if="loading"
     :cols="columns.length"
-    :class="igualacion ? 'shrink-0' : 'hidden shrink-0 md:block'"
+    class="hidden shrink-0 md:block"
   />
 
   <UTable
@@ -129,7 +130,7 @@ const columns = computed<TableColumn<SalesOrderListItem>[]>(() => [numberColumn,
     :data="tableOrders"
     :columns="columns"
     empty="No hay pedidos para mostrar."
-    :class="igualacion ? 'shrink-0' : 'hidden shrink-0 md:block'"
+    class="hidden shrink-0 md:block"
     :ui="{
       base: 'table-fixed border-separate border-spacing-0',
       thead: '[&>tr]:bg-elevated/50 [&>tr]:after:content-none',
