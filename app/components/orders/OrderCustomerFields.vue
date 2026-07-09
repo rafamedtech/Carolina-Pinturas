@@ -101,6 +101,16 @@ const selectedCustomerAddress = computed(() => siigoCustomerAddress(selectedCust
 const createCustomerOpen = shallowRef(false)
 const createCustomerName = shallowRef('')
 
+// Los nombres de cliente se capturan siempre en mayúsculas (consistencia con
+// el catálogo de Siigo); se normaliza lo tecleado en la búsqueda para que el
+// alta rápida ("Crear cliente …") herede el valor ya en mayúsculas.
+const customerSearchTerm = shallowRef('')
+
+watch(customerSearchTerm, (value) => {
+  const upper = value.toUpperCase()
+  if (upper !== value) customerSearchTerm.value = upper
+})
+
 function openCreateCustomer(searchTerm: string) {
   createCustomerName.value = searchTerm.trim()
   createCustomerOpen.value = true
@@ -136,6 +146,7 @@ function onCustomerCreated(customer: SiigoCustomer) {
         -->
         <USelectMenu
           v-model="customerId"
+          v-model:search-term="customerSearchTerm"
           :items="customerOptions"
           value-key="value"
           :loading="loading"

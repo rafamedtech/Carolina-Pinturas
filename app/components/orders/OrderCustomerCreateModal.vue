@@ -247,8 +247,8 @@ async function onSubmit(event: FormSubmitEvent<Schema>) {
       body: {
         personType: data.personType,
         name: data.personType === 'Physical'
-          ? [data.nombres, data.apellidos]
-          : [data.razonSocial],
+          ? [data.nombres.toUpperCase(), data.apellidos.toUpperCase()]
+          : [data.razonSocial.toUpperCase()],
         rfcId: data.rfcId.toUpperCase(),
         fiscalRegime: data.fiscalRegime || undefined,
         email: data.email || genericEmailFor(data.rfcId),
@@ -319,7 +319,7 @@ async function onSubmit(event: FormSubmitEvent<Schema>) {
               v-model="state.nombres"
               :disabled="saving"
               maxlength="100"
-              class="w-full"
+              class="w-full uppercase"
             />
           </UFormField>
           <UFormField label="Apellidos" name="apellidos" required>
@@ -327,7 +327,7 @@ async function onSubmit(event: FormSubmitEvent<Schema>) {
               v-model="state.apellidos"
               :disabled="saving"
               maxlength="100"
-              class="w-full"
+              class="w-full uppercase"
             />
           </UFormField>
         </div>
@@ -341,7 +341,7 @@ async function onSubmit(event: FormSubmitEvent<Schema>) {
             v-model="state.razonSocial"
             :disabled="saving"
             maxlength="100"
-            class="w-full"
+            class="w-full uppercase"
           />
         </UFormField>
 
