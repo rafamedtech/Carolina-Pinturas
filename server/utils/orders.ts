@@ -139,25 +139,56 @@ function productPrice(product: SiigoProduct) {
   }
 }
 
+function discountOf(base: Decimal, discountType: string, discountValue: Decimal.Value) {
+  return discountType === 'monto'
+    ? money(Decimal.min(money(discountValue), base))
+    : money(base.mul(discountValue).div(100))
+}
+
+// El descuento de la partida se aplica sobre la base sin impuestos; el
+// impuesto se calcula sobre la base ya descontada. `subtotal` conserva la
+// base bruta, de modo que total = subtotal - descuento + impuestos.
 function lineAmounts(
   quantity: Decimal,
   unitPrice: Decimal,
   taxPercentage: Decimal,
-  taxIncluded: boolean
+  taxIncluded: boolean,
+  discountType = 'porcentaje',
+  discountValue: Decimal.Value = 0
 ) {
   const listedTotal = money(quantity.mul(unitPrice))
   const divisor = money(1).plus(taxPercentage.div(100))
   const subtotal = taxIncluded && taxPercentage.gt(0)
     ? money(listedTotal.div(divisor))
     : listedTotal
-  const taxAmount = taxIncluded
-    ? money(listedTotal.minus(subtotal))
-    : money(subtotal.mul(taxPercentage).div(100))
-  const total = taxIncluded
-    ? listedTotal
-    : money(subtotal.plus(taxAmount))
+  const discountAmount = discountOf(subtotal, discountType, discountValue)
+  const taxableBase = money(subtotal.minus(discountAmount))
+  const taxAmount = money(taxableBase.mul(taxPercentage).div(100))
+  const total = money(taxableBase.plus(taxAmount))
 
-  return { subtotal, taxAmount, total }
+  return { subtotal, discountAmount, taxAmount, total }
+}
+
+// El descuento del pedido se aplica sobre la suma de partidas ya con
+// impuestos; discount_total acumula descuentos de partidas + del pedido.
+function orderTotals(
+  lines: { subtotal: Decimal.Value, discountAmount: Decimal.Value, taxAmount: Decimal.Value, total: Decimal.Value }[],
+  discountType: string,
+  discountValue: Decimal.Value
+) {
+  const subtotal = lines.reduce((sum, line) => sum.plus(line.subtotal), money(0))
+  const lineDiscounts = lines.reduce((sum, line) => sum.plus(line.discountAmount), money(0))
+  const taxTotal = lines.reduce((sum, line) => sum.plus(line.taxAmount), money(0))
+  const linesTotal = lines.reduce((sum, line) => sum.plus(line.total), money(0))
+  const discountAmount = discountOf(linesTotal, discountType, discountValue)
+
+  return {
+    subtotal,
+    taxTotal,
+    discountAmount,
+    discountTotal: money(lineDiscounts.plus(discountAmount)),
+    total: money(linesTotal.minus(discountAmount))
+  }
 }
 
 function taxPercentageFromPayload(taxPayload: Prisma.JsonValue): Decimal {
@@ -171,19 +202,31 @@ function taxPercentageFromPayload(taxPayload: Prisma.JsonValue): Decimal {
 
 function buildLine(
   product: SiigoProduct,
-  quantityValue: number,
-  position: number,
-  observations?: string | null
+  line: {
+    quantity: number
+    unitPrice?: number | null
+    priceNote?: string | null
+    observations?: string | null
+    discountType: string
+    discountValue: number
+  },
+  position: number
 ) {
-  const quantity = money(quantityValue)
+  const quantity = money(line.quantity)
   const selectedPrice = productPrice(product)
+  // El precio editado en el editor sustituye al de lista de Siigo; el cambio
+  // queda auditado en sales_order_item_price_history al guardar.
+  const unitPrice = line.unitPrice != null ? money(line.unitPrice) : selectedPrice.value
+  const priceOverridden = !unitPrice.equals(selectedPrice.value)
   const percentage = money((product.taxes || []).reduce((sum, tax) =>
     sum + (Number(tax.percentage) || 0), 0))
-  const { subtotal, taxAmount, total } = lineAmounts(
+  const { subtotal, discountAmount, taxAmount, total } = lineAmounts(
     quantity,
-    selectedPrice.value,
+    unitPrice,
     percentage,
-    product.tax_included ?? false
+    product.tax_included ?? false,
+    line.discountType,
+    line.discountValue
   )
   const unit = product.unit && typeof product.unit === 'object' ? product.unit : undefined
 
@@ -198,17 +241,69 @@ function buildLine(
     unitNameSnapshot: unit?.name || null,
     productPayload: siigoJson(product),
     quantity: quantity.toString(),
-    unitPrice: selectedPrice.value.toString(),
+    unitPrice: unitPrice.toString(),
     taxIncluded: product.tax_included ?? false,
-    discountPercentage: '0',
-    discountAmount: '0',
+    discountType: line.discountType,
+    discountValue: money(line.discountValue).toString(),
+    discountPercentage: line.discountType === 'porcentaje' ? money(line.discountValue).toString() : '0',
+    discountAmount: discountAmount.toString(),
     taxPayload: siigoJson(product.taxes || []),
     subtotal: subtotal.toString(),
     taxAmount: taxAmount.toString(),
     total: total.toString(),
-    observations: observations || null,
-    currencyCode: selectedPrice.currencyCode
+    observations: line.observations || null,
+    currencyCode: selectedPrice.currencyCode,
+    catalogPrice: selectedPrice.value.toString(),
+    priceNote: line.priceNote || null,
+    priceOverridden
   }
+}
+
+type BuiltLine = ReturnType<typeof buildLine>
+
+function assertLinePricePermission(lines: BuiltLine[], user: AppUser) {
+  if (lines.some(line => line.priceOverridden) && !canManageOrderLogistics(user.role)) {
+    throw createError({
+      statusCode: 403,
+      statusMessage: 'No tienes permiso para modificar el precio de las partidas.'
+    })
+  }
+}
+
+// createMany no devuelve ids: se recuperan por posición para ligar el
+// historial de precio de las partidas con precio editado.
+async function createLinePriceHistory(
+  tx: Prisma.TransactionClient,
+  orderId: string,
+  lines: BuiltLine[],
+  user: AppUser
+) {
+  const overriddenLines = lines.filter(line => line.priceOverridden)
+  if (!overriddenLines.length) return
+
+  const createdItems = await tx.salesOrderItem.findMany({
+    where: { orderId },
+    select: { id: true, position: true }
+  })
+  const itemIdByPosition = new Map(createdItems.map(item => [item.position, item.id]))
+
+  await tx.salesOrderItemPriceHistory.createMany({
+    data: overriddenLines.flatMap((line) => {
+      const orderItemId = itemIdByPosition.get(line.position)
+      if (!orderItemId) return []
+
+      return [{
+        orderItemId,
+        orderId,
+        previousPrice: line.catalogPrice,
+        newPrice: line.unitPrice,
+        note: line.priceNote,
+        changedByName: user.name,
+        changedByEmail: user.email,
+        changedByRole: user.role
+      }]
+    })
+  })
 }
 
 const IGUALACION_MATCH = 'igualacion de color'
@@ -335,6 +430,9 @@ function detail(order: OrderDetailRecord): SalesOrderDetail {
     paymentDate: dateOnly(order.paymentDate),
     currencyCode: order.currencyCode,
     subtotal: number(order.subtotal),
+    discountType: order.discountType === 'monto' ? 'monto' : 'porcentaje',
+    discountValue: number(order.discountValue),
+    discountAmount: number(order.discountAmount),
     discountTotal: number(order.discountTotal),
     taxTotal: number(order.taxTotal),
     taxBreakdown: orderTaxBreakdown(order),
@@ -371,6 +469,8 @@ function detail(order: OrderDetailRecord): SalesOrderDetail {
       },
       quantity: number(item.quantity),
       unitPrice: number(item.unitPrice),
+      discountType: item.discountType === 'monto' ? 'monto' : 'porcentaje',
+      discountValue: number(item.discountValue),
       discountPercentage: number(item.discountPercentage),
       discountAmount: number(item.discountAmount),
       subtotal: number(item.subtotal),
@@ -426,7 +526,7 @@ export async function createOrder(
         statusMessage: `El producto ${line.productId} ya no está disponible en Siigo.`
       })
     }
-    return buildLine(product, line.quantity, index + 1, line.observations)
+    return buildLine(product, line, index + 1)
   })
   const currencyCodes = new Set(lines.map(line => line.currencyCode))
   if (currencyCodes.size > 1) {
@@ -435,10 +535,8 @@ export async function createOrder(
       statusMessage: 'Todos los productos del pedido deben usar la misma moneda.'
     })
   }
-  const subtotal = lines.reduce((sum, line) => sum.plus(line.subtotal), money(0))
-  const discountTotal = lines.reduce((sum, line) => sum.plus(line.discountAmount), money(0))
-  const taxTotal = lines.reduce((sum, line) => sum.plus(line.taxAmount), money(0))
-  const total = lines.reduce((sum, line) => sum.plus(line.total), money(0))
+  assertLinePricePermission(lines, user)
+  const totals = orderTotals(lines, input.discountType, input.discountValue)
   const displayName = siigoCustomerDisplayName(customer)
 
   const created = await prisma.$transaction(async (tx) => {
@@ -473,10 +571,13 @@ export async function createOrder(
         paymentMethod: input.paymentMethod ?? null,
         paymentDate: input.paymentDate ? new Date(`${input.paymentDate}T00:00:00.000Z`) : null,
         currencyCode: lines[0]?.currencyCode || 'MXN',
-        subtotal: subtotal.toString(),
-        discountTotal: discountTotal.toString(),
-        taxTotal: taxTotal.toString(),
-        total: total.toString(),
+        subtotal: totals.subtotal.toString(),
+        discountType: input.discountType,
+        discountValue: money(input.discountValue).toString(),
+        discountAmount: totals.discountAmount.toString(),
+        discountTotal: totals.discountTotal.toString(),
+        taxTotal: totals.taxTotal.toString(),
+        total: totals.total.toString(),
         vendedorNombre: user.name,
         vendedorEmail: user.email,
         repartidorId: repartidor?.id ?? null,
@@ -489,11 +590,12 @@ export async function createOrder(
       }
     })
     await tx.salesOrderItem.createMany({
-      data: lines.map(({ currencyCode: _currencyCode, ...line }) => ({
+      data: lines.map(({ currencyCode: _currencyCode, catalogPrice: _catalogPrice, priceNote: _priceNote, priceOverridden: _priceOverridden, ...line }) => ({
         orderId: order.id,
         ...line
       }))
     })
+    await createLinePriceHistory(tx, order.id, lines, user)
     await tx.salesOrderStatusHistory.create({
       data: {
         orderId: order.id,
@@ -548,7 +650,7 @@ export async function updateQuote(
         statusMessage: `El producto ${line.productId} ya no está disponible en Siigo.`
       })
     }
-    return buildLine(product, line.quantity, index + 1, line.observations)
+    return buildLine(product, line, index + 1)
   })
   const currencyCodes = new Set(lines.map(line => line.currencyCode))
   if (currencyCodes.size > 1) {
@@ -558,10 +660,8 @@ export async function updateQuote(
     })
   }
 
-  const subtotal = lines.reduce((sum, line) => sum.plus(line.subtotal), money(0))
-  const discountTotal = lines.reduce((sum, line) => sum.plus(line.discountAmount), money(0))
-  const taxTotal = lines.reduce((sum, line) => sum.plus(line.taxAmount), money(0))
-  const total = lines.reduce((sum, line) => sum.plus(line.total), money(0))
+  assertLinePricePermission(lines, user)
+  const totals = orderTotals(lines, input.discountType, input.discountValue)
   const displayName = siigoCustomerDisplayName(customer)
 
   const updated = await prisma.$transaction(async (tx) => {
@@ -581,10 +681,13 @@ export async function updateQuote(
         observations: input.observations || null,
         tags: input.tags,
         currencyCode: lines[0]?.currencyCode || 'MXN',
-        subtotal: subtotal.toString(),
-        discountTotal: discountTotal.toString(),
-        taxTotal: taxTotal.toString(),
-        total: total.toString(),
+        subtotal: totals.subtotal.toString(),
+        discountType: input.discountType,
+        discountValue: money(input.discountValue).toString(),
+        discountAmount: totals.discountAmount.toString(),
+        discountTotal: totals.discountTotal.toString(),
+        taxTotal: totals.taxTotal.toString(),
+        total: totals.total.toString(),
         updatedByEmail: user.email,
         version: { increment: 1 }
       }
@@ -598,11 +701,12 @@ export async function updateQuote(
 
     await tx.salesOrderItem.deleteMany({ where: { orderId: id } })
     await tx.salesOrderItem.createMany({
-      data: lines.map(({ currencyCode: _currencyCode, ...line }) => ({
+      data: lines.map(({ currencyCode: _currencyCode, catalogPrice: _catalogPrice, priceNote: _priceNote, priceOverridden: _priceOverridden, ...line }) => ({
         orderId: id,
         ...line
       }))
     })
+    await createLinePriceHistory(tx, id, lines, user)
     await tx.salesOrderStatusHistory.create({
       data: {
         orderId: id,
@@ -1024,7 +1128,7 @@ export async function updateOrderItemPrice(
       id: orderId,
       AND: [orderVisibilityFilter(user)]
     },
-    select: { statusKey: true, version: true }
+    select: { statusKey: true, version: true, discountType: true, discountValue: true }
   })
   if (!order) {
     throw createError({ statusCode: 404, statusMessage: 'No se encontró el pedido.' })
@@ -1061,7 +1165,14 @@ export async function updateOrderItemPrice(
 
   const quantity = money(item.quantity)
   const taxPercentage = taxPercentageFromPayload(item.taxPayload)
-  const { subtotal, taxAmount, total } = lineAmounts(quantity, newPrice, taxPercentage, item.taxIncluded)
+  const { subtotal, discountAmount, taxAmount, total } = lineAmounts(
+    quantity,
+    newPrice,
+    taxPercentage,
+    item.taxIncluded,
+    item.discountType,
+    item.discountValue
+  )
 
   await prisma.$transaction(async (tx) => {
     await tx.salesOrderItem.update({
@@ -1069,6 +1180,7 @@ export async function updateOrderItemPrice(
       data: {
         unitPrice: newPrice.toString(),
         subtotal: subtotal.toString(),
+        discountAmount: discountAmount.toString(),
         taxAmount: taxAmount.toString(),
         total: total.toString()
       }
@@ -1087,18 +1199,21 @@ export async function updateOrderItemPrice(
     })
 
     const items = await tx.salesOrderItem.findMany({ where: { orderId } })
-    const orderSubtotal = items.reduce((sum, current) => sum.plus(current.subtotal), money(0))
-    const orderDiscountTotal = items.reduce((sum, current) => sum.plus(current.discountAmount), money(0))
-    const orderTaxTotal = items.reduce((sum, current) => sum.plus(current.taxAmount), money(0))
-    const orderTotal = items.reduce((sum, current) => sum.plus(current.total), money(0))
+    const totals = orderTotals(items.map(current => ({
+      subtotal: current.subtotal.toString(),
+      discountAmount: current.discountAmount.toString(),
+      taxAmount: current.taxAmount.toString(),
+      total: current.total.toString()
+    })), order.discountType, order.discountValue.toString())
 
     const result = await tx.salesOrder.updateMany({
       where: { id: orderId, version: input.version },
       data: {
-        subtotal: orderSubtotal.toString(),
-        discountTotal: orderDiscountTotal.toString(),
-        taxTotal: orderTaxTotal.toString(),
-        total: orderTotal.toString(),
+        subtotal: totals.subtotal.toString(),
+        discountAmount: totals.discountAmount.toString(),
+        discountTotal: totals.discountTotal.toString(),
+        taxTotal: totals.taxTotal.toString(),
+        total: totals.total.toString(),
         updatedByEmail: user.email,
         version: { increment: 1 }
       }

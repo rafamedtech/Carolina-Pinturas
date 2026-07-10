@@ -1,4 +1,6 @@
 import { computed, readonly, ref } from 'vue'
+import type { OrderDiscountType } from '~/types/orders'
+import { discountAmountOf } from '~/utils/orderDiscount'
 
 export interface DraftOrderLine {
   productId: string
@@ -10,8 +12,14 @@ export interface DraftOrderLine {
   }
   quantity: number
   unitPrice: number
+  // Precio de lista de Siigo al agregar la partida; si unitPrice difiere, el
+  // guardado envía el precio editado y el servidor registra el cambio.
+  catalogPrice: number
+  priceNote: string
   taxIncluded: boolean
   taxPercentage: number
+  discountType: OrderDiscountType
+  discountValue: number
   observations: string
 }
 
@@ -29,18 +37,22 @@ interface AddOrderProductInput {
   taxPercentage: number
 }
 
-function lineTotal(line: DraftOrderLine) {
+// Refleja el cálculo del servidor (server/utils/orders.ts): el descuento se
+// aplica sobre la base sin impuestos y el impuesto sobre la base descontada.
+export function draftLineTotal(line: DraftOrderLine) {
   const listedTotal = line.quantity * line.unitPrice
-  return line.taxIncluded
-    ? listedTotal
-    : listedTotal * (1 + line.taxPercentage / 100)
+  const base = line.taxIncluded && line.taxPercentage > 0
+    ? listedTotal / (1 + line.taxPercentage / 100)
+    : listedTotal
+  const discounted = base - discountAmountOf(base, line.discountType, line.discountValue)
+  return discounted * (1 + line.taxPercentage / 100)
 }
 
 export function useOrderDraft() {
   const internalLines = ref<DraftOrderLine[]>([])
 
   const total = computed(() =>
-    internalLines.value.reduce((sum, line) => sum + lineTotal(line), 0)
+    internalLines.value.reduce((sum, line) => sum + draftLineTotal(line), 0)
   )
 
   function addProduct(product: AddOrderProductInput) {
@@ -63,8 +75,12 @@ export function useOrderDraft() {
       unit: product.unit,
       quantity,
       unitPrice: product.unitPrice,
+      catalogPrice: product.unitPrice,
+      priceNote: '',
       taxIncluded: product.taxIncluded,
       taxPercentage: product.taxPercentage,
+      discountType: 'porcentaje',
+      discountValue: 0,
       observations: ''
     }]
   }
@@ -89,6 +105,24 @@ export function useOrderDraft() {
     )
   }
 
+  function setPrice(productId: string, unitPrice: number, priceNote: string) {
+    if (!Number.isFinite(unitPrice) || unitPrice <= 0) return
+
+    internalLines.value = internalLines.value.map(line =>
+      line.productId === productId ? { ...line, unitPrice, priceNote } : line
+    )
+  }
+
+  function setDiscount(productId: string, discountType: OrderDiscountType, discountValue: number) {
+    const normalizedValue = Number.isFinite(discountValue) ? Math.max(0, discountValue) : 0
+
+    internalLines.value = internalLines.value.map(line =>
+      line.productId === productId
+        ? { ...line, discountType, discountValue: normalizedValue }
+        : line
+    )
+  }
+
   function reset() {
     internalLines.value = []
   }
@@ -104,6 +138,8 @@ export function useOrderDraft() {
     removeProduct,
     setObservations,
     setQuantity,
+    setPrice,
+    setDiscount,
     replaceLines,
     reset
   }

@@ -63,21 +63,27 @@ const paymentStatusOptions = [{
       />
     </div>
 
-    <div class="flex gap-2">
+    <div class="flex w-full gap-2 sm:w-auto">
       <UButton
         v-if="!igualacion && canCreate"
         to="/ventas/nueva-cotizacion"
-        label="Nueva cotización"
         icon="i-lucide-file-text"
         color="neutral"
         variant="outline"
-      />
+        class="flex-1 justify-center sm:flex-none"
+      >
+        <span class="sm:hidden">Cotización</span>
+        <span class="hidden sm:inline">Nueva cotización</span>
+      </UButton>
       <UButton
         v-if="!igualacion && canCreate"
         to="/ventas/nuevo-pedido"
-        label="Nuevo pedido"
         icon="i-lucide-shopping-cart"
-      />
+        class="flex-1 justify-center sm:flex-none"
+      >
+        <span class="sm:hidden">Pedido</span>
+        <span class="hidden sm:inline">Nuevo pedido</span>
+      </UButton>
     </div>
   </div>
 </template>

@@ -723,6 +723,14 @@ async function convertToPedido() {
                     {{ formatCurrency(order.subtotal) }}
                   </dd>
                 </div>
+                <div v-if="order.discountTotal > 0" class="flex justify-between gap-4">
+                  <dt class="text-muted">
+                    Descuento
+                  </dt>
+                  <dd class="font-medium text-error">
+                    -{{ formatCurrency(order.discountTotal) }}
+                  </dd>
+                </div>
                 <div class="flex justify-between gap-4">
                   <dt class="text-muted">
                     Impuestos

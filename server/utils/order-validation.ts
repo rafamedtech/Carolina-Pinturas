@@ -3,6 +3,27 @@ import { PAYMENT_STATUS_KEYS, PAYMENT_METHOD_KEYS } from '~/utils/orderPayment'
 
 const dateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Usa una fecha con formato AAAA-MM-DD.')
 
+export const DISCOUNT_TYPES = ['porcentaje', 'monto'] as const
+
+const discountFields = {
+  discountType: z.enum(DISCOUNT_TYPES).default('porcentaje'),
+  discountValue: z.number().min(0, 'El descuento no puede ser negativo.').max(100_000_000).default(0)
+}
+
+function validateDiscount(
+  data: { discountType: string, discountValue: number },
+  ctx: z.RefinementCtx,
+  basePath: (string | number)[] = []
+) {
+  if (data.discountType === 'porcentaje' && data.discountValue > 100) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: [...basePath, 'discountValue'],
+      message: 'El descuento porcentual no puede ser mayor a 100%.'
+    })
+  }
+}
+
 // A repartidor is optional while the order is in borrador/ingresado; it becomes
 // mandatory once the order reaches confirmado (or a later igualación state).
 export const STATUS_KEYS_REQUIRING_REPARTIDOR = ['confirmado', 'surtido', 'en_espera']
@@ -20,14 +41,27 @@ const orderFieldsSchema = z.object({
   paymentStatus: z.enum(PAYMENT_STATUS_KEYS as [string, ...string[]]).default('pendiente_pago'),
   paymentMethod: z.enum(PAYMENT_METHOD_KEYS as [string, ...string[]]).nullable().optional(),
   paymentDate: dateSchema.nullable().optional(),
+  ...discountFields,
   lines: z.array(z.object({
     productId: z.string().uuid('Selecciona un producto válido.'),
     quantity: z.number().positive().max(1_000_000),
-    observations: z.string().trim().max(5000).nullable().optional()
+    unitPrice: z.number().positive('El precio debe ser mayor a cero.').max(100_000_000).nullish(),
+    priceNote: z.string().trim().max(1000).nullish(),
+    observations: z.string().trim().max(5000).nullable().optional(),
+    ...discountFields
   })).min(1, 'Agrega al menos un producto.').max(100)
 })
 
+function validateOrderDiscounts(
+  data: { discountType: string, discountValue: number, lines: { discountType: string, discountValue: number }[] },
+  ctx: z.RefinementCtx
+) {
+  validateDiscount(data, ctx)
+  data.lines.forEach((line, index) => validateDiscount(line, ctx, ['lines', index]))
+}
+
 export const createOrderSchema = orderFieldsSchema.superRefine((data, ctx) => {
+  validateOrderDiscounts(data, ctx)
   if (STATUS_KEYS_REQUIRING_REPARTIDOR.includes(data.statusKey) && !data.repartidorId) {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
@@ -42,10 +76,12 @@ export const updateQuoteSchema = orderFieldsSchema.pick({
   orderDate: true,
   observations: true,
   tags: true,
+  discountType: true,
+  discountValue: true,
   lines: true
 }).extend({
   version: z.number().int().positive()
-})
+}).superRefine(validateOrderDiscounts)
 
 export const updateOrderStatusSchema = z.object({
   statusKey: z.string().trim().min(1).max(32),

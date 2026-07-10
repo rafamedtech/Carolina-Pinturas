@@ -147,25 +147,34 @@ function openProduct(_: Event, row: TableRow<SiigoProduct>) {
         icon="i-lucide-plug-zap"
       />
 
-      <AppTableSkeleton v-else-if="loading" :cols="columns.length" />
+      <template v-else>
+        <ProductsProductListCards
+          :products="products"
+          :loading="loading"
+          :unit-for="(product) => unitsById.get(product.id) ?? '…'"
+          :price-for="formatProductPrice"
+        />
 
-      <UTable
-        v-else
-        :data="products"
-        :columns="columns"
-        empty="No hay productos para mostrar."
-        class="shrink-0"
-        :meta="{ class: { tr: 'cursor-pointer transition-colors hover:bg-elevated/50' } }"
-        :ui="{
-          base: 'table-fixed border-separate border-spacing-0',
-          thead: '[&>tr]:bg-elevated/50 [&>tr]:after:content-none',
-          tbody: '[&>tr]:last:[&>td]:border-b-0',
-          th: 'py-2 first:rounded-l-lg last:rounded-r-lg border-y border-default first:border-l last:border-r',
-          td: 'border-b border-default',
-          separator: 'h-0'
-        }"
-        @select="openProduct"
-      />
+        <AppTableSkeleton v-if="loading" :cols="columns.length" class="hidden shrink-0 md:block" />
+
+        <UTable
+          v-else
+          :data="products"
+          :columns="columns"
+          empty="No hay productos para mostrar."
+          class="hidden shrink-0 md:block"
+          :meta="{ class: { tr: 'cursor-pointer transition-colors hover:bg-elevated/50' } }"
+          :ui="{
+            base: 'table-fixed border-separate border-spacing-0',
+            thead: '[&>tr]:bg-elevated/50 [&>tr]:after:content-none',
+            tbody: '[&>tr]:last:[&>td]:border-b-0',
+            th: 'py-2 first:rounded-l-lg last:rounded-r-lg border-y border-default first:border-l last:border-r',
+            td: 'border-b border-default',
+            separator: 'h-0'
+          }"
+          @select="openProduct"
+        />
+      </template>
 
       <div
         v-if="!error && totalProducts > 0"

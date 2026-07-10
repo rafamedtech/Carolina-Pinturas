@@ -86,8 +86,10 @@ function addProduct() {
       <UFormField name="quantity" label="Cantidad" class="min-w-0">
         <UInputNumber
           v-model="quantity"
-          :min="0.000001"
+          :min="0.01"
           :step="1"
+          :step-snapping="false"
+          :format-options="{ maximumFractionDigits: 2 }"
           :disabled="disabled"
           class="w-full min-w-0"
         />

@@ -160,7 +160,7 @@ async function downloadPdf() {
       y += rowHeight
     }
 
-    const totalsHeight = 20 + order.value.taxBreakdown.length * 6
+    const totalsHeight = 26 + order.value.taxBreakdown.length * 6
     if (y + totalsHeight > pageHeight - 25) {
       pdf.addPage()
       y = 20
@@ -174,6 +174,14 @@ async function downloadPdf() {
     pdf.text('Subtotal', totalsLabelX, y)
     pdf.setTextColor(17, 24, 39)
     pdf.text(formatCurrency(order.value.subtotal), right, y, { align: 'right' })
+
+    if (order.value.discountTotal > 0) {
+      y += 6
+      pdf.setTextColor(107, 114, 128)
+      pdf.text('Descuento', totalsLabelX, y)
+      pdf.setTextColor(17, 24, 39)
+      pdf.text(`-${formatCurrency(order.value.discountTotal)}`, right, y, { align: 'right' })
+    }
 
     for (const tax of order.value.taxBreakdown) {
       y += 6
@@ -356,6 +364,14 @@ watch([status, order], () => {
               </td>
               <td class="t-value">
                 {{ formatCurrency(order.subtotal) }}
+              </td>
+            </tr>
+            <tr v-if="order.discountTotal > 0">
+              <td class="t-label">
+                Descuento
+              </td>
+              <td class="t-value">
+                -{{ formatCurrency(order.discountTotal) }}
               </td>
             </tr>
             <tr

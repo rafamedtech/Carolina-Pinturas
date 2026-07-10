@@ -229,6 +229,9 @@ model SalesOrder {
   paymentMethod              String?   @map("payment_method") @db.VarChar(32)
   paymentDate                DateTime? @map("payment_date") @db.Date
   subtotal                   Decimal   @default(0) @db.Decimal(20, 6)
+  discountType               String    @default("porcentaje") @map("discount_type") @db.VarChar(16)
+  discountValue              Decimal   @default(0) @map("discount_value") @db.Decimal(20, 6)
+  discountAmount             Decimal   @default(0) @map("discount_amount") @db.Decimal(20, 6)
   discountTotal              Decimal   @default(0) @map("discount_total") @db.Decimal(20, 6)
   taxTotal                   Decimal   @default(0) @map("tax_total") @db.Decimal(20, 6)
   total                      Decimal   @default(0) @db.Decimal(20, 6)
@@ -277,6 +280,8 @@ model SalesOrderItem {
   quantity                   Decimal  @db.Decimal(20, 6)
   unitPrice                  Decimal  @map("unit_price") @db.Decimal(20, 6)
   taxIncluded                Boolean  @default(false) @map("tax_included")
+  discountType               String   @default("porcentaje") @map("discount_type") @db.VarChar(16)
+  discountValue              Decimal  @default(0) @map("discount_value") @db.Decimal(20, 6)
   discountPercentage         Decimal  @default(0) @map("discount_percentage") @db.Decimal(9, 6)
   discountAmount             Decimal  @default(0) @map("discount_amount") @db.Decimal(20, 6)
   taxPayload                 Json     @map("tax_payload") @db.JsonB

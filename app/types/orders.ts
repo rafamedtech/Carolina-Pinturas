@@ -24,6 +24,8 @@ export interface RepartidorDetail {
   deliveredOrders: RepartidorDelivery[]
 }
 
+export type OrderDiscountType = 'porcentaje' | 'monto'
+
 export interface OrderStatus {
   key: string
   label: string
@@ -88,6 +90,8 @@ export interface SalesOrderItem {
   }
   quantity: number
   unitPrice: number
+  discountType: OrderDiscountType
+  discountValue: number
   discountPercentage: number
   discountAmount: number
   subtotal: number
@@ -124,6 +128,9 @@ export interface SalesOrderDetail extends SalesOrderListItem {
   paymentDate: string | null
   currencyCode: string
   subtotal: number
+  discountType: OrderDiscountType
+  discountValue: number
+  discountAmount: number
   discountTotal: number
   taxTotal: number
   taxBreakdown: Array<{

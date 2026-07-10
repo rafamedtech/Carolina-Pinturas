@@ -1,28 +1,27 @@
 <script setup lang="ts">
 import type { DraftOrderLine } from '~/composables/useOrderDraft'
+import { draftLineTotal } from '~/composables/useOrderDraft'
+import type { OrderDiscountType } from '~/types/orders'
+import { DISCOUNT_TYPE_OPTIONS } from '~/utils/orderDiscount'
 
 defineProps<{
   lines: readonly DraftOrderLine[]
   quoteMode?: boolean
+  editablePrices?: boolean
 }>()
 
 const emit = defineEmits<{
-  remove: [productId: string]
-  observations: [productId: string, value: string]
-  quantity: [productId: string, value: number]
+  'remove': [productId: string]
+  'observations': [productId: string, value: string]
+  'quantity': [productId: string, value: number]
+  'discount': [productId: string, type: OrderDiscountType, value: number]
+  'edit-price': [line: DraftOrderLine]
 }>()
 
 const currency = new Intl.NumberFormat('es-MX', {
   style: 'currency',
   currency: 'MXN'
 })
-
-function lineTotal(line: DraftOrderLine) {
-  const listedTotal = line.quantity * line.unitPrice
-  return line.taxIncluded
-    ? listedTotal
-    : listedTotal * (1 + line.taxPercentage / 100)
-}
 </script>
 
 <template>
@@ -60,8 +59,10 @@ function lineTotal(line: DraftOrderLine) {
         <UFormField label="Cantidad">
           <UInputNumber
             :model-value="line.quantity"
-            :min="0.000001"
+            :min="0.01"
             :step="1"
+            :step-snapping="false"
+            :format-options="{ maximumFractionDigits: 2 }"
             variant="subtle"
             class="w-full"
             :aria-label="`Cantidad de ${line.name}`"
@@ -74,12 +75,44 @@ function lineTotal(line: DraftOrderLine) {
             <dt class="text-muted">
               Precio unitario
             </dt>
-            <dd class="font-medium text-highlighted">
+            <dd class="flex items-center justify-end gap-1 font-medium text-highlighted">
               {{ currency.format(line.unitPrice) }}
+              <UButton
+                v-if="editablePrices"
+                icon="i-lucide-pencil"
+                color="neutral"
+                variant="ghost"
+                size="xs"
+                :aria-label="`Editar precio de ${line.name}`"
+                @click="emit('edit-price', line)"
+              />
             </dd>
           </div>
         </dl>
       </div>
+
+      <UFormField label="Descuento">
+        <div class="flex items-center gap-2">
+          <USelect
+            :model-value="line.discountType"
+            :items="DISCOUNT_TYPE_OPTIONS"
+            variant="subtle"
+            class="w-20"
+            :aria-label="`Tipo de descuento de ${line.name}`"
+            @update:model-value="emit('discount', line.productId, $event as OrderDiscountType, line.discountValue)"
+          />
+          <UInputNumber
+            :model-value="line.discountValue"
+            :min="0"
+            :max="line.discountType === 'porcentaje' ? 100 : undefined"
+            :step="1"
+            variant="subtle"
+            class="w-full"
+            :aria-label="`Descuento de ${line.name}`"
+            @update:model-value="emit('discount', line.productId, line.discountType, $event)"
+          />
+        </div>
+      </UFormField>
 
       <dl class="text-sm">
         <div class="col-span-2 flex items-end justify-between gap-4 border-t border-default pt-3">
@@ -87,7 +120,7 @@ function lineTotal(line: DraftOrderLine) {
             Importe
           </dt>
           <dd class="text-base font-semibold text-highlighted">
-            {{ currency.format(lineTotal(line)) }}
+            {{ currency.format(draftLineTotal(line)) }}
           </dd>
         </div>
       </dl>

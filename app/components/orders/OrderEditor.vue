@@ -5,6 +5,8 @@ import type { OrderStatus, SalesOrderDetail } from '~/types/orders'
 import type { SiigoCustomer, SiigoProduct } from '~/types/siigo'
 import { submittedOrderStatusKey, canManageOrderLogistics } from '~/utils/roleAccess'
 import { DEFAULT_PAYMENT_STATUS } from '~/utils/orderPayment'
+import { discountAmountOf } from '~/utils/orderDiscount'
+import { draftLineTotal } from '~/composables/useOrderDraft'
 
 const props = withDefaults(defineProps<{
   mode?: 'order' | 'quote'
@@ -38,8 +40,17 @@ const schema = z.object({
   paymentDate: z.string(),
   requiresInvoice: z.boolean(),
   tags: z.array(z.string()),
+  discountType: z.enum(['porcentaje', 'monto']),
+  discountValue: z.number().min(0, 'El descuento no puede ser negativo.'),
   observations: z.string().max(5000)
 }).superRefine((data, ctx) => {
+  if (data.discountType === 'porcentaje' && data.discountValue > 100) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['discountValue'],
+      message: 'El descuento porcentual no puede ser mayor a 100%.'
+    })
+  }
   if (STATUS_KEYS_REQUIRING_REPARTIDOR.includes(data.statusKey) && !data.repartidorId) {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
@@ -78,6 +89,8 @@ const state = reactive<Schema>({
   paymentDate: isQuoteMode.value ? '' : mexicoToday(),
   requiresInvoice: false,
   tags: [],
+  discountType: 'porcentaje',
+  discountValue: 0,
   observations: ''
 })
 const saving = shallowRef(false)
@@ -106,8 +119,13 @@ const {
   removeProduct,
   setObservations,
   setQuantity,
+  setPrice,
+  setDiscount,
   replaceLines
 } = useOrderDraft()
+const orderDiscountAmount = computed(() =>
+  discountAmountOf(total.value, state.discountType, state.discountValue))
+const grandTotal = computed(() => total.value - orderDiscountAmount.value)
 const {
   data: existingOrder,
   status: existingOrderStatus,
@@ -206,13 +224,24 @@ watch(existingOrder, (value) => {
   state.statusKey = value.status.key
   state.orderDate = value.orderDate
   state.tags = value.tags || []
+  state.discountType = value.discountType
+  state.discountValue = value.discountValue
   state.observations = value.observations || ''
   replaceLines(value.items.map((item) => {
-    const listedTotal = item.quantity * item.unitPrice
-    const taxIncluded = Math.abs(listedTotal - item.total) < 0.01
-    const taxPercentage = item.subtotal > 0
-      ? item.taxAmount / item.subtotal * 100
+    // El impuesto se calcula sobre la base ya descontada; el precio con
+    // impuesto incluido se detecta comparando contra la base bruta.
+    const taxableBase = item.subtotal - item.discountAmount
+    const taxPercentage = taxableBase > 0
+      ? item.taxAmount / taxableBase * 100
       : 0
+    const listedTotal = item.quantity * item.unitPrice
+    const taxIncluded = taxPercentage > 0
+      && Math.abs(listedTotal - item.subtotal * (1 + taxPercentage / 100)) < 0.01
+
+    // La primera entrada del historial de precio conserva el precio de lista
+    // original; sin historial, el precio guardado es el de lista.
+    const catalogPrice = item.priceHistory[0]?.previousPrice ?? item.unitPrice
+    const lastHistoryNote = item.priceHistory[item.priceHistory.length - 1]?.note
 
     return {
       productId: item.productId,
@@ -221,8 +250,12 @@ watch(existingOrder, (value) => {
       unit: item.unit,
       quantity: item.quantity,
       unitPrice: item.unitPrice,
+      catalogPrice,
+      priceNote: item.unitPrice !== catalogPrice ? lastHistoryNote || '' : '',
       taxIncluded,
       taxPercentage,
+      discountType: item.discountType,
+      discountValue: item.discountValue,
       observations: item.observations || ''
     }
   }))
@@ -232,6 +265,8 @@ const formDisabled = computed(() => saving.value || Boolean(catalogError.value))
 const mayChooseInitialStatus = computed(() => user.value?.role === 'admin')
 const mayManagePayment = computed(() =>
   Boolean(user.value && canManageOrderLogistics(user.value.role)))
+// Mismo permiso que el editor de precio del detalle del pedido.
+const mayEditLinePrices = mayManagePayment
 const maySaveDraft = computed(() => Boolean(user.value && user.value.role !== 'admin'))
 const sendStatusKey = computed(() =>
   user.value
@@ -290,11 +325,6 @@ function documentMessage(message: string) {
     .replace(/\bpedidos\b/g, 'cotizaciones')
     .replace(/\bPedido\b/g, 'Cotización')
     .replace(/\bpedido\b/g, 'cotización')
-}
-
-function lineTotal(line: { quantity: number, unitPrice: number, taxIncluded: boolean, taxPercentage: number }) {
-  const listedTotal = line.quantity * line.unitPrice
-  return line.taxIncluded ? listedTotal : listedTotal * (1 + line.taxPercentage / 100)
 }
 
 function onCustomerCreated(customer: SiigoCustomer) {
@@ -368,9 +398,16 @@ async function confirmSubmit(statusKey: string) {
   summaryOpen.value = true
 
   try {
+    // El precio sólo viaja cuando el usuario lo editó; si no, el servidor usa
+    // el precio de lista vigente en Siigo.
     const requestLines = lines.value.map(line => ({
       productId: line.productId,
       quantity: line.quantity,
+      discountType: line.discountType,
+      discountValue: line.discountValue,
+      ...(line.unitPrice !== line.catalogPrice
+        ? { unitPrice: line.unitPrice, priceNote: line.priceNote || null }
+        : {}),
       observations: line.observations || null
     }))
     const order = isEditing.value && props.orderId && existingOrder.value
@@ -381,6 +418,8 @@ async function confirmSubmit(statusKey: string) {
             orderDate: data.orderDate,
             observations: data.observations || null,
             tags: data.tags,
+            discountType: data.discountType,
+            discountValue: data.discountValue,
             lines: requestLines,
             version: existingOrder.value.version
           }
@@ -499,13 +538,20 @@ async function confirmSubmit(statusKey: string) {
         </div>
 
         <OrdersOrderLinesTable
+          v-model:discount-type="state.discountType"
+          v-model:discount-value="state.discountValue"
           :lines="lines"
           :total="total"
+          :discount-amount="orderDiscountAmount"
+          :grand-total="grandTotal"
           :quote-mode="isQuoteMode"
+          :editable-prices="mayEditLinePrices"
           :cancel-to="isEditing && orderId ? `/ventas/${orderId}` : '/ventas'"
           @remove="removeProduct"
           @observations="setObservations"
           @quantity="setQuantity"
+          @price="setPrice"
+          @discount="setDiscount"
         />
 
         <OrdersOrderFormActions
@@ -588,19 +634,36 @@ async function confirmSubmit(statusKey: string) {
                     <p class="text-sm text-muted">
                       {{ line.quantity }} {{ line.unit.name || line.unit.code || '' }} × {{ currency.format(line.unitPrice) }}
                     </p>
+                    <p v-if="line.discountValue > 0" class="text-sm text-error">
+                      Descuento: {{ line.discountType === 'porcentaje' ? `${line.discountValue}%` : currency.format(line.discountValue) }}
+                    </p>
                   </div>
                   <p class="font-medium">
-                    {{ currency.format(lineTotal(line)) }}
+                    {{ currency.format(draftLineTotal(line)) }}
                   </p>
                 </li>
               </ul>
             </div>
-            <div class="flex items-center justify-between border-t border-default pt-4">
+            <div
+              v-if="orderDiscountAmount > 0"
+              class="flex items-center justify-between border-t border-default pt-4"
+            >
+              <p class="text-sm text-muted">
+                {{ isQuoteMode ? 'Descuento a la cotización' : 'Descuento al pedido' }}
+              </p>
+              <p class="font-medium text-error">
+                -{{ currency.format(orderDiscountAmount) }}
+              </p>
+            </div>
+            <div
+              class="flex items-center justify-between pt-4"
+              :class="orderDiscountAmount > 0 ? '' : 'border-t border-default'"
+            >
               <p class="font-semibold text-primary">
                 Total
               </p>
               <p class="text-lg font-semibold text-primary">
-                {{ currency.format(total) }}
+                {{ currency.format(grandTotal) }}
               </p>
             </div>
             <UAlert
