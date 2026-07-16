@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { OrderStatus, SalesOrderListResponse } from '~/types/orders'
+import type { OrderDateRange, OrderStatus, SalesOrderListResponse } from '~/types/orders'
 import { canCreateOrders } from '~/utils/roleAccess'
 
 const props = withDefaults(defineProps<{
@@ -13,6 +13,7 @@ const props = withDefaults(defineProps<{
 const filter = shallowRef('')
 const statusKey = shallowRef('all')
 const paymentStatusKey = shallowRef('all')
+const dateRange = shallowRef<OrderDateRange | null>(null)
 const page = shallowRef(1)
 const pageSize = 25
 const debouncedFilter = refDebounced(filter, 300)
@@ -24,9 +25,16 @@ onMounted(() => {
   isHydrated.value = true
 })
 
-watch([filter, statusKey, paymentStatusKey], () => {
+watch([filter, statusKey, paymentStatusKey, dateRange], () => {
   page.value = 1
 })
+
+const dateFrom = computed(() => dateRange.value?.start && dateRange.value?.end
+  ? dateRange.value.start.toString()
+  : undefined)
+const dateTo = computed(() => dateRange.value?.start && dateRange.value?.end
+  ? dateRange.value.end.toString()
+  : undefined)
 
 const {
   data: orders,
@@ -41,6 +49,8 @@ const {
     search: debouncedFilter,
     status: computed(() => statusKey.value === 'all' ? undefined : statusKey.value),
     payment_status: computed(() => paymentStatusKey.value === 'all' ? undefined : paymentStatusKey.value),
+    date_from: dateFrom,
+    date_to: dateTo,
     igualacion: props.igualacion ? 'true' : undefined
   },
   default: () => ({
@@ -105,6 +115,7 @@ const statusTabItems = computed(() => {
         v-model:filter="filter"
         v-model:status="statusKey"
         v-model:payment-status="paymentStatusKey"
+        v-model:date-range="dateRange"
         :statuses="statuses"
         :igualacion="igualacion"
         :can-create="canCreate"

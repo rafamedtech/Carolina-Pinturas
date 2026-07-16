@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { OrderStatus } from '~/types/orders'
+import type { OrderDateRange, OrderStatus } from '~/types/orders'
 import { PAYMENT_STATUSES } from '~/utils/orderPayment'
 
 const props = withDefaults(defineProps<{
@@ -14,6 +14,7 @@ const props = withDefaults(defineProps<{
 const filter = defineModel<string>('filter', { required: true })
 const status = defineModel<string>('status', { required: true })
 const paymentStatus = defineModel<string>('paymentStatus', { required: true })
+const dateRange = defineModel<OrderDateRange | null>('dateRange', { required: true })
 
 const IGUALACION_STATUS_KEYS = ['confirmado', 'surtido', 'en_espera']
 
@@ -61,6 +62,7 @@ const paymentStatusOptions = [{
         value-key="value"
         class="w-full sm:w-48"
       />
+      <OrdersOrderDateRangePicker v-model="dateRange" />
     </div>
 
     <div class="flex w-full gap-2 sm:w-auto">

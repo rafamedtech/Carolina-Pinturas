@@ -749,6 +749,8 @@ export async function listOrders(options: {
   search?: string
   statusKey?: string
   paymentStatus?: string
+  dateFrom?: string
+  dateTo?: string
   igualacion?: boolean
 }, user: AppUser) {
   const prisma = usePrisma()
@@ -766,6 +768,16 @@ export async function listOrders(options: {
       : {}
   const paymentStatusFilter: Prisma.SalesOrderWhereInput = options.paymentStatus
     ? { paymentStatus: options.paymentStatus }
+    : {}
+  const dateFilter: Prisma.SalesOrderWhereInput = options.dateFrom || options.dateTo
+    ? {
+        orderDate: {
+          ...(options.dateFrom ? { gte: new Date(`${options.dateFrom}T00:00:00.000Z`) } : {}),
+          ...(options.dateTo
+            ? { lt: new Date(new Date(`${options.dateTo}T00:00:00.000Z`).getTime() + 86_400_000) }
+            : {})
+        }
+      }
     : {}
   const searchFilter: Prisma.SalesOrderWhereInput = options.search
     ? {
@@ -790,6 +802,7 @@ export async function listOrders(options: {
     AND: [
       statusFilter,
       paymentStatusFilter,
+      dateFilter,
       orderVisibilityFilter(user),
       ...(isIgualacionesView ? [igualacionFilter] : []),
       searchFilter

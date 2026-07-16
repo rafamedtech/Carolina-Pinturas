@@ -1,3 +1,10 @@
+import type { DateValue } from '@internationalized/date'
+
+export interface OrderDateRange {
+  start: DateValue | undefined
+  end: DateValue | undefined
+}
+
 export interface Repartidor {
   id: string
   nombre: string
