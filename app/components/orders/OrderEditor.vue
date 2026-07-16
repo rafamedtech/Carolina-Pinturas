@@ -595,7 +595,7 @@ async function confirmSubmit(statusKey: string) {
             ? `${documentNounCapitalized} enviado`
             : `Resumen ${documentOf}`"
         :close="false"
-        :dismissible="modalPhase !== 'sending'"
+        :dismissible="false"
       >
         <template #body>
           <div v-if="modalPhase === 'sending'" class="flex flex-col items-center justify-center gap-3 py-10">
