@@ -7,6 +7,7 @@ import { submittedOrderStatusKey, canManageOrderLogistics } from '~/utils/roleAc
 import { DEFAULT_PAYMENT_STATUS } from '~/utils/orderPayment'
 import { discountAmountOf } from '~/utils/orderDiscount'
 import { orderListReturnPath } from '~/utils/orderNavigation'
+import { resolveCreatedOrderStatusKey } from '~/utils/orderCreation'
 import { draftLineTotal } from '~/composables/useOrderDraft'
 
 const props = withDefaults(defineProps<{
@@ -284,11 +285,18 @@ const mayManagePayment = computed(() =>
 // Mismo permiso que el editor de precio del detalle del pedido.
 const mayEditLinePrices = mayManagePayment
 const maySaveDraft = computed(() => Boolean(user.value && user.value.role !== 'admin'))
-const sendStatusKey = computed(() =>
+const requestedSendStatusKey = computed(() =>
   user.value
     ? submittedOrderStatusKey(user.value.role, state.statusKey)
     : state.statusKey
 )
+const selectedRepartidor = computed(() =>
+  repartidores.value.find(repartidor => repartidor.id === state.repartidorId)
+)
+const sendStatusKey = computed(() => resolveCreatedOrderStatusKey(
+  requestedSendStatusKey.value,
+  selectedRepartidor.value?.esMostrador ?? false
+))
 const sendStatusLabel = computed(() =>
   statuses.value.find(status => status.key === sendStatusKey.value)?.label
   || sendStatusKey.value
@@ -754,9 +762,9 @@ async function confirmSubmit(statusKey: string) {
               :label="sendButtonLabel"
               icon="i-lucide-send"
               class="justify-center"
-              :loading="saving && submittingStatusKey === sendStatusKey"
+              :loading="saving && submittingStatusKey === requestedSendStatusKey"
               :disabled="saving || sendBlockedByRepartidor"
-              @click="confirmSubmit(sendStatusKey)"
+              @click="confirmSubmit(requestedSendStatusKey)"
             />
           </div>
         </template>

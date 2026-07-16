@@ -19,6 +19,7 @@ import {
   canManageOrderLogistics,
   editableOrderStatusKeys
 } from '~/utils/roleAccess'
+import { resolveCreatedOrderStatusKey } from '~/utils/orderCreation'
 import {
   siigoCustomerDisplayName,
   siigoJson,
@@ -515,7 +516,12 @@ export async function createOrder(
   user: AppUser,
   customer: SiigoCustomer,
   products: Map<string, SiigoProduct>,
-  repartidor: { id: string, nombre: string, telefono: string | null } | null
+  repartidor: {
+    id: string
+    nombre: string
+    telefono: string | null
+    esMostrador: boolean
+  } | null
 ) {
   const prisma = usePrisma()
   const lines = input.lines.map((line, index) => {
@@ -538,10 +544,14 @@ export async function createOrder(
   assertLinePricePermission(lines, user)
   const totals = orderTotals(lines, input.discountType, input.discountValue)
   const displayName = siigoCustomerDisplayName(customer)
+  const statusKey = resolveCreatedOrderStatusKey(
+    input.statusKey,
+    repartidor?.esMostrador ?? false
+  )
 
   const created = await prisma.$transaction(async (tx) => {
     const status = await tx.orderStatus.findFirst({
-      where: { key: input.statusKey, isActive: true }
+      where: { key: statusKey, isActive: true }
     })
     if (!status) {
       throw createError({ statusCode: 422, statusMessage: 'El estado seleccionado no está disponible.' })
