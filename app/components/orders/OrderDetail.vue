@@ -12,11 +12,13 @@ import {
   paymentStatusLabel,
   paymentMethodLabel
 } from '~/utils/orderPayment'
+import { orderListReturnPath } from '~/utils/orderNavigation'
 
 const props = defineProps<{
   orderId: string
 }>()
 
+const route = useRoute()
 const selectedStatus = shallowRef('')
 const statusNote = shallowRef('')
 const savingStatus = shallowRef(false)
@@ -135,8 +137,11 @@ const availableStatuses = computed(() => {
     status.key === order.value?.status.key || editableKeys.includes(status.key)
   )
 })
-const backPath = computed(() =>
+const defaultBackPath = computed(() =>
   user.value?.role === 'igualaciones' ? '/igualaciones' : '/ventas'
+)
+const backPath = computed(() =>
+  orderListReturnPath(route.query.returnTo, defaultBackPath.value)
 )
 const savingChanges = computed(() =>
   savingRepartidor.value || savingPayment.value || savingStatus.value || savingTags.value
@@ -460,7 +465,10 @@ async function convertToPedido() {
             <OrdersPrinterSettingsModal v-model:open="printerSettingsOpen" />
             <UButton
               v-if="isQuote && mayEditQuote"
-              :to="`/ventas/${order.id}/editar`"
+              :to="{
+                path: `/ventas/${order.id}/editar`,
+                query: { returnTo: backPath }
+              }"
               label="Editar cotización"
               icon="i-lucide-pencil"
               color="neutral"

@@ -4,6 +4,7 @@ import { PAYMENT_STATUSES } from '~/utils/orderPayment'
 
 const props = withDefaults(defineProps<{
   statuses: OrderStatus[]
+  returnTo: string
   igualacion?: boolean
   canCreate?: boolean
 }>(), {
@@ -68,7 +69,10 @@ const paymentStatusOptions = [{
     <div class="flex w-full gap-2 sm:w-auto">
       <UButton
         v-if="!igualacion && canCreate"
-        to="/ventas/nueva-cotizacion"
+        :to="{
+          path: '/ventas/nueva-cotizacion',
+          query: { returnTo }
+        }"
         icon="i-lucide-file-text"
         color="neutral"
         variant="outline"
@@ -79,7 +83,10 @@ const paymentStatusOptions = [{
       </UButton>
       <UButton
         v-if="!igualacion && canCreate"
-        to="/ventas/nuevo-pedido"
+        :to="{
+          path: '/ventas/nuevo-pedido',
+          query: { returnTo }
+        }"
         icon="i-lucide-shopping-cart"
         class="flex-1 justify-center sm:flex-none"
       >

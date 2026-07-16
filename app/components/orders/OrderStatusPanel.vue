@@ -40,24 +40,35 @@ const historyModalOpen = shallowRef(false)
           />
         </UFormField>
 
-        <UPopover :content="{ align: 'end' }">
-          <UButton
-            icon="i-lucide-sticky-note"
-            color="neutral"
-            variant="ghost"
-            :aria-label="note ? 'Editar nota del cambio' : 'Agregar nota del cambio'"
+        <UFormField label="Nota del cambio" class="hidden flex-1 sm:block">
+          <UInput
+            v-model="note"
+            :disabled="saving"
+            placeholder="Opcional"
+            class="w-full"
           />
-          <template #content>
-            <UTextarea
-              v-model="note"
-              :rows="3"
-              :disabled="saving"
-              placeholder="Nota del cambio (opcional)"
-              class="w-72 m-3"
-              :ui="{ base: 'resize-none' }"
+        </UFormField>
+
+        <div class="sm:hidden">
+          <UPopover :content="{ align: 'end' }">
+            <UButton
+              icon="i-lucide-sticky-note"
+              color="neutral"
+              variant="ghost"
+              :aria-label="note ? 'Editar nota del cambio' : 'Agregar nota del cambio'"
             />
-          </template>
-        </UPopover>
+            <template #content>
+              <UTextarea
+                v-model="note"
+                :rows="3"
+                :disabled="saving"
+                placeholder="Nota del cambio (opcional)"
+                class="m-3 w-72"
+                :ui="{ base: 'resize-none' }"
+              />
+            </template>
+          </UPopover>
+        </div>
       </div>
 
       <div :class="{ 'border-t border-default pt-4': editable }">

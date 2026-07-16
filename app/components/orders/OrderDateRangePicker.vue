@@ -6,7 +6,7 @@ import { MEXICO_TIME_ZONE } from '~/utils/datetime'
 const selectedRange = defineModel<OrderDateRange | null>({ required: true })
 
 const open = shallowRef(false)
-const draftRange = ref<OrderDateRange | null>(selectedRange.value)
+const draftRange = shallowRef<OrderDateRange | null>(selectedRange.value)
 const formatter = new DateFormatter('es-MX', {
   day: '2-digit',
   month: 'short',

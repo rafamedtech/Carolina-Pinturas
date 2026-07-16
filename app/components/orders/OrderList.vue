@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { parseDate } from '@internationalized/date'
 import type { OrderDateRange, OrderStatus, SalesOrderListResponse } from '~/types/orders'
 import { canCreateOrders } from '~/utils/roleAccess'
 
@@ -10,11 +11,36 @@ const props = withDefaults(defineProps<{
   igualacion: false
 })
 
-const filter = shallowRef('')
-const statusKey = shallowRef('all')
-const paymentStatusKey = shallowRef('all')
-const dateRange = shallowRef<OrderDateRange | null>(null)
-const page = shallowRef(1)
+function queryValue(value: unknown) {
+  return typeof value === 'string' ? value : ''
+}
+
+function queryPage(value: unknown) {
+  const parsedPage = Number(queryValue(value))
+  return Number.isInteger(parsedPage) && parsedPage > 0 ? parsedPage : 1
+}
+
+function queryDateRange(from: unknown, to: unknown): OrderDateRange | null {
+  const start = queryValue(from)
+  const end = queryValue(to)
+  if (!start || !end) return null
+
+  try {
+    return { start: parseDate(start), end: parseDate(end) }
+  } catch {
+    return null
+  }
+}
+
+const route = useRoute()
+const router = useRouter()
+const filter = shallowRef(queryValue(route.query.search))
+const statusKey = shallowRef(queryValue(route.query.status) || 'all')
+const paymentStatusKey = shallowRef(queryValue(route.query.payment_status) || 'all')
+const dateRange = shallowRef<OrderDateRange | null>(
+  queryDateRange(route.query.date_from, route.query.date_to)
+)
+const page = shallowRef(queryPage(route.query.page))
 const pageSize = 25
 const debouncedFilter = refDebounced(filter, 300)
 const { user } = useAuth()
@@ -35,6 +61,25 @@ const dateFrom = computed(() => dateRange.value?.start && dateRange.value?.end
 const dateTo = computed(() => dateRange.value?.start && dateRange.value?.end
   ? dateRange.value.end.toString()
   : undefined)
+const listQuery = computed(() => ({
+  ...(filter.value ? { search: filter.value } : {}),
+  ...(statusKey.value !== 'all' ? { status: statusKey.value } : {}),
+  ...(paymentStatusKey.value !== 'all' ? { payment_status: paymentStatusKey.value } : {}),
+  ...(dateFrom.value ? { date_from: dateFrom.value } : {}),
+  ...(dateTo.value ? { date_to: dateTo.value } : {}),
+  ...(page.value > 1 ? { page: String(page.value) } : {})
+}))
+const returnTo = computed(() => router.resolve({
+  path: route.path,
+  query: listQuery.value
+}).fullPath)
+
+watch(
+  [debouncedFilter, statusKey, paymentStatusKey, dateFrom, dateTo, page],
+  () => {
+    void router.replace({ query: listQuery.value })
+  }
+)
 
 const {
   data: orders,
@@ -119,6 +164,7 @@ const statusTabItems = computed(() => {
         :statuses="statuses"
         :igualacion="igualacion"
         :can-create="canCreate"
+        :return-to="returnTo"
       />
 
       <UTabs
@@ -141,6 +187,7 @@ const statusTabItems = computed(() => {
         :orders="orders.results"
         :loading="loading"
         :igualacion="igualacion"
+        :return-to="returnTo"
       />
 
       <OrdersOrderListPagination

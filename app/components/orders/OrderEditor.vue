@@ -6,6 +6,7 @@ import type { SiigoCustomer, SiigoProduct } from '~/types/siigo'
 import { submittedOrderStatusKey, canManageOrderLogistics } from '~/utils/roleAccess'
 import { DEFAULT_PAYMENT_STATUS } from '~/utils/orderPayment'
 import { discountAmountOf } from '~/utils/orderDiscount'
+import { orderListReturnPath } from '~/utils/orderNavigation'
 import { draftLineTotal } from '~/composables/useOrderDraft'
 
 const props = withDefaults(defineProps<{
@@ -15,8 +16,23 @@ const props = withDefaults(defineProps<{
   mode: 'order',
   orderId: undefined
 })
+const route = useRoute()
+const router = useRouter()
 const isQuoteMode = computed(() => props.mode === 'quote')
 const isEditing = computed(() => Boolean(props.orderId))
+const returnPath = computed(() => orderListReturnPath(route.query.returnTo))
+
+function orderDetailLocation(orderId: string) {
+  return {
+    path: `/ventas/${encodeURIComponent(orderId)}`,
+    query: { returnTo: returnPath.value }
+  }
+}
+
+const cancelPath = computed(() => isEditing.value && props.orderId
+  ? router.resolve(orderDetailLocation(props.orderId)).fullPath
+  : returnPath.value
+)
 const documentNoun = computed(() => isQuoteMode.value ? 'cotización' : 'pedido')
 const documentNounCapitalized = computed(() =>
   documentNoun.value.charAt(0).toUpperCase() + documentNoun.value.slice(1))
@@ -447,7 +463,7 @@ async function confirmSubmit(statusKey: string) {
       icon: 'i-lucide-circle-check'
     })
     if (isEditing.value) {
-      await navigateTo(`/ventas/${order.id}`)
+      await navigateTo(orderDetailLocation(order.id))
     } else {
       createdOrder.value = order
       modalPhase.value = 'done'
@@ -476,7 +492,7 @@ async function confirmSubmit(statusKey: string) {
       <UDashboardNavbar :title="pageTitle">
         <template #leading>
           <UButton
-            to="/ventas"
+            :to="returnPath"
             icon="i-lucide-arrow-left"
             color="neutral"
             variant="ghost"
@@ -546,7 +562,6 @@ async function confirmSubmit(statusKey: string) {
           :grand-total="grandTotal"
           :quote-mode="isQuoteMode"
           :editable-prices="mayEditLinePrices"
-          :cancel-to="isEditing && orderId ? `/ventas/${orderId}` : '/ventas'"
           @remove="removeProduct"
           @observations="setObservations"
           @quantity="setQuantity"
@@ -559,13 +574,19 @@ async function confirmSubmit(statusKey: string) {
           :saving-draft="savingDraft"
           :disabled="!canSubmit"
           :quote-mode="isQuoteMode"
+          :cancel-to="cancelPath"
           @save-draft="saveAsQuote"
         />
       </UForm>
 
       <UModal
         v-model:open="summaryOpen"
-        :title="modalPhase === 'done' ? `${documentNounCapitalized} enviado` : `Resumen ${documentOf}`"
+        :title="modalPhase === 'sending'
+          ? undefined
+          : modalPhase === 'done'
+            ? `${documentNounCapitalized} enviado`
+            : `Resumen ${documentOf}`"
+        :close="false"
         :dismissible="modalPhase !== 'sending'"
       >
         <template #body>
@@ -601,20 +622,20 @@ async function confirmSubmit(statusKey: string) {
                 {{ formatDate(pendingSubmission.promisedDate) }}
               </p>
             </div>
-            <div>
+            <div v-if="pendingSubmission.tags.length">
               <p class="text-sm text-muted">
                 Etiquetas
               </p>
               <p class="font-medium">
-                {{ pendingSubmission.tags.join(', ') || '—' }}
+                {{ pendingSubmission.tags.join(', ') }}
               </p>
             </div>
-            <div>
+            <div v-if="pendingSubmission.observations?.trim()">
               <p class="text-sm text-muted">
                 Observaciones
               </p>
               <p class="font-medium whitespace-pre-wrap">
-                {{ pendingSubmission.observations || '—' }}
+                {{ pendingSubmission.observations }}
               </p>
             </div>
             <div>
@@ -688,7 +709,7 @@ async function confirmSubmit(statusKey: string) {
               color="neutral"
               variant="outline"
               class="justify-center"
-              @click="navigateTo('/ventas')"
+              @click="navigateTo(returnPath)"
             />
             <UButton
               v-if="createdOrder"
@@ -697,7 +718,7 @@ async function confirmSubmit(statusKey: string) {
               color="neutral"
               variant="soft"
               class="justify-center"
-              @click="navigateTo(`/ventas/${createdOrder.id}`)"
+              @click="navigateTo(orderDetailLocation(createdOrder.id))"
             />
             <UButton
               v-if="createdOrder"

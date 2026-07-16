@@ -4,6 +4,7 @@ import type { SalesOrderListItem } from '~/types/orders'
 withDefaults(defineProps<{
   orders: readonly SalesOrderListItem[]
   loading: boolean
+  returnTo: string
   igualacion?: boolean
 }>(), {
   igualacion: false
@@ -62,7 +63,10 @@ function igualacionItems(order: SalesOrderListItem) {
             </p>
             <NuxtLink
               v-if="!igualacion"
-              :to="`/ventas/${encodeURIComponent(order.id)}`"
+              :to="{
+                path: `/ventas/${encodeURIComponent(order.id)}`,
+                query: { returnTo }
+              }"
               class="text-lg font-semibold text-primary hover:underline"
               :aria-label="`Abrir pedido ${order.number}`"
             >
@@ -136,7 +140,10 @@ function igualacionItems(order: SalesOrderListItem) {
 
         <UButton
           v-if="!igualacion"
-          :to="`/ventas/${encodeURIComponent(order.id)}`"
+          :to="{
+            path: `/ventas/${encodeURIComponent(order.id)}`,
+            query: { returnTo }
+          }"
           label="Ver pedido"
           icon="i-lucide-arrow-right"
           trailing

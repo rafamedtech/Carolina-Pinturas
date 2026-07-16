@@ -7,6 +7,7 @@ import type { SalesOrderListItem } from '~/types/orders'
 const props = withDefaults(defineProps<{
   orders: readonly SalesOrderListItem[]
   loading: boolean
+  returnTo: string
   igualacion?: boolean
 }>(), {
   igualacion: false
@@ -88,7 +89,10 @@ const numberColumn: TableColumn<SalesOrderListItem> = props.igualacion
       cell: ({ row }) => h(
         NuxtLink,
         {
-          'to': `/ventas/${encodeURIComponent(row.original.id)}`,
+          'to': {
+            path: `/ventas/${encodeURIComponent(row.original.id)}`,
+            query: { returnTo: props.returnTo }
+          },
           'class': 'font-medium text-primary hover:underline',
           'aria-label': `Abrir pedido ${row.original.number}`
         },
@@ -116,6 +120,7 @@ const columns = computed<TableColumn<SalesOrderListItem>[]>(() => [numberColumn,
     :orders="orders"
     :loading="loading"
     :igualacion="igualacion"
+    :return-to="returnTo"
     @open="openOrder"
   />
 
@@ -206,7 +211,10 @@ const columns = computed<TableColumn<SalesOrderListItem>[]>(() => [numberColumn,
     <template #footer>
       <UButton
         v-if="selectedOrder"
-        :to="`/ventas/${encodeURIComponent(selectedOrder.id)}`"
+        :to="{
+          path: `/ventas/${encodeURIComponent(selectedOrder.id)}`,
+          query: { returnTo }
+        }"
         label="Atender pedido"
         icon="i-lucide-arrow-right"
         trailing
