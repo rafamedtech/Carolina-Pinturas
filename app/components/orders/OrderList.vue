@@ -37,6 +37,7 @@ const router = useRouter()
 const filter = shallowRef(queryValue(route.query.search))
 const statusKey = shallowRef(queryValue(route.query.status) || 'all')
 const paymentStatusKey = shallowRef(queryValue(route.query.payment_status) || 'all')
+const paymentMethodKey = shallowRef(queryValue(route.query.payment_method) || 'all')
 const dateRange = shallowRef<OrderDateRange | null>(
   queryDateRange(route.query.date_from, route.query.date_to)
 )
@@ -51,7 +52,7 @@ onMounted(() => {
   isHydrated.value = true
 })
 
-watch([filter, statusKey, paymentStatusKey, dateRange], () => {
+watch([filter, statusKey, paymentStatusKey, paymentMethodKey, dateRange], () => {
   page.value = 1
 })
 
@@ -65,6 +66,7 @@ const listQuery = computed(() => ({
   ...(filter.value ? { search: filter.value } : {}),
   ...(statusKey.value !== 'all' ? { status: statusKey.value } : {}),
   ...(paymentStatusKey.value !== 'all' ? { payment_status: paymentStatusKey.value } : {}),
+  ...(paymentMethodKey.value !== 'all' ? { payment_method: paymentMethodKey.value } : {}),
   ...(dateFrom.value ? { date_from: dateFrom.value } : {}),
   ...(dateTo.value ? { date_to: dateTo.value } : {}),
   ...(page.value > 1 ? { page: String(page.value) } : {})
@@ -75,7 +77,7 @@ const returnTo = computed(() => router.resolve({
 }).fullPath)
 
 watch(
-  [debouncedFilter, statusKey, paymentStatusKey, dateFrom, dateTo, page],
+  [debouncedFilter, statusKey, paymentStatusKey, paymentMethodKey, dateFrom, dateTo, page],
   () => {
     void router.replace({ query: listQuery.value })
   }
@@ -94,6 +96,7 @@ const {
     search: debouncedFilter,
     status: computed(() => statusKey.value === 'all' ? undefined : statusKey.value),
     payment_status: computed(() => paymentStatusKey.value === 'all' ? undefined : paymentStatusKey.value),
+    payment_method: computed(() => paymentMethodKey.value === 'all' ? undefined : paymentMethodKey.value),
     date_from: dateFrom,
     date_to: dateTo,
     igualacion: props.igualacion ? 'true' : undefined
@@ -160,6 +163,7 @@ const statusTabItems = computed(() => {
         v-model:filter="filter"
         v-model:status="statusKey"
         v-model:payment-status="paymentStatusKey"
+        v-model:payment-method="paymentMethodKey"
         v-model:date-range="dateRange"
         :statuses="statuses"
         :igualacion="igualacion"

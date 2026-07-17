@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { OrderDateRange, OrderStatus } from '~/types/orders'
-import { PAYMENT_STATUSES } from '~/utils/orderPayment'
+import { PAYMENT_METHODS, PAYMENT_STATUSES } from '~/utils/orderPayment'
 
 const props = withDefaults(defineProps<{
   statuses: OrderStatus[]
@@ -15,6 +15,7 @@ const props = withDefaults(defineProps<{
 const filter = defineModel<string>('filter', { required: true })
 const status = defineModel<string>('status', { required: true })
 const paymentStatus = defineModel<string>('paymentStatus', { required: true })
+const paymentMethod = defineModel<string>('paymentMethod', { required: true })
 const dateRange = defineModel<OrderDateRange | null>('dateRange', { required: true })
 
 const IGUALACION_STATUS_KEYS = ['confirmado', 'surtido', 'en_espera']
@@ -39,6 +40,14 @@ const paymentStatusOptions = [{
   label: item.label,
   value: item.key as string
 }))]
+
+const paymentMethodOptions = [{
+  label: 'Todos los métodos',
+  value: 'all'
+}, ...PAYMENT_METHODS.map(item => ({
+  label: item.label,
+  value: item.key as string
+}))]
 </script>
 
 <template>
@@ -60,6 +69,13 @@ const paymentStatusOptions = [{
         v-if="!igualacion"
         v-model="paymentStatus"
         :items="paymentStatusOptions"
+        value-key="value"
+        class="w-full sm:w-48"
+      />
+      <USelect
+        v-if="!igualacion"
+        v-model="paymentMethod"
+        :items="paymentMethodOptions"
         value-key="value"
         class="w-full sm:w-48"
       />

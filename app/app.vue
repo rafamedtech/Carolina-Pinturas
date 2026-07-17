@@ -1,4 +1,7 @@
 <script setup lang="ts">
+import { es } from '@nuxt/ui/locale'
+
+const locale = extendLocale(es, { code: 'es-MX' })
 const colorMode = useColorMode()
 
 const color = computed(() => colorMode.value === 'dark' ? '#1b1718' : 'white')
@@ -14,7 +17,7 @@ useHead({
     { rel: 'icon', href: '/carolina-logo.jpg', type: 'image/jpeg' }
   ],
   htmlAttrs: {
-    lang: 'en'
+    lang: 'es-MX'
   }
 })
 
@@ -31,7 +34,7 @@ useSeoMeta({
 </script>
 
 <template>
-  <UApp>
+  <UApp :locale="locale">
     <NuxtLoadingIndicator />
     <SiigoLoadingOverlay />
 

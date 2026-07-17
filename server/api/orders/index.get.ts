@@ -26,6 +26,7 @@ export default eventHandler(async (event) => {
     search: typeof query.search === 'string' ? query.search.trim().slice(0, 200) : undefined,
     statusKey: typeof query.status === 'string' ? query.status.trim().slice(0, 32) : undefined,
     paymentStatus: typeof query.payment_status === 'string' ? query.payment_status.trim().slice(0, 32) : undefined,
+    paymentMethod: typeof query.payment_method === 'string' ? query.payment_method.trim().slice(0, 32) : undefined,
     dateFrom: dateOnly(query.date_from),
     dateTo: dateOnly(query.date_to),
     igualacion: query.igualacion === 'true' || query.igualacion === '1'
