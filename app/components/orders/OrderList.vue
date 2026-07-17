@@ -103,6 +103,7 @@ const {
   },
   default: () => ({
     results: [],
+    filteredTotal: 0,
     pagination: {
       page: 1,
       pageSize,
@@ -198,6 +199,7 @@ const statusTabItems = computed(() => {
         v-if="!error"
         v-model:page="page"
         :total-results="orders.pagination.totalResults"
+        :filtered-total="igualacion ? undefined : orders.filteredTotal"
         :page-size="orders.pagination.pageSize"
         :loading="loading"
       />

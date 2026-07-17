@@ -835,7 +835,7 @@ export async function listOrders(options: {
       searchFilter
     ]
   }
-  const [orders, totalResults] = await prisma.$transaction([
+  const [orders, totalResults, totalAmount] = await prisma.$transaction([
     prisma.salesOrder.findMany({
       where,
       include: {
@@ -854,11 +854,16 @@ export async function listOrders(options: {
       skip: (options.page - 1) * options.pageSize,
       take: options.pageSize
     }),
-    prisma.salesOrder.count({ where })
+    prisma.salesOrder.count({ where }),
+    prisma.salesOrder.aggregate({
+      where,
+      _sum: { total: true }
+    })
   ])
 
   return {
     results: orders.map(listItem),
+    filteredTotal: number(totalAmount._sum.total ?? 0),
     pagination: {
       page: options.page,
       pageSize: options.pageSize,

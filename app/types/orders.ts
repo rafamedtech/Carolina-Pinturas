@@ -64,6 +64,7 @@ export interface SalesOrderListItem {
 
 export interface SalesOrderListResponse {
   results: SalesOrderListItem[]
+  filteredTotal: number
   pagination: {
     page: number
     pageSize: number
