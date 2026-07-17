@@ -1,16 +1,23 @@
+<script setup lang="ts">
+import type { DashboardDailySale } from '~/types/dashboard'
+
+defineProps<{
+  data: DashboardDailySale[]
+  periodLabel: string
+}>()
+</script>
+
 <template>
-  <UCard class="shrink-0" :ui="{ body: 'px-0! pt-0! pb-3!' }">
+  <UCard class="shrink-0" :ui="{ header: 'pb-0', body: 'px-4! pt-3! pb-3!' }">
     <template #header>
       <div>
-        <p class="text-xs text-muted uppercase mb-1.5">
-          Revenue
+        <p class="font-semibold text-highlighted">
+          Ventas de los últimos 7 días
         </p>
-        <p class="text-3xl text-highlighted font-semibold">
-          ---
-        </p>
+        <USkeleton class="mt-3 h-8 w-40" />
       </div>
     </template>
 
-    <div class="h-96" />
+    <USkeleton class="h-80 w-full rounded-lg" />
   </UCard>
 </template>

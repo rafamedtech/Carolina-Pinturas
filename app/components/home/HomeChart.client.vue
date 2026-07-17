@@ -1,121 +1,74 @@
 <script setup lang="ts">
-import { eachDayOfInterval, eachWeekOfInterval, eachMonthOfInterval, format } from 'date-fns'
-import { VisXYContainer, VisLine, VisAxis, VisArea, VisCrosshair, VisTooltip } from '@unovis/vue'
-import type { Period, Range } from '~/types'
-
-const cardRef = useTemplateRef<HTMLElement | null>('cardRef')
+import type { DashboardDailySale } from '~/types/dashboard'
+import { dashboardCurrency } from '~/utils/dashboardFormatters'
 
 const props = defineProps<{
-  period: Period
-  range: Range
+  data: DashboardDailySale[]
+  periodLabel: string
 }>()
 
-type DataRecord = {
-  date: Date
-  amount: number
+const total = computed(() => props.data.reduce((sum, item) => sum + item.total, 0))
+const hasSales = computed(() => props.data.some(item => item.total > 0))
+const recentDays = computed(() => props.data.slice(-7))
+const maximum = computed(() => Math.max(...recentDays.value.map(item => item.total), 0))
+
+function progress(item: DashboardDailySale) {
+  return maximum.value > 0 ? (item.total / maximum.value) * 100 : 0
 }
-
-const { width } = useElementSize(cardRef)
-
-const data = ref<DataRecord[]>([])
-
-watch([() => props.period, () => props.range], () => {
-  const dates = ({
-    daily: eachDayOfInterval,
-    weekly: eachWeekOfInterval,
-    monthly: eachMonthOfInterval
-  } as Record<Period, typeof eachDayOfInterval>)[props.period](props.range)
-
-  const min = 1000
-  const max = 10000
-
-  data.value = dates.map(date => ({ date, amount: Math.floor(Math.random() * (max - min + 1)) + min }))
-}, { immediate: true })
-
-const x = (_: DataRecord, i: number) => i
-const y = (d: DataRecord) => d.amount
-
-const total = computed(() => data.value.reduce((acc: number, { amount }) => acc + amount, 0))
-
-const formatNumber = new Intl.NumberFormat('en', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format
-
-const formatDate = (date: Date): string => {
-  return ({
-    daily: format(date, 'd MMM'),
-    weekly: format(date, 'd MMM'),
-    monthly: format(date, 'MMM yyy')
-  })[props.period]
-}
-
-const xTicks = (i: number) => {
-  if (i === 0 || i === data.value.length - 1 || !data.value[i]) {
-    return ''
-  }
-
-  return formatDate(data.value[i].date)
-}
-
-const template = (d: DataRecord) => `${formatDate(d.date)}: ${formatNumber(d.amount)}`
 </script>
 
 <template>
-  <UCard ref="cardRef" :ui="{ root: 'overflow-visible', body: 'px-0! pt-0! pb-3!' }">
+  <UCard :ui="{ header: 'pb-3', body: 'pt-2' }">
     <template #header>
-      <div>
-        <p class="text-xs text-muted uppercase mb-1.5">
-          Revenue
-        </p>
-        <p class="text-3xl text-highlighted font-semibold">
-          {{ formatNumber(total) }}
-        </p>
+      <div class="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <h2 class="font-semibold text-highlighted">
+            Ventas de los últimos 7 días
+          </h2>
+          <p class="mt-1 text-sm text-muted capitalize">
+            Tendencia diaria de {{ periodLabel }}
+          </p>
+        </div>
+        <UBadge
+          :label="dashboardCurrency.format(total)"
+          icon="i-lucide-chart-column"
+          color="primary"
+          variant="soft"
+        />
       </div>
     </template>
 
-    <VisXYContainer
-      :data="data"
-      :padding="{ top: 40 }"
-      class="h-96"
-      :width="width"
-    >
-      <VisLine
-        :x="x"
-        :y="y"
-        color="var(--ui-primary)"
-      />
-      <VisArea
-        :x="x"
-        :y="y"
-        color="var(--ui-primary)"
-        :opacity="0.1"
-      />
+    <div v-if="hasSales" class="space-y-5">
+      <div
+        v-for="item in recentDays"
+        :key="item.date"
+        class="grid gap-2 sm:grid-cols-[5rem_minmax(0,1fr)_7rem] sm:items-center"
+      >
+        <p class="text-sm text-muted">
+          {{ item.label }}
+        </p>
+        <UProgress
+          :model-value="progress(item)"
+          color="primary"
+          size="lg"
+        />
+        <div class="flex items-center justify-between gap-2 sm:block sm:text-right">
+          <p class="text-sm font-medium text-highlighted">
+            {{ dashboardCurrency.format(item.total) }}
+          </p>
+          <p class="text-xs text-muted">
+            {{ item.orders }} {{ item.orders === 1 ? 'pedido' : 'pedidos' }}
+          </p>
+        </div>
+      </div>
+    </div>
 
-      <VisAxis
-        type="x"
-        :x="x"
-        :tick-format="xTicks"
-      />
-
-      <VisCrosshair
-        color="var(--ui-primary)"
-        :template="template"
-      />
-
-      <VisTooltip />
-    </VisXYContainer>
+    <UEmpty
+      v-else
+      icon="i-lucide-chart-spline"
+      title="Aún no hay ventas este mes"
+      description="La tendencia aparecerá aquí cuando se registren pedidos."
+      class="h-80"
+    />
   </UCard>
 </template>
-
-<style scoped>
-.unovis-xy-container {
-  --vis-crosshair-line-stroke-color: var(--ui-primary);
-  --vis-crosshair-circle-stroke-color: var(--ui-bg);
-
-  --vis-axis-grid-color: var(--ui-border);
-  --vis-axis-tick-color: var(--ui-border);
-  --vis-axis-tick-label-color: var(--ui-text-dimmed);
-
-  --vis-tooltip-background-color: var(--ui-bg);
-  --vis-tooltip-border-color: var(--ui-border);
-  --vis-tooltip-text-color: var(--ui-text-highlighted);
-}
-</style>

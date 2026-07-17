@@ -11,20 +11,19 @@ useSeoMeta({ title: 'Inicio' })
         </template>
         <template #right>
           <UButton
-            label="Productos"
-            icon="i-lucide-package"
+            label="Ver ventas"
+            icon="i-lucide-list-filter"
             color="neutral"
             variant="ghost"
-            to="/productos"
+            to="/ventas"
           />
-          <UButton label="Clientes" icon="i-lucide-users" to="/clientes" />
+          <UButton label="Nuevo pedido" icon="i-lucide-plus" to="/ventas/nuevo-pedido" />
         </template>
       </UDashboardNavbar>
     </template>
 
     <template #body>
-      <HomeStats />
-      <HomeSales />
+      <HomeDashboard />
     </template>
   </UDashboardPanel>
 </template>
