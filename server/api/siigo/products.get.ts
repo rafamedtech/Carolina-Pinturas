@@ -4,10 +4,11 @@ import { requireRole } from '../../utils/auth'
 import { listQuery, siigoRequest } from '../../utils/siigo'
 
 const siigoPageSize = 25
+const activeProductsQuery = { active: 'true' }
 
 async function getAllProducts() {
   const firstPage = await siigoRequest<SiigoListResponse<SiigoProduct>>('/v1/products', {
-    query: { page: '1', page_size: String(siigoPageSize) }
+    query: { ...activeProductsQuery, page: '1', page_size: String(siigoPageSize) }
   })
   const allProducts = [...firstPage.results]
   const totalInSiigo = firstPage.pagination?.total_results || allProducts.length
@@ -15,7 +16,7 @@ async function getAllProducts() {
 
   for (let sourcePage = 2; sourcePage <= totalPages; sourcePage++) {
     const response = await siigoRequest<SiigoListResponse<SiigoProduct>>('/v1/products', {
-      query: { page: String(sourcePage), page_size: String(siigoPageSize) }
+      query: { ...activeProductsQuery, page: String(sourcePage), page_size: String(siigoPageSize) }
     })
     allProducts.push(...response.results)
   }
@@ -38,5 +39,7 @@ export default eventHandler(async (event) => {
     return getAllProducts()
   }
 
-  return siigoRequest<SiigoListResponse<SiigoProduct>>('/v1/products', { query: listQuery(event) })
+  return siigoRequest<SiigoListResponse<SiigoProduct>>('/v1/products', {
+    query: { ...listQuery(event), ...activeProductsQuery }
+  })
 })
