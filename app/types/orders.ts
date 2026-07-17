@@ -55,6 +55,8 @@ export interface SalesOrderListItem {
   promisedDate: string | null
   total: number
   itemCount: number
+  paymentStatus: string
+  paymentMethod: string | null
   partidas?: { code: string, name: string, quantity: number, observations: string | null, isIgualacion: boolean }[]
   createdAt: string
   updatedAt: string
@@ -130,8 +132,6 @@ export interface SalesOrderDetail extends SalesOrderListItem {
   remision: string | null
   requiresInvoice: boolean
   tags: string[]
-  paymentStatus: string
-  paymentMethod: string | null
   paymentDate: string | null
   currencyCode: string
   subtotal: number

@@ -381,6 +381,8 @@ function listItem(order: SalesOrder & {
     promisedDate: dateOnly(order.promisedDate),
     total: number(order.total),
     itemCount: order._count.items,
+    paymentStatus: order.paymentStatus,
+    paymentMethod: order.paymentMethod,
     ...(order.items
       ? {
           partidas: order.items.map(item => ({

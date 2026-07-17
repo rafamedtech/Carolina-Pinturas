@@ -3,6 +3,7 @@ import { h, resolveComponent } from 'vue'
 import type { TableColumn } from '@nuxt/ui'
 import OrderListCards from './OrderListCards.vue'
 import type { SalesOrderListItem } from '~/types/orders'
+import { paymentMethodLabel, paymentStatusColor, paymentStatusLabel } from '~/utils/orderPayment'
 
 const props = withDefaults(defineProps<{
   orders: readonly SalesOrderListItem[]
@@ -16,6 +17,7 @@ const props = withDefaults(defineProps<{
 const OrderStatusBadge = resolveComponent('OrdersOrderStatusBadge')
 const NuxtLink = resolveComponent('NuxtLink')
 const UButton = resolveComponent('UButton')
+const UBadge = resolveComponent('UBadge')
 const currency = new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' })
 const tableOrders = computed(() => [...props.orders])
 
@@ -51,10 +53,20 @@ const igualacionColumn: TableColumn<SalesOrderListItem> = {
   }
 }
 
-const itemsColumn: TableColumn<SalesOrderListItem> = {
-  id: 'items',
-  header: () => h('div', { class: 'text-right' }, 'Partidas'),
-  cell: ({ row }) => h('div', { class: 'text-right' }, String(row.original.itemCount))
+const paymentStatusColumn: TableColumn<SalesOrderListItem> = {
+  id: 'paymentStatus',
+  header: 'Estado de pago',
+  cell: ({ row }) => h(UBadge, {
+    color: paymentStatusColor(row.original.paymentStatus),
+    label: paymentStatusLabel(row.original.paymentStatus),
+    variant: 'subtle'
+  })
+}
+
+const paymentMethodColumn: TableColumn<SalesOrderListItem> = {
+  id: 'paymentMethod',
+  header: 'Método de pago',
+  cell: ({ row }) => paymentMethodLabel(row.original.paymentMethod)
 }
 
 const totalColumn: TableColumn<SalesOrderListItem> = {
@@ -108,7 +120,7 @@ const columns = computed<TableColumn<SalesOrderListItem>[]>(() => [numberColumn,
   id: 'customer',
   header: 'Cliente',
   cell: ({ row }) => row.original.customer.name
-}, props.igualacion ? igualacionColumn : itemsColumn, {
+}, ...(props.igualacion ? [igualacionColumn] : [paymentStatusColumn, paymentMethodColumn]), {
   id: 'status',
   header: 'Estado',
   cell: ({ row }) => h(OrderStatusBadge, { status: row.original.status })
