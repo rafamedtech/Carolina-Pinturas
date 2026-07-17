@@ -27,6 +27,10 @@ export function canCreateOrders(role: UserRole) {
   return ORDER_ENTRY_ROLES.includes(role as typeof ORDER_ENTRY_ROLES[number])
 }
 
+export function canCustomizeOrderColumns(role: UserRole) {
+  return role === 'admin'
+}
+
 export function creatableOrderStatusKeys(role: UserRole): readonly string[] | null {
   if (role === 'admin') return null
   if (role === 'mostrador') return MOSTRADOR_CREATE_STATUS_KEYS

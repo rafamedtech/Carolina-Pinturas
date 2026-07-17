@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { h, resolveComponent } from 'vue'
-import type { TableColumn } from '@nuxt/ui'
+import type { DropdownMenuItem, TableColumn } from '@nuxt/ui'
+import type { Table, VisibilityState } from '@tanstack/table-core'
 import OrderListCards from './OrderListCards.vue'
 import type { SalesOrderListItem } from '~/types/orders'
 import { paymentMethodLabel, paymentStatusColor, paymentStatusLabel } from '~/utils/orderPayment'
@@ -10,8 +11,10 @@ const props = withDefaults(defineProps<{
   loading: boolean
   returnTo: string
   igualacion?: boolean
+  canCustomizeColumns?: boolean
 }>(), {
-  igualacion: false
+  igualacion: false,
+  canCustomizeColumns: false
 })
 
 const OrderStatusBadge = resolveComponent('OrdersOrderStatusBadge')
@@ -19,7 +22,19 @@ const NuxtLink = resolveComponent('NuxtLink')
 const UButton = resolveComponent('UButton')
 const UBadge = resolveComponent('UBadge')
 const currency = new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' })
+const dateTime = new Intl.DateTimeFormat('es-MX', {
+  dateStyle: 'short',
+  timeStyle: 'short'
+})
 const tableOrders = computed(() => [...props.orders])
+const table = useTemplateRef<{ tableApi: Table<SalesOrderListItem> }>('table')
+const columnVisibility = ref<VisibilityState>({
+  promisedDate: false,
+  rfc: false,
+  itemCount: false,
+  createdAt: false,
+  updatedAt: false
+})
 
 const selectedOrder = shallowRef<SalesOrderListItem | null>(null)
 const detailOpen = shallowRef(false)
@@ -32,6 +47,10 @@ function openOrder(order: SalesOrderListItem) {
 function formatDate(value: string | null) {
   if (!value) return '—'
   return value.split('-').reverse().join('/')
+}
+
+function formatDateTime(value: string) {
+  return dateTime.format(new Date(value))
 }
 
 const igualacionColumn: TableColumn<SalesOrderListItem> = {
@@ -117,14 +136,68 @@ const columns = computed<TableColumn<SalesOrderListItem>[]>(() => [numberColumn,
   header: 'Fecha',
   cell: ({ row }) => formatDate(row.original.orderDate)
 }, {
+  accessorKey: 'promisedDate',
+  header: 'Fecha prometida',
+  cell: ({ row }) => formatDate(row.original.promisedDate)
+}, {
   id: 'customer',
   header: 'Cliente',
   cell: ({ row }) => row.original.customer.name
+}, {
+  id: 'rfc',
+  header: 'RFC',
+  cell: ({ row }) => row.original.customer.rfc || '—'
+}, {
+  accessorKey: 'itemCount',
+  header: 'Partidas'
 }, ...(props.igualacion ? [igualacionColumn] : [paymentStatusColumn, paymentMethodColumn]), {
   id: 'status',
   header: 'Estado',
   cell: ({ row }) => h(OrderStatusBadge, { status: row.original.status })
-}, ...(props.igualacion ? [] : [totalColumn])])
+}, ...(props.igualacion ? [] : [totalColumn]), {
+  accessorKey: 'createdAt',
+  header: 'Creado',
+  cell: ({ row }) => formatDateTime(row.original.createdAt)
+}, {
+  accessorKey: 'updatedAt',
+  header: 'Última actualización',
+  cell: ({ row }) => formatDateTime(row.original.updatedAt)
+}])
+
+const columnLabels: Record<string, string> = {
+  number: 'Pedido',
+  orderDate: 'Fecha',
+  promisedDate: 'Fecha prometida',
+  customer: 'Cliente',
+  rfc: 'RFC',
+  itemCount: 'Partidas',
+  igualaciones: 'Igualaciones',
+  paymentStatus: 'Estado de pago',
+  paymentMethod: 'Método de pago',
+  status: 'Estado',
+  total: 'Total',
+  createdAt: 'Creado',
+  updatedAt: 'Última actualización'
+}
+
+const columnMenuItems = computed<DropdownMenuItem[]>(() => {
+  const visibility = columnVisibility.value
+
+  return table.value?.tableApi
+    .getAllColumns()
+    .filter(column => column.getCanHide())
+    .map(column => ({
+      label: columnLabels[column.id] || column.id,
+      type: 'checkbox' as const,
+      checked: visibility[column.id] ?? column.getIsVisible(),
+      onUpdateChecked(checked: boolean) {
+        table.value?.tableApi.getColumn(column.id)?.toggleVisibility(checked)
+      },
+      onSelect(event: Event) {
+        event.preventDefault()
+      }
+    })) || []
+})
 </script>
 
 <template>
@@ -142,21 +215,40 @@ const columns = computed<TableColumn<SalesOrderListItem>[]>(() => [numberColumn,
     class="hidden shrink-0 md:block"
   />
 
-  <UTable
-    v-else
-    :data="tableOrders"
-    :columns="columns"
-    empty="No hay pedidos para mostrar."
-    class="hidden shrink-0 md:block"
-    :ui="{
-      base: 'table-fixed border-separate border-spacing-0',
-      thead: '[&>tr]:bg-elevated/50 [&>tr]:after:content-none',
-      tbody: '[&>tr]:last:[&>td]:border-b-0',
-      th: 'py-2 first:rounded-l-lg last:rounded-r-lg border-y border-default first:border-l last:border-r',
-      td: 'border-b border-default',
-      separator: 'h-0'
-    }"
-  />
+  <template v-else>
+    <div v-if="canCustomizeColumns" class="hidden justify-end md:flex">
+      <UDropdownMenu
+        :items="columnMenuItems"
+        :content="{ align: 'end' }"
+      >
+        <UButton
+          label="Columnas"
+          icon="i-lucide-columns-3"
+          trailing-icon="i-lucide-chevron-down"
+          color="neutral"
+          variant="outline"
+          aria-label="Seleccionar columnas visibles"
+        />
+      </UDropdownMenu>
+    </div>
+
+    <UTable
+      ref="table"
+      v-model:column-visibility="columnVisibility"
+      :data="tableOrders"
+      :columns="columns"
+      empty="No hay pedidos para mostrar."
+      class="hidden shrink-0 md:block"
+      :ui="{
+        base: 'min-w-full border-separate border-spacing-0',
+        thead: '[&>tr]:bg-elevated/50 [&>tr]:after:content-none',
+        tbody: '[&>tr]:last:[&>td]:border-b-0',
+        th: 'py-2 first:rounded-l-lg last:rounded-r-lg border-y border-default first:border-l last:border-r',
+        td: 'border-b border-default',
+        separator: 'h-0'
+      }"
+    />
+  </template>
 
   <UModal
     v-model:open="detailOpen"
