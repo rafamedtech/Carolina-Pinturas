@@ -1,0 +1,2414 @@
+FORMAT: 1A
+HOST: https://api.siigo.mx
+
+# Siigo API México
+Siigo API México te permite integrar cualquiera de tus aplicaciones a Siigo Nube para automatizar todo tu ciclo de venta.
+
+Tendrás acceso a los siguientes recursos:
+
+| Recurso                   | Endpoint               | Descripción
+|---------------------------|------------------------|-------------------------------------------
+| Productos o servicios     | /products              | Crear, consultar, actualizar y borrar productos.|
+| Clientes                  | /customers             | Crear, consultar y actualizar clientes, proveedores u otros.|
+| Facturas de venta         | /invoices              | Crear, consultar, actualizar, timbrar, enviar por mail y borrar facturas de venta.|
+| Recepciones de pago       | /vouchers              | Crear, consultar, actualizar, timbrar, enviar por mail y borrar recepciones de pago|
+
+
+# Códigos de estado HTTP
+
+| Código | Mensaje                | Descripción
+|------|------------------------|-------------------------------------------
+| 200  | OK                     | La solicitud ha tenido éxito.|
+| 201  | Created                | La solicitud ha tenido éxito y se ha creado un nuevo recurso como resultado de ello.|
+| 400  | Bad Request            | Existe un problema en el lado del cliente, a menudo debido a que falta un parámetro obligatorio.|
+| 401  | Unauthorized           | No se ha proporcionado ningún access_token válido.|
+| 403  | Forbidden              | El usuario asociado con el access_token no tiene permisos para realizar la solicitud.|
+| 404  | Not Found              | El recurso solicitado no existe.|
+| 408  | Request Timeout        | Siigo API no logró completar la solicitud dentro del tiempo que estaba preparado para esperar.|
+| 409  | Conflict               | Solicitud HTTP válida, pero se está intentando poner los recursos del servidor en un estado imposible o inconsistente.|
+| 415  | Unsupported media type | Se envió un media type no soportado. El servidor podría haber estado esperando JSON y el cliente envió XML.|
+| 429  | Too Many Requests      | Se han enviado demasiadas solicitudes en un corto periodo de tiempo ("rate limiting") Puedes enviar hasta 100 peticiones por minuto como máximo.|
+| 500  | Internal Server Error  | Error no controlado durante el proceso de la solicitud.| 
+| 503  | Service Unavailable    | Siigo API actualmente no está disponible debido a una sobrecarga temporal o mantenimiento programado.|
+
+# Manejo de errores
+
+Los errores en Siigo API México tienen la siguiente estructura:
+
+```json
+{
+    "Status": 400,
+    "Errors": [
+        {
+            "Code": "parameter_required",
+            "Message": "The field code is required",
+            "Params": [
+                "code"
+            ],
+            "Detail": "Check the API documentation: [url_to_documentation]"
+        }
+    ]
+}
+```
+
+- **Status**: Siigo utiliza códigos de respuesta HTTP para indicar el éxito o fracaso de una solicitud de API.
+- **Code**: Para algunos errores que podrían manejarse mediante programación, se muestra una cadena corta que indica el código de error.
+- **Message**: Mensaje con la explicación del error.
+- **Param**: Si el error es específico del parámetro, el parámetro relacionado con el error.
+- **Detail**: Mensaje que proporciona más detalles acerca del error.
+
+# Límite de solicitudes
+
+Es importante tener en cuenta en el momento de construir tu integración, que puedes enviar como máximo 150 peticiones por minuto y máximo 5.000 request en un día a Siigo API México.
+
+Adicionalmente, dependiendo del plan de Siigo Nube que dispongas, tienes la siguiente cantidad de creaciones de facturas de venta a través de Siigo API:
+
+* Siigo Nube Gestión Inicio: 300 FV/mes
+* Siigo Nube Gestión Avanzado: 600 FV/mes
+* Siigo Nube Gestión Premium: 1200 FV/mes
+
+Si tienes alguna inquietud o sugerencia sobre estos límites y deseas tener más facturas escríbenos a soporteapimx@siigo.com
+
+# SiigoAPI-Application-Id
+
+Para nosotros es muy importante conocer tu integración para poder brindarte un mejor acompañamiento, monitoreo y soporte.
+
+En todos los request que envíes a Siigo API debes enviar un Header llamado SiigoAPI-Application-Id, en el "value" de este header se debe enviar  el nombre del software/aplicación que estás integrando con Siigo Nube, este debe tener entre 3 y 100 caracteres alfanuméricos, sin espacios en blanco.
+
+Si estás construyendo una integración para más de una empresa en Siigo Nube, debes enviar el mismo value para todas las empresas. Siigo estará monitoreando continuamente esta información y bloqueará a usuarios API que no estén enviando información real en este header.
+
+# Bloqueo de usuarios
+
+Se bloqueará de manera temporal tu usuario de Siigo API México si realizas un uso incorrecto de nuestro servicio, si durante 7 días la proporción de errores enviados supera el 80% del total de requests que envías a Siigo API, serás notificado por mail con el bloqueo temporal de tu usuario y el bloqueo será hasta que hagas las correcciones correspondientes, en dicho proceso podemos acompañarte y asesorarte. 
+
+# Códigos de error
+
+A continuación se muestra la lista de posibles códigos de error con información adicional sobre cómo resolverlos.
+
+
+## `already_exists`
+Este error ocurre cuando se intenta crear un registro ya existente en Siigo Nube. 
+
+Usa un valor diferente y único para el id o código e intenta nuevamente.
+
+## `delete_not_allowed`
+El recurso no se puede eliminar porque tiene movimientos o transacciones relacionadas.
+
+## `documents_service`
+El servicio de documentos no esta disponible, intente en unos minutos.
+
+## `document_settings`
+Este error ocurre cuando se envía algún parámetro que no está configurado en el comprobante.
+
+Verifica la configuración de los siguientes parámetros de Factura de Venta en el menú *Configuración* `>` *Ventas* `>` *Documentos* `>` *Facturas de ventas* y Elige el tipo de factura
+
+* Centro de costos
+* Numeración automática
+* Descuentos por valor o porcentaje
+
+## `company_settings`
+Este error ocurre cuando se envía algún parámetro que no está configurado en los parametros de la empresa.
+
+## `header_required`
+Este error ocurre cuando NO se envía un header requerido, es probable que no este enviando el Header: SiigoAPI-Application-Id, que es obligatorio y en el cuál se debe enviar el nombre del software/aplicación que se está integrando con Siigo Nube.
+
+Consulta más detalles <a href="https://siigoapimexico.docs.apiary.io/#introduction/siigoapi-application-id">**aquí**</a>.
+
+## `invalid_array`
+Este error ocurre cuando se envía un array con valores inválidos.
+
+* **Contacts:** Este error ocurre al exceder la cantidad máxima de contactos, puedes crear hasta 10 contactos por cliente.
+* **Name:** Debes verificar los siguientes escenarios:
+        
+    Si estás creando un cliente tipo 'Physical'
+        
+        {
+            "name": [
+                "Marcos",
+                "Castillo"
+            ],
+        }
+    
+    Si estás creando un cliente tipo 'Moral'
+        
+        {
+            "name": [
+                "Stark Industries"
+            ],
+        }
+            
+* **Payments:** Este error ocurre al envíar condiciones de pago inválidas, debes consultar las condiciones de pago válidas y verificar si son de tipo cartera: Si ingresa dinero o proveedor: En caso de compras.
+* **Prices:** Este error ocurre al exceder la cantidad máxima de Listas de precio, puedes crear hasta 12 Listas de precio por producto.
+* **Retentions:** De acuerdo a la configuración del comprobante en el menú *Configuración* `>` *Ventas* `>` *Documentos* `>` *Facturas de ventas*, Elige el tipo de factura y en la sección de configuraciones complementarian se encuentra: Retenciones
+
+    Ret.IVA: Se aplica sobre el valor de la factura.
+
+    Ret.ISR: Se aplica sobre el valor de la factura.
+
+**Taxes:** Este error ocurre:
+    
+    `-` Si envías más de la cantidad de impuestos permitidos, puedes enviar hasta 3 impuestos.
+    
+* **Items:** Este error ocurre:
+
+     `-`En factura de venta ocurre si envías más de 500 items.
+     
+## `invalid_amount`
+El valor especificado no es válido. El monto debe ser un número positivo en la unidad monetaria correspondiente y no exceder el monto mínimo o máximo (99,999,999,999.99).
+
+**Consideraciones**
+
+El total de `payments` debe coincidir con el total de la factura, el valor máximo es máximo (9,999,999,999,999.99).
+
+El campo de `price` permite hasta 6 decimales.
+
+Los demás campos como `discount` permiten hasta 2 decimales.
+
+No puede enviar un valor mayor al valor del saldo de la "cuota".
+
+## `invalid_code`
+El código no puede tener comillas simples (') ni espacios.
+
+Expresión regular: `^[^'\s]+$`
+
+## `invalid_cfdi`
+La forma de pago CFDI es  incorrecta según el método seleccionado, por favor valide si el código de la forma corresponde al método PUE O PPD.
+
+## `invalid_date`
+Estás enviando una fecha inválida, verifica el limite de días para facturas electronicas que es 3 días inferior o 1 día superior a la fecha actual.
+Tambien verifica los formatos válidos para las fechas:
+
+Date: `yyyy-MM-dd`
+
+Date and time in UTC: `yyyy-MM-ddTHH:mm:ssZ`
+
+## `invalid_description`
+Estás enviando una descripción inválida.
+
+Expresión regular: `@"^$|^[\w\.@-\\%_;()\]#?¡[/:{ } *+,$&quot;\sñáéíóúÁÉÍÓÚüÜ\-&quot;]+$"`
+
+## `invalid_document`
+El `id` del tipo de comprobante no corresponde al que estás creando.
+
+## `invalid_email` 
+La dirección de correo electrónico no es válida, 
+verifica que la dirección de correo electrónico tenga el formato correcto.
+
+Expresión regular: `^([-+.]*\w)+[-+.]*@([\w-]+\.)+[\w-]{2,}$`
+
+## `invalid_rfc_id`
+Estás enviando una identificación inválida, se deben enviar las identificaciones de acuerdo con las siguientes expresiones regulares:
+
+
+* Moral:  `('^([A-ZÑa-zñ&]{3}[0-9]{6}[A-ZÑa-zñ0-9]{3})$')` 
+* Physical: `('^([A-ZÑa-zñ&]{4}[0-9]{6}[A-ZÑa-zñ0-9]{3})$')` 
+
+## `invalid_country_code`
+Si se coloca un código de méxico en el código de pais de un person_type = Foreign debe retornar este código .
+
+
+## `invalid_fiscal_regime`
+Si se envía un régimen fiscal que no es válido para el tipo de persona mencionada al crear o editar un tercero.
+Consulte el listado de códigos válidos por el SAT para cada tipo de persona <a href="https://saprodcentralassets.blob.core.windows.net/siigoapi/documentation/Listado de régimen fiscal.xlsx">**aquí**</a>.
+
+
+## `invalid_name`
+Estás enviando un nombre inválido.
+
+Expresión regular: `@"^[\w\.@-\\%_;()\]#?¡[/:{ } *+,$&quot;\sñáéíóúÁÉÍÓÚüÜ\-&quot;]+$"`
+
+## `invalid_range`
+El campo solo permite un valor entre los rangos indicados.
+
+## `invalid_reference`
+Este error ocurre cuando envías un id o código que no existe en Siigo Nube para este campo. Verifica los <a href="ENLACE A CATALOGSSSSSSSSSSSSSSSSSSSSSSSSSS">Catálogos.</a>
+
+## `invalid_total_payments`
+
+El sistema valida que el valor total pagado *(suma de payments[i].value)* coincida con el total de la factura (suma de los totales de los ítems).
+
+El total por ítem se calcula así:
+
+```
+    ValorBase = Redondear(Cantidad * ValorUnitario - Descuento, 2)
+    IVA = Redondear((baseValue * PorcentajeIVA)/100, 2)
+    TotalItem = Redondear(ValorBase + IVA, 2)
+```    
+
+*Ejemplo:*
+```    
+    Cantidad = 10
+    ValorUnitario = 100.00
+    Descuento = 50.00
+    
+    ValorBase = Redondear(10 * 100.00 - 50.00, 2) = 950.00
+    
+    IVA = Redondear((950.00 * 19)/100, 2) = 180.50
+    TotalItem = Redondear(950.00 + 180.50, 2) = 1130.50
+```
+
+## `invalid_retentions`
+De acuerdo a la configuración del comprobante en el menú  *Configuración* `>` *Ventas* `>` *Documentos* `>` *Facturas de ventas*, Elige el tipo de factura y en la sección de configuraciones complementarian se encuentra: Retenciones
+
+    Ret.IVA: Se aplica sobre el valor de la factura.
+
+    Ret.ISR: Se aplica sobre el valor de la factura.
+    
+
+## `invalid_type`
+El tipo de dato enviado no es correcto, valida el tipo del campo. (string, bollean, number)
+
+## `invalid_use`
+El código del listado es diferente al que corresponde según el person_type.
+
+## `invalid_value`
+El valor especificado no es válido. (Cantidades, Consecutivos y Cuotas).
+
+## `length_max`
+Verifica que no superas la longitud máxima del campo indicada en el mensaje del error.
+
+El máximo de carácteres es:
+
+En productos:
+code = 30 carácteres.
+name = 100 carácteres.
+reference = 80 carácteres.
+description = 500 carácteres.
+barcore =  50 carácteres.
+brand =  50 carácteres.
+
+## `length_min`
+Verifica la longitud mínima del campo indicada en el mensaje del error.
+
+## `not_found`
+Recurso no encontrado.
+
+## `duplicated_document`
+El documento ya existe, por favor valide la información.
+
+## `parameter_empty`
+Se utiliza para los campos que son parámetros obligatorios y no se envío en la petición.
+
+## `parameter_inactive`
+El parámetro que estás utilizando está inactivo. Usa un parámetro diferente o activa el parámetro actual nuevamente.
+
+Grupos de inventario: Puedes validar en en Siigo Nube en el menú lateral: *Configuración* `>` *Productos y servicios* `>` *Generales* `>` *Clasificación de producto y servicio*
+
+Usuarios: Puedes validar en en Siigo Nube en el menú lateral: *Reportes* `>` *Reportes de configuración* `>` *Usuarios* `>` *Administración de usuarios*
+
+Condiciones de Pago: Puedes validar en en Siigo Nube en el menú lateral: *Configuración* `>` *Contabilidad* `>` *Generales* `>` *Condiciones de Pago*
+
+Impuestos: Puedes validar en Siigo Nube en el menú lateral: *Configuración* `>` *Contabilidad* `>` *Generales* `>` *Impuestos*
+
+Listas de Precios: Puedes validar en en Siigo Nube en el menú *Configuración* `>` *Productos y servicios* `>` *Generales* `>` *Listas de precios de venta* ahi puedes habilitar hasta 12 de listas de precios.
+
+## `parameter_required`
+No se proporcionaron uno o más valores obligatorios.
+Asegúrate de que las solicitudes incluyan todos los parámetros obligatorios.
+
+Condiciones de Pago: Debes enviar el query parameter document_type=FV (FV)
+
+Productos: Debes enviar obligatoriamente el campo code, name, account_group, unit y key.
+
+## `parameters_exclusive`
+Se proporcionó un valor no permitido, debe enviarse solo los valores existentes para los campos de siigo nube, consulta la documentación de nuestra API o el mensaje de error devuelto para verificar los valores que están permitidos al crear o modificar el recurso especificado.
+
+En productos:
+type = El sistema solamente recibe los valores Product, Service y ConsumerGood para este campo.
+
+## `product_settings`
+Este error sucede si envías una bodega en la creación de factura y el producto no maneja control de inventarios.
+
+## `requests_limit`
+Están llegando solicitudes demasiado rápido a la API. Recomendamos una retirada exponencial de sus solicitudes.
+*Importante:* `>` Para la empresa de pruebas las solicitudes son de 10 request por minuto
+`>` Empresas en producción son 100 request por minuto.
+
+## `unauthorized`
+No estás autorizado, verifica el token de acceso.
+
+## `update_not_allowed`
+No se puede actualizar el grupo de inventarios del producto, debido a que ya tiene movimientos.
+
+## `unhandled_error`
+Error no controlado, escríbenos a soporteapi@siigo.com para ayudarte y dar claridad a este error, por favor aclaranos cual es el proceso que realizaste y una copia del JSON de la petición.
+
+## `request_timeout`
+Siigo API no logró completar la solicitud dentro del tiempo que estaba preparado para esperar. Puede intentar de nuevo en unos segundos.
+
+## `service_unavailable`
+Siigo API actualmente no está disponible debido a una sobrecarga temporal o mantenimiento programado. Puede intentar de nuevo en unos segundos.
+
+## `warehouse_settings`
+Este error sucede si envías una bodega en la creación de factura o nota crédito y NO está activo el manejo de bodegas.
+
+Puedes validar en el menú *Configuración* `>` *Productos y servicios* `>` *Generales* `>` *Configuración de Bodegas* ahi puedes habilitar el manejo de bodegas y crear más bodegas.
+
+## `invalid_balance`
+Este error aparece cuando la suma de los debitos y créditos nos son iguales. 
+
+## `invalid_cost_center`
+Por favor verifica el identificador del centro de costos. <a href="https://siigoapimexico.docs.apiary.io/#reference/catalogos/centros-de-costo">/cost-centers</a>
+
+## `values_limit`
+Este error aparece cuando se ha excedido él limite de los valores permitidos.
+
+## `invalid_date_range`
+Este error aparece cuando las fechas que se proporcionan no están en un rango válido.
+
+## `date_settings`
+Este error aparece cuando la fecha que se proporcionan en la elaboración del comprobante no es permitida.
+
+## `parameter_not_allowed`
+Este error aparece cuando se envía el campo de vat_excluded: true, y no se está en la fecha correcta para los dias de la exención de IVA.
+
+## `non_editable`
+Este error ocurre cuando se cambian datos que NO son editables
+
+## `entry_service`
+No es posible completar su solicitud con las condiciones actuales.
+
+## `general_service`
+El servicio no está disponible por el momento. Inténtalo en unos minutos. 
+
+# Data Structures
+
+## AccountGroup (object)
++ id: 1253 (number,required) - Identificador único de la clasificación de inventario.
++ name: Productos (string,required) - Nombre de la clasificación de inventario.
++ active: true (boolean,required) - Indica si la clasificación de inventario está en uso.
+
+## AccountGroupOut (object)
++ id: 1253 (number,required) - Identificador único de la clasificación de inventario.
++ name: Productos (string) - Nombre de la clasificación de inventario.
+
+## ProductType (enum)
++ `Product` - Producto
++ `Service` - Servicio
++ `ConsumerGood` - Consumo
+
+
+## TaxType (enum)
++ `IVA`
++ `ISR`
++ `ReteIVA`
+
+
+## PaymentType (enum)
++ `Cartera` - Factura de venta y Recepción de pago
++ `Proveedor` - Factura de Compra y Pago a proveedor
++ `CarteraProveedor` - Cartera/Proveedores
+
+## DocumentType (enum)
++ `FV` - Factura de Venta
++ `RC` - Recepción de pagos
++ `NC` - Nota Crédito
++ `FC` - Factura de Compra/Gasto
++ `CC` - Póliza
+
+## DiscountType (enum)
++ `Percentage` - Maneja descuento por Porcentaje
++ `Value` - Maneja descuento por Valor
+
+
+## TokenIn (object)
++ username: usuario@api.com (string,required) - Usuario
++ access_key: NWNmMTczNGYtZjQ0OS00MjgwLTg51WItYjNiNWRiNGUxMjIzOnM/WDkqPypfVFN= (string,required) - Access Key
+
+## TokenOut (object)
++ access_token: access token (string) - Access Token
++ expires_in: 86400 (number) - Expiración en milisegundos
++ token_type: Bearer (string) - Tipo de Token
++ scope: SiigoAPI (string) - Alcance
+
+
+## Tax (object)
++ id: 13156 (number,required) - Identificador único del impuesto.
++ name: IVA 19% (string,required) - Nombre del impuesto.
++ type: IVA (TaxType,required) - Tipo del impuesto.
++ percentage: 19.00 (number,required) - Porcentaje del impuesto.
++ active: true (boolean,required) - Indica si el impuesto está en uso.
+
+## TaxIn (object)
++ id: 13156 (number,required) - Identificador único del impuesto.
+
+## TaxRet (object)
++ id: 13156 (number,required) - Identificador único del impuesto.
+
+## TaxOut (object)
++ id: 13156 (number) - Identificador único del impuesto.
++ name: IVA 19% (string) - Nombre del impuesto.
++ type: IVA (TaxType) - Tipo del impuesto.
++ percentage: 19.00 (number) - Porcentaje del impuesto.
+
+## TaxOutInvoice (object)
++ id: 13156 (number) - Identificador único del impuesto.
++ name: IVA 19% (string) - Nombre del impuesto.
++ type: IVA (TaxType) - Tipo del impuesto.
++ percentage: 19 (number) - Porcentaje del impuesto.
++ value: 406.51 (number) - Valor del impuesto.
+
+## RetentionOutInvoice (object)
++ id: 34072 (number) - Identificador único del impuesto.
++ name: ReteIVA 15% (string) - Nombre del impuesto.
++ type: ReteIVA (TaxType) - Tipo del impuesto.
++ percentage: 15 (number) - Porcentaje del impuesto.
++ value: 60.98 (number) - Valor del impuesto.
+
+## PriceList (object)
++ id: 2766 (number,required) - Identificador único de la lista de precio.
++ name: Precio de venta 1 (string) - Nombre de la lista de precio.
++ active: true (boolean) - Indica si la lista de precio está en uso.
++ position: 1 (number) - Posición de la lista de precio.
+
+## PriceIn
++ price_list (array[PriceListIn],required) - Lista de precios
++ currency_code: MXN (string,required) - Código de moneda
+
+## PriceOut
++ price_list (array[PriceListOut],required) - Lista de precios
++ currency_code: MXN (string,required) - Código de moneda
+
+## PriceListIn (object)
++ position: 1 (number,required) - Identificador único de la lista de precio.
++ value: 12000 (number,required) - Valor de la lista de precio.
+
+## PriceListOut (object)
++ position: 1 (number) - Identificador único de la lista de precio.
++ name: Precio de venta 1 (string) - Nombre de la lista de precio.
++ value: 12000 (number) - Valor de la lista de precio.
+
+## UnitOut (object)
++ code: 18 (string,required) - Código de la unidad de medida.
++ name: Tambor de cincuenta y cinco galones (string) - Nombre de la unidad de medida.
+
+## KeyOut (object)
++ code: 31241607 (string,required) - Código de la clave SAT.
++ name: Barras redondas (string) - Nombre de la de la clave SAT.
+
+## AdditionalFields (object)
++ barcode: B0123 (string) - Código de barras.
++ brand: Gef (string) - Marca.
+
+## Warehouse (object)
++ id: 1270 (number,required) - Identificador único de la bodega.
++ name: Bodega principal (string) - Nombre de la bodega.
++ active: true (boolean) - Indica si la bodega está en uso.
++ has_movements: true (boolean) - Indica si la bodega tiene movimientos.
+
+## WarehouseProduct (object)
++ id: 1270 (number,required) - Identificador único de la bodega.
++ name: Bodega principal (string) - Nombre de la bodega.
++ quantity: 1 (number) - Cantidad disponible.
+
+## WarehouseOutInvoice (object)
++ id: 1270 (number,required) - Identificador único de la bodega.
++ name: Bodega principal (string) - Nombre de la bodega.
+
+## User (object)
++ id: 35071 (number,required) - Identificador único del usuario o vendedor.
++ username: usuario@prueba.com (string, required) - Nombre de usuario.
++ first_name: David Felipe (string, required) - Nombre del usuario.
++ last_name: Yepes Sánchez (string, required) - Apellido del usuario.
++ email: usuario@prueba.com (string, required) - Correo del usuario.
++ active: true (boolean,required) -  Estado del usuario.
++ identification: 13832082 (string, required) - Número de identificación del usuario.
+
+## PaymentTypes (object)
++ id: 5636 (number,required) - Identificador único de la condición de pago.
++ name: Crédito (string, required) - Nombre de la condición de pago.
++ `type` (PaymentType, required) - Tipo de la condición de pago.
++ active: true (boolean, required) - Estado de la condición de pago.
++ due_date: true (boolean, required) - Indica si la condición de pago maneja fecha de vencimiento.
+
+## DocumentTypeFV (object)
++ id: 59625 (number) - Identificador único del tipo de comprobante.
++ code: 1 (string) - Código del tipo comprobante.
++ name: Factura (string) - Nombre o título del tipo de comprobante.
++ description: Factura de venta (string) - Descripción del tipo de comprobante.
++ type: FV (string) - Tipo de comprobante.
++ active: true (boolean) -  Estado del tipo de comprobante.
++ cost_center: false (boolean) - Maneja centro de costos.
++ cost_center_mandatory: false (boolean) - El centro de costos es obligatorio.
++ cost_center_default: 1513 (number) - Identificador el número del centro de costos por defecto.
++ automatic_number: true (boolean) - Maneja numeración automática.
++ consecutive: 3 (number) - Consecutivo.
++ `discount_type` (DiscountType) - Maneja descuento por Porcentaje o Valor.
++ reteiva: true (boolean) - Maneja reteIVA.
++ isr: true (boolean) - Maneja ISR.
+
+## DocumentTypeRC (object)
++ id: 59625 (number) - Identificador único del tipo de comprobante.
++ code: 1 (string) - Código del tipo comprobante.
++ name: Recepción (string) - Nombre o título del tipo de comprobante.
++ description: Recepción de pago (string) - Descripción del tipo de comprobante.
++ type: RC (string) - Tipo de comprobante.
++ active: true (boolean) -  Estado del tipo de comprobante.
++ cost_center: false (boolean) - Maneja centro de costos.
++ cost_center_mandatory: false (boolean) - El centro de costos es obligatorio.
++ cost_center_default: 1513 (number) - Identificador el número del centro de costos por defecto.
++ automatic_number: true (boolean) - Maneja numeración automática.
++ consecutive: 3 (number) - Consecutivo.
+
+
+## CostCenter (object)
++ id: 25732 (number,required) - Identificador único del centro de costo.
++ code: 13-1 (string, required) - Código del centro de costo.
++ name: Principal (string, required) - Nombre del centro de costo.
++ active: true (boolean,required) -  Estado del centro de costo.
+
+
+## Currency (object)
++ code: USD (string,required) - Código de moneda.
++ exchange_rate: ``3825.03`` (number,required) - Tasa / Valor en moneda extranjera.
+
+## Discount (object)
++ percentage: 13 (number) - Porcentaje de descuento
++ value: 130 (number) - Valor de descuento
+
+## ProductIn (object)
++ code: ``Item-1`` (string, required) - Código único del producto.
++ name: Camiseta de algodón (string, required) - Nombre del producto / servicio.
++ account_group: 1253 (number,required) - ID de la clasificación de inventario. 
++ `type` (ProductType) - Tipo de producto, valor por default Product
++ stock_control: false (boolean) - Control de inventario, valor por default "false".
++ active: true (boolean) - Estado del producto en Siigo, valor por default "true".
++ tax_included: false (boolean) - IVA incluido.
++ taxes (array[TaxIn]) - Impuestos que se desean asociar al producto o servicio.
++ prices (array[PriceIn]) - Son valores de venta que manejan cada uno de los productos o servicios, en  Siigo  es  posible  manejar  hasta 12 precios de venta.
++ unit: A37 (string, required) - Unidad de medida SAT del producto.
++ key: 94101701 (string, required) - Clave SAT del producto.
++ reference: REF1 (string) - Referencia o código de fábrica del producto o servicio.
++ description: Camiseta de algodón blanca (string) - Descripción del producto o servicio.
++ additional_fields (AdditionalFields) - Campos adicionales como: Código de barras, Marca.
+
+## ProductOutCreate (object)
++ id: ``00584089-4ebc-49de-bf75-6a6cc968a96d`` (string) - Identificador del producto.
++ code: ``Item-1`` (string, required) - Código único del producto.
++ name: Camiseta de algodón (string, required) - Nombre del producto / servicio.
++ account_group (AccountGroupOut) - ID de la clasificación de inventario.
++ `type` (ProductType, required) - Tipo de producto, valor por default Product
++ stock_control: false (boolean) - Control de inventario, valor por default "false".
++ active: true (boolean) - Estado del producto en Siigo, valor por default "true".
++ tax_included: false (boolean) - IVA incluido.
++ taxes (array[TaxOut]) - Impuestos que se desean asociar al producto o servicio.
++ prices (array[PriceOut]) - Son valores de venta que manejan cada uno de los productos o servicios, en  Siigo  es  posible  manejar  hasta 12 precios de venta.
++ unit (UnitOut) - Unidad de medida SAT del producto.
++ key (KeyOut) - Clave SAT del producto.
++ reference: REF1 (string) - Referencia o código de fábrica del producto o servicio.
++ description: Camiseta de algodón blanca (string) - Descripción del producto o servicio.
++ additional_fields (AdditionalFields) - Campos adicionales como: Código de barras, Marca.
++ available_quantity: 0 (number) - Indica la cantidad disponible en el inventario. Si el producto se encuentra distribuido en múltiples bodegas, este atributo retorna la cantidad disponible en todas las bodegas.
++ warehouses (array) - Indica las bodegas asociadas al producto.
++ metadata (MetadataCreate) - Información acerca de la entidad.
+
+## ProductOut (object)
++ id: ``00584089-4ebc-49de-bf75-6a6cc968a96d`` (string) - Identificador del producto.
++ code: ``Item-1`` (string, required) - Código único del producto.
++ name: Camiseta de algodón (string, required) - Nombre del producto / servicio.
++ account_group (AccountGroupOut) - ID de la clasificación de inventario.
++ `type` (ProductType, required) - Tipo de producto, valor por default Product
++ stock_control: false (boolean) - Control de inventario, valor por default "false".
++ active: true (boolean) - Estado del producto en Siigo, valor por default "true".
++ tax_included: false (boolean) - IVA incluido.
++ taxes (array[TaxOut]) - Impuestos que se desean asociar al producto o servicio.
++ prices (array[PriceOut]) - Son valores de venta que manejan cada uno de los productos o servicios, en  Siigo  es  posible  manejar  hasta 12 precios de venta.
++ unit (UnitOut) - Unidad de medida SAT del producto.
++ key (KeyOut) - Clave SAT del producto.
++ reference: REF1 (string) - Referencia o código de fábrica del producto o servicio.
++ description: Camiseta de algodón blanca (string) - Descripción del producto o servicio.
++ additional_fields (AdditionalFields) - Campos adicionales como: Código de barras, Marca, Código arancelario, Modelo.
++ available_quantity: 0 (number) - Indica la cantidad disponible en el inventario. Si el producto se encuentra distribuido en múltiples bodegas, este atributo retorna la cantidad disponible en todas las bodegas.
++ warehouses (array[WarehouseProduct]) - Indica las bodegas asociadas al producto.
++ metadata (Metadata) - Información acerca de la entidad.
+
+## ProductsOutList (object)
++ `pagination` (Pagination)
++ results (array[ProductOut])
++ _links
+    - *previous*
+        - href: https://api.siigo.mx/v1/products?page=4&page_size=25
+    - *self*
+        - href: https://api.siigo.mx/v1/products?page=5&page_size=25
+    - *next*
+        - href: https://api.siigo.mx/v1/products?page=6&page_size=25
+
+## CustomerType (enum)
++ `Customer` - Cliente
++ `Supplier` - Proveedor
++ `Other` - Otros
+
+## PersonType (enum)
++ `Physical` - Persona
++ `Moral` - Empresa
++ `Foreign` - Empresa
+
+## City (object)
++ CityID: 12346 (string,required) - Código de la ciudad.
++ CountryCode: MX(string,required) - Código del país.
++ CountryName: Mexico (string,required) - Nombre del país.
++ StateCode: 2(string,required) - Código del departamento.
++ StateName: Bajo California (string,required) - Nombre del departamento.
++ CityCode: 24 (string,required) - Código de la ciudad.
++ CityName: Tijuana (string,required) - Nombre de la ciudad.
+
+## CityIn (object)
++ country_code: MX (string, required) - Código del país.
++ state_code: 2 (string,required) - Código del departamento/estado.
++ city_code: 4 (string,required) - Código de la ciudad.
+
+## CityOut (object)
++ country_code: MX (string, required) - Código del país.
++ country_name: Mexico (string) - Nombre del país.
++ state_code: 2 (string,required) - Código del departamento/estado.
++ state_name: Bajo California (string) - Nombre del departamento/estado.
++ city_code: 24 (string,required) - Código de la ciudad.
++ city_name: Tijuana (string) - Nombre de la ciudad.
+
+## CityOutInvoice (object)
++ country_name: Mexico (string) - Nombre del país.
++ state_name: Bajo California (string) - Nombre del departamento/estado.
++ city_name: Tijuana (string) - Nombre de la ciudad.
+
+## AddressIn (object)
++ street: ``45`` (string) - Calle del cliente.
++ interior_number: `11`` (string) - Número de interior.
++ exterior_number: `23`` (string) - Número de exterior.
++ colony: `Juarez`` (string) - Colonia.
++ locality: `Coyoacan`` (string) - Localidad.
++ city (CityIn,required) - Ciudad del cliente.
++ postal_code: 12345 (string) - Código postal.
+
+## AddressOut (object)
++ address: ``45`` (string) - Dirección del cliente.
++ interior_number: `11`` (string) - Número de interior.
++ exterior_number: `23`` (string) - Número de exterior.
++ colony: `Juarez`` (string) - Colonia.
++ locality: `Coyoacan`` (string) - Localidad.
++ city (CityOut,required) - Ciudad del cliente.
++ postal_code: 12345 (string) - Código postal.
+
+## Phone (object)
++ indicative: 52 (string) - Indicativo
++ number: 15535167256 (string,required) - Número
++ extension: 132 (string) - Extensión
+
+## PhoneContact (object)
++ indicative: 52 (string) - Indicativo
++ number: 15535167256 (string) - Número
++ extension: 132 (string) - Extensión
+
+## Contact (object)
++ first_name: Marcos (string,required) - Nombres del contacto.
++ last_name: Castillo (string,required) - Apellidos del contacto.
++ email: marcos.castillo@contacto.com (string,required) - Correo electrónico del contacto.
++ phone (PhoneContact) - Indica el teléfono asociado al contacto.
+
+## FiscalRegimeIn (object)
++ code: ``623`` (string,required) - Código del régimen fiscal.
+
+## FiscalRegime (object)
++ code: ``623`` (string,required) - Código de la régimen fiscal.
++ name: ``Opcional para Grupos de Sociedades`` (string) - Nombre del régimen fiscal.
+
+## RelatedUsers (object)
++ seller_id: 629 (number) - Usuario vendedor asigando al cliente.
++ collector_id: 629 (number) - Usuario cobrador encargado del recaudo de cartera.
+
+## CustomField (object)
++ key: webpage (string) - Tipo de atributo
++ value: www.siigo.com (string) - Valor del atributo
+
+## MetadataCreate (object)
++ created: ``2020-06-15T03:33:17.208Z`` (string) - La fecha en la que se creó la entidad.
++ last_updated: null (string) - La fecha en la que se actualizó la entidad por última vez.
+
+## pdf (object)
++ id: ``b446fbc3-99c5-4c2d-8a28-1c0d3721ab91`` (string) - Identificador de la Factura de Venta.
++ base64: ``Y29udGVuaWRvIGRlbCBwZGY=`` (string) - PDF de Factura de Venta.
+
+
+## fvRejected (object)
++ id: ``b446fbc3-99c5-4c2d-8a28-1c0d3721ab91`` (string) - Identificador de la Factura de Venta.
++ errors (array[RejectedOut]) - Información del error.
+
+## RejectedOut (object)
++ code: CFDI40148 (string) - Código de rechazo.
++ message: El código postal y nombre del cliente asociado no corresponden. (string) - Motivo de rechazo por el SAT.
+
+## rcRejected (object)
++ id: ``b446fbc3-99c5-4c2d-8a28-1c0d3721ab91`` (string) - Identificador de la recepción de pago.
++ errors (array[RejectedOut]) - Información del error.
+
+## Metadata (object)
++ created: ``2020-06-15T03:33:17.208Z`` (string) - La fecha en la que se creó la entidad.
++ last_updated: null (string) - La fecha en la que se actualizó la entidad por última vez.
+
+## CustomerIn (object)
++ `type` (CustomerType) - Tipo de cliente, valor por default Customer.
++ `person_type` (PersonType,required) - Tipo de persona.
++ rfc_id: MELM8305281H0 (string, required) - Número de identificación del cliente.
++ name: ``Marcos``,``Castillo`` (array[string], required) - Razón social o nombres y apellidos del cliente. Si "type": Moral enviar name: ["Stark Industries"] Si "type": Physical enviar name: ["Marcos" , "Castillo"]
++ commercial_name: Siigo (string) - Nombre comercial o Nombre comercial de la empresa del cliente.
++ branch_office: 0 (number) - Sucursal, valor por default 0.
++ active: true (boolean) - Estado del cliente en Siigo, valor por default "true".
++ fiscal_regime: 601 (string) - Régimen fiscal del cliente.
++ address (AddressIn,required) - Dirección del cliente.
++ phones (array[Phone],required) - Indica los teléfonos asociados al cliente.
++ contacts (array[Contact],required) - Indica los contactos asociados al cliente.
++ comments: Comentarios (string) - Observaciones.
++ related_users (RelatedUsers) - Asigna el vendedor y el cobrador encargado del recaudo de cartera al cliente.
+
+## CustomerOut (object)
++ id: ``6b6ceb28-b2eb-4b98-b3dd-26648a933c81`` (string) - Identificador del cliente.
++ `type` (CustomerType) - Tipo de cliente, valor por default Customer.
++ `person_type` (PersonType,required) - Tipo de persona.
++ rfc_id: MELM8305281H0 (string, required) - Número de identificación del cliente.
++ name: ``Marcos``,``Castillo`` (array[string], required) - Razón social o nombres y apellidos del cliente.
++ commercial_name: Siigo (string) - Nombre comercial o Nombre comercial de la empresa cLiente.
++ branch_office: 0 (number) - Sucursal, valor por default 0.
++ active: true (boolean) - Estado del cliente en Siigo, valor por default "true".
++ fiscal_regime (array[FiscalRegime]) - Régimen fiscal del cliente.
++ address (AddressOut,required) - Dirección del cliente.
++ phones (array[Phone],required) - Indica los teléfonos asociados al cliente.
++ contacts (array[Contact],required) - Indica los contactos asociados al cliente.
++ comments: Comentarios (string) - Observaciones.
++ related_users (RelatedUsers) - Asigna el vendedor y el cobrador encargado del recaudo de cartera al cliente.
++ metadata (Metadata) - Información acerca de la entidad.
+
+## Pagination
++ page: 1 (number)
++ page_size: 25 (number)
++ total_results: 253 (number)
+
+# CustomersOutList (object)
++ `pagination` (Pagination)
++ results (array[CustomerOut])
++ _links
+    - *previous*
+        - href: https://api.siigo.mx/v1/customers?page=4&page_size=25
+    - *self*
+        - href: https://api.siigo.mx/v1/customers?page=5&page_size=25
+    - *next*
+        - href: https://api.siigo.mx/v1/customers?page=6&page_size=25
+
+## Stamp (object)
++ send: true (boolean,required) - Indica nombre del estado 
+
+## StampO (object)
++ status: Accepted
++ uuid: 7eb8c882cd62daffded44b7d08668d04383b579c86b5bf23dcb3d601a2347bac07a7e08ae2c3602787bfaf91691449a6
++ observations: "",
++ errors: ""
+
+## mailInCustomer (object)
++ send: true (boolean,required) - Indica nombre del estado 
+
+
+## mailOutCustomer (object)
++ status: sent,
++ observations: ""
+
+## CopyCustomerIn (object)
++ mail_to: cabr110042@siigo.com,
++ copy_to: juan.casallas@siigo.com;armando.cabrera@siigo.com
+
+
+## CopyCustomerOut (object)
++ status: sent,
++ observations: ""
+
+## UseInInvoice (object)
++ code: ``G01`` (string,required) - Código de uso CFDi.
+
+## UseOutInvoice (object)
++ code: ``G01`` (string,required) - Código de uso CFDi.
++ name: Adquisición de mercancías (string) - Nombre del código de uso CFDi.
+
+## CustomerInInvoiceS (object)
++ rfc_id: MELM8305281H0 (string, required) - Número de identificación del cliente.
++ branch_office: 0 (number) - Sucursal, valor por default 0
+
+## CustomerOutInvoiceS (object)
++ id: ``6b6ceb28-b2eb-4b98-b3dd-26648a933c81`` (string) - Identificador del cliente.
++ rfc_id: MELM8305281H0 (string, required) - Número de identificación del cliente.
++ branch_office: 0 (number) - Sucursal, valor por default 0.
+
+## CustomerInInvoice (object)
++ person_type: Physical (string, required) - Tipo de persona asociado al documento.
++ rfc_id: MELM8305281H0 (string, required) - Número de identificación del cliente.
++ branch_office: 0 (number) - Sucursal, valor por default 0.
++ name: ``Manuel``,``Camacho`` (array[string], required) - Razón social o nombres y apellidos del cliente.
++ address (AddressOut,required) - Dirección del cliente.
++ phones (array[Phone],required) - Indica los teléfonos asociados al cliente.
++ contacts (array[Contact],required) - Indica los contactos asociados al cliente.
+
+
+## CustomerOutInvoice (object)
++ id: ``6b6ceb28-b2eb-4b98-b3dd-26648a933c81`` (string) - Identificador del cliente.
++ rfc_id: MELM8305281H0 (string, required) - Número de identificación del cliente.
++ branch_office: 0 (number) - Sucursal, valor por default 0.
+
+## CustomerOutInvoiceCompletoSinUsar (object)
++ id: ``6b6ceb28-b2eb-4b98-b3dd-26648a933c81`` (string) - Identificador del cliente.
++ `type` (CustomerType) - Tipo de cliente, valor por default Customer.
++ `person_type` (PersonType,required) - Tipo de persona.
++ rfc_id: MELM8305281H0 (string, required) - Número de identificación del cliente.
++ name: ``Marcos``,``Castillo`` (array[string], required) - Razón social o nombres y apellidos del cliente.
++ commercial_name: Siigo (string) - Nombre comercial o Nombre comercial de la empresa del cLiente.
++ branch_office: 0 (number) - Sucursal, valor por default 0.
++ fiscal_regime (array[FiscalRegime]) - Régimen fiscal del cliente.
++ address (AddressOut,required) - Dirección del cliente.
++ phones (array[Phone],required) - Indica los teléfonos asociados al cliente.
++ contacts (array[Contact],required) - Indica los contactos asociados al cliente.
+
+
+## NameCustomer (object)
++ code: ``Item-1`` (string,required) - Código único del producto.
++ description: Camiseta de algodón (string) - Nombre o descripción del producto/servicio.
+
+
+
+## ItemIn (object)
++ code: ``Item-1`` (string,required) - Código único del producto.
++ description: Camiseta de algodón (string) - Nombre o descripción del producto/servicio.
++ quantity: 1 (number,required) - Cantidad.
++ price: 1069.77 (number,required) - Precio del producto / Valor unitario.
++ discount: ``0.0`` (number) - Porcentaje o Valor de descuento. Según configuración de la factura.
++ taxes (array[TaxIn]) - Impuestos que se desean asociar al producto o servicio.
+
+## ItemOut (object)
++ id: ``63f918c2-ca65-4edc-a7db-66bcdd5159ps`` (string) - Identificador del producto/servicio.
++ code: ``Item-1`` (string) - Código único del producto.
++ description: Camiseta de algodón (string) - Nombre o descripción del producto/servicio.
++ quantity: 2 (number) - Cantidad. En Siigo Nube queda registado con dos decimales.
++ price: 1069.77 (number) - Precio del producto / Valor unitario. En Siigo Nube queda registado con dos decimales.
++ discount (Discount) - Porcentaje y valor de descuento.
++ taxes (array[TaxOutInvoice]) - Impuestos que se desean asociar al producto o servicio.
++ total: 2546.05 (number) - Total del producto, incluye impuestos.
+
+## PaymentDocument
++ prefix: ``FV-2`` (string,required) - Prefijo - Comprobante a cruzar, si el cliente tiene anticipos.
++ consecutive: 22 (number,required) - Consecutivo
++ quote: 1 (number) - Cuota
+
+## ConditionsIn (object)
++ id: 5636 (number) - ID del medio de pago.
++ value: ``1273.03`` (number,required) - Valor asociado al medio de pago.
++ due_date: ``2021-03-19`` (string) - Fecha pago cuota, formato yyyy-MM-dd.
+
+## ConditionsOut (object)
++ id: 5636 (number) - ID del medio de pago.
++ name: ``Crédito`` (string) - Nombre del medio de pago.
++ value: ``1273.03`` (number,required) - Valor asociado al medio de pago.
++ due_date: ``2021-03-19`` 
+
+## ConditionsVouchersIn (object)
++ id: 5636 (number) - ID del medio de pago.
++ value: ``1273.03`` (number,required) - Valor asociado al medio de pago.
+
+## ConditionsVouchersOut (object)
++ id: 5636 (number) - ID del medio de pago.
++ name: ``Efectivo`` (string) - Nombre del medio de pago.
++ value: ``1273.03`` (number,required) - Valor asociado al medio de pago.
+
+# PaymentIn (object)
++ method: PUE (string,required) - Método de pago, puede ser PUE o PPD.
++ conditions (array[ConditionsIn]) - Condiciones de pago.
+
+# PaymentOut (object)
++ method: PUE (string,required) - Método de pago, puede ser PUE o PPD.
++ conditions (array[ConditionsVouchersOut]) - Condiciones de pago.
+
+# cfdiOut (object)
++ code: 01 (string) - Código de la forma de pago CFDI.
++ name: ``Efectivo`` (string) - Nombre de la forma de pago CFDI
+# InvoicesOutList (object)
++ `pagination` (Pagination)
++ results (array[InvoiceOutS])
++ _links
+    - *previous*
+        - href: https://api.siigo.mx/v1/invoices?page=4&page_size=25
+    - *self*
+        - href: https://api.siigo.mx/v1/invoices?page=5&page_size=25
+    - *next*
+        - href: https://api.siigo.mx/v1/invoices?page=6&page_size=25
+
+
+# DocumentFV (object)
++ id: 24446 (number,required) - Identificador del comprobante *https://api.siigo.mx/v1/document-types?type=FV*
+
+# DocumentInDev (object)
++ id: 24446 (number,required) - Identificador del comprobante
++ number: 22 (number) - Consecutivo/número del comprobante, el campo NO es obligatorio por defecto, depende de la configuración del tipo de comprobante.
+
+# Totals (object)
++ total: 2546.05 (number) - Total del comprobante, es calculado según el manejo de decimales que tenga configurada la empresa al momento de la creación.
++ totalRetentions
+
+## InvoiceInS (object)
++ document (DocumentFV,required) - Tipo de Comprobante (Para verificar la configuración ir a Siigo Nube en el menú Configuración > Transacciones > Comprobantes > Facturas)
++ date: ``2015-12-15`` (string,required) - Fecha de la factura, formato yyyy-MM-dd.
++ customer (CustomerInInvoiceS,required) - Identificador del cliente asociado a la factura.
++ cost_center: 235 (number) - Centro de costo.
++ seller: 629 (number,required) - ID del vendedor asociado a la factura.
++ use: G01 (string,required) - Uso CFDI del listado del SAT.
++ observations: Observaciones (string) - Comentarios para agregar información a la factura.
++ Stamp: true (boolean) - Campo para enivar electronicamente la factura de venta.
++ items (array[ItemIn],required) - Productos o Servicios asociados a la factura.
++ payment (PaymentIn,required) - Condiciones de pago asociadas a la factura.
+
+
+## InvoiceOutS (object)
++ id: ``63f918c2-ca65-4edc-a7db-66bcdd5159fb`` (string) - Identificador de la factura de venta.
++ document (DocumentFV) - Tipo de Comprobante (Para verificar la configuración ir a Siigo Nube en el menú Configuración > Transacciones > Comprobantes) factura.
++ number: 22 (number) - Consecutivo/número del comprobante, el campo es obligatorio según la configuración del tipo de comprobante.
++ name: ``FV-2-22`` (string) - Tipo de Comprobante + Código de Comprobante + Número de Comprobante
++ date: ``2015-12-15`` (string) - Fecha de la factura, formato yyyy-MM-dd.
++ customer (CustomerOutInvoiceS) - Identificador del cliente asociado a la factura.
++ cost_center: 235 (number) - Centro de costo.
++ total: 2546.05 (number) - Total de la factura, es calculado según el manejo de decimales que tenga configurada la empresa al momento de crear la factura.
++ balance: 0 (number) - Saldo pendiente de pago en la factura.
++ seller: 629 (number) - ID del vendedor asociado a la factura.
++ use (UseOutInvoice) - Uso CFDI de la factura.
++ observations: Observaciones (string) - Comentarios para agregar información a la factura.
++ items (array[ItemOut]) - Productos o Servicios asociados a la factura.
++ payment (PaymentOut) - Condiciones de pago asociadas a la factura.
++ metadata (Metadata) - Información acerca de la entidad.
+
+## InvoiceIn (object)
++ document (DocumentFV,required) - Tipo de Comprobante (Para verificar la configuración ir a Siigo Nube en el menú Configuración > Transacciones > Comprobantes > Facturas)
++ date: ``2015-12-15`` (string,required) - Fecha de la factura, formato yyyy-MM-dd.
++ customer (CustomerInInvoice,required) - Identificador del cliente asociado a la factura.
++ cost_center: 235 (number) - Centro de costo.
++ seller: 629 (number,required) - ID del vendedor asociado a la factura.
++ use (UseInInvoice) - Uso CFDI de la factura.
++ stamp (Stamp) - Campo para indicar el envío de la factura electronica
++ mail (mailInCustomer) - Campo para indicar el envío de la factura al cliente
++ observations: Observaciones (string) - Comentarios para agregar información a la factura.
++ items (array[ItemIn],required) - Productos o Servicios asociados a la factura.
++ payments (array[PaymentIn],required) - Condiciones de pago asociadas a la factura.
+
+
+## InvoiceOut (object)
++ id: ``63f918c2-ca65-4edc-a7db-66bcdd5159fb`` (string) - Identificador de la factura de venta.
++ document (DocumentFV) - Tipo de Comprobante (Para verificar la configuración ir a Siigo Nube en el menú Configuración > Transacciones > Comprobantes) factura.
++ number: 22 (number) - Consecutivo/número del comprobante, el campo es obligatorio según la configuración del tipo de comprobante.
++ name: ``FV-2-22`` (string) - Tipo de Comprobante + Código de Comprobante + Número de Comprobante
++ date: ``2015-12-15`` (string) - Fecha de la factura, formato yyyy-MM-dd.
++ customer (CustomerOutInvoice) - Identificador del cliente asociado a la factura.*Revisar
++ cost_center: 235 (number) - Centro de costo.
++ total: 2546.05 (number) - Total de la factura, es calculado según el manejo de decimales que tenga configurada la empresa al momento de crear la factura.
++ balance: 0 (number) - Saldo pendiente de pago en la factura.
++ seller: 629 (number) - ID del vendedor asociado a la factura.
++ stamp (StampO) - Campo para indicar el envío de la factura electronica
++ mail (mailOutCustomer) - Campo para indicar el envío de la factura al cliente
++ observations: Observaciones (string) - Comentarios para agregar información a la factura.
++ items (array[ItemOut]) - Productos o Servicios asociados a la factura.
++ payments (array[PaymentOut]) - Condiciones de pago asociadas a la factura.
++ metadata (Metadata) - Información acerca de la entidad.
+
+## InvoiceInSat (object)
++ document (DocumentFV,required) - Tipo de Comprobante (Para verificar la configuración ir a Siigo Nube en el menú Configuración > Transacciones > Comprobantes > Facturas)
++ date: ``2015-12-15`` (string,required) - Fecha de la factura, formato yyyy-MM-dd.
++ customer (CustomerInInvoice,required) - Identificador del cliente asociado a la factura.
++ cost_center: 235 (number) - Centro de costo.
++ seller: 629 (number,required) - ID del vendedor asociado a la factura.
++ stamp (Stamp) - Campo para indicar el envío de la factura electronica
++ mail (mailInCustomer) - Campo para indicar el envío de la factura al cliente
++ observations: Observaciones (string) - Comentarios para agregar información a la factura.
++ items (array[ItemIn],required) - Productos o Servicios asociados a la factura.
++ payments (array[PaymentIn],required) - Condiciones de pago asociadas a la factura.
+
+
+## InvoiceOutSat (object)
++ id: ``63f918c2-ca65-4edc-a7db-66bcdd5159fb`` (string) - Identificador de la factura de venta.
++ document (DocumentFV) - Tipo de Comprobante (Para verificar la configuración ir a Siigo Nube en el menú Configuración > Transacciones > Comprobantes) factura.
++ number: 22 (number) - Consecutivo/número del comprobante, el campo es obligatorio según la configuración del tipo de comprobante.
++ name: ``FV-2-22`` (string) - Tipo de Comprobante + Código de Comprobante + Número de Comprobante
++ date: ``2015-12-15`` (string) - Fecha de la factura, formato yyyy-MM-dd.
++ cost_center: 235 (number) - Centro de costo.
++ total: 2546.05 (number) - Total de la factura, es calculado según el manejo de decimales que tenga configurada la empresa al momento de crear la factura.
++ balance: 0 (number) - Saldo pendiente de pago en la factura.
++ seller: 629 (number) - ID del vendedor asociado a la factura.
++ stamp (StampO) - Campo para indicar el envío de la factura electronica
++ mail (mailOutCustomer) - Campo para indicar el envío de la factura al cliente
++ observations: Observaciones (string) - Comentarios para agregar información a la factura.
++ items (array[ItemOut]) - Productos o Servicios asociados a la factura.
++ payments (array[PaymentOut]) - Condiciones de pago asociadas a la factura.
++ metadata (Metadata) - Información acerca de la entidad.
+
+## CopyMailIn
++ mail_to: cabr110042@siigo.com,
++ copy_to: juan.casallas@siigo.com;armando.cabrera@siigo.com
+
+
+## CopyMailOut 
++ status: sent,
++ observations: ""
+
+## DueVoucher (object)
++ prefix: ``FV-1`` (string,required) - Prefijo de factura a la cual se le va a aplicar el pago
++ consecutive: 68 (number,required) - Consecutivo de la factura a la cual se le va a aplicar el pago 
++ quote: 1 (number,required) - Número de la cuota que se va a pagar.
++ uuid: 16763be46022406ea950fcd5018633ca (string) - Número de UUID de la factura de venta.
+
+## Due (object)
++ prefix: ``FV-1`` (string,required) - Prefijo de factura a la cual se le va a aplicar el pago
++ consecutive: 68 (number,required) - Consecutivo de la factura a la cual se le va a aplicar el abono o pago 
++ quote: 1 (number,required) - Número de la cuota que se va a pagar.
++ date: ``2021-04-22`` (string) - Fecha pago cuota, formato yyyy-MM-dd.
+
+## DueDetailed (object)
++ prefix: ``FV-1`` (string,required) - Prefijo de factura a la cual se le va a aplicar el abono o pago
++ consecutive: 68 (number,required) - Consecutivo de la factura a la cual se le va a aplicar el abono o pago 
++ quote: 1 (number,required) - Número de la cuota que se va a pagar o a abonar
++ date: ``2021-04-22`` (string) - Fecha pago cuota, formato yyyy-MM-dd.
+
+# DocumentRC (object)
++ id: 7714 (number,required) - Identificador del comprobante *https://api.siigo.com/v1/document-types?type=RC*
+
+## VoucherPaymentIn (object)
++ id: 5636 (number,required) - ID del medio de pago con cuenta contable que no maneja vencimiento.
++ value: ``119000`` (number,required) - Valor asociado al medio de pago.
+
+## VoucherPaymentOut (object)
++ method: PUE (string,required) - Método de pago, puede ser PUE o PPD.
++ cfdi (cfdiOut) -  Forma de pago CFDI.
++ conditions (array[ConditionsVouchersOut]) - Condiciones de pago.
+
+## ItemVoucher (object)
++ due (DueVoucher) - Vencimiento / Factura de venta a la cuál se le va a aplicar el pago
++ value: 119000 (number,required) - Valor total del item 
+
+## CustomerInVoucher (object)
++ rfc.id: 209048401 (string, required) - Número de identificación del cliente.
++ branch_office: 0 (number) - Sucursal, valor por default 0.
+
+## CustomerInBalance (object)
++ rfc.id: 209048401 (string) - Número de identificación del tercero por el cual se quiera filtrar el reporte.
++ branch_office: 0 (number) - Sucursal, valor por default 0.
+
+## CustomerOutVoucher (object)
++ id: ``6b6ceb28-b2eb-4b98-b3dd-26648a933c81`` (string) - Identificador del cliente.
++ rfc.id: 13832081 (string, required) - Número de identificación del cliente.
++ branch_office: 0 (number) - Sucursal, valor por default 0.
+
+# PaymentVoucherIn (object)
++ method: PUE (string,required) - Método de pago, puede ser PUE o PPD.
++ cfdi: ``1273`` (string,required) - Forma de pago CFDI.
++ conditions (array[ConditionsVouchersIn]) - Condiciones de pago.
+
+# PaymentVoucherOut (object)
++ method: PUE (string,required) - Método de pago, puede ser PUE o PPD.
++ cfdi (cfdiOut) -  Forma de pago CFDI.
++ conditions (array[ConditionsVouchersOut]) - Condiciones de pago.
+
+## VoucherIn (object)
++ document (DocumentRC,required) - Tipo de Comprobante (Para verificar la configuración ir a Siigo Nube en el menú Configuración > Ventas > Recepciones de pago)
++ date: ``2021-04-22`` (string,required) - Fecha de elaboración del recibo de caja, formato yyyy-MM-dd.
++ customer (CustomerInVoucher,required) - Identificador del cliente asociado a la recepción de pago.
++ cost_center: 235 (number) - Centro de costo.
++ items (array[ItemVoucher]) - Facturas a las que se les va a aplicar el pago.
++ payment (PaymentVoucherIn) - ID y valor de la condición de pago.
++ observations : Observaciones (string) - Comentarios para agregar información a la recepción de pago.
+
+## VoucherOut (object)
++ id: ``63f918c2-ca65-4edc-a7db-66bcdd5159fb`` (string) - Identificador de la recepción de pago.
++ document (DocumentRC) - Tipo de Comprobante (Para verificar la configuración ir a Siigo Nube en el menú Configuración > Ventas > Recepciones de pago)
++ number: 22 (number) - Consecutivo/número del comprobante, el campo es obligatorio según la configuración del tipo de comprobante.
++ name: ``RC-2-22`` (string) - Tipo de Comprobante + Código de Comprobante + Número de Comprobante
++ date: ``2022-12-15`` (string,required) - Fecha de elaboración de la recepción de pago, formato yyyy-MM-dd.
++ customer (CustomerOutVoucher,required) - Identificador del cliente asociado a la recepción de pago.
++ cost_center: 235 (number) - Centro de costo.
++ items (array[ItemVoucher]) -Facturas a las que se les aplicó el pago.
++ payments (array[PaymentVoucherOut]) - Condiciones de pago asociadas a la factura.
++ observations : Observaciones (string) - Comentarios para agregar información a la recepción de pago.
++ metadata (Metadata) - Información acerca de la entidad.
+
+## VouchersDelete (object)
++ id: ``63f918c2-ca65-4edc-a7db-66bcdd5159fb`` (string) - Identificador de la recepción de pago.
++ deleted: true (boolean) - Indica si la recepción de pago fue eliminadaou
+
+# VouchersOutList (object)
++ `pagination` (Pagination)
++ results (array[VoucherOut])
++ _links
+    - *previous*
+        - href: https://api.siigo.com/v1/vouchers?page=4&page_size=25
+    - *self*
+        - href: https://api.siigo.com/v1/vouchers?page=5&page_size=25
+    - *next*
+        - href: https://api.siigo.com/v1/vouchers?page=6&page_size=25
+  
+
+# Group Autenticación
+Para comunicarte con nuestro servicio debes autenticarte mediante un esquema **OAuth**. Como primer paso debes generar un Token de acceso tipo [JWT](https://jwt.io/ "JSON Web Tokens").
+
+Para generar el token deberás utilizar las credenciales conformadas por **username** y **access_key**. 
+
+Para realizar la generación de credenciales es necesario ingresar a Siigo Nube, menú de *configuración* `>` *API / Integraciones* `>` *Credenciales API*
+
+Puedes solicitar la información de pruebas a nuestras [líneas de atención](https://www.siigo.mx/contactenos/ "Contáctanos"), indicando el RFC registrado en Siigo y te suministraremos los datos vía correo.
+
+## Generar Token [POST /auth]
+
+Obtendrás un **access_token** válido por **24 horas**. Este token debe ser enviado en la cabecera de autorización (Authorization) de todas las peticiones al API.
+
++ Request (application/json)
+
+    + Headers
+    
+
+    + Attributes (TokenIn)
+    
+
++ Response 201 (application/json)
+
+    + Attributes (TokenOut)
+
+    + Body
+
+
+# Group Productos
+Son los bienes y/o servicios que adquiere la empresa para su propio uso o para realizar comercialización de ellos.
+
+## Crear Producto [POST /v1/products]
+Esta funcionalidad te permite  crear un producto/servicio, configurando sus características como se puede ver en los siguientes campos:
+
+Nombre          |Tipo                          |Descripción  |Características
+----------------|------------------------------|--------------- | ---------
+code            |*string*          | Código único del producto. | Campo obligatorio, alfanúmerico, NO permite espacios,  máximo  30 carácteres.
+name            |*string*                      | Nombre del producto.  | Campo obligatorio,  máximo  100 caracteres, permite caracteres especiales  y espacios.
+account_group   |*number*                      | Id de la clasificación de inventario, se puede consultar en el siguiente endpoint: <a href="https://siigoapimexico.docs.apiary.io/#reference/catalogos/grupos-de-inventario/grupos-de-inventario">**/account-groups**</a>  | Campo obligatorio, debe estar creado en Siigo Nube y estar activo.
+unit            |*string*                      | Código de la unidad de medida del producto del catálogo del SAT. |  Campo obligatorio, consulte el listado de códigos válidos por el SAT <a href="https://saprodcentralassets.blob.core.windows.net/siigoapi/documentation/Unidades de medida SAT.xlsm">**aquí**</a>.
+key             |*string*                      | Clave SAT. |  Campo obligatorio, consulte el listado de códigos válidos por el SAT <a href="https://saprodcentralassets.blob.core.windows.net/siigoapi/documentation/Claves de Productos-Servicios SAT.xlsx">**aquí**</a>.
+type            |*string*                      | Tipo del producto: Product, Service, ConsumerGood    | Campo opcional para identificar el tipo, si no se envia se toma por defecto el valor "Product".
+stock_control   |*boolean*                      | Manejo del  control  de inventario  | Campo booleano opcional, si no se envia por defecto toma "false".
+active          |*boolean*                      | Estado del producto en Siigo, valor por default "true". |   Campo tipo booleano, opcional, si no se envia por defecto toma "true".
+tax_included    |*boolean*                      | IVA incluido. |  Campo tipo booleano, opcional para indicar si el producto tiene IVA incluido en el precio de venta, si no se envia por defecto se toma "false".
+tax.id  |*number*                      |Identificador único del impuesto, se puede consultar en el siguiente endpoint: <a href="https://siigoapimexico.docs.apiary.io/#reference/catalogos/impuestos/grupos-de-inventario">**/taxes**</a>   |   Campo tipo númerico, opcional para relacionar un impuesto al producto, el impuesto debe existir previamente en Siigo Nube.
+prices.price_list.position |*number*                | Identificador único de la lista de precio.  |   Campo tipo númerico, opcional, debe ser un número entero del 1 al 12.
+prices.price_list.value |*number*                | Valor de la lista de precio.  | Campo tipo númerico, opcional, máximo maneja 2 decimales, debe ser positivo.
+reference            |*string*                      | Referencia o código de fábrica del producto o servicio. |   Campo tipo string, opcional,permite espacios, alfanúmerico de máximo 80 carácteres.
+description            |*string*                      | Descripción del producto o servicio.  |   Campo tipo string, opcional, de máximo 2500 carácteres.
+barcode            |*string*                      | Código de barras.  |   Campo tipo string, opcional, permite espacios, alfanúmerico de máximo 50 carácteres.
+brand            |*string*                      | Marca.   |   Campo tipo string, opcional, permite espacios, alfanúmerico de máximo 50 carácteres.
+
+
+
++ Request (application/json)
+
+    + Headers
+
+            Authorization: [access_token]
+            SiigoAPI-Application-Id: [nombre de la aplicación que estás integrando]
+
+    + Attributes (ProductIn)
+    
+
++ Response 201 (application/json)
+
+    + Attributes (ProductOutCreate)
+
+    + Body
+    
+
+## Actualizar Producto [PUT /v1/products/]
+
+Esta funcionalidad te permite  editar un producto/servicio, configurando sus características como se puede ver en los siguientes campos:
+
+Nombre          |Tipo                          |Descripción  |Características
+----------------|------------------------------|--------------- | ---------
+code            |*string*                      | Código único del producto. | Campo obligatorio, alfanúmerico, NO permite espacios,  máximo  30 carácteres.
+name            |*string*                      | Nombre del producto.  | Campo obligatorio,  máximo  100 caracteres, permite caracteres especiales  y espacios.
+account_group   |*number*                      | Id de la clasificación de inventario, se puede consultar en el siguiente endpoint: <a href="https://siigoapimexico.docs.apiary.io/#reference/catalogos/grupos-de-inventario/grupos-de-inventario">**/account-groups**</a>  | Campo obligatorio, debe estar creado en Siigo Nube y estar activo.
+unit            |*string*                      | Código de la unidad de medida del producto del catálogo del SAT. |  Campo obligatorio, consulte el listado de códigos válidos por el SAT <a href="https://saprodcentralassets.blob.core.windows.net/siigoapi/documentation/Unidades de medida SAT.xlsm">**aquí**</a>.
+key             |*string*                      | Clave SAT. |  Campo obligatorio, consulte el listado de códigos válidos por el SAT <a href="https://saprodcentralassets.blob.core.windows.net/siigoapi/documentation/Claves de Productos-Servicios SAT.xlsx">**aquí**</a>.
+type            |*string*                      | Tipo del producto: Product, Service, ConsumerGood    | Campo opcional para identificar el tipo, si no se envia se toma por defecto el valor "Product".
+stock_control   |*boolean*                     | Manejo del  control  de inventario  | Campo booleano opcional, si no se envia por defecto toma "false".
+active          |*boolean*                     | Estado del producto en Siigo, valor por default "true". |   Campo tipo booleano, opcional, si no se envia por defecto toma "true".
+tax_included    |*boolean*                     | IVA incluido. |  Campo tipo booleano, opcional para indicar si el producto tiene IVA incluido en el precio de venta, si no se envia por defecto se toma "false".
+tax.id  |*number*                              | Identificador único del impuesto, se puede consultar en el siguiente endpoint: <a href="https://siigoapimexico.docs.apiary.io/#reference/catalogos/impuestos/grupos-de-inventario">**/taxes**</a>   |  Campo tipo númerico, opcional para relacionar un impuesto al producto, el impuesto debe existir previamente en Siigo Nube.
+prices.price_list.position |*number*           | Identificador único de la lista de precio.  |   Campo tipo númerico, opcional, debe ser un número entero del 1 al 12.
+prices.price_list.value |*number*              | Valor de la lista de precio.  | Campo tipo númerico, opcional, máximo maneja 2 decimales, debe ser positivo.
+reference            |*string*                 | Referencia o código de fábrica del producto o servicio. |   Campo tipo string, opcional,permite espacios, alfanúmerico de máximo 80 carácteres.
+description            |*string*               | Descripción del producto o servicio.  |   Campo tipo string, opcional, de máximo 2500 carácteres.
+barcode            |*string*                   | Código de barras.  |   Campo tipo string, opcional, permite espacios, alfanúmerico de máximo 50 carácteres.
+brand            |*string*                     | Marca.   |   Campo tipo string, opcional, permite espacios, alfanúmerico de máximo 50 carácteres.
+
+
++ Request (application/json)
+
+    + Headers
+
+            Authorization: [access_token]
+            SiigoAPI-Application-Id: [nombre de la aplicación que estás integrando]
+
+    + Attributes (ProductIn)
+    
+
++ Response 201 (application/json)
+
+    + Attributes (ProductOutCreate)
+
+    + Body
+
+
+## Consultar Producto [GET /v1/products/{product_id}]
+Consultar un producto o servicio único por su id.
+
+Se manejan los siguientes datos informativos:
+
+Nombre                   |Tipo                   |Descripción
+-------------------------|-----------------------|---------------
+**id**                   |String                 | Identificador del producto.
+**code**                 |String                 | Código único para identificar el producto.
+**name**                 |String                 | Nombre del producto / servicio.
+**account_group.id**     |number                 | Identificador único de la clasificación de inventario.
+**account_group.name**   |String                 | Nombre de la clasificación de inventario.
+**type.product**         |String                 | Se identifica el tipo de producto, puede ser: Product, service o ConsumerGood.
+**stock_control**        |boolean                | Control de inventario, valor por default "false".
+**active**               |boolean                | Estado del producto en Siigo, valor por default "true".
+**taxes.id**            |number                 | Identificador único del impuesto.
+**taxes.name**           |string                 | Nombre del impuesto.
+**taxes.type**           |string                 | Tipo del impuesto, ejemplo: IVA o ISR
+**taxes.percentage**     |number                 | Indica el número de porcentaje de los impuestos.
+**tax_included**         |boolean                | Indica si el producto maneja IVA incluido o no, no es obligatorio.
+**prices.price_list.position**  |number          |Identificador único de la lista de precio.
+**prices.price_list.name**  |string              |Nombre de la lista de precio.
+**prices.price_list.value**  |string             |Valor de la lista de precio.
+**unit**                 |string                 | Unidad de medida del SAT
+**key**                  |string                 | Clave SAT del producto
+**reference**            |string                 | Referencia o código de fábrica del producto o servicio.
+**description**          |string                 | Descripción del producto o servicio.
+**barcode**              |string                 | Código de barras.
+**brand**                |string                 | Marca del producto.
+**available_quantity**   |number                 | Indica la cantidad disponible en el inventario. Si el producto se encuentra distribuido en múltiples bodegas, este atributo retorna la cantidad disponible en todas las bodegas.
+**warehouses.id**        |number                 | Identificador único de la bodega.
+**warehouses.name**      |string                 | Nombre de la bodega.
+**warehouses.quantity**  |string                 | Cantidad disponible.
+**created**              |string                 | La fecha en la que se creó el producto.
+**last_updated**         |string                 | La fecha en la que se actualizó el producto por última vez.
+
+
++ Parameters
+    + product_id (string,`00584089-4ebc-49de-bf75-6a6cc968a96d`)
+ 
++ Request (application/json)
+    
+    + Headers
+            
+            Authorization: [access_token]
+            SiigoAPI-Application-Id: [nombre de la aplicación que estás integrando]
+
++ Response 200 (application/json)
+
+    + Attributes (ProductOut)
+
+    + Body
+
+## Listar Productos [GET /v1/products{?created_start}]
+Devuelve una lista de los productos o servicios. Los productos se devuelven ordenados por fecha de creación, y los productos creados más recientemente aparecen primero.
+
+Listado de productos en Siigo Nube en el menú lateral: *Transacciones* `>` *Inventarios* `>` *Productos / Servicios.*
+
+---------------------------------------------------------------------------------------
+
+**Query Parameters**
+Puedes utilizar los siguientes parámetros para poder realizar filtros en las consultas.
+
+
+Param                  |Type       |Description
+-----------------------|-----------|-----------------------------------------------------------------------------------
+**code**               |Date       | Devuelve resultados por "code".
+**created_start**      |Date       | Devuelve resultados de productos con fecha de creación mayor o igual que este valor.
+**created_end**        |Date       | Devuelve resultados de productos con fecha de creación menor o igual que este valor.
+**updated_start**      |Date       | Devuelve resultados de productos con actualización en sus propiedades o saldos de inventario en una fecha mayor o igual que este valor.
+**updated_end**        |Date       | Devuelve resultados de productos con actualización en sus propiedades o saldos de inventario en una fecha menor o igual que este valor.
+**id**                 |Date       | Devuelve resultados por "id". Es posible hacer filtros hasta con 20 Ids a la vez separados por coma ejemplo: https://api.siigo.mx/v1/products?ids={GUID},{GUID}
+
+
+**Date**: yyyy-MM-dd
+
+**Date and time in UTC**: yyyy-MM-ddTHH:mm:ssZ
+
++ Parameters
+    + created_start (optional, type, `2021-02-17`)
+
++ Request (application/json)
+
+    + Headers
+
+            Authorization: [access_token]
+            SiigoAPI-Application-Id: [nombre de la aplicación que estás integrando]
+
++ Response 200 (application/json)
+
+    + Attributes (ProductsOutList)
+
+    + Body
+    
+
+# Group Clientes
+Los clientes o terceros son las personas fisicas, morales o extranjeras que se manejaran en relaciones comerciales o administrativas con la empresa.
+
+## Crear Cliente [POST /v1/customers]
+Esta funcionalidad permite crear  un tercero. Puede ser: cliente, proveedor u otro.
+
+Nombre                   |Tipo                   |Descripción  |Características
+-------------------------|-----------------------|--------------- |-------------
+**type**                 |String                 | Campo para identificar el tipo de cliente. |  Campo opcional, con 3 tipos "Customer, Supplier, Other", si no se envia por defecto toma el tipo "Customer".
+**person_type**          |String, required                   | Identifica cuál es el tipo de persona. | Campo obligatorio, solo se puede enviar  "Moral, Physical o Foreign".
+**rfc_id**               |String, required                   | RFC de identificación del cliente. |  Campo obligatorio, debe cumplir con las siguientes expresiones regulares según el tipo de persona: Moral:  `('^([A-ZÑa-zñ&]{3}[0-9]{6}[A-ZÑa-zñ0-9]{3})$')`, Physical: `('^([A-ZÑa-zñ&]{4}[0-9]{6}[A-ZÑa-zñ0-9]{3})$')`.
+**name**                 |String, required       | Razón social o nombres y apellidos del cliente.  |  Campo obligatorio, no permite carácteres especiales, "moral o foreign" es un solo campo, en el array de "physical" son 2 campos,  tiene un máximo 100 carácteres por campo "string".
+**commercial_name**      |String                 | Nombre comercial o Nombre comercial de la empresa del cliente. | Campo opcional, alfanúmerico, permite espacios y carácteres especiales. 
+**branch_office**        |number                 | Sucursal, valor por default 0. |   Campo opcional, solo recibe números enteros del 0 al 999.
+**fiscal_regime**        |string              | Régimen fiscal del tercero. |   Campo opcional, consulte el listado de códigos válidos por el SAT para cada tipo de persona <a href="https://saprodcentralassets.blob.core.windows.net/siigoapi/documentation/Listado de régimen fiscal.xlsx">**aquí**</a>.
+**active**               |boolean                 | Estado del cliente en Siigo.  |Campo opcional, si no se envia el valor por default es "true".
+**address.address**       |string, required                 | Dirección del cliente.  | Campo obligatorio, alfanúmerico, permite espacios, máximo 256 carácteres.
+**address.interior_number**       |string                 | Número de interior del cliente. | Alfanumérico máximo 20 caracteres, permite espacios intermedios, permite caracteres especiales, puede estar vacío, puede existir previamente otro tercero con el mismo interior_number.
+**address.exterior_number**       |string                 | Número de exterior del cliente. | Alfanumérico máximo 20 caracteres, permite espacios intermedios, permite caracteres especiales, puede estar vacío, puede existir previamente otro tercero con el mismo exterior_number.
+**address.colony**         |string                 | Colonía de la dirección del cliente. | Alfanumérico máximo 20 caracteres, permite espacios intermedios, permite caracteres especiales, puede estar vacío, puede existir previamente otro tercero con la misma colony.
+**address.locality**       |string                 | Localidad de la dirección del cliente.  | Alfanumérico máximo 20 caracteres, permite espacios intermedios, permite caracteres especiales, puede estar vacío, puede existir previamente otro tercero con la misma locality. 
+**address.city.country_code**          |string, required    | Código del país.  | Puedes descargar el listado de códigos <a href="https://saprodcentralassets.blob.core.windows.net/siigoapi/documentation/Paises-Estados-Ciudades.xlsx">**aquí**</a> o consultar en Siigo Nube por la ruta de: Reportes de configuración - Localidad -  Países, estados y ciudades / municipios.
+**address.city.state_code**            |string, required    | Código del departamento/estado.  | Puedes descargar el listado de códigos <a href="https://saprodcentralassets.blob.core.windows.net/siigoapi/documentation/Paises-Estados-Ciudades.xlsx">**aquí**</a> o consultar en Siigo Nube por la ruta de: Reportes de configuración - Localidad -  Países, estados y ciudades / municipios.
+**address.city.city_code**            |string, required     | Código de la ciudad. |  Puedes descargar el listado de códigos <a href="https://saprodcentralassets.blob.core.windows.net/siigoapi/documentation/Paises-Estados-Ciudades.xlsx">**aquí**</a> o consultar en Siigo Nube por la ruta de: Reportes de configuración - Localidad -  Países, estados y ciudades / municipios.
+**address.postal_code**       |string                 | Código postal.  | Campo opcional, alfanúmerico, no permite espacios, máximo  5 carácteres.
+**phones.indicative**         |string                 | Indicativo del número de contacto.  | Campo opcional, númerico, no permite espacios ni carácteres especiales, máximo  10 carácteres.
+**phones.number**             |string                 | Número de contacto. | Campo opcional, númerico, no permite espacios ni carácteres especiales, máximo  10 carácteres.
+**phones.extension**          |string                 | Extensión del número de contacto. | Campo opcional, númerico, no permite espacios ni carácteres especiales, máximo  10 carácteres.
+**contacts.first_name**  |string,required                 | Nombres del contacto.  |  Campo obligatorio, permite espacios y carácteres especiales, alfanpumerico, máximo 50 carácteres.
+**contacts.last_name**  |string                 | Apellidos del contacto. |  Campo opcional, permite espacios y carácteres especiales, alfanpumerico, máximo 50 carácteres.
+**contacts.email**  |string                 | Correo del contacto. |  Campo opcional, NO permite espacios ni carácteres especiales, alfanpumerico, máximo 100 carácteres.
+**contacts.phone.indicative**  |string                | Indicativo del número del contacto. | Campo opcional, númerico, no permite espacios ni carácteres especiales, máximo  10 carácteres.
+**contacts.phone.number**             |string                 | Número del contacto. | Campo opcional, númerico, no permite espacios ni carácteres especiales, máximo  10 carácteres.
+**contacts.phone.extension**          |string                 | Extensión del número del contacto. | Campo opcional, númerico, no permite espacios ni carácteres especiales, máximo  10 carácteres.
+**comments**          |string                 | Observaciones o comentarios adicionales.  | Campo opcional, alfanúmerico,  permite espacios y carácteres especiales,  máximo  4000 carácteres.
+**seller_id**         |number                | Usuario vendedor asigando al cliente.   | Campo opcional, númerico, el id del usuario debe existir previamente en Siigo Nube, se puede consultar con una petición tipo GET  al endpoint de https://api.siigo.mx/v1/users.
+**collector_id**      |number                | Usuario cobrador encargado del recaudo de cartera.  | Campo opcional, númerico, el id del usuario debe existir previamente en Siigo Nube, se puede consultar con una petición tipo GET  al endpoint de https://api.siigo.mx/v1/users.
+
+
++ Request (application/json)
+
+    + Headers
+
+            Authorization: [access_token]
+            SiigoAPI-Application-Id: [nombre de la aplicación que estás integrando]
+
+    + Attributes (CustomerIn)
+        
++ Response 201 (application/json)
+
+     + Attributes (CustomerOut)
+
+    + Body
+    
+
+## Actualizar Cliente [PUT /v1/customers/{id}]
+Esta funcionalidad te permite actualizar un tercero, debe enviar igual los campos como en su creación porque remplaza los datos. Si hay un campo vacio quedara vacio en Nube.
+
+Nombre                   |Tipo                   |Descripción  |Características
+-------------------------|-----------------------|--------------- |-------------
+**type**                 |String                 | Campo para identificar el tipo de cliente. |  Campo opcional, con 3 tipos "Customer, Supplier, Other", si no se envia por defecto toma el tipo "Customer".
+**person_type**          |String, required                 | Identifica si el tercero es moral, physical o foreign. | Campo obligatorio, solo se puede enviar  "moral, physical o foreign".
+**rfc_id**               |String, required                | RFC de identificación del cliente. |  Campo obligatorio, debe cumplir con las siguientes expresiones regulares según el tipo de persona: Moral:  `('^([A-ZÑa-zñ&]{3}[0-9]{6}[A-ZÑa-zñ0-9]{3})$')`, Physical: `('^([A-ZÑa-zñ&]{4}[0-9]{6}[A-ZÑa-zñ0-9]{3})$')`.
+**name**                 |String, required       | Razón social o nombres y apellidos del cliente.  |  Campo obligatorio, no permite carácteres especiales, Company es un solo campo, en el array de Person son 2 campos,  tiene un máximo 100 carácteres por campo "string".
+**commercial_name**      |String                 | Nombre comercial o Nombre comercial de la empresa del cliente. | Campo opcional, alfanúmerico, permite espacios y carácteres especiales. 
+**branch_office**        |number                 | Sucursal, valor por default 0. |   Campo opcional, solo recibe números enteros del 0 al 999.
+**fiscal_regime**        |string              | Régimen fiscal del tercero. |   Campo opcional, consulte el listado de códigos válidos por el SAT para cada tipo de persona <a href="https://saprodcentralassets.blob.core.windows.net/siigoapi/documentation/Listado de régimen fiscal.xlsx">**aquí**</a>.
+**active**               |boolean                 | Estado del cliente en Siigo.  |Campo opcional, si no se envia el valor por default es "true".
+**address.address**       |string, required                 | Dirección del cliente.  | Campo obligatorio, alfanúmerico, permite espacios, máximo 256 carácteres.
+**address.interior_number**       |string                 | Número de interior del cliente. | Alfanumérico máximo 20 caracteres, permite espacios intermedios, permite caracteres especiales, puede estar vacío, puede existir previamente otro tercero con el mismo interior_number.
+**address.exterior_number**       |string                 | Número de exterior del cliente. | Alfanumérico máximo 20 caracteres, permite espacios intermedios, permite caracteres especiales, puede estar vacío, puede existir previamente otro tercero con el mismo exterior_number.
+**address.colony**         |string                 | Colonía de la dirección del cliente. | Alfanumérico máximo 20 caracteres, permite espacios intermedios, permite caracteres especiales, puede estar vacío, puede existir previamente otro tercero con la misma colony.
+**address.locality**       |string                 | Localidad de la dirección del cliente.  | Alfanumérico máximo 20 caracteres, permite espacios intermedios, permite caracteres especiales, puede estar vacío, puede existir previamente otro tercero con la misma locality. 
+**address.city.country_code**          |string, required    | Código del país.  | Puedes descargar el listado de códigos <a href="https://saprodcentralassets.blob.core.windows.net/siigoapi/documentation/Paises-Estados-Ciudades.xlsx">**aquí**</a> o consultar en Siigo Nube por la ruta de: Reportes de configuración - Localidad -  Países, estados y ciudades / municipios.
+**address.city.state_code**            |string, required    | Código del departamento/estado.  | Puedes descargar el listado de códigos <a href="https://saprodcentralassets.blob.core.windows.net/siigoapi/documentation/Paises-Estados-Ciudades.xlsx">**aquí**</a> o consultar en Siigo Nube por la ruta de: Reportes de configuración - Localidad -  Países, estados y ciudades / municipios.
+**address.city.city_code**            |string, required     | Código de la ciudad. |  Puedes descargar el listado de códigos <a href="https://saprodcentralassets.blob.core.windows.net/siigoapi/documentation/Paises-Estados-Ciudades.xlsx">**aquí**</a> o consultar en Siigo Nube por la ruta de: Reportes de configuración - Localidad -  Países, estados y ciudades / municipios.
+**address.postal_code**       |string                 | Código postal.  | Campo opcional, alfanúmerico, no permite espacios, máximo  5 carácteres.
+**phones.indicative**         |string                 | Indicativo del número de contacto.  | Campo opcional, númerico, no permite espacios ni carácteres especiales, máximo  10 carácteres.
+**phones.number**             |string                 | Número de contacto. | Campo opcional, númerico, no permite espacios ni carácteres especiales, máximo  10 carácteres.
+**phones.extension**          |string                 | Extensión del número de contacto. | Campo opcional, númerico, no permite espacios ni carácteres especiales, máximo  10 carácteres.
+**contacts.first_name**  |string,required                 | Nombres del contacto.  |  Campo obligatorio, permite espacios y carácteres especiales, alfanpumerico, máximo 50 carácteres.
+**contacts.last_name**  |string                 | Apellidos del contacto. |  Campo opcional, permite espacios y carácteres especiales, alfanpumerico, máximo 50 carácteres.
+**contacts.email**  |string                 | Correo del contacto. |  Campo opcional, NO permite espacios ni carácteres especiales, alfanpumerico, máximo 100 carácteres.
+**contacts.phone.indicative**  |string                | Indicativo del número del contacto. | Campo opcional, númerico, no permite espacios ni carácteres especiales, máximo  10 carácteres.
+**contacts.phone.number**             |string                 | Número del contacto. | Campo opcional, númerico, no permite espacios ni carácteres especiales, máximo  10 carácteres.
+**contacts.phone.extension**          |string                 | Extensión del número del contacto. | Campo opcional, númerico, no permite espacios ni carácteres especiales, máximo  10 carácteres.
+**comments**          |string                 | Observaciones o comentarios adicionales.  | Campo opcional, alfanúmerico,  permite espacios y carácteres especiales,  máximo  4000 carácteres.
+**seller_id**         |number                | Usuario vendedor asigando al cliente.   | Campo opcional, númerico, el id del usuario debe existir previamente en Siigo Nube, se puede consultar con una petición tipo GET  al endpoint de https://api.siigo.mx/v1/users.
+**collector_id**      |number                | Usuario cobrador encargado del recaudo de cartera.  | Campo opcional, númerico, el id del usuario debe existir previamente en Siigo Nube, se puede consultar con una petición tipo GET  al endpoint de https://api.siigo.mx/v1/users.
+
++ Request (application/json)
+
+    + Headers
+
+            Authorization: [access_token]
+            SiigoAPI-Application-Id: [nombre de la aplicación que estás integrando]
+
+    + Attributes (CustomerIn)
+        
++ Response 200 (application/json)
+
+     + Attributes (CustomerOut)
+
+    + Body
+
+
+## Consultar Cliente [GET /v1/customers/{customer_id}]
+Consultar un tercero por su id.
+
+Se manejan los siguientes datos informativos:
+
+Nombre                   |Tipo                   |Descripción
+-------------------------|-----------------------|---------------
+**id**                   |String                 | Identificador del cliente.
+**type**                 |String                 | Tipo de cliente, valor por default Customer.
+**person_type**          |String                 | Identifica si el tercero es moral, physical o foreign. | 
+**rfc_id**               |String                 | RFC de identificación del cliente.
+**name**                 |String                 | Razón social o nombres y apellidos del cliente.
+**commercial_name**      |String                 | Nombre comercial o Nombre comercial de la empresa cLiente.
+**branch_office**        |number                 | Sucursal, valor por default 0.
+**active**               |boolean                 | Estado del cliente en Siigo, valor por default "true".
+**address.street**       |string                 | Dirección del cliente.
+**address.interior_number**       |string                 | Número de interior del cliente.
+**address.exterior_number**       |string                 | Número de exterior del cliente.
+**address.colony**         |string                 | Colonía de la dirección del cliente.
+**address.locality**       |string                 | Localidad de la dirección del cliente.
+**address.city.country_code**          |string                 | Código del país.
+**address.city.country_name**          |string                 | Nombre del país.
+**address.city.state_code**            |string                 | Código del departamento/estado.
+**address.city.state_name**            |string                 | Nombre del departamento/estado.
+**address.city.city_code**            |string                 | Código de la ciudad.
+**address.city.city_name**            |string                 | Nombre de la ciudad.
+**address.postal_code**       |string                 | Código postal.
+**phones.indicative**         |string                 | Indicativo del número de contacto.
+**phones.number**             |string                 | Número de contacto.
+**phones.extension**          |string                 | Extensión del número de contacto.
+**contacts.first_name**       |string                 | Nombres del contacto.
+**contacts.lasst_name**       |string                 | Apellidos del contacto.
+**contacts.email**       |string                 | Correo del contacto.
+**comments**          |string                 | Observaciones o comentarios adicionales.
+**seller_id**         |number                | Usuario vendedor asigando al cliente.
+**collector_id**      |number                | Usuario cobrador encargado del recaudo de cartera.
+**created**           |string                 | La fecha en la que se creó la entidad.
+**last_updated**      |string                 | La fecha en la que se actualizó la entidad por última vez.
+
+
++ Parameters
+    + customer_id (string,`6b6ceb28-b2eb-4b98-b3dd-26648a933c81`)
+
++ Request
+    
+    + Headers
+            
+            Authorization: [access_token]
+            SiigoAPI-Application-Id: [nombre de la aplicación que estás integrando]
+
++ Response 200 (application/json)
+
+    + Attributes (CustomerOut)
+
+    + Body
+
+
+## Listar Clientes [GET /v1/customers{?created_start}]
+Lista todos los clientes o terceros.
+
+Listado de clientes en Siigo Nube en el menú lateral: *Reportes* `>` *Clientes y proveedores* `>` *Búsqueda de terceros* `>` *Búsqueda de Clientes, Proveedores u otros* 
+
+
+**Query Parameters**
+
+Param                  |Type       |Description
+-----------------------|-----------|-----------------------------------------------------------------------------------
+**identification**     |String     | Devuelve resultados por "identification".
+**branch_office**      |Number     | Devuelve resultados por "branch_office".
+**created_start**      |Date       | Devuelve resultados donde el campo "created" es mayor o igual que este valor.
+**created_end**        |Date       | Devuelve resultados donde el campo "created" es menor o igual que este valor.
+**updated_start**      |Date       | Devuelve resultados donde el campo "last_updated " es mayor o igual que este valor.
+**updated_end**        |Date       | Devuelve resultados donde el campo "last_updated" es menor o igual que este valor.
+
+**Date**: yyyy-MM-dd
+
+**Date and time in UTC**: yyyy-MM-ddTHH:mm:ssZ
+
++ Parameters
+    + created_start (optional, type, `2021-02-17`)
+
++ Request (application/json)
+
+    + Headers
+
+            Authorization: [access_token]
+            SiigoAPI-Application-Id: [nombre de la aplicación que estás integrando]
+
++ Response 200 (application/json)
+
+    + Attributes (CustomersOutList)
+
+    + Body
+
+
+    
+# Group Facturas de Venta
+Comprobante que permite registrar las cantidades y valores de los productos y/o servicios que estás vendiendo en la empresa.
+
+## Crear Factura  [POST /v1/invoices]
+Crear una nueva factura de venta teniendo en cuenta que el cliente o tercero ya está creado en la base de datos de Siigo Nube.
+
+Nombre                      |Tipo          |Descripción     |  Características
+----------------------------|--------------|------------------ |----------------
+**document.id**                |*number*      | Identificador del tipo de comprobante. | Campo obligatorio,  debe existir en Siigo previamnete, se puede consultar por: <a href="https://siigoapimexico.docs.apiary.io/#reference/facturas-de-venta/consultar-tipos-de-facturas-de-venta">**/document-types**</a>
+**number**                |*number*      | Consecutivo/número del comprobante  |  El campo opcional u obligatorio dependiendiendo la configuración de Siigo Nube, si se envia debe ser un consecutivo que no exista en Nube.
+**customer.rfc_id**      |*string*                 |Número de RFC del cliente.|  Debe existir en Siigo Nube, debe estar activo.
+**customer.branch_office**   |*number*      | Número de Sucursal del cliente. | Campo opcional, si no se envia toma por defecto el 0.
+**seller**                    |*number*      | Identificador del vendedor asociado a la factura. | Campo obligatorio, debe existir en Siigo Nube, se puede consultar por la ruta: <a href="https://siigoapimexico.docs.apiary.io/#reference/catalogos/usuarios">**/users**</a>
+**observations**               |*string*      | Comentarios u observaciones de la factura. | Campo opcional, tiene un limite de 4.000 carácteres.
+**use**              |*string*                 | Código de uso CFDi.  |  Campo obligatorio, consulte el listado de códigos válidos por el SAT para cada tipo de persona <a href="https://saprodcentralassets.blob.core.windows.net/siigoapi/documentation/Listado Uso CFDI.xlsx">**aquí**.
+**cost_center**                 |*number*      | Identificador del Centro de costos.  | Campo opcional, debe existir en Siigo Nube y estar activo.
+**items.code**            |*string*                 | Código único del producto o servicio.  | Campo obligatorio, debe existir en Siigo Nube y estar activo, alfanúmerico.
+**items.description**     |*string*                 | Nombre o descripción del producto/servicio. |  Campo opcional, si no maneja descripción larga en la configuración y se envia toma el nombre del producto. Si maneja descripción larga en la configuración del producto y no se envia debe tomar la descipción de la configuración del producto. Si se envia y viene vacio lo tomara así en la factura. 
+**items.quantity**        |*number*                 | Cantidad. En Siigo Nube queda registado con dos decimales. |  Campo obligatorio, númerico de máximo 2 decimales.
+**items.price**           |*number*                 | Precio del producto / Valor unitario. |  Campo obligatorio, númerico de máximo 2 decimales.
+**items.discount**        |*number*                 | Valor de descuento del producto. | Campo opcional, puede ser por valor o porcentaje dependiendo de la configuración de la factura.
+**items.warehouse**             |*number*      | Identificador de la bodega/almacén asociada al producto. | Campo opcional, si se envia debe existir en Siigo nube y estar activo.
+**retentions**              |*array*       | Array con los id de los impuestos tipo ReteIVA y/o Rete ISR. | Campo opcional, se puede consultar por la ruta: <a href="https://siigoapimexico.docs.apiary.io/#reference/catalogos/impuestos">**/taxes**</a>
+**stamp.send**                       |*Boolean*       | Campo para timbrar una factura electrónica en el SAT. | Campo opcional, solo puede ir en true o false, sino se envia se toma por defecto false.
+**mail.send**                       |*Boolean*       | Campo para enviar una factura por medio de un correo electrónico al cliente. | Campo opcional, solo puede ir en true o false, sino se envia se toma por defecto false.
+**payment.method**              |*string*               | Método de pago si fue en una exhibición seria PUE  y PPD si es diferido. | Campo obligatorio, solo puede ir con los valores: PUE o PPD.
+**payment.conditions.id**              |*number*                 | ID de la condición de pago. |  Campo obligatorio, debe existir en Siigo Nube y etsar activa, se puede consultar por la ruta: <a href="https://siigoapimexico.docs.apiary.io/#reference/catalogos/condiciones-de-pago">**/payment-types**</a>
+**payment.conditions.value**           |*number*                 | Valor asociado a la condición de pago. |   Campo obligatorio, númerico, máximo 2 decimales.
+**payment.conditions.due_date**        |*string*                 | Fecha pago del vencimiento de la factura. | Si el payments.id maneja vencimiento, es obligatorio enviar este campo con la fecha del vencimiento en formato yyyy-MM-dd.
+
+**Estados de envio electrónico:**
+Nombre                      |Recibido por el SAT          |Descripción     
+----------------------------|--------------|------------------ 
+**Draft**                      |`NO`                 |En este estado una factura de tipo electrónico fue guardada satisfactoriamente en Siigo Nube pero no se ha enviado al SAT (No tiene CUFE) 
+**Accepted**                   |`SI`                 |En este estado la factura fue enviada y aceptada por el SAT
+**Rejected**                   |`NO`                 |En este estado la factura fue enviada al SAT con errores y fue rechazada, se debe corregir y enviar nuevamente desde Siigo Nube.
+**Sending**                   |`NO`                 |En este estado la factura esta en proceso de envío al SAT.
+
+
++ Request (application/json)
+
+    + Headers
+
+            Authorization: [access_token]
+            SiigoAPI-Application-Id: [nombre de la aplicación que estás integrando]
+
+    + Attributes (InvoiceInS)
+    
+
++ Response 201 (application/json)
+
+      + Attributes (InvoiceOutS)
+
+    + Body
+
+
+## Timbrar Factura en el SAT  [POST /v1/invoices/id/stamp]
+Este endpoint te permite  timbrar una factura electronicamente en el SAT.
+
+*Se debe enviar el GUID de la factura al endpoint de invoices con un petición tipo POST, por ejemplo:*
+
+Ejemplo: https://api.siigo.mx/v1/invoices/2adb6e83-dcff-431c-a666-d53cee2a18fc/stamp
+
+https://api.siigo.mx/v1/invoices/(GUID)/stamp
+
++ Request (application/json)
+
+    + Headers
+
+            Authorization: [access_token]
+            SiigoAPI-Application-Id: [nombre de la aplicación que estás integrando]
+
+    + Attributes (CopyMailIn)
+    
+
++ Response 201 (application/json)
+
+    + Attributes (CopyMailOut)
+
+    + Body
+
+## Consultar errores de timbrado de Factura por el SAT  [GET /v1/invoices/id/stamp/errors]
+Este endpoint te permite consultar errores en facturas que han sido rechazadas por el SAT.
+
+Nombre                      |Tipo          |Descripción
+----------------------------|--------------|------------------
+**id**                       |*String*       | Identificador de la Factura.
+**errors.code**                       |*String*       | Código de error.
+**errors.message**                       |*String*       | Detalle del error presentado en el envío al SAT.
+
+
+
++ Request (application/json)
+
+    + Headers
+
+            Authorization: [access_token]
+            SiigoAPI-Application-Id: [nombre de la aplicación que estás integrando]
+
+    
++ Response 201 (application/json)
+
+    + Attributes (fvRejected)
+
+    + Body
+
+## Enviar Factura por mail  [POST /v1/invoices/id/mail]
+Este endpoint te permite  envIar una factura por correo electronico a los clientes, puede enviar a más de un contacto,
+
+Nombre                      |Tipo          |Descripción     |  Características
+----------------------------|--------------|------------------ |----------------
+**mail_to**                       |*String*       | Campo de contacto principal al cual enviara la factura. | Campo obligatorio, debe ser una dirección de correo válida.
+**copy_to**                       |*String*       | Campo para enviar una factura por medio de un correo electrónico al cliente. | Campo opcional,puede enviarse máximo a 5 direcciones de correo electrónico, debe ser una dirección de correo válida.
+
++ Request (application/json)
+
+    + Headers
+
+            Authorization: [access_token]
+            SiigoAPI-Application-Id: [nombre de la aplicación que estás integrando]
+
+    + Attributes (CopyMailIn)
+    
+
++ Response 201 (application/json)
+
+    + Attributes (CopyMailOut)
+
+    + Body
+
+
+## Editar Factura  [PUT /v1/invoices/]
+Dentro de el manejo de este endpoint es importante tener en cuenta que hay varios campos que no será posible poder modificarlos como por ejemplo el document.id, customer.rfc_id y si dentro de la configuración del documento está como numeración manual el campo de number, de igual forma para aquellas facturas que estén en proceso de envío aL SAT o timbradas. Para facturas timbradas se debe realizar mediante una nota crédito electrónica.
+
+Nombre                      |Tipo          |Descripción     |  Características
+----------------------------|--------------|------------------ |----------------
+**document.id**                |*number*      | Identificador del tipo de comprobante. | Campo obligatorio,  debe existir en Siigo previamnete, se puede consultar por: <a href="https://siigoapimexico.docs.apiary.io/#reference/catalogos/tipos-de-comprobante">**/document-types**</a>
+**number**                |*number*      | Consecutivo/número del comprobante  |  El campo opcional u obligatorio dependiendiendo la configuración de Siigo Nube,  si se envia debe ser el mismo consecutivo de la factura.
+**customer.rfc_id**      |*string*                 |Número de RFC del cliente.|  Campo obligatorio, no se puede modificar, debe estar activo.
+**customer.branch_office**   |*number*      | Número de Sucursal del cliente. | Campo opcional, si no se envia toma por defecto el 0.
+**seller**                    |*number*      | Identificador del vendedor asociado a la factura. | Campo obligatorio, debe existir en Siigo Nube, se puede consultar por la ruta: <a href="https://siigoapimexico.docs.apiary.io/#reference/catalogos/usuarios/usuarios">**/users**</a>
+**observations**               |*string*      | Comentarios u observaciones de la factura. | Campo opcional, tiene un limite de 4.000 carácteres.
+**use**              |string                 | Código de uso CFDi.  |  Campo obligatorio, consulte el listado de códigos válidos por el SAT para cada tipo de persona <a href="https://saprodcentralassets.blob.core.windows.net/siigoapi/documentation/Listado Uso CFDI.xlsx">**aquí**.
+**cost_center**                 |*number*      | Identificador del Centro de costos.  | Campo opcional, debe existir en Siigo Nube y estar activo.
+**retentions**              |*array*       | Array con los id de los impuestos tipo ReteIVA y/o Rete ISR. | Campo opcional, se puede consultar por la ruta: <a href="https://siigoapimexico.docs.apiary.io/#reference/catalogos/impuestos">**/taxes**</a>
+**items.code**            |*string*                 | Código único del producto o servicio.  | Campo obligatorio, debe existir en Siigo Nube y estar activo, alfanúmerico.
+**items.description**     |*string*                 | Nombre o descripción del producto/servicio. |  Campo opcional, si no maneja descripción larga en la configuración y se envia toma el nombre del producto. Si maneja descripción larga en la configuración del producto y no se envia debe tomar la descipción de la configuración del producto. Si se envia y viene vacio lo tomara así en la factura. 
+**items.quantity**        |*number*                 | Cantidad. En Siigo Nube queda registado con dos decimales. |  Campo obligatorio, númerico de máximo 2 decimales.
+**items.price**           |*number*                 | Precio del producto / Valor unitario. |  Campo obligatorio, númerico de máximo 2 decimales.
+**items.discount**        |*number*                 | Valor de descuento del producto. | Campo opcional, puede ser por valor o porcentaje dependiendo de la configuración de la factura.
+**items.warehouse**             |*number*      | Identificador de la bodega/almacén asociada al producto. | Campo opcional, si se envia debe existir en Siigo nube y estar activo.
+**payment.method**              |*string*               | Método de pago si fue en una exhibición seria PUE  y PPD si es diferido. | Campo obligatorio, solo puede ir con los valores: PUE o PPD, no se puede modificar.
+**payment.cfdi**              |*string*                 | Código de la forma de pago CFDI. | Campo obligatorio, consulte el listado de códigos válidos por el SAT para cada método <a href="https://saprodcentralassets.blob.core.windows.net/siigoapi/documentation/Formas de pago CFDI.xlsx">**aquí**.
+**payment.paid**              |*Boolean*                | Indica si la factura fue pagada o no. | Campo obligatorio, si es PPD por defecto toma paid = False y si es PUE debe identificar si fue paga debe ser "true" o si maneja vencimiento debe ir "false".
+**payment.conditions.id**              |*number*                 | ID de la condición de pago. |  Campo obligatorio, debe existir en Siigo Nube y etsar activa, se puede consultar por la ruta: <a href="https://siigoapimexico.docs.apiary.io/#reference/catalogos/condiciones-de-pago">**/payment-types**</a>
+**payment.conditions.value**           |*number*                 | Valor asociado a la condición de pago. |   Campo obligatorio, númerico, máximo 2 decimales.
+**payment.conditions.due_date**        |*string*                 | Fecha pago del vencimiento de la factura. | Si el payments.id maneja vencimiento, es obligatorio enviar este campo con la fecha del vencimiento en formato yyyy-MM-dd.
+
+**Edición de payments.conditions:**
+
+Method = PUE  y Paid = True   | No se puede modificar ningún campo en el objeto “conditions”  (solo puede modificar el Value)
+
+Method = PUE  y Paid = False   | Puede modificar "conditions" siempre y cuando envíe un id de una condición que tenga vencimiento.
+
+Method = PPD   |  Puede modificar "conditions" siempre y cuando envíe un "id" de una condición que tenga vencimiento.
+
+
++ Request (application/json)
+
+    + Headers
+
+            Authorization: [access_token]
+            SiigoAPI-Application-Id: [nombre de la aplicación que estás integrando]
+
+    + Attributes (InvoiceInS)
+    
+
++ Response 201 (application/json)
+
+    + Attributes (InvoiceOutS)
+
+    + Body
+
+## Consultar Tipos de Facturas de venta [GET /v1/document-types?type=FV]
+Lista todos los tipos de Factura de venta que se encuentran configurados en Siigo Nube y sus características.
+
+**Datos que encontrarás en el response:**
+Nombre          |Tipo                          |Descripción
+----------------|------------------------------|---------------
+id              |*number*                      | Identificador único del tipo de factura de venta, este dato se debe enviar en las creaciones de .
+code     |*string*                      | Código asignado en Siigo Nube al tipo de factura de venta.
+name      |*string*                      | Nombre del tipo de factura de venta.
+description       |*string*                      | Descripción del tipo de factura de venta.
+type         |*string*                      | Indica el tipo de documento en este "FV" para facturas de venta.
+active         |*boolean*                     | Estado del tipo de documento.
+seller_by_item        |*boolean*                     | Indica si se maneja vendedor por ítem o no en este tipo de factura de venta.
+cost_center      |*boolean*                     | Indica si se pueden manejar centros de costo o no en este tipo de factura de venta.
+cost_center_mandatory       |*boolean*                     | Indica si se maneja centro de costo de forma obligatoria en este tipo de factura de venta.
+automatic_number       |*boolean*                     | Indica si se maneja numeración automática o no en este tipo de factura de venta, si es false, en la creación de facturas usando este tipo, se debe enviar el campo "number".
+consecutive      |*number*                      | Número del próximo consecutivo de factura.
+discount_type         |*string*                      | Indica el tipo de descuento que se maneja en este tipo de factura "Percentage" o "Value" de esto depende la forma en la que envias un descuento en un ítem al crear facturas de este tipo.
+reteiva       |*boolean*                     | Indica si se pueden usar retenciones de tipo ReteIVA en este tipo de factura de venta.
+isr       |*boolean*                     | Indica si se pueden usar retenciones de tipo ISR en este tipo de factura de venta.
+
++ Request (application/json)
+
+    + Headers
+
+            Authorization: [access_token]
+            SiigoAPI-Application-Id: [nombre de la aplicación que estás integrando]
+
++ Response 200 (application/json)
+
+    + Attributes (array[DocumentTypeFV])
+
+    + Body
+
+
+## Consultar Factura [GET /v1/invoices/{invoice_id}]
+Consultar una factura por su id.
+
+Se manejan los siguientes datos informativos:
+Nombre                   |Tipo                   |Descripción
+-------------------------|-----------------------|---------------
+**id**                   |string                 | Identificador de la factura de venta.
+**document.id**          |number                 | Identificador del comprobante, se puede consultar en https://api.siigo.mx/v1/document-types?type=FV.
+**number**               |number                 | Consecutivo/número del comprobante, el campo es obligatorio según la configuración del tipo de comprobante.
+**name**                 |string                 | Tipo de Comprobante + Código de Comprobante + Número de Comprobante
+**date**                 |string                 | Fecha de la factura, formato yyyy-MM-dd.
+**customer.id**          |string                 | Serial identificador del cliente.
+**customer.rfc_id**      |string                 |Número de RFC del cliente.
+**customer.branch_office**          |string                 |Sucursal, valor por default 0.
+**seller**                |number                 | ID del vendedor asociado a la factura.
+**use.code**              |string                 | Código de uso CFDi.
+**use.name**              |string                 | Nombre del código de uso CFDi.
+**total**                 |number                 | Total de la factura, es calculado según el manejo de decimales que tenga configurada la empresa al momento de crear la factura.
+**balance**               |number                 | Saldo pendiente de pago en la factura.
+**cost_center**            |number                 | Indica el Centro de costo de la factura.
+**observations**          |string                 | Comentarios para agregar información a la factura.
+**items.id**              |string                 | Identificador del producto/servicio.
+**items.code**            |string                 | Código único del producto.
+**items.description**     |string                 | Nombre o descripción del producto/servicio.
+**items.quantity**        |number                 | Cantidad. En Siigo Nube queda registado con dos decimales.
+**items.price**           |number                 | Precio del producto / Valor unitario. En Siigo Nube queda registado con dos decimales.
+**items.discount.percentage**        |number                 | Porcentaje de descuento del producto
+**items.discount.value**        |number                 | Valor de descuento del producto.
+**items.taxes.id**        |number                 | Identificador único del impuesto.
+**items.taxes.name**      |string                 | Nombre del impuesto.
+**items.taxes.percentage**   |number                 | Porcentaje de impuesto del producto
+**items.taxes.value**        |number                 | Valor de impuesto del producto
+**items.taxes.type**        |number                 | Tipo de impuesto, puede ser IVA O ISR.
+**warehouses.id**           |number                 | Identificador único de la bodega.
+**warehouses.name**          |string                 | Nombre de la bodega.
+**payment.method**              |string               | Método de pago, puede ser PUE o PPD.
+**payment.cfdi**              |string                 | Forma de pago CFDI, consulte el listado de códigos válidos por el SAT para cada método <a href="https://saprodcentralassets.blob.core.windows.net/siigoapi/documentation/Formas de pago CFDI.xlsx">**aquí**.
+**payment.paid**              |Boolean                | Indica si la factura fue pagada o no, si es un method = PPD debe ser  99 por defecto.
+**payment.conditions.id**              |number                 | ID de la condición de pago.
+**payment.conditions.value**           |number                 | Valor asociado a la condición de pago.
+**payment.conditions.due_date**        |string                 | Fecha pago cuota, formato yyyy-MM-dd.
+**created**                  |string                 | La fecha en la que se creó la entidad.
+**last_updated**             |string                 | La fecha en la que se actualizó la entidad por última vez.
+
+
+Para visualizar una factura en Siigo Nube puedes ingresar al ícono de la lupa que corresponde al Buscador, digita el número y oprime en Facturas.
+
+
+
++ Parameters
+    + invoice_id (string,`b446fbc3-99c5-4c2d-8a28-1c0d3721ab91`)
+
++ Request
+    
+    + Headers
+            
+            Authorization: [access_token]
+            SiigoAPI-Application-Id: [nombre de la aplicación que estás integrando]
+
++ Response 200 (application/json)
+
+    + Attributes (InvoiceOutS)
+
+    + Body
+    
+
+## Listar Facturas [GET /v1/invoices{?created_start}]
+Lista todas las facturas de venta.
+
+Listado de facturas en Siigo Nube en el menú lateral: Transacciones > Proceso de ventas
+
+**Query Parameters**
+
+Param                      |Type       |Description
+---------------------------|-----------|-----------------------------------------------------------------------------------
+**created_start**          |Date       | Devuelve resultados donde la fecha de creación es mayor o igual que este valor.
+**created_end**            |Date       | Devuelve resultados donde la fecha de creación es menor o igual que este valor.
+**updated_start**          |Date       | Devuelve resultados donde la fecha de última modificación es mayor o igual que este valor.
+**updated_end**            |Date       | Devuelve resultados donde la fecha de última modificación es menor o igual que este valor.
+**name**                   |Date       | Permite consultar facturas por nombre ejemplo, FV-003-457.
+**customer_identification**|Date       | Permite consultar facturas por cliente.
+**customer_branch_office** |Date       | Permite consultar facturas por sucursal.
+**document_id**            |Date       | Permite consultar facturas por id.
+**date_start**             |Date       | Devuelve resultados de las facturas con fecha de elaboración asignada mayor o igual que este valor.
+**date_end**               |Date       | Devuelve resultados de las facturas con fecha de elaboración asignada o igual que este valor.
+
+**Date**: yyyy-MM-dd
+
+**Date and time in UTC**: yyyy-MM-ddTHH:mm:ssZ
+
++ Parameters
+    + created_start (optional, type, `2021-02-17`)
+
++ Request (application/json)
+
+    + Headers
+
+            Authorization: [access_token]
+            SiigoAPI-Application-Id: [nombre de la aplicación que estás integrando]
+
++ Response 200 (application/json)
+
+    + Attributes (InvoicesOutList)
+
+    + Body
+    
+
+##  Borrar Factura [DELETE /v1/invoices/id]
+Este endpoint te permite borrar una factura no electronica con su ID.
+
++ Request (application/json)
+
+    + Headers
+    
+            Authorization: [access_token]
+            SiigoAPI-Application-Id: [nombre de la aplicación que estás integrando]
+    + Body
+    
+
++ Response 200 (application/json)
+
+    + Headers
+    
+    + Body
+    
+            {
+                "id": "63f918c2-ca65-4edc-a7db-66bcdd5159fb",
+                "deleted": true
+            }
+
+# Group Recepción de pago
+Estos documentos permiten registrar los pagos que ingresan a la empresa.
+
+## Crear Recepción de pago [POST /v1/vouchers]
+Este endpoint te permite crear las  recepciones de pago.
+
+Nombre                   |Tipo                   |Descripción
+-------------------------|-----------------------|---------------
+**id**                   |string                 | Identificador de la recepción de pago.
+**document.id**          |number                 | Identificador del comprobante, se puede consultar en https://api.siigo.mx/v1/document-types?type=RC.
+**number**               |number                 | Consecutivo/número del comprobante, el campo es obligatorio según la configuración del tipo de comprobante.
+**name**                 |string                 | Tipo de Comprobante + Código de Comprobante + Número de Comprobante. Por ejemplo: RC-1-22
+**date**                 |string                 | Fecha de la recepción de pago, formato yyyy-MM-dd.
+**customer.id**          |string                 | Serial identificador del cliente.
+**customer.rfc_id**      |string                 | Número de RFC del cliente.
+**customer.branch_office**          |string                 |Sucursal, valor por default 0.
+**cost_center**            |number                 | Indica el Centro de costo de la recepción de pago.
+**observations**          |string                 | Comentarios para agregar información a la recepción de pago.
+**payment.method**              |string               | Método de pago, puede ser PUE o PPD.
+**payment.cfdi**              |string                 | Forma de pago CFDI, se puede consultar en el listado del SAT y depende de el método.
+**payment.conditions.id**              |number                 | ID de la condición de pago.
+**payment.conditions.name**              |number                 | Nombre de la condición de pago.
+**payment.conditions.value**           |number                 | Valor asociado a la condición de pago.
+**stamp.status**                       |*string*       | Estado del envio electrónico de la recepción de pago en el SAT.
+**mail.status**                       |*string*       | Estado del envio por mail al cliente.
+
+**Estados de envio electrónico:**
+Nombre                      |Recibido por el SAT          |Descripción     
+----------------------------|--------------|------------------ 
+**Draft**                      |`NO`                 |En este estado una recepción de pago de tipo electrónico fue guardada satisfactoriamente en Siigo Nube pero no se ha enviado al SAT (No tiene CUFE) 
+**Accepted**                   |`SI`                 |En este estado la recepción de pago fue enviada y aceptada por el SAT
+**Rejected**                   |`NO`                 |En este estado la recepción de pago fue enviada al SAT con errores y fue rechazada, se debe corregir y enviar nuevamente desde Siigo Nube.
+**Sending**                   |`NO`                 |En este estado la recepción de pago esta en proceso de envío al SAT.
+
+
++ Request (application/json)
+
+    + Headers
+
+            Authorization: [access_token]
+            SiigoAPI-Application-Id: [nombre de la aplicación que estás integrando]
+
+    + Attributes (VoucherIn)
+    
+
++ Response 201 (application/json)
+
+    + Attributes (VoucherOut)
+
+    + Body
+    
+
+## Editar Recepción de pago [PUT /v1/vouchers/{id}]
+Este endpoint te permite crear las  recepciones de pago.
+
+Nombre                   |Tipo                   |Descripción
+-------------------------|-----------------------|---------------
+**id**                   |string                 | Identificador de la recepción de pago.
+**document.id**          |number                 | Identificador del comprobante, se puede consultar en https://api.siigo.mx/v1/document-types?type=RC.
+**number**               |number                 | Consecutivo/número del comprobante, el campo es obligatorio según la configuración del tipo de comprobante.
+**name**                 |string                 | Tipo de Comprobante + Código de Comprobante + Número de Comprobante. Por ejemplo: RC-1-22
+**date**                 |string                 | Fecha de la recepción de pago, formato yyyy-MM-dd.
+**customer.id**          |string                 | Serial identificador del cliente.
+**customer.rfc_id**      |string                 | Número de RFC del cliente.
+**customer.branch_office**          |string                 |Sucursal, valor por default 0.
+**cost_center**            |number                 | Indica el Centro de costo de la recepción de pago.
+**observations**          |string                 | Comentarios para agregar información a la recepción de pago.
+**payment.method**              |string               | Método de pago, puede ser PUE o PPD.
+**payment.cfdi**              |string                 | Forma de pago CFDI, se puede consultar en el listado del SAT y depende de el método.
+**payment.conditions.id**              |number                 | ID de la condición de pago.
+**payment.conditions.name**              |number                 | Nombre de la condición de pago.
+**payment.conditions.value**           |number                 | Valor asociado a la condición de pago.
+**stamp.status**                       |*string*       | Estado del envio electrónico de la recepción de pago en el SAT.
+**mail.status**                       |*string*       | Estado del envio por mail al cliente.
+
++ Request (application/json)
+
+    + Headers
+
+            Authorization: [access_token]
+            SiigoAPI-Application-Id: [nombre de la aplicación que estás integrando]
+
+    + Attributes (VoucherIn)
+    
+
++ Response 201 (application/json)
+
+    + Attributes (VoucherOut)
+
+    + Body
+
+## Consultar recepciones de pago [GET /v1/vouchers/id]
+Este endpoint te permite consultar las  recepciones de pago
+
+Se manejan los siguientes datos informativos:
+Nombre                   |Tipo                   |Descripción
+-------------------------|-----------------------|---------------
+**id**                   |string                 | Identificador de la recepción de pago.
+**document.id**          |number                 | Identificador del comprobante, se puede consultar en https://api.siigo.mx/v1/document-types?type=RC.
+**number**               |number                 | Consecutivo/número del comprobante, el campo es obligatorio según la configuración del tipo de comprobante.
+**name**                 |string                 | Tipo de Comprobante + Código de Comprobante + Número de Comprobante. Por ejemplo: RC-1-22
+**date**                 |string                 | Fecha de la recepción de pago, formato yyyy-MM-dd.
+**customer.id**          |string                 | Serial identificador del cliente.
+**customer.rfc_id**      |string                 | Número de RFC del cliente.
+**customer.branch_office**          |string                 |Sucursal, valor por default 0.
+**cost_center**            |number                 | Indica el Centro de costo de la recepción de pago.
+**observations**          |string                 | Comentarios para agregar información a la recepción de pago.
+**payment.method**              |string               | Método de pago, puede ser PUE o PPD.
+**payment.cfdi**              |string                 | Forma de pago CFDI, se puede consultar en el listado del SAT y depende de el método.
+**payment.conditions.id**              |number                 | ID de la condición de pago.
+**payment.conditions.name**              |number                 | Nombre de la condición de pago.
+**payment.conditions.value**           |number                 | Valor asociado a la condición de pago.
+**stamp.status**                       |*string*       | Estado del envio electrónico de la recepción de pago en el SAT.
+**stamp.uuid**                       |*string*       |  Código UUID de la recepción de pago.
+**stamp.observations**               |*string*       | Observaciones de la recepción de pago enviada a timbrar en el SAT.
+**stamp.errors**                       |*string*       | Error en el timbrado de la recepción de pago en el SAT.
+**mail.status**                       |*string*       | Estado del envio por mail al cliente.
+**mail.observations**               |*string*       | Observaciones del envio por mail al cliente.
+**created**                  |string                 | La fecha en la que se creó la recepción de pago.
+**last_updated**             |string                 | La fecha en la que se actualizó la recepción de pago por última vez.
+
++ Request
+    
+       + Headers
+
+            Authorization: [access_token]
+            SiigoAPI-Application-Id: [nombre de la aplicación que estás integrando]
+
++ Response 200 (application/json)
+
+    + Attributes (VoucherOut)
+
+    + Body
+
+## Listar Recepciones de pago [GET /v1/vouchers/]
+Lista todos las recepciones de pago, se pueden aplicar filtros de fechas de creación o actualización.
+
+**Query Parameters**
+
+Param                  |Type       |Description
+-----------------------|-----------|-----------------------------------------------------------------------------------
+**created_start**      |Date       | Devuelve resultados donde el campo "created" es mayor o igual que este valor.
+**created_end**        |Date       | Devuelve resultados donde el campo "created" es menor o igual que este valor.
+**updated_start**      |Date       | Devuelve resultados donde el campo "last_updated " es mayor o igual que este valor.
+**updated_end**        |Date       | Devuelve resultados donde el campo "last_updated" es menor o igual que este valor.
+
+**Date**: yyyy-MM-dd
+
+**Date and time in UTC**: yyyy-MM-ddTHH:mm:ssZ
+
++ Request (application/json)
+
+    + Headers
+
+            Authorization: [access_token]
+            SiigoAPI-Application-Id: [nombre de la aplicación que estás integrando]
+
++ Response 200 (application/json)
+
+    + Attributes (VouchersOutList)
+
+    + Body
+
+## Consultar Tipos de recepciones de pago [GET /v1/document-types?type=RC]
+Lista todos los tipos de recepciones de pago que se encuentran configurados en Siigo Nube y sus características.
+
+**Query Parameters**
+
+Param                  |Type       |Description
+-----------------------|-----------|-----------------------------------------------------------------------------------
+**id**                   |string                 | Identificador de la recepción de pago.
+**code**               |number                 | Codigo del tipo de recepción de pago.
+**name**                 |string                 | Nombre interno para identificar el comprobante de recepción de pago.
+**description**          |string                 | Descripción del nombre de la recepción de pago.
+**type**               |string                 | Tipo de recepción de pago.
+**active**         |*boolean*                     | Indica si la recepción de pago esta activa o no.
+**cost_center**      |*boolean*                     | Indica si se pueden manejar centros de costo o no en este tipo de recepción de pago.
+**cost_center_mandatory**       |*boolean*                     | Indica si se maneja centro de costo de forma obligatoria en este tipo de recepción de pago.
+**cost_center_default**    |*boolean*                     | Indica si se maneja un centro de costos por defecto en el tipo de recepción de pago.
+**automatic_number**       |*boolean*                     | Indica si se maneja numeración automática o no en este tipo de recepción de pago, si es false, en la creación de recepción de pagos usando este tipo, se debe enviar el campo "number".
+**consecutive**      |*number*                      | Número del próximo consecutivo de la recepción de pago.
+
+
++ Request (application/json)
+
+    + Headers
+
+            Authorization: [access_token]
+            SiigoAPI-Application-Id: [nombre de la aplicación que estás integrando]
+
++ Response 200 (application/json)
+
+    + Attributes (array[DocumentTypeRC])
+
+    + Body
+
+ 
+## Eliminar Recepción de pago [DELETE /v1/vouchers/{voucher_id}]
+Este endpoint te permite eliminar las  recepciones de pago, debes identificar el ID en el endpoint.
+
+Se manejan los siguientes datos informativos en al respuesta:
+
+Nombre                   |Tipo                   |Descripción
+-------------------------|-----------------------|---------------
+**id**                   |string                 | Identificador de la recpeción de pago.
+**deleted**              |boolean                | Identifica si la recepción de pago fue eliminada.
+
++ Parameters
+    + voucher_id (string,`b446fbc3-99c5-4c2d-8a28-1c0d3721ab91`)
+
++ Request (application/json)
+
+    + Headers
+
+            Authorization: [access_token]
+            SiigoAPI-Application-Id: [nombre de la aplicación que estás integrando]
+
++ Response 200 (application/json)
+
+    + Attributes (VouchersDelete)
+
+    + Body
+
+## Timbrar recepción de pago en el SAT  [PUT /v1/vouchers/id/stamp]
+Este endpoint te permite  timbrar una recepción de pago electronicamente en el SAT.
+
+Nombre                      |Tipo          |Descripción     |  Características
+----------------------------|--------------|------------------|---------------
+**mail_to**                       |*String*       | Campo de contacto principal al cual enviara la recepción de pago. | Campo obligatorio, debe ser un dirección de correo valida.
+**copy_to**                       |*String*       | Campo para enviar una recepción de pago por medio de un correo electrónico al cliente. | Campo opcional,puede enviarse máximo a 5 direcciones de correo electrónico.
+
++ Request (application/json)
+
+    + Headers
+
+            Authorization: [access_token]
+            SiigoAPI-Application-Id: [nombre de la aplicación que estás integrando]
+
+    + Attributes (CopyMailIn)
+    
+
++ Response 201 (application/json)
+
+    + Attributes (CopyMailOut)
+
+    + Body
+
+## Consultar errores de timbrado de recepciones de pago por el SAT  [PUT /v1/vouchers/id/stamp/errors]
+Este endpoint te permite  timbrar una factura electronicmanete en el SAT.
+
+Nombre                      |Tipo          |Descripción
+----------------------------|--------------|------------------
+**id**                      |*String*       | Identificador de la recepción de pago..
+**errors.code**             |*String*       | Código de error.
+**errors.message**          |*String*       | Detalle del error presentado en el envío al SAT.
+
+
+
++ Request (application/json)
+
+    + Headers
+
+            Authorization: [access_token]
+            SiigoAPI-Application-Id: [nombre de la aplicación que estás integrando]
+
+    
++ Response 201 (application/json)
+
+    + Attributes (rcRejected)
+
+    + Body
+
+## Enviar Recepción de pago por mail  [PUT /v1/vouchers/id/mail]
+Este endpoint te permite  enivar una recepción de pago por correo electronico a los clientes, puede enviar a más de un contacto.
+
+Nombre                      |Tipo          |Descripción     |  Características
+----------------------------|--------------|------------------ |----------------
+**mail_to**                       |*String*       | Campo de contacto principal al cual enviara la recepción de pago. | Campo obligatorio, debe ser una dirección de correo válida.
+**copy_to**                       |*String*       | Campo para enviar una recepción de pago por medio de un correo electrónico al cliente. | Campo opcional,puede enviarse máximo a 5 direcciones de correo electrónico, debe ser una dirección de correo válida.
+
++ Request (application/json)
+
+    + Headers
+
+            Authorization: [access_token]
+            SiigoAPI-Application-Id: [nombre de la aplicación que estás integrando]
+
+    + Attributes (CopyMailIn)
+    
+
++ Response 201 (application/json)
+
+    + Attributes (CopyMailOut)
+
+    + Body
+
+
+
+# Group Catálogos
+Endpoints que listan los diferentes catálogos de Siigo.
+
+
+## Grupos de Inventario [GET /v1/account-groups]
+Este endpoint te permite consultar la clasificación de inventarios, la cuál corresponde a la clasificación general de los productos o servicios que se comercializan en la empresa y que se debe configurar previamente en Siigo Nube.
+
+**Datos que encontrarás en el response:**
+Nombre          |Tipo                          |Descripción
+----------------|------------------------------|---------------
+id              |*number*                      | Id de la clasificación de inventario, este dato lo necesitarás para crear posteriormente un producto o servicio.
+name            |*string*                      | Nombre de la clasificación de inventario.
+active          |*boolean*                     | Indica si la clasificación de inventario está en uso.
+
+
++ Request (application/json)
+
+    + Headers
+
+            Authorization: [access_token]
+            SiigoAPI-Application-Id: [nombre de la aplicación que estás integrando]
+
++ Response 200 (application/json)
+
+    + Attributes (array[AccountGroup])
+
+    + Body
+        
+
+## Impuestos [GET /v1/taxes]
+Este endpoint te permite consultar el listado de impuestos creados en Siigo Nube para utilizarlos en la creación de comprobantes.
+
+
+**Datos que encontrarás en el response:**
+Nombre          |Tipo                          |Descripción
+----------------|------------------------------|---------------
+id              |*number*                      | Id del impuesto.
+name            |*string*                      | Nombre del impuesto.
+type            |*string*                      | Tipo de impuesto.
+percentage      |*number*                      | Porcentaje del impuesto.
+active          |*boolean*                     | Indica si el impuesto esta activo en la configuración.
+
+
++ Request (application/json)
+
+    + Headers
+
+            Authorization: [access_token]
+            SiigoAPI-Application-Id: [nombre de la aplicación que estás integrando]
+
++ Response 200 (application/json)
+
+    + Attributes (array[Tax])
+
+    + Body
+  
+
+## Tipos de Comprobante [GET /v1/document-types?type=FV]
+Lista todos los comprobantes o documentos contables registrados.
+
+**Parámetros**
+
+Param         |Type       |Description
+--------------|-----------|-----------------------------------------------------------------------------------
+**type**      |String     | Devuelve los tipos de comprobantes de acuerdo a los tipos de documentos contables como FV, NC, RC.
+
++ Request (application/json)
+
+    + Headers
+
+            Authorization: [access_token]
+            Partner-Id: [nombre de la aplicación que estás integrando]
+
++ Response 200 (application/json)
+
+    + Attributes (array[DocumentTypeFV])
+
+    + Body
+
+
+## Listas de Precio [GET /v1/price-lists]
+Este endpoint te permite consultar todas las listas de precios registradas para vender tus productos.
+
+**Datos que encontrarás en el response:**
+Nombre          |Tipo                          |Descripción
+----------------|------------------------------|---------------
+id              |*number*                      | Identificador de la lista de precio.
+name            |*string*                      | Nombre de la lista de precio.
+active          |*boolean*                     | Indica si la lista de precio está en uso.
+position        |*number*                      | Posición de la lista de precio.
+
+
++ Request (application/json)
+
+    + Headers
+
+            Authorization: [access_token]
+            SiigoAPI-Application-Id: [nombre de la aplicación que estás integrando]
+
++ Response 200 (application/json)
+
+    + Attributes (array[PriceList])
+
+    + Body
+    
+
+## Bodegas [GET /v1/warehouses]
+Este endpoint te permite consultar todas las bodegas creadas en Siigo Nube para el manejo de inventarios.
+
+**Datos que encontrarás en el response:**
+Nombre          |Tipo                          |Descripción
+----------------|------------------------------|---------------
+id              |*number*                      | Identificador único de la bodega.
+name            |*string*                      | Nombre de la bodega.
+active          |*boolean*                     | Indica si la bodega está en uso.
+has_movements   |*boolean*                     | Indica si la bodega tiene movimientos.
+
+
++ Request (application/json)
+
+    + Headers
+
+            Authorization: [access_token]
+            SiigoAPI-Application-Id: [nombre de la aplicación que estás integrando]
+
++ Response 200 (application/json)
+
+    + Attributes (array[Warehouse])
+
+    + Body
+    
+
+
+## Usuarios [GET /v1/users]
+Este endpoint te permite consultar todos los usuarios registrados. Se utiliza como vendedor en la factura de venta. en Siigo Nube para el manejo de inventarios.
+
+**Datos que encontrarás en el response:**
+Nombre          |Tipo                          |Descripción
+----------------|------------------------------|---------------
+id              |*number*                      | Identificador único del usuario o vendedor.
+username        |*string*                      | Nombre o Correo de usuario.
+first_name      |*string*                      | Nombre del usuario.
+last_name       |*string*                      | Apellido del usuario.
+email           |*string*                      | Correo del usuario.
+active          |*boolean*                     | Estado del usuario.
+rfc_id          |*string*                      | Número de identificación del usuario.
+
+
++ Request (application/json)
+
+    + Headers
+
+            Authorization: [access_token]
+            SiigoAPI-Application-Id: [nombre de la aplicación que estás integrando]
+
++ Response 200 (application/json)
+
+    + Attributes (array[User])
+
+    + Body
+
+
+## Condiciones de Pago [GET /v1/payment-types?document_type=FV]
+Este endpoint te permite consultar todos las condiciones de pago creadas en Siigo Nube. Se utilizan para identificar la condición de pago en los comprobantes de Factura de venta, recibos de caja y notas crédito.
+
+**Datos que encontrarás en el response:**
+Nombre          |Tipo                          |Descripción
+----------------|------------------------------|---------------
+id              |*number*                      | Identificador único de la condición de pago.
+name            |*string*                      | Nombre de la condición de pago.
+type            |*string*                      | Tipo de condición de pago: Puede ser de Cartera, proveedor  o cartera/proveedor
+active          |*boolean*                     | Estado de la condición de pago.
+due_date        |*boolean*                     | Indica si la condición de pago maneja fecha de vencimiento.
+
+
++ Request (application/json)
+
+    + Headers
+
+            Authorization: [access_token]
+            SiigoAPI-Application-Id: [nombre de la aplicación que estás integrando]
+
++ Response 200 (application/json)
+
+    + Attributes (array[PaymentTypes])
+
+    + Body
+
+## Centros de Costo [GET /v1/cost-centers]
+Este endpoint te permite consultar todos los centros de costos creados en Siigo Nube. Se utilizan para relacionar en los comprobantes Factura de venta, Recibo de caja, comprobante contable y notas crédito.
+
+**Datos que encontrarás en el response:**
+Nombre          |Tipo                          |Descripción
+----------------|------------------------------|---------------
+id              |*number*                      | Identificador único del centro de costo.
+code            |*string*                      | Código del centro de costo.
+name            |*string*                      | Nombre del centro de costo.
+active          |*boolean*                     | Estado del centro de costo.
+
+
++ Request (application/json)
+
+    + Headers
+
+            Authorization: [access_token]
+            SiigoAPI-Application-Id: [nombre de la aplicación que estás integrando]
+
++ Response 200 (application/json)
+
+    + Attributes (array[CostCenter])
+
+    + Body
+
+

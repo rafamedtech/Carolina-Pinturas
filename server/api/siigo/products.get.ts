@@ -1,34 +1,17 @@
 import type { SiigoListResponse, SiigoProduct } from '~/types/siigo'
 import { ORDER_ENTRY_ROLES } from '~/utils/roleAccess'
 import { requireRole } from '../../utils/auth'
+import { cachedSiigoCatalog, collectSiigoCatalog } from '../../utils/siigo-catalog'
 import { listQuery, siigoRequest } from '../../utils/siigo'
 
-const siigoPageSize = 25
 const activeProductsQuery = { active: 'true' }
 
 async function getAllProducts() {
-  const firstPage = await siigoRequest<SiigoListResponse<SiigoProduct>>('/v1/products', {
-    query: { ...activeProductsQuery, page: '1', page_size: String(siigoPageSize) }
-  })
-  const allProducts = [...firstPage.results]
-  const totalInSiigo = firstPage.pagination?.total_results || allProducts.length
-  const totalPages = Math.ceil(totalInSiigo / siigoPageSize)
-
-  for (let sourcePage = 2; sourcePage <= totalPages; sourcePage++) {
-    const response = await siigoRequest<SiigoListResponse<SiigoProduct>>('/v1/products', {
-      query: { ...activeProductsQuery, page: String(sourcePage), page_size: String(siigoPageSize) }
+  return cachedSiigoCatalog('active-products', () => collectSiigoCatalog((page, pageSize) => (
+    siigoRequest<SiigoListResponse<SiigoProduct>>('/v1/products', {
+      query: { ...activeProductsQuery, page: String(page), page_size: String(pageSize) }
     })
-    allProducts.push(...response.results)
-  }
-
-  return {
-    results: allProducts,
-    pagination: {
-      total_results: allProducts.length,
-      page: 1,
-      page_size: allProducts.length
-    }
-  }
+  )))
 }
 
 export default eventHandler(async (event) => {

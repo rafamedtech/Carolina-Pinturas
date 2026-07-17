@@ -60,22 +60,18 @@ export async function upsertSiigoCustomer(tx: TransactionClient, customer: Siigo
     where: { id: customer.id },
     create: {
       id: customer.id,
-      ...data
+      ...data,
+      phones: { create: phones },
+      contacts: { create: contacts }
     },
-    update: data
+    update: {
+      ...data,
+      // Una escritura anidada conserva la sustitución atómica del snapshot y
+      // evita cuatro round trips extra dentro de la transacción del pedido.
+      phones: { deleteMany: {}, create: phones },
+      contacts: { deleteMany: {}, create: contacts }
+    }
   })
-  await tx.siigoCustomerPhone.deleteMany({ where: { customerId: customer.id } })
-  await tx.siigoCustomerContact.deleteMany({ where: { customerId: customer.id } })
-  if (phones.length) {
-    await tx.siigoCustomerPhone.createMany({
-      data: phones.map(phone => ({ customerId: customer.id, ...phone }))
-    })
-  }
-  if (contacts.length) {
-    await tx.siigoCustomerContact.createMany({
-      data: contacts.map(contact => ({ customerId: customer.id, ...contact }))
-    })
-  }
 }
 
 export async function upsertSiigoProduct(tx: TransactionClient, product: SiigoProduct) {
@@ -150,34 +146,23 @@ export async function upsertSiigoProduct(tx: TransactionClient, product: SiigoPr
     where: { id: product.id },
     create: {
       id: product.id,
-      ...data
+      ...data,
+      prices: { create: prices },
+      taxes: { create: taxes },
+      warehouses: { create: warehouses },
+      components: { create: components }
     },
-    update: data
+    update: {
+      ...data,
+      // Siigo devuelve snapshots completos. Sustituir las relaciones en el
+      // mismo upsert reduce hasta nueve llamadas Prisma por producto a una
+      // sola escritura anidada y mantiene todo el snapshot atómico.
+      prices: { deleteMany: {}, create: prices },
+      taxes: { deleteMany: {}, create: taxes },
+      warehouses: { deleteMany: {}, create: warehouses },
+      components: { deleteMany: {}, create: components }
+    }
   })
-  await tx.siigoProductPrice.deleteMany({ where: { productId: product.id } })
-  await tx.siigoProductTax.deleteMany({ where: { productId: product.id } })
-  await tx.siigoProductWarehouse.deleteMany({ where: { productId: product.id } })
-  await tx.siigoProductComponent.deleteMany({ where: { productId: product.id } })
-  if (prices.length) {
-    await tx.siigoProductPrice.createMany({
-      data: prices.map(price => ({ productId: product.id, ...price }))
-    })
-  }
-  if (taxes.length) {
-    await tx.siigoProductTax.createMany({
-      data: taxes.map(tax => ({ productId: product.id, ...tax }))
-    })
-  }
-  if (warehouses.length) {
-    await tx.siigoProductWarehouse.createMany({
-      data: warehouses.map(warehouse => ({ productId: product.id, ...warehouse }))
-    })
-  }
-  if (components.length) {
-    await tx.siigoProductComponent.createMany({
-      data: components.map(component => ({ productId: product.id, ...component }))
-    })
-  }
 }
 
 export function siigoJson(value: unknown) {

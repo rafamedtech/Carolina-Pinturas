@@ -7,7 +7,32 @@ interface AccessToken {
 }
 
 let token: AccessToken | null = null
+let tokenRequest: Promise<string> | null = null
 const SIIGO_REQUEST_TIMEOUT_MS = 15_000
+const SIIGO_READ_RETRIES = 2
+const SIIGO_MAX_RETRY_DELAY_MS = 10_000
+
+function wait(milliseconds: number) {
+  return new Promise(resolve => setTimeout(resolve, milliseconds))
+}
+
+function retryDelay(error: unknown, attempt: number) {
+  const retryAfter = (error as { response?: { headers?: { get?: (name: string) => string | null } } })
+    ?.response?.headers?.get?.('retry-after')
+
+  if (retryAfter) {
+    const seconds = Number(retryAfter)
+    const milliseconds = Number.isFinite(seconds)
+      ? seconds * 1000
+      : Date.parse(retryAfter) - Date.now()
+
+    if (Number.isFinite(milliseconds) && milliseconds > 0) {
+      return Math.min(milliseconds, SIIGO_MAX_RETRY_DELAY_MS)
+    }
+  }
+
+  return 750 * (2 ** attempt)
+}
 
 export function siigoConfigured() {
   const { siigo } = useRuntimeConfig()
@@ -34,7 +59,18 @@ function getConfig() {
 
 async function getAccessToken() {
   if (token && token.expiresAt > Date.now()) return token.value
+  if (tokenRequest) return tokenRequest
 
+  tokenRequest = requestAccessToken()
+
+  try {
+    return await tokenRequest
+  } finally {
+    tokenRequest = null
+  }
+}
+
+async function requestAccessToken() {
   const config = getConfig()
 
   try {
@@ -79,38 +115,56 @@ export async function siigoRequest<T>(path: string, options: {
 } = {}): Promise<T> {
   const config = getConfig()
   const accessToken = await getAccessToken()
+  const method = options.method || 'GET'
+  const maxAttempts = method === 'GET' ? SIIGO_READ_RETRIES + 1 : 1
 
-  try {
-    return await $fetch<unknown>(`${config.apiUrl}${path}`, {
-      method: options.method || 'GET',
-      timeout: SIIGO_REQUEST_TIMEOUT_MS,
-      headers: {
-        'Authorization': accessToken,
-        'SiigoAPI-Application-Id': config.applicationId
-      },
-      body: options.body,
-      query: options.query
-    }) as T
-  } catch (error: unknown) {
-    const fetchError = error as {
-      response?: { status?: number }
-      data?: unknown
-      message?: string
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    try {
+      return await $fetch<unknown>(`${config.apiUrl}${path}`, {
+        method,
+        retry: 0,
+        timeout: SIIGO_REQUEST_TIMEOUT_MS,
+        headers: {
+          'Authorization': accessToken,
+          'SiigoAPI-Application-Id': config.applicationId
+        },
+        body: options.body,
+        query: options.query
+      }) as T
+    } catch (error: unknown) {
+      const status = (error as { response?: { status?: number } })?.response?.status
+
+      if (status === 429 && attempt < maxAttempts - 1) {
+        await wait(retryDelay(error, attempt))
+        continue
+      }
+
+      throw normalizeSiigoError(error)
     }
-    const status = fetchError.response?.status
-
-    if (status === 401) token = null
-
-    const timedOut = error instanceof Error && /timeout/i.test(`${error.name} ${error.message}`)
-
-    throw createError({
-      statusCode: timedOut ? 504 : status && status >= 400 && status < 500 ? status : 502,
-      statusMessage: timedOut
-        ? 'Siigo tardó demasiado en responder. Intenta actualizar de nuevo.'
-        : siigoErrorMessages(fetchError.data) || 'Siigo no pudo completar la consulta.',
-      data: fetchError.data || fetchError.message
-    })
   }
+
+  throw createError({ statusCode: 502, statusMessage: 'Siigo no pudo completar la consulta.' })
+}
+
+function normalizeSiigoError(error: unknown) {
+  const fetchError = error as {
+    response?: { status?: number }
+    data?: unknown
+    message?: string
+  }
+  const status = fetchError.response?.status
+
+  if (status === 401) token = null
+
+  const timedOut = error instanceof Error && /timeout/i.test(`${error.name} ${error.message}`)
+
+  throw createError({
+    statusCode: timedOut ? 504 : status && status >= 400 && status < 500 ? status : 502,
+    statusMessage: timedOut
+      ? 'Siigo tardó demasiado en responder. Intenta actualizar de nuevo.'
+      : siigoErrorMessages(fetchError.data) || 'Siigo no pudo completar la consulta.',
+    data: fetchError.data || fetchError.message
+  })
 }
 
 export function listQuery(event: H3Event) {

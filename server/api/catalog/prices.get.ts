@@ -1,8 +1,7 @@
 import type { SiigoListResponse, SiigoProduct } from '~/types/siigo'
 import type { CatalogPrice } from '~/types/catalog'
+import { cachedSiigoCatalog, collectSiigoCatalog } from '../../utils/siigo-catalog'
 import { siigoRequest } from '../../utils/siigo'
-
-const SIIGO_PAGE_SIZE = 25
 
 function productPrice(product: SiigoProduct) {
   const price = product.prices?.find(entry => entry.price_list?.some(item => item.position === 1)) ?? product.prices?.[0]
@@ -18,20 +17,13 @@ function productPrice(product: SiigoProduct) {
 }
 
 async function getProducts() {
-  const firstPage = await siigoRequest<SiigoListResponse<SiigoProduct>>('/v1/products', {
-    query: { page: '1', page_size: String(SIIGO_PAGE_SIZE) }
-  })
-  const products = [...firstPage.results]
-  const total = firstPage.pagination?.total_results || products.length
-
-  for (let page = 2; page <= Math.ceil(total / SIIGO_PAGE_SIZE); page++) {
-    const response = await siigoRequest<SiigoListResponse<SiigoProduct>>('/v1/products', {
-      query: { page: String(page), page_size: String(SIIGO_PAGE_SIZE) }
+  const catalog = await cachedSiigoCatalog('active-products', () => collectSiigoCatalog((page, pageSize) => (
+    siigoRequest<SiigoListResponse<SiigoProduct>>('/v1/products', {
+      query: { active: 'true', page: String(page), page_size: String(pageSize) }
     })
-    products.push(...response.results)
-  }
+  )))
 
-  return products
+  return catalog.results
 }
 
 export default eventHandler(async (event) => {

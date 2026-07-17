@@ -6,6 +6,7 @@ import {
   normalizeSiigoCustomer,
   type SiigoCustomerApiResponse
 } from '../../../utils/siigo-customers'
+import { invalidateSiigoCatalog } from '../../../utils/siigo-catalog'
 import { siigoRequest } from '../../../utils/siigo'
 
 export default eventHandler(async (event) => {
@@ -25,5 +26,6 @@ export default eventHandler(async (event) => {
     body: buildSiigoCustomerPayload(parsed.data)
   })
 
+  invalidateSiigoCatalog('customers')
   return normalizeSiigoCustomer(response)
 })

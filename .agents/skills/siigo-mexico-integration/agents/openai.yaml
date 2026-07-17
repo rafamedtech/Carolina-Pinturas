@@ -1,0 +1,4 @@
+interface:
+  display_name: "Siigo México Integration"
+  short_description: "Integra Siigo México con seguridad"
+  default_prompt: "Usa $siigo-mexico-integration para implementar o revisar una tarea relacionada con Siigo México en este proyecto."

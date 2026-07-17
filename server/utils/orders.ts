@@ -49,6 +49,16 @@ const orderDetailInclude = {
 
 type OrderDetailRecord = Prisma.SalesOrderGetPayload<{ include: typeof orderDetailInclude }>
 
+// Prisma cancela las transacciones interactivas después de 5 s por defecto.
+// La app sincroniza snapshots de Siigo antes de escribir el pedido y la
+// latencia del pooler de producción puede superar ese umbral aun con queries
+// pequeñas. Mantener un límite explícito y acotado después de reducir los
+// round trips de persistencia.
+const ORDER_WRITE_TRANSACTION_OPTIONS = {
+  maxWait: 5_000,
+  timeout: 15_000
+} as const
+
 function money(value: Decimal.Value) {
   return new Decimal(value).toDecimalPlaces(6)
 }
@@ -623,7 +633,7 @@ export async function createOrder(
       where: { id: order.id },
       include: orderDetailInclude
     })
-  })
+  }, ORDER_WRITE_TRANSACTION_OPTIONS)
 
   return detail(created)
 }
@@ -734,7 +744,7 @@ export async function updateQuote(
       where: { id },
       include: orderDetailInclude
     })
-  })
+  }, ORDER_WRITE_TRANSACTION_OPTIONS)
 
   return detail(updated)
 }
