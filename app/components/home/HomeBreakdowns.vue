@@ -93,13 +93,16 @@ defineProps<{
           v-for="item in statuses"
           :key="item.key"
           :to="`/ventas?status=${item.key}`"
+          :aria-label="`Ver pedidos en etapa ${item.label}`"
           :title="`${item.count} ${item.count === 1 ? 'pedido' : 'pedidos'}`"
           :description="`${item.percentage}% del mes · ${dashboardCompactCurrency.format(item.amount)}`"
-          icon="i-lucide-package-check"
-          :badge="{ label: item.label, color: item.color, variant: 'soft' }"
           variant="subtle"
           :ui="{ container: 'gap-y-2 p-4 sm:p-4' }"
-        />
+        >
+          <template #leading>
+            <OrdersOrderStatusBadge :status="{ label: item.label, color: item.color }" />
+          </template>
+        </UPageCard>
       </UPageGrid>
 
       <UEmpty
