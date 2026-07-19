@@ -52,6 +52,7 @@ export interface DashboardRecentOrder {
   orderDate: string
   total: number
   paymentStatus: string
+  paymentMethod: string | null
   status: Pick<OrderStatus, 'key' | 'label' | 'color'>
 }
 

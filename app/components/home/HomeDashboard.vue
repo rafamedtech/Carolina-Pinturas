@@ -104,7 +104,7 @@ const periodProgress = computed(() => {
       <HomeStats :metrics="data.metrics" />
 
       <div class="grid gap-4 xl:grid-cols-[minmax(0,1.65fr)_minmax(20rem,0.75fr)]">
-        <HomeChart :data="data.dailySales" :period-label="data.period.label" />
+        <HomeChart :data="data.dailySales" />
         <HomeTopProducts :products="data.topProducts" />
       </div>
 

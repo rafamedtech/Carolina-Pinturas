@@ -4,7 +4,6 @@ import { dashboardCurrency } from '~/utils/dashboardFormatters'
 
 const props = defineProps<{
   data: DashboardDailySale[]
-  periodLabel: string
 }>()
 
 const total = computed(() => props.data.reduce((sum, item) => sum + item.total, 0))
@@ -22,12 +21,9 @@ function progress(item: DashboardDailySale) {
     <template #header>
       <div class="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h2 class="font-semibold text-highlighted">
+          <h2 class="text-lg font-semibold text-highlighted">
             Ventas de los últimos 7 días
           </h2>
-          <p class="mt-1 text-sm text-muted capitalize">
-            Tendencia diaria de {{ periodLabel }}
-          </p>
         </div>
         <UBadge
           :label="dashboardCurrency.format(total)"

@@ -14,10 +14,7 @@ defineProps<{
       <template #header>
         <div class="flex items-center justify-between gap-3">
           <div>
-            <p class="text-xs font-semibold uppercase tracking-[0.14em] text-muted">
-              Flujo de efectivo
-            </p>
-            <h2 class="mt-2 text-lg font-semibold text-highlighted">
+            <h2 class="text-lg font-semibold text-highlighted">
               Estado de cobro
             </h2>
           </div>
@@ -75,10 +72,7 @@ defineProps<{
       <template #header>
         <div class="flex items-center justify-between gap-3">
           <div>
-            <p class="text-xs font-semibold uppercase tracking-[0.14em] text-muted">
-              Operación
-            </p>
-            <h2 class="mt-2 text-lg font-semibold text-highlighted">
+            <h2 class="text-lg font-semibold text-highlighted">
               Pedidos por etapa
             </h2>
           </div>

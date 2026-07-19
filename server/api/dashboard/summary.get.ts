@@ -54,6 +54,7 @@ export default eventHandler(async (event) => {
         total: true,
         customerNameSnapshot: true,
         paymentStatus: true,
+        paymentMethod: true,
         status: {
           select: { key: true, label: true, color: true, sortOrder: true }
         },
@@ -195,6 +196,7 @@ export default eventHandler(async (event) => {
       orderDate: dateOnly(order.orderDate),
       total: numeric(order.total),
       paymentStatus: order.paymentStatus,
+      paymentMethod: order.paymentMethod,
       status: {
         key: order.status.key,
         label: order.status.label,

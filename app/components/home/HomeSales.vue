@@ -3,7 +3,7 @@ import { h, resolveComponent } from 'vue'
 import type { TableColumn } from '@nuxt/ui'
 import type { DashboardRecentOrder } from '~/types/dashboard'
 import { dashboardCurrency, dashboardDate } from '~/utils/dashboardFormatters'
-import { paymentStatusColor, paymentStatusLabel } from '~/utils/orderPayment'
+import { paymentMethodLabel, paymentStatusColor, paymentStatusLabel } from '~/utils/orderPayment'
 
 const NuxtLink = resolveComponent('NuxtLink')
 const OrderStatusBadge = resolveComponent('OrdersOrderStatusBadge')
@@ -19,8 +19,12 @@ const columns: TableColumn<DashboardRecentOrder>[] = [{
   cell: ({ row }) => h(
     NuxtLink,
     {
-      to: `/ventas/${encodeURIComponent(row.original.id)}`,
-      class: 'font-medium text-primary hover:underline'
+      'to': {
+        path: `/ventas/${encodeURIComponent(row.original.id)}`,
+        query: { returnTo: '/' }
+      },
+      'class': 'font-medium text-primary hover:underline',
+      'aria-label': `Abrir pedido ${row.original.number}`
     },
     () => row.original.number
   )
@@ -33,18 +37,21 @@ const columns: TableColumn<DashboardRecentOrder>[] = [{
   header: 'Cliente',
   cell: ({ row }) => h('span', { class: 'line-clamp-1' }, row.original.customerName)
 }, {
-  id: 'status',
-  header: 'Estado',
-  cell: ({ row }) => h(OrderStatusBadge, { status: row.original.status })
-}, {
-  accessorKey: 'paymentStatus',
-  header: 'Cobro',
+  id: 'paymentStatus',
+  header: 'Estado de pago',
   cell: ({ row }) => h(UBadge, {
     label: paymentStatusLabel(row.original.paymentStatus),
     color: paymentStatusColor(row.original.paymentStatus),
-    variant: 'soft',
-    size: 'sm'
+    variant: 'subtle'
   })
+}, {
+  id: 'paymentMethod',
+  header: 'Método de pago',
+  cell: ({ row }) => paymentMethodLabel(row.original.paymentMethod)
+}, {
+  id: 'status',
+  header: 'Estado',
+  cell: ({ row }) => h(OrderStatusBadge, { status: row.original.status })
 }, {
   accessorKey: 'total',
   header: () => h('div', { class: 'text-right' }, 'Total'),
@@ -57,14 +64,11 @@ const columns: TableColumn<DashboardRecentOrder>[] = [{
 </script>
 
 <template>
-  <UCard :ui="{ header: 'px-4 py-4 sm:px-6', body: 'p-0 sm:p-0' }">
+  <UCard class="w-full" :ui="{ header: 'px-4 py-4 sm:px-6', body: 'p-0 sm:p-0' }">
     <template #header>
       <div class="flex items-center justify-between gap-3">
         <div>
-          <p class="text-xs font-semibold uppercase tracking-[0.14em] text-muted">
-            Actividad reciente
-          </p>
-          <h2 class="mt-2 text-lg font-semibold text-highlighted">
+          <h2 class="text-lg font-semibold text-highlighted">
             Últimos pedidos del mes
           </h2>
         </div>
@@ -84,13 +88,15 @@ const columns: TableColumn<DashboardRecentOrder>[] = [{
       v-if="orders.length"
       :data="orders"
       :columns="columns"
-      class="shrink-0"
+      class="w-full"
       :ui="{
-        base: 'min-w-4xl border-separate border-spacing-0',
+        root: 'w-full',
+        base: 'min-w-full border-separate border-spacing-0',
         thead: '[&>tr]:bg-elevated/50 [&>tr]:after:content-none',
         tbody: '[&>tr]:last:[&>td]:border-b-0',
-        th: 'border-y border-default first:border-l last:border-r first:rounded-l-lg last:rounded-r-lg',
-        td: 'border-b border-default'
+        th: 'py-2 first:rounded-l-lg last:rounded-r-lg border-y border-default first:border-l last:border-r',
+        td: 'border-b border-default',
+        separator: 'h-0'
       }"
     />
 

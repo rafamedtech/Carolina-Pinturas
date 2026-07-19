@@ -12,10 +12,7 @@ defineProps<{
     <template #header>
       <div class="flex items-start justify-between gap-3">
         <div>
-          <p class="text-xs font-semibold uppercase tracking-[0.14em] text-muted">
-            Mezcla de venta
-          </p>
-          <h2 class="mt-2 text-lg font-semibold text-highlighted">
+          <h2 class="text-lg font-semibold text-highlighted">
             Productos destacados
           </h2>
         </div>
