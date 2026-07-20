@@ -69,6 +69,7 @@ export interface SiigoProduct {
 export interface SiigoCustomer {
   id: string
   name: string[]
+  commercial_name?: string
   person_type?: string
   type?: string
   identification?: string

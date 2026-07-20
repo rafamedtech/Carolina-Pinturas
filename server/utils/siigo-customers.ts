@@ -1,5 +1,5 @@
 import { createError } from 'h3'
-import type { SiigoCustomer } from '~/types/siigo'
+import type { SiigoCustomer, SiigoListResponse } from '~/types/siigo'
 import type { CreateCustomerInput } from './customer-validation'
 
 // Cuerpo de POST /v1/customers en Siigo México. Solo se envían propiedades
@@ -112,5 +112,14 @@ export function normalizeSiigoCustomer(raw: SiigoCustomerApiResponse): SiigoCust
     ...(raw as Partial<SiigoCustomer>),
     id,
     name
+  }
+}
+
+export function normalizeSiigoCustomerList(
+  response: SiigoListResponse<SiigoCustomerApiResponse>
+): SiigoListResponse<SiigoCustomer> {
+  return {
+    ...response,
+    results: response.results.map(normalizeSiigoCustomer)
   }
 }

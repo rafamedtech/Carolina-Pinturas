@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import type { CreateCustomerInput } from '../../server/utils/customer-validation'
-import { buildSiigoCustomerPayload, normalizeSiigoCustomer } from '../../server/utils/siigo-customers'
+import {
+  buildSiigoCustomerPayload,
+  normalizeSiigoCustomer,
+  normalizeSiigoCustomerList
+} from '../../server/utils/siigo-customers'
 
 function physicalInput(overrides: Partial<CreateCustomerInput> = {}): CreateCustomerInput {
   return {
@@ -138,6 +142,26 @@ describe('buildSiigoCustomerPayload — forma de phones/contacts', () => {
 })
 
 describe('normalizeSiigoCustomer', () => {
+  it('usa el nombre comercial cuando Siigo devuelve name sin valores útiles', () => {
+    const response = normalizeSiigoCustomerList({
+      results: [{
+        id: '048fac97-d25e-4724-bbea-c9c731c22656',
+        name: [null],
+        commercial_name: 'INDUSTRIAS POLYPLASTIC LA FORTUNA',
+        rfc_id: 'IPF1611092Z3'
+      }],
+      pagination: { page: 1, page_size: 100, total_results: 1 }
+    })
+
+    expect(response.results[0]).toMatchObject({
+      id: '048fac97-d25e-4724-bbea-c9c731c22656',
+      name: ['INDUSTRIAS POLYPLASTIC LA FORTUNA'],
+      commercial_name: 'INDUSTRIAS POLYPLASTIC LA FORTUNA',
+      rfc_id: 'IPF1611092Z3'
+    })
+    expect(response.pagination?.total_results).toBe(1)
+  })
+
   const id = '6b6ceb28-b2eb-4b98-b3dd-26648a933c81'
 
   it('conserva name cuando llega como arreglo', () => {

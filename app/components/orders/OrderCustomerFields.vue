@@ -4,7 +4,7 @@ import type { DateValue } from '@internationalized/date'
 import type { OrderStatus, Repartidor } from '~/types/orders'
 import type { SiigoCustomer } from '~/types/siigo'
 import { PAYMENT_STATUSES, PAYMENT_METHODS } from '~/utils/orderPayment'
-import { siigoCustomerPhone, siigoCustomerAddress } from '~/utils/siigoCustomer'
+import { siigoCustomerPhone, siigoCustomerAddress, siigoCustomerName } from '~/utils/siigoCustomer'
 
 const props = withDefaults(defineProps<{
   customers: SiigoCustomer[]
@@ -59,12 +59,8 @@ const paymentDateValue = computed<DateValue | undefined>({
   }
 })
 
-function customerName(customer: SiigoCustomer) {
-  return customer.name?.filter(Boolean).join(' ') || customer.rfc_id || 'Cliente sin nombre'
-}
-
 const customerOptions = computed(() => props.customers.map(customer => ({
-  label: customerName(customer),
+  label: siigoCustomerName(customer) || 'Cliente sin nombre',
   description: customer.rfc_id || customer.identification,
   value: customer.id
 })))

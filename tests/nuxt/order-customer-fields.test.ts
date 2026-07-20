@@ -24,12 +24,19 @@ const existingCustomer: SiigoCustomer = {
   }
 }
 
+const commercialNameCustomer: SiigoCustomer = {
+  id: '048fac97-d25e-4724-bbea-c9c731c22656',
+  name: [],
+  commercial_name: 'INDUSTRIAS POLYPLASTIC LA FORTUNA',
+  rfc_id: 'IPF1611092Z3'
+}
+
 let wrapper: VueWrapper | null = null
 
 async function mountFields() {
   wrapper = await mountSuspended(OrderCustomerFields, {
     props: {
-      customers: [existingCustomer],
+      customers: [existingCustomer, commercialNameCustomer],
       statuses: [],
       repartidores: [],
       tagOptions: [],
@@ -63,6 +70,32 @@ afterEach(() => {
 })
 
 describe('OrderCustomerFields', () => {
+  it('permite encontrar un cliente por su nombre comercial cuando la razón social viene vacía', async () => {
+    const mounted = await mountFields()
+
+    await mounted.find('[data-slot="base"]').trigger('click')
+    await nextTick()
+
+    const searchInput = await vi.waitFor(() => {
+      const input = document.body.querySelector('[data-slot="content"] input')
+      if (!(input instanceof HTMLInputElement)) throw new Error('El buscador del menú aún no aparece.')
+      return input
+    })
+
+    searchInput.value = 'POLYPLASTIC'
+    searchInput.dispatchEvent(new Event('input', { bubbles: true }))
+
+    await vi.waitFor(() => {
+      const text = document.body.querySelector('[data-slot="content"]')?.textContent || ''
+      if (!text.includes('INDUSTRIAS POLYPLASTIC LA FORTUNA')) {
+        throw new Error(`Contenido actual: "${text}"`)
+      }
+    })
+
+    expect(document.body.querySelector('[data-slot="content"]')?.textContent)
+      .toContain('IPF1611092Z3')
+  })
+
   it('habilita crear cliente incluso con coincidencias parciales, con position explícito', async () => {
     // `when: 'empty'` solo la muestra si el filtro no arroja NADA: un cliente
     // existente con nombre/RFC parecido la esconde y bloquea el alta. `always`

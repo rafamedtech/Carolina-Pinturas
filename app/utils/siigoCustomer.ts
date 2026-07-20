@@ -1,5 +1,15 @@
 import type { SiigoCustomer } from '~/types/siigo'
 
+export function siigoCustomerName(customer: SiigoCustomer | null | undefined) {
+  if (!customer) return null
+
+  return customer.name?.filter(part => typeof part === 'string' && part.trim()).join(' ')
+    || customer.commercial_name?.trim()
+    || customer.rfc_id
+    || customer.identification
+    || null
+}
+
 export function siigoCustomerPhone(customer: SiigoCustomer | null | undefined) {
   if (!customer) return null
 
