@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { parseDate } from '@internationalized/date'
 import type { OrderDateRange, OrderStatus, SalesOrderListResponse } from '~/types/orders'
-import { canCreateOrders, canCustomizeOrderColumns } from '~/utils/roleAccess'
+import { canCreateOrders } from '~/utils/roleAccess'
 
 const props = withDefaults(defineProps<{
   title?: string
@@ -46,9 +46,6 @@ const pageSize = 25
 const debouncedFilter = refDebounced(filter, 300)
 const { user } = useAuth()
 const canCreate = computed(() => Boolean(user.value && canCreateOrders(user.value.role)))
-const canCustomizeColumns = computed(() => Boolean(
-  user.value && canCustomizeOrderColumns(user.value.role)
-))
 const isHydrated = shallowRef(false)
 
 onMounted(() => {
@@ -195,7 +192,6 @@ const statusTabItems = computed(() => {
         :orders="orders.results"
         :loading="loading"
         :igualacion="igualacion"
-        :can-customize-columns="canCustomizeColumns"
         :return-to="returnTo"
       />
 

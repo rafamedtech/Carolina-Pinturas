@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { h, resolveComponent } from 'vue'
-import type { DropdownMenuItem, TableColumn } from '@nuxt/ui'
-import type { Table, VisibilityState } from '@tanstack/table-core'
+import type { TableColumn } from '@nuxt/ui'
+import type { Column, SortingState, VisibilityState } from '@tanstack/table-core'
 import OrderListCards from './OrderListCards.vue'
 import type { SalesOrderListItem } from '~/types/orders'
 import { paymentMethodLabel, paymentStatusColor, paymentStatusLabel } from '~/utils/orderPayment'
@@ -11,10 +11,8 @@ const props = withDefaults(defineProps<{
   loading: boolean
   returnTo: string
   igualacion?: boolean
-  canCustomizeColumns?: boolean
 }>(), {
-  igualacion: false,
-  canCustomizeColumns: false
+  igualacion: false
 })
 
 const OrderStatusBadge = resolveComponent('OrdersOrderStatusBadge')
@@ -27,7 +25,7 @@ const dateTime = new Intl.DateTimeFormat('es-MX', {
   timeStyle: 'short'
 })
 const tableOrders = computed(() => [...props.orders])
-const table = useTemplateRef<{ tableApi: Table<SalesOrderListItem> }>('table')
+const sorting = ref<SortingState>([])
 const columnVisibility = ref<VisibilityState>({
   promisedDate: false,
   rfc: false,
@@ -53,9 +51,49 @@ function formatDateTime(value: string) {
   return dateTime.format(new Date(value))
 }
 
+function sortableHeader(label: string, align: 'left' | 'right' = 'left') {
+  return ({ column }: { column: Column<SalesOrderListItem, unknown> }) => {
+    const direction = column.getIsSorted()
+    const nextDirection = column.getNextSortingOrder()
+    const directionLabel = direction === 'asc'
+      ? 'ascendente'
+      : direction === 'desc'
+        ? 'descendente'
+        : 'sin ordenar'
+    const nextDirectionLabel = nextDirection === 'asc'
+      ? 'ascendente'
+      : nextDirection === 'desc'
+        ? 'descendente'
+        : 'quitar el orden'
+    const actionLabel = direction
+      ? `Cambiar ${label} a orden ${nextDirectionLabel}`
+      : `Ordenar por ${label} ${nextDirectionLabel}`
+
+    return h(UButton, {
+      'label': label,
+      'color': 'neutral',
+      'variant': 'ghost',
+      'size': 'sm',
+      'class': align === 'right' ? 'w-full justify-end' : undefined,
+      'trailingIcon': direction === 'asc'
+        ? 'i-lucide-arrow-up'
+        : direction === 'desc'
+          ? 'i-lucide-arrow-down'
+          : 'i-lucide-arrow-up-down',
+      'aria-label': `${label}, ${directionLabel}. ${actionLabel}`,
+      'title': actionLabel,
+      'onClick': () => column.toggleSorting()
+    })
+  }
+}
+
 const igualacionColumn: TableColumn<SalesOrderListItem> = {
   id: 'igualaciones',
-  header: 'Igualaciones',
+  accessorFn: row => (row.partidas ?? [])
+    .filter(item => item.isIgualacion)
+    .map(item => item.code)
+    .join(' '),
+  header: sortableHeader('Igualaciones'),
   cell: ({ row }) => {
     const items = (row.original.partidas ?? []).filter(item => item.isIgualacion)
     if (!items.length) return h('span', { class: 'text-muted' }, '—')
@@ -74,7 +112,8 @@ const igualacionColumn: TableColumn<SalesOrderListItem> = {
 
 const paymentStatusColumn: TableColumn<SalesOrderListItem> = {
   id: 'paymentStatus',
-  header: 'Estado de pago',
+  accessorFn: row => paymentStatusLabel(row.paymentStatus),
+  header: sortableHeader('Estado de pago'),
   cell: ({ row }) => h(UBadge, {
     color: paymentStatusColor(row.original.paymentStatus),
     label: paymentStatusLabel(row.original.paymentStatus),
@@ -84,13 +123,14 @@ const paymentStatusColumn: TableColumn<SalesOrderListItem> = {
 
 const paymentMethodColumn: TableColumn<SalesOrderListItem> = {
   id: 'paymentMethod',
-  header: 'Método de pago',
+  accessorFn: row => paymentMethodLabel(row.paymentMethod),
+  header: sortableHeader('Método de pago'),
   cell: ({ row }) => paymentMethodLabel(row.original.paymentMethod)
 }
 
 const totalColumn: TableColumn<SalesOrderListItem> = {
   accessorKey: 'total',
-  header: () => h('div', { class: 'text-right' }, 'Total'),
+  header: sortableHeader('Total', 'right'),
   cell: ({ row }) => h(
     'div',
     { class: 'text-right font-medium' },
@@ -101,7 +141,7 @@ const totalColumn: TableColumn<SalesOrderListItem> = {
 const numberColumn: TableColumn<SalesOrderListItem> = props.igualacion
   ? {
       accessorKey: 'number',
-      header: 'Pedido',
+      header: sortableHeader('Pedido'),
       cell: ({ row }) => h(
         UButton,
         {
@@ -116,7 +156,7 @@ const numberColumn: TableColumn<SalesOrderListItem> = props.igualacion
     }
   : {
       accessorKey: 'number',
-      header: 'Pedido',
+      header: sortableHeader('Pedido'),
       cell: ({ row }) => h(
         NuxtLink,
         {
@@ -133,71 +173,40 @@ const numberColumn: TableColumn<SalesOrderListItem> = props.igualacion
 
 const columns = computed<TableColumn<SalesOrderListItem>[]>(() => [numberColumn, {
   accessorKey: 'orderDate',
-  header: 'Fecha',
+  header: sortableHeader('Fecha'),
   cell: ({ row }) => formatDate(row.original.orderDate)
 }, {
-  accessorKey: 'promisedDate',
-  header: 'Fecha prometida',
+  id: 'promisedDate',
+  accessorFn: row => row.promisedDate || '',
+  header: sortableHeader('Fecha prometida'),
   cell: ({ row }) => formatDate(row.original.promisedDate)
 }, {
   id: 'customer',
-  header: 'Cliente',
+  accessorFn: row => row.customer.name,
+  header: sortableHeader('Cliente'),
   cell: ({ row }) => row.original.customer.name
 }, {
   id: 'rfc',
-  header: 'RFC',
+  accessorFn: row => row.customer.rfc || '',
+  header: sortableHeader('RFC'),
   cell: ({ row }) => row.original.customer.rfc || '—'
 }, {
   accessorKey: 'itemCount',
-  header: 'Partidas'
+  header: sortableHeader('Partidas')
 }, ...(props.igualacion ? [igualacionColumn] : [paymentStatusColumn, paymentMethodColumn]), {
   id: 'status',
-  header: 'Estado',
+  accessorFn: row => row.status.sortOrder,
+  header: sortableHeader('Estado'),
   cell: ({ row }) => h(OrderStatusBadge, { status: row.original.status })
 }, ...(props.igualacion ? [] : [totalColumn]), {
   accessorKey: 'createdAt',
-  header: 'Creado',
+  header: sortableHeader('Creado'),
   cell: ({ row }) => formatDateTime(row.original.createdAt)
 }, {
   accessorKey: 'updatedAt',
-  header: 'Última actualización',
+  header: sortableHeader('Última actualización'),
   cell: ({ row }) => formatDateTime(row.original.updatedAt)
 }])
-
-const columnLabels: Record<string, string> = {
-  number: 'Pedido',
-  orderDate: 'Fecha',
-  promisedDate: 'Fecha prometida',
-  customer: 'Cliente',
-  rfc: 'RFC',
-  itemCount: 'Partidas',
-  igualaciones: 'Igualaciones',
-  paymentStatus: 'Estado de pago',
-  paymentMethod: 'Método de pago',
-  status: 'Estado',
-  total: 'Total',
-  createdAt: 'Creado',
-  updatedAt: 'Última actualización'
-}
-
-const columnMenuItems = computed<DropdownMenuItem[]>(() => {
-  const visibility = columnVisibility.value
-
-  return table.value?.tableApi
-    .getAllColumns()
-    .filter(column => column.getCanHide())
-    .map(column => ({
-      label: columnLabels[column.id] || column.id,
-      type: 'checkbox' as const,
-      checked: visibility[column.id] ?? column.getIsVisible(),
-      onUpdateChecked(checked: boolean) {
-        table.value?.tableApi.getColumn(column.id)?.toggleVisibility(checked)
-      },
-      onSelect(event: Event) {
-        event.preventDefault()
-      }
-    })) || []
-})
 </script>
 
 <template>
@@ -216,25 +225,9 @@ const columnMenuItems = computed<DropdownMenuItem[]>(() => {
   />
 
   <template v-else>
-    <div v-if="canCustomizeColumns" class="hidden justify-end md:flex">
-      <UDropdownMenu
-        :items="columnMenuItems"
-        :content="{ align: 'end' }"
-      >
-        <UButton
-          label="Columnas"
-          icon="i-lucide-columns-3"
-          trailing-icon="i-lucide-chevron-down"
-          color="neutral"
-          variant="outline"
-          aria-label="Seleccionar columnas visibles"
-        />
-      </UDropdownMenu>
-    </div>
-
     <UTable
-      ref="table"
       v-model:column-visibility="columnVisibility"
+      v-model:sorting="sorting"
       :data="tableOrders"
       :columns="columns"
       empty="No hay pedidos para mostrar."
