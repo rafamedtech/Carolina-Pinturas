@@ -24,8 +24,8 @@ function validateDiscount(
   }
 }
 
-// A repartidor is optional while the order is in borrador/ingresado; it becomes
-// mandatory once the order reaches confirmado (or a later igualación state).
+// Existing drafts may still lack a repartidor, but every new non-draft order
+// must have one. Later status changes keep enforcing the operational states.
 export const STATUS_KEYS_REQUIRING_REPARTIDOR = ['confirmado', 'surtido', 'en_espera']
 
 const orderFieldsSchema = z.object({
@@ -67,11 +67,11 @@ function validateOrderDiscounts(
 
 export const createOrderSchema = orderFieldsSchema.superRefine((data, ctx) => {
   validateOrderDiscounts(data, ctx)
-  if (STATUS_KEYS_REQUIRING_REPARTIDOR.includes(data.statusKey) && !data.repartidorId) {
+  if (data.statusKey !== 'borrador' && !data.repartidorId) {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
       path: ['repartidorId'],
-      message: 'Selecciona un repartidor para confirmar el pedido.'
+      message: 'Selecciona un repartidor para guardar el pedido.'
     })
   }
 })

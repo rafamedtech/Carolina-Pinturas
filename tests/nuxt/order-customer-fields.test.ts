@@ -40,7 +40,11 @@ const counterCustomer: SiigoCustomer = {
 
 let wrapper: VueWrapper | null = null
 
-async function mountFields(options: { counterSale?: boolean, customerId?: string } = {}) {
+async function mountFields(options: {
+  counterSale?: boolean
+  customerId?: string
+  showPaymentSelectors?: boolean
+} = {}) {
   wrapper = await mountSuspended(OrderCustomerFields, {
     props: {
       customers: [existingCustomer, commercialNameCustomer, counterCustomer],
@@ -60,7 +64,8 @@ async function mountFields(options: { counterSale?: boolean, customerId?: string
       requiresInvoice: false,
       tags: [],
       observations: '',
-      counterSale: options.counterSale || false
+      counterSale: options.counterSale || false,
+      showPaymentSelectors: options.showPaymentSelectors ?? true
     }
   })
   return wrapper
@@ -96,6 +101,23 @@ describe('OrderCustomerFields', () => {
     expect(mounted.text()).not.toContain('Requiere factura')
     expect(mounted.text()).not.toContain('Etiquetas')
     expect(mounted.findComponent(OrderCustomerCreateModal).exists()).toBe(false)
+  })
+
+  it('oculta los selectores de pago sin ocultar la fecha de pago', async () => {
+    const mounted = await mountFields({ showPaymentSelectors: false })
+
+    expect(mounted.text()).toContain('Fecha de pago')
+    expect(mounted.text()).not.toContain('Estado de pago')
+    expect(mounted.text()).not.toContain('Método de pago')
+  })
+
+  it('ordena las fechas y el repartidor en las posiciones solicitadas', async () => {
+    const mounted = await mountFields()
+    const text = mounted.text()
+
+    expect(text.indexOf('Fecha del pedido')).toBeLessThan(text.indexOf('Fecha de pago'))
+    expect(text.indexOf('Fecha de pago')).toBeLessThan(text.indexOf('Fecha de entrega'))
+    expect(text.indexOf('Fecha de entrega')).toBeLessThan(text.indexOf('Repartidor'))
   })
 
   it('selecciona al cliente MOSTRADOR . desde la acción de cliente genérico', async () => {

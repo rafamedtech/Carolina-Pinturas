@@ -29,6 +29,9 @@ import {
 const orderDetailInclude = {
   status: true,
   customer: true,
+  siigoInvoice: {
+    select: { status: true }
+  },
   items: {
     orderBy: { position: 'asc' },
     include: {
@@ -436,6 +439,7 @@ function detail(order: OrderDetailRecord): SalesOrderDetail {
     observations: order.observations,
     remision: order.remision,
     requiresInvoice: order.requiresInvoice,
+    invoiceCreated: order.siigoInvoice?.status === 'created',
     tags: order.tags,
     paymentStatus: order.paymentStatus,
     paymentMethod: order.paymentMethod,
@@ -562,6 +566,9 @@ export async function createOrder(
   const initialPaymentDate = input.initialPayment
     ? new Date(`${input.initialPayment.date}T00:00:00.000Z`)
     : null
+  const paymentDate = input.paymentDate
+    ? new Date(`${input.paymentDate}T00:00:00.000Z`)
+    : initialPaymentDate
 
   const created = await prisma.$transaction(async (tx) => {
     const status = await tx.orderStatus.findFirst({
@@ -593,7 +600,7 @@ export async function createOrder(
         tags: input.tags,
         paymentStatus: input.initialPayment ? 'pago_recibido' : 'pendiente_pago',
         paymentMethod: input.initialPayment?.paymentMethod ?? null,
-        paymentDate: initialPaymentDate,
+        paymentDate,
         currencyCode: lines[0]?.currencyCode || 'MXN',
         subtotal: totals.subtotal.toString(),
         discountType: input.discountType,

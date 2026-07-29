@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { parseDate } from '@internationalized/date'
+import type { DateValue } from '@internationalized/date'
 import * as z from 'zod'
 import type { FormSubmitEvent } from '@nuxt/ui'
 import type {
@@ -16,13 +18,40 @@ const emit = defineEmits<{
   submit: [input: CreateOrderSiigoInvoiceInput]
 }>()
 
+const useCfdiItems = [
+  { label: 'G01 · Adquisición de mercancías', value: 'G01' },
+  { label: 'G02 · Devoluciones, descuentos o bonificaciones', value: 'G02' },
+  { label: 'G03 · Gastos en general', value: 'G03' },
+  { label: 'I01 · Construcciones', value: 'I01' },
+  { label: 'I02 · Mobiliario y equipo de oficina por inversiones', value: 'I02' },
+  { label: 'I03 · Equipo de transporte', value: 'I03' },
+  { label: 'I04 · Equipo de cómputo y accesorios', value: 'I04' },
+  { label: 'I05 · Dados, troqueles, moldes, matrices y herramental', value: 'I05' },
+  { label: 'I06 · Comunicaciones telefónicas', value: 'I06' },
+  { label: 'I07 · Comunicaciones satelitales', value: 'I07' },
+  { label: 'I08 · Otra maquinaria y equipo', value: 'I08' },
+  { label: 'D01 · Honorarios médicos, dentales y gastos hospitalarios', value: 'D01' },
+  { label: 'D02 · Gastos médicos por incapacidad o discapacidad', value: 'D02' },
+  { label: 'D03 · Gastos funerales', value: 'D03' },
+  { label: 'D04 · Donativos', value: 'D04' },
+  { label: 'D05 · Intereses reales pagados por créditos hipotecarios', value: 'D05' },
+  { label: 'D06 · Aportaciones voluntarias al SAR', value: 'D06' },
+  { label: 'D07 · Primas por seguros de gastos médicos', value: 'D07' },
+  { label: 'D08 · Gastos de transportación escolar obligatoria', value: 'D08' },
+  { label: 'D09 · Depósitos en cuentas para el ahorro y planes de pensiones', value: 'D09' },
+  { label: 'D10 · Pagos por servicios educativos (colegiaturas)', value: 'D10' },
+  { label: 'P01 · Por definir', value: 'P01' },
+  { label: 'S01 · Sin efectos fiscales', value: 'S01' },
+  { label: 'CP01 · Pagos', value: 'CP01' },
+  { label: 'CN01 · Nómina', value: 'CN01' }
+]
+
 const schema = z.object({
   documentTypeId: z.number().int().positive('Selecciona un tipo de factura.'),
   invoiceNumber: z.number().int().positive().optional(),
   sellerId: z.number().int().positive('Selecciona un vendedor.'),
-  paymentTypeId: z.number().int().positive('Selecciona una condición de pago.'),
+  paymentTypeId: z.number().int().positive('Selecciona un método de pago.'),
   costCenterId: z.number().int().positive().optional(),
-  warehouseId: z.number().int().positive().optional(),
   useCfdi: z.string().trim().toUpperCase().regex(/^[A-Z0-9]{3,8}$/, 'Captura un uso CFDI válido.'),
   paymentMethod: z.enum(['PUE', 'PPD']),
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Selecciona la fecha de factura.'),
@@ -37,7 +66,6 @@ const state = reactive<Partial<Schema>>({
   sellerId: undefined,
   paymentTypeId: undefined,
   costCenterId: undefined,
-  warehouseId: undefined,
   useCfdi: 'G03',
   paymentMethod: 'PUE',
   date: new Date().toISOString().slice(0, 10),
@@ -45,41 +73,41 @@ const state = reactive<Partial<Schema>>({
   confirmed: false
 })
 
-const documentItems = computed(() => props.context.documentTypes.map(item => ({
-  label: `${item.name} (${item.code})`,
-  value: item.id
-})))
 const sellerItems = computed(() => props.context.sellers.map(item => ({
   label: item.name,
   description: item.email || undefined,
   value: item.id
 })))
-const paymentItems = computed(() => props.context.paymentTypes.map(item => ({
-  label: item.name,
-  value: item.id
-})))
-const costCenterItems = computed(() => props.context.costCenters.map(item => ({
-  label: item.name,
-  value: item.id
-})))
-const warehouseItems = computed(() => props.context.warehouses.map(item => ({
-  label: item.name,
-  value: item.id
-})))
+const paymentItems = computed(() => [...props.context.paymentTypes]
+  .sort((first, second) => first.id - second.id)
+  .map(item => ({
+    label: item.name,
+    value: item.id
+  })))
+const defaultPaymentTypeId = computed(() =>
+  props.context.paymentTypes.find(item => item.name.trim().toLocaleLowerCase('es-MX') === 'efectivo')?.id
+  ?? paymentItems.value[0]?.value
+)
+const invoiceDate = computed<DateValue | undefined>({
+  get: () => state.date ? parseDate(state.date) : undefined,
+  set: (value) => { state.date = value?.toString() ?? '' }
+})
+const dueDate = computed<DateValue | undefined>({
+  get: () => state.dueDate ? parseDate(state.dueDate) : undefined,
+  set: (value) => { state.dueDate = value?.toString() ?? '' }
+})
 const selectedDocument = computed(() =>
   props.context.documentTypes.find(item => item.id === state.documentTypeId)
 )
 const manualNumber = computed(() => selectedDocument.value?.automatic_number === false)
-const requiresCostCenter = computed(() => Boolean(selectedDocument.value?.cost_center_mandatory))
 
 function resetState() {
   const document = props.context.documentTypes[0]
   state.documentTypeId = document?.id
   state.invoiceNumber = document?.automatic_number === false ? document.consecutive : undefined
   state.sellerId = props.context.sellers[0]?.id
-  state.paymentTypeId = props.context.paymentTypes[0]?.id
+  state.paymentTypeId = defaultPaymentTypeId.value
   state.costCenterId = document?.cost_center_default ?? undefined
-  state.warehouseId = undefined
   state.useCfdi = 'G03'
   state.paymentMethod = 'PUE'
   state.date = new Date().toISOString().slice(0, 10)
@@ -107,7 +135,6 @@ function onSubmit(event: FormSubmitEvent<Schema>) {
     sellerId: event.data.sellerId,
     paymentTypeId: event.data.paymentTypeId,
     costCenterId: event.data.costCenterId,
-    warehouseId: event.data.warehouseId,
     useCfdi: event.data.useCfdi,
     paymentMethod: event.data.paymentMethod,
     date: event.data.date,
@@ -123,18 +150,9 @@ function onSubmit(event: FormSubmitEvent<Schema>) {
     title="Crear factura borrador en Siigo"
     description="El documento se guardará sin timbrar y sin enviarse por correo."
     :dismissible="!saving"
-    :ui="{ footer: 'justify-end' }"
+    :ui="{ content: 'sm:max-w-[40rem]', footer: 'justify-end' }"
   >
     <template #body>
-      <UAlert
-        class="mb-5"
-        color="warning"
-        variant="subtle"
-        icon="i-lucide-file-warning"
-        title="Esta acción sí crea una factura de venta"
-        description="Quedará en estado Draft dentro de Siigo. El timbrado seguirá siendo una acción distinta."
-      />
-
       <UForm
         id="siigo-invoice-form"
         :schema="schema"
@@ -142,13 +160,12 @@ function onSubmit(event: FormSubmitEvent<Schema>) {
         class="grid gap-4 sm:grid-cols-2"
         @submit="onSubmit"
       >
-        <UFormField name="documentTypeId" label="Tipo de factura" required>
-          <USelect
-            v-model="state.documentTypeId"
-            :items="documentItems"
-            value-key="value"
-            class="w-full"
-          />
+        <UFormField name="date" label="Fecha de factura" required>
+          <OrdersOrderDatePicker v-model="invoiceDate" />
+        </UFormField>
+
+        <UFormField name="dueDate" label="Fecha de vencimiento" required>
+          <OrdersOrderDatePicker v-model="dueDate" />
         </UFormField>
 
         <UFormField
@@ -160,25 +177,25 @@ function onSubmit(event: FormSubmitEvent<Schema>) {
           <UInputNumber v-model="state.invoiceNumber" :min="1" class="w-full" />
         </UFormField>
 
-        <UFormField name="sellerId" label="Vendedor en Siigo" required>
+        <UFormField name="useCfdi" label="Uso CFDI" required>
           <USelectMenu
-            v-model="state.sellerId"
-            :items="sellerItems"
+            v-model="state.useCfdi"
+            :items="useCfdiItems"
             value-key="value"
             class="w-full"
           />
         </UFormField>
 
-        <UFormField
-          name="useCfdi"
-          label="Uso CFDI"
-          description="Código SAT, por ejemplo G03."
-          required
-        >
-          <UInput v-model="state.useCfdi" class="w-full" />
+        <UFormField name="paymentTypeId" label="Método de pago" required>
+          <USelectMenu
+            v-model="state.paymentTypeId"
+            :items="paymentItems"
+            value-key="value"
+            class="w-full"
+          />
         </UFormField>
 
-        <UFormField name="paymentMethod" label="Método de pago" required>
+        <UFormField name="paymentMethod" label="Condición de pago" required>
           <USelect
             v-model="state.paymentMethod"
             :items="[
@@ -190,44 +207,11 @@ function onSubmit(event: FormSubmitEvent<Schema>) {
           />
         </UFormField>
 
-        <UFormField name="paymentTypeId" label="Condición de pago" required>
-          <USelect
-            v-model="state.paymentTypeId"
-            :items="paymentItems"
+        <UFormField name="sellerId" label="Vendedor en Siigo" required>
+          <USelectMenu
+            v-model="state.sellerId"
+            :items="sellerItems"
             value-key="value"
-            class="w-full"
-          />
-        </UFormField>
-
-        <UFormField name="date" label="Fecha de factura" required>
-          <UInput v-model="state.date" type="date" class="w-full" />
-        </UFormField>
-
-        <UFormField name="dueDate" label="Fecha de vencimiento" required>
-          <UInput v-model="state.dueDate" type="date" class="w-full" />
-        </UFormField>
-
-        <UFormField
-          v-if="selectedDocument?.cost_center"
-          name="costCenterId"
-          label="Centro de costo"
-          :required="requiresCostCenter"
-        >
-          <USelect
-            v-model="state.costCenterId"
-            :items="costCenterItems"
-            value-key="value"
-            placeholder="Sin centro de costo"
-            class="w-full"
-          />
-        </UFormField>
-
-        <UFormField name="warehouseId" label="Bodega" hint="Opcional">
-          <USelect
-            v-model="state.warehouseId"
-            :items="warehouseItems"
-            value-key="value"
-            placeholder="Usar configuración de Siigo"
             class="w-full"
           />
         </UFormField>

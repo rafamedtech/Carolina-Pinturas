@@ -73,7 +73,7 @@ function addProduct() {
           :items="productOptions"
           value-key="value"
           :filter-fields="['label', 'code', 'reference', 'barcode']"
-          :search-input="{ placeholder: 'Buscar por nombre o código' }"
+          :search-input="{ placeholder: 'Escribe el nombre o código del producto' }"
           :content="{ align: 'start', reference: productMenuReference }"
           :loading="loading"
           :disabled="disabled"

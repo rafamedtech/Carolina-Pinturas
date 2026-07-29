@@ -53,10 +53,7 @@ export default eventHandler(async (event) => {
         statusMessage: 'No tienes permiso para registrar pagos.'
       })
     }
-    assertInitialLocalPaymentAllowed(
-      parsed.data.requiresInvoice,
-      repartidor?.esMostrador ?? false
-    )
+    assertInitialLocalPaymentAllowed(parsed.data.requiresInvoice)
   }
 
   return createOrder(parsed.data, user, customer, productsById, repartidor)

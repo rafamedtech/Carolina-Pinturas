@@ -92,9 +92,8 @@ describe('pagos unificados de pedidos', () => {
     if (result.success) expect(result.data.initialPayment).not.toHaveProperty('amount')
   })
 
-  it('limita el pago inicial local a pedidos de mostrador sin factura', () => {
-    expect(() => assertInitialLocalPaymentAllowed(false, true)).not.toThrow()
-    expect(() => assertInitialLocalPaymentAllowed(true, true)).toThrow()
-    expect(() => assertInitialLocalPaymentAllowed(false, false)).toThrow()
+  it('permite el pago inicial local en pedidos sin factura', () => {
+    expect(() => assertInitialLocalPaymentAllowed(false)).not.toThrow()
+    expect(() => assertInitialLocalPaymentAllowed(true)).toThrow()
   })
 })

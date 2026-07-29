@@ -23,6 +23,7 @@ const route = useRoute()
 const router = useRouter()
 const isQuoteMode = computed(() => props.mode === 'quote')
 const isCounterSale = computed(() => props.saleType === 'counter')
+const isDeliverySale = computed(() => props.saleType === 'delivery')
 const isEditing = computed(() => Boolean(props.orderId))
 const returnPath = computed(() => orderListReturnPath(route.query.returnTo))
 
@@ -50,9 +51,6 @@ const pageTitle = computed(() => isEditing.value
       ? 'Venta mostrador'
       : props.saleType === 'delivery' ? 'Venta a domicilio' : 'Nuevo pedido')
 
-// Repartidor is optional while the order is borrador/ingresado; required to confirm.
-const STATUS_KEYS_REQUIRING_REPARTIDOR = ['confirmado', 'surtido', 'en_espera']
-
 const schema = z.object({
   customerId: z.string().uuid('Selecciona un cliente.'),
   statusKey: z.string().min(1, 'Selecciona un estado.'),
@@ -75,11 +73,11 @@ const schema = z.object({
       message: 'El descuento porcentual no puede ser mayor a 100%.'
     })
   }
-  if (STATUS_KEYS_REQUIRING_REPARTIDOR.includes(data.statusKey) && !data.repartidorId) {
+  if (!isQuoteMode.value && !data.repartidorId) {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
       path: ['repartidorId'],
-      message: `Selecciona un repartidor para confirmar ${documentWithArticle.value}.`
+      message: `Selecciona un repartidor para guardar ${documentWithArticle.value}.`
     })
   }
 })
@@ -333,6 +331,9 @@ const requestedSendStatusKey = computed(() =>
 const selectedRepartidor = computed(() =>
   repartidores.value.find(repartidor => repartidor.id === state.repartidorId)
 )
+const pendingRepartidor = computed(() =>
+  repartidores.value.find(repartidor => repartidor.id === pendingSubmission.value?.repartidorId)
+)
 const sendStatusKey = computed(() => resolveCreatedOrderStatusKey(
   requestedSendStatusKey.value,
   selectedRepartidor.value?.esMostrador ?? false
@@ -346,18 +347,16 @@ const sendButtonLabel = computed(() =>
     ? `Guardar como ${sendStatusLabel.value.toLowerCase()}`
     : 'Enviar'
 )
-const repartidorRequired = computed(() =>
-  STATUS_KEYS_REQUIRING_REPARTIDOR.includes(state.statusKey)
-)
-const sendRequiresRepartidor = computed(() =>
-  STATUS_KEYS_REQUIRING_REPARTIDOR.includes(sendStatusKey.value)
-)
+const repartidorRequired = computed(() => !isQuoteMode.value)
 const sendBlockedByRepartidor = computed(() =>
   Boolean(
     pendingSubmission.value
-    && sendRequiresRepartidor.value
+    && repartidorRequired.value
     && !pendingSubmission.value.repartidorId
   )
+)
+const useDeliveryPaymentActions = computed(() =>
+  Boolean(isDeliverySale.value && pendingSubmission.value && !pendingSubmission.value.requiresInvoice)
 )
 const canSubmit = computed(() =>
   Boolean(state.customerId)
@@ -449,10 +448,10 @@ async function confirmSubmit(
 ) {
   if (!pendingSubmission.value || !canSubmit.value) return
 
-  if (STATUS_KEYS_REQUIRING_REPARTIDOR.includes(statusKey) && !pendingSubmission.value.repartidorId) {
+  if (repartidorRequired.value && !pendingSubmission.value.repartidorId) {
     toast.add({
       title: 'Selecciona un repartidor',
-      description: `${isQuoteMode.value ? 'La cotización' : 'El pedido'} necesita un repartidor antes de guardarse como ${isQuoteMode.value ? 'confirmada' : 'confirmado'}.`,
+      description: 'El pedido necesita un repartidor antes de guardarse.',
       color: 'warning',
       icon: 'i-lucide-truck'
     })
@@ -604,6 +603,7 @@ async function confirmSubmit(
             :repartidor-required="repartidorRequired"
             :show-status="mayChooseInitialStatus && !isQuoteMode"
             :show-payment="mayManagePayment"
+            :show-payment-selectors="props.saleType !== 'delivery'"
             :quote-mode="isQuoteMode"
             :counter-sale="props.saleType === 'counter'"
             @customer-created="onCustomerCreated"
@@ -687,6 +687,14 @@ async function confirmSubmit(
               </p>
               <p class="font-medium">
                 {{ formatDate(pendingSubmission.promisedDate) }}
+              </p>
+            </div>
+            <div v-if="isDeliverySale">
+              <p class="text-sm text-muted">
+                Repartidor asignado
+              </p>
+              <p class="font-medium">
+                {{ pendingRepartidor?.nombre || '—' }}
               </p>
             </div>
             <div v-if="isCounterSale">
@@ -806,7 +814,7 @@ async function confirmSubmit(
           </div>
           <div v-else class="flex w-full flex-col gap-2 sm:flex-row sm:justify-end">
             <UButton
-              :label="isCounterSale ? 'Editar' : `Editar ${documentNoun}`"
+              :label="isCounterSale || isDeliverySale ? 'Editar' : `Editar ${documentNoun}`"
               icon="i-lucide-pencil"
               color="neutral"
               variant="outline"
@@ -815,7 +823,18 @@ async function confirmSubmit(
               @click="editOrder"
             />
             <UButton
-              v-if="isCounterSale || maySaveDraft"
+              v-if="useDeliveryPaymentActions"
+              label="Enviar"
+              icon="i-lucide-send"
+              color="neutral"
+              variant="soft"
+              class="justify-center"
+              :loading="saving && submissionIntent === 'save'"
+              :disabled="saving || sendBlockedByRepartidor"
+              @click="confirmSubmit(requestedSendStatusKey, 'save')"
+            />
+            <UButton
+              v-else-if="isCounterSale || maySaveDraft"
               :label="isCounterSale ? 'Guardar pedido' : 'Guardar cotización'"
               icon="i-lucide-save"
               color="neutral"
@@ -830,7 +849,16 @@ async function confirmSubmit(
                 : confirmSubmit('borrador', 'draft')"
             />
             <UButton
-              v-if="!isCounterSale || mayManagePayment"
+              v-if="useDeliveryPaymentActions && mayManagePayment"
+              label="Enviar y pagar"
+              icon="i-lucide-circle-dollar-sign"
+              class="justify-center"
+              :loading="saving && submissionIntent === 'save-and-pay'"
+              :disabled="saving || sendBlockedByRepartidor"
+              @click="confirmSubmit(requestedSendStatusKey, 'save-and-pay')"
+            />
+            <UButton
+              v-else-if="!useDeliveryPaymentActions && (!isCounterSale || mayManagePayment)"
               :label="isCounterSale ? 'Guardar y pagar' : sendButtonLabel"
               :icon="isCounterSale ? 'i-lucide-circle-dollar-sign' : 'i-lucide-send'"
               class="justify-center"

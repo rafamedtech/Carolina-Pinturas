@@ -16,12 +16,14 @@ const props = withDefaults(defineProps<{
   repartidorRequired?: boolean
   showStatus?: boolean
   showPayment?: boolean
+  showPaymentSelectors?: boolean
   quoteMode?: boolean
   counterSale?: boolean
 }>(), {
   repartidorRequired: false,
   showStatus: true,
   showPayment: true,
+  showPaymentSelectors: true,
   quoteMode: false,
   counterSale: false
 })
@@ -249,23 +251,6 @@ function selectCounterCustomer() {
       </UFormField>
 
       <UFormField
-        v-if="!props.quoteMode && !props.counterSale"
-        name="repartidorId"
-        label="Repartidor"
-        :required="props.repartidorRequired"
-      >
-        <USelect
-          v-model="repartidorId"
-          :items="repartidorOptions"
-          value-key="value"
-          :loading="loading"
-          :disabled="disabled"
-          placeholder="Selecciona un repartidor"
-          class="w-full"
-        />
-      </UFormField>
-
-      <UFormField
         v-if="!props.quoteMode && !props.counterSale && props.showPayment"
         name="paymentDate"
         label="Fecha de pago"
@@ -290,7 +275,27 @@ function selectCounterCustomer() {
       </UFormField>
 
       <UFormField
-        v-if="!props.quoteMode && !props.counterSale && props.showPayment"
+        v-if="!props.quoteMode && !props.counterSale"
+        name="repartidorId"
+        label="Repartidor"
+        :required="props.repartidorRequired"
+      >
+        <USelect
+          v-model="repartidorId"
+          :items="repartidorOptions"
+          value-key="value"
+          :loading="loading"
+          :disabled="disabled"
+          placeholder="Selecciona un repartidor"
+          class="w-full"
+        />
+      </UFormField>
+
+      <UFormField
+        v-if="!props.quoteMode
+          && !props.counterSale
+          && props.showPayment
+          && props.showPaymentSelectors"
         name="paymentStatus"
         label="Estado de pago"
         required
@@ -305,7 +310,7 @@ function selectCounterCustomer() {
       </UFormField>
 
       <UFormField
-        v-if="!props.quoteMode && props.showPayment"
+        v-if="!props.quoteMode && props.showPayment && props.showPaymentSelectors"
         name="paymentMethod"
         label="Método de pago"
       >

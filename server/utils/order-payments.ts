@@ -28,20 +28,11 @@ export function paymentDestinationForOrder(requiresInvoice: boolean) {
   return requiresInvoice ? 'siigo' : 'local'
 }
 
-export function assertInitialLocalPaymentAllowed(
-  requiresInvoice: boolean,
-  repartidorIsMostrador: boolean
-) {
+export function assertInitialLocalPaymentAllowed(requiresInvoice: boolean) {
   if (requiresInvoice) {
     throw createError({
       statusCode: 422,
       statusMessage: 'Un pedido con factura no puede registrar un pago inicial local.'
-    })
-  }
-  if (!repartidorIsMostrador) {
-    throw createError({
-      statusCode: 422,
-      statusMessage: 'El pago completo al crear el pedido sólo está disponible para ventas de mostrador.'
     })
   }
 }

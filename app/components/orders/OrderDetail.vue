@@ -7,8 +7,7 @@ import {
 } from '~/utils/roleAccess'
 import {
   paymentStatusColor,
-  paymentStatusLabel,
-  paymentMethodLabel
+  paymentStatusLabel
 } from '~/utils/orderPayment'
 import { orderListReturnPath } from '~/utils/orderNavigation'
 
@@ -24,6 +23,7 @@ const selectedRepartidor = shallowRef('')
 const savingRepartidor = shallowRef(false)
 const selectedTags = shallowRef<string[]>([])
 const savingTags = shallowRef(false)
+const hiddenSeguimientoStatusKeys = new Set(['borrador', 'ingresado', 'facturado', 'cancelado'])
 const toast = useToast()
 const { user } = useAuth()
 const {
@@ -79,24 +79,23 @@ const detailTitle = computed(() => isQuote.value ? 'Detalle de la cotización' :
 
 // The document opens in a clean new tab (no controls); ?action triggers print /
 // pdf there so those actions live here, not on the client-facing document.
-function openCotizacion(action?: 'print' | 'pdf') {
+function openCotizacion(action?: 'pdf') {
   const query = action ? `?action=${action}` : ''
   window.open(`/ventas/${props.orderId}/cotizacion${query}`, '_blank', 'noopener')
 }
-const { printTicket, openTicketPreview } = useTicketPrinter()
+const { printTicket } = useTicketPrinter()
 const printerSettingsOpen = shallowRef(false)
 const paymentsOpen = shallowRef(false)
+const siigoInvoiceOpen = shallowRef(false)
 const documentOptions = computed(() => {
   const groups = [[
     { label: 'Ver documento', icon: 'i-lucide-eye', onSelect: () => openCotizacion() },
-    { label: 'Imprimir', icon: 'i-lucide-printer', onSelect: () => openCotizacion('print') },
     { label: 'Descargar PDF', icon: 'i-lucide-download', onSelect: () => openCotizacion('pdf') }
   ]]
 
   if (!isQuote.value) {
     groups.push([
       { label: 'Imprimir ticket', icon: 'i-lucide-receipt', onSelect: () => { if (order.value) printTicket(order.value) } },
-      { label: 'Ver ticket', icon: 'i-lucide-receipt-text', onSelect: () => openTicketPreview(props.orderId) },
       { label: 'Impresora de tickets…', icon: 'i-lucide-settings-2', onSelect: () => { printerSettingsOpen.value = true } }
     ])
   }
@@ -111,15 +110,20 @@ const mayManagePayment = mayManageLogistics
 const mayEditQuote = computed(() =>
   Boolean(user.value && canCreateOrders(user.value.role))
 )
+const paymentsBlockedByMissingInvoice = computed(() =>
+  !isQuote.value && Boolean(order.value?.requiresInvoice && !order.value.invoiceCreated)
+)
 const availableStatuses = computed(() => {
   if (!user.value) return []
 
   const editableKeys = editableOrderStatusKeys(user.value.role)
-  if (!editableKeys) return statuses.value
+  const permittedStatuses = !editableKeys
+    ? statuses.value
+    : statuses.value.filter(status =>
+        status.key === order.value?.status.key || editableKeys.includes(status.key)
+      )
 
-  return statuses.value.filter(status =>
-    status.key === order.value?.status.key || editableKeys.includes(status.key)
-  )
+  return permittedStatuses.filter(status => !hiddenSeguimientoStatusKeys.has(status.key))
 })
 const defaultBackPath = computed(() =>
   user.value?.role === 'igualaciones' ? '/igualaciones' : '/ventas'
@@ -392,13 +396,29 @@ async function convertToPedido() {
           </div>
           <div class="[grid-area:acciones] flex flex-wrap items-center gap-4 lg:justify-end">
             <UButton
-              v-if="!isQuote && mayManagePayment"
-              label="Pagos"
-              icon="i-lucide-hand-coins"
+              v-if="!isQuote && mayManagePayment && order.requiresInvoice"
+              label="Facturar"
+              icon="i-lucide-file-plus-2"
               color="neutral"
               variant="outline"
-              @click="paymentsOpen = true"
+              @click="siigoInvoiceOpen = true"
             />
+            <UTooltip
+              v-if="!isQuote && mayManagePayment"
+              text="Debes crear la factura antes de poder registrar pagos."
+              :disabled="!paymentsBlockedByMissingInvoice"
+            >
+              <span class="inline-flex">
+                <UButton
+                  label="Pagos"
+                  icon="i-lucide-hand-coins"
+                  color="neutral"
+                  variant="outline"
+                  :disabled="paymentsBlockedByMissingInvoice"
+                  @click="paymentsOpen = true"
+                />
+              </span>
+            </UTooltip>
             <UDropdownMenu :items="documentOptions">
               <UButton
                 label="Opciones"
@@ -424,6 +444,12 @@ async function convertToPedido() {
                 />
               </template>
             </UModal>
+            <OrdersSiigoOrderSiigoInvoiceCard
+              v-if="!isQuote && mayManagePayment && order.requiresInvoice"
+              v-model:open="siigoInvoiceOpen"
+              :order-id="order.id"
+              @created="() => refresh()"
+            />
             <UButton
               v-if="isQuote && mayEditQuote"
               :to="{
@@ -503,28 +529,12 @@ async function convertToPedido() {
                   {{ order.customer.address || '—' }}
                 </dd>
               </div>
-              <div>
-                <dt class="text-sm text-muted">
-                  {{ isQuote ? 'Fecha de cotización' : 'Fecha del pedido' }}
-                </dt>
-                <dd class="mt-1 font-medium">
-                  {{ formatDate(order.orderDate) }}
-                </dd>
-              </div>
               <div v-if="!isQuote">
                 <dt class="text-sm text-muted">
                   Fecha de entrega
                 </dt>
                 <dd class="mt-1 font-medium">
                   {{ formatDate(order.promisedDate) }}
-                </dd>
-              </div>
-              <div v-if="!isQuote">
-                <dt class="text-sm text-muted">
-                  Vendedor
-                </dt>
-                <dd class="mt-1 font-medium">
-                  {{ order.vendedor.name }}
                 </dd>
               </div>
               <div v-if="!isQuote">
@@ -537,24 +547,10 @@ async function convertToPedido() {
               </div>
               <div v-if="!isQuote">
                 <dt class="text-sm text-muted">
-                  Estado de pago
+                  Vendedor
                 </dt>
-                <dd class="mt-1">
-                  <UBadge
-                    :color="paymentStatusColor(order.paymentStatus)"
-                    variant="subtle"
-                    :label="paymentStatusLabel(order.paymentStatus)"
-                  />
-                </dd>
-              </div>
-              <div v-if="!isQuote">
-                <dt class="text-sm text-muted">
-                  Método de pago
-                </dt>
-                <dd class="mt-1">
-                  <span class="font-medium">
-                    {{ paymentMethodLabel(order.paymentMethod) }}
-                  </span>
+                <dd class="mt-1 font-medium">
+                  {{ order.vendedor.name }}
                 </dd>
               </div>
               <div v-if="!isQuote">
@@ -645,11 +641,6 @@ async function convertToPedido() {
               :entries="order.statusHistory"
               :editable="!isQuote"
             />
-            <OrdersSiigoOrderSiigoInvoiceCard
-              v-if="!isQuote && mayManagePayment && order.requiresInvoice"
-              :order-id="order.id"
-              @created="() => refresh()"
-            />
           </div>
 
           <OrdersOrderDetailItems
@@ -688,7 +679,7 @@ async function convertToPedido() {
                 </div>
                 <div class="flex justify-between gap-4">
                   <dt class="text-muted">
-                    Impuestos
+                    IVA (8%)
                   </dt>
                   <dd class="font-medium">
                     {{ formatCurrency(order.taxTotal) }}

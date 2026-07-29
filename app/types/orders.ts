@@ -133,6 +133,7 @@ export interface SalesOrderDetail extends SalesOrderListItem {
   observations: string | null
   remision: string | null
   requiresInvoice: boolean
+  invoiceCreated: boolean
   tags: string[]
   paymentDate: string | null
   currencyCode: string
