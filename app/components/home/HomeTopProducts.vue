@@ -41,7 +41,7 @@ defineProps<{
                 </p>
               </div>
               <span class="shrink-0 text-sm font-semibold text-highlighted">
-                {{ dashboardCompactCurrency.format(product.amount) }}
+                {{ dashboardCompactCurrency(product.amount) }}
               </span>
             </div>
             <UProgress

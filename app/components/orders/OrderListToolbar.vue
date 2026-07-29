@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import type { DropdownMenuItem } from '@nuxt/ui'
 import type { OrderDateRange, OrderStatus } from '~/types/orders'
 import { PAYMENT_METHODS, PAYMENT_STATUSES } from '~/utils/orderPayment'
 
@@ -48,6 +49,39 @@ const paymentMethodOptions = [{
   label: item.label,
   value: item.key as string
 }))]
+
+const newOrderItems = computed<DropdownMenuItem[][]>(() => [[
+  {
+    label: 'Cotización',
+    icon: 'i-lucide-file-text',
+    to: {
+      path: '/ventas/nueva-cotizacion',
+      query: { returnTo: props.returnTo }
+    }
+  },
+  {
+    label: 'Venta mostrador',
+    icon: 'i-lucide-store',
+    to: {
+      path: '/ventas/nuevo-pedido',
+      query: {
+        tipo: 'mostrador',
+        returnTo: props.returnTo
+      }
+    }
+  },
+  {
+    label: 'Venta a domicilio',
+    icon: 'i-lucide-truck',
+    to: {
+      path: '/ventas/nuevo-pedido',
+      query: {
+        tipo: 'domicilio',
+        returnTo: props.returnTo
+      }
+    }
+  }
+]])
 </script>
 
 <template>
@@ -82,33 +116,18 @@ const paymentMethodOptions = [{
       <OrdersOrderDateRangePicker v-model="dateRange" />
     </div>
 
-    <div class="flex w-full gap-2 sm:w-auto">
+    <UDropdownMenu
+      v-if="!igualacion && canCreate"
+      :items="newOrderItems"
+      :content="{ align: 'end', collisionPadding: 12 }"
+      :ui="{ content: 'w-64' }"
+    >
       <UButton
-        v-if="!igualacion && canCreate"
-        :to="{
-          path: '/ventas/nueva-cotizacion',
-          query: { returnTo }
-        }"
-        icon="i-lucide-file-text"
-        color="neutral"
-        variant="outline"
-        class="flex-1 justify-center sm:flex-none"
-      >
-        <span class="sm:hidden">Cotización</span>
-        <span class="hidden sm:inline">Nueva cotización</span>
-      </UButton>
-      <UButton
-        v-if="!igualacion && canCreate"
-        :to="{
-          path: '/ventas/nuevo-pedido',
-          query: { returnTo }
-        }"
-        icon="i-lucide-shopping-cart"
-        class="flex-1 justify-center sm:flex-none"
-      >
-        <span class="sm:hidden">Pedido</span>
-        <span class="hidden sm:inline">Nuevo pedido</span>
-      </UButton>
-    </div>
+        label="Nuevo"
+        icon="i-lucide-plus"
+        trailing-icon="i-lucide-chevron-down"
+        class="w-full justify-center data-[state=open]:bg-primary/90 sm:w-auto"
+      />
+    </UDropdownMenu>
   </div>
 </template>

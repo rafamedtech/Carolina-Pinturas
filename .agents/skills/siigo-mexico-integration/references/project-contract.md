@@ -14,8 +14,14 @@
 - Usar Nuxt 4 + Nuxt UI 4 con SSR.
 - Considerar Siigo como fuente de verdad de productos y clientes.
 - Mantener pedidos internos en PostgreSQL/Supabase mediante Prisma.
-- No buscar ni inventar un recurso de pedidos en Siigo México. Crear o modificar un pedido nunca debe crear una factura ni otro documento fiscal en Siigo.
+- No buscar ni inventar un recurso de pedidos en Siigo México. Los pedidos siguen siendo internos.
+- Por decisión explícita del usuario del 2026-07-28, un pedido marcado con `requiresInvoice` puede crear, mediante una acción confirmada y separada, una factura borrador en Siigo con `stamp.send: false` y `mail.send: false`. Los demás pedidos no crean documentos en Siigo.
+- Por decisión explícita del usuario del 2026-07-28, todos los pagos se registran primero en `sales_order_payments` de PostgreSQL. El núcleo local no exige RFC ni factura; los campos `siigo_*` forman una extensión opcional compatible con `/v1/vouchers` para pedidos facturados.
+- Por decisión explícita del usuario del 2026-07-28, el destino del pago no se selecciona manualmente: un pedido sin factura se registra sólo en PostgreSQL; un pedido con `requiresInvoice` se reserva en PostgreSQL y debe crear su recepción en Siigo. El servidor rechaza destinos que contradigan esta regla.
+- Cada alta de pago exige un `requestId` UUID único. Las recepciones fiscales se reservan localmente antes de llamar a Siigo y conservan un estado `pending`, `synced`, `failed` o `unknown`; nunca se reintenta automáticamente una respuesta fiscal ambigua.
+- Una venta de mostrador puede crear un pago inicial completo. El navegador envía únicamente `requestId`, método y fecha; el servidor calcula el total definitivo y guarda pedido y pago local en la misma transacción. Esta opción se rechaza para repartidores distintos de Mostrador o pedidos que requieren factura.
 - Volver a consultar cliente y productos en Siigo al guardar un pedido; no confiar en el payload del navegador.
+- La apertura de una venta de mostrador no descarga el catálogo de clientes de Siigo. Resuelve únicamente el ID de `MOSTRADOR .` desde el snapshot local de PostgreSQL; al guardar, conserva la consulta puntual del cliente en Siigo.
 - Conservar snapshots históricos e `raw_payload` para tolerar cambios futuros del contrato externo.
 
 ## 2. Puntos de extensión
@@ -66,6 +72,7 @@ Dar prioridad a estas regresiones locales frente a ejemplos contradictorios:
 - Los errores pueden usar `Errors` o `errors`, y `Message` o `message`.
 - El 2026-07-17 producción registró errores Prisma `P2028` al crear/editar pedidos: la sincronización secuencial de precios, impuestos, bodegas y componentes agotaba el timeout interactivo predeterminado de 5 segundos. Conservar los upserts anidados de snapshots en `siigo-persistence.ts` y las opciones acotadas de transacción de escritura; no reintroducir `deleteMany`/`createMany` separados por relación dentro del pedido.
 - El 2026-07-17 los catálogos tenían 708 productos activos y 317 clientes. Cargarlos con páginas de 25 generaba 42 solicitudes por apertura. Siigo México aceptó `page_size=100`; conservar ese tamaño, la caché corta y la deduplicación de cargas concurrentes. Ante `429` o `5xx`, reutilizar solamente un catálogo previamente obtenido; no ocultar `401` u otros errores permanentes.
+- Al desplegar `sales_order_payments`, migrar cada pedido histórico con `payment_status = 'pago_recibido'` a un pago local por el total del pedido, conservando su método y fecha actuales. El backfill debe ser idempotente y no inferir importes parciales para pedidos `abonado`, porque el modelo anterior no almacenaba el monto del abono.
 
 El script de smoke incluido en el repositorio puede quedarse atrás respecto del constructor probado. Comparar su payload con `buildSiigoCustomerPayload()` antes de ejecutarlo; no asumir que un script manual es la fuente más reciente.
 

@@ -17,11 +17,13 @@ const props = withDefaults(defineProps<{
   showStatus?: boolean
   showPayment?: boolean
   quoteMode?: boolean
+  counterSale?: boolean
 }>(), {
   repartidorRequired: false,
   showStatus: true,
   showPayment: true,
-  quoteMode: false
+  quoteMode: false,
+  counterSale: false
 })
 
 const emit = defineEmits<{
@@ -64,6 +66,11 @@ const customerOptions = computed(() => props.customers.map(customer => ({
   description: customer.rfc_id || customer.identification,
   value: customer.id
 })))
+const COUNTER_CUSTOMER_NAME = 'MOSTRADOR .'
+const normalizeCustomerName = (value: string) => value.trim().replace(/\s+/g, ' ').toUpperCase()
+const counterCustomer = computed(() => props.customers.find(customer =>
+  normalizeCustomerName(siigoCustomerName(customer) || '') === COUNTER_CUSTOMER_NAME
+))
 const statusOptions = computed(() => props.statuses.map(status => ({
   label: status.label,
   value: status.key
@@ -116,6 +123,10 @@ function onCustomerCreated(customer: SiigoCustomer) {
   emit('customerCreated', customer)
   customerId.value = customer.id
 }
+
+function selectCounterCustomer() {
+  if (counterCustomer.value) customerId.value = counterCustomer.value.id
+}
 </script>
 
 <template>
@@ -133,6 +144,12 @@ function onCustomerCreated(customer: SiigoCustomer) {
         required
         class="sm:col-span-2"
       >
+        <div
+          v-if="props.counterSale"
+          class="flex min-h-9 items-center rounded-md border border-default bg-elevated/50 px-3 py-2 font-medium text-highlighted"
+        >
+          MOSTRADOR
+        </div>
         <!--
           when:'always' para no esconder "crear cliente" ante coincidencias
           parciales (nombres/RFC comunes). `position` es obligatorio: en esta
@@ -141,6 +158,7 @@ function onCustomerCreated(customer: SiigoCustomer) {
           queda undefined y el ítem nunca se renderiza.
         -->
         <USelectMenu
+          v-else
           v-model="customerId"
           v-model:search-term="customerSearchTerm"
           :items="customerOptions"
@@ -156,10 +174,23 @@ function onCustomerCreated(customer: SiigoCustomer) {
             Crear cliente “{{ item }}”
           </template>
         </USelectMenu>
+        <template v-if="!props.counterSale" #hint>
+          <UButton
+            v-if="counterCustomer"
+            :label="`Usar ${COUNTER_CUSTOMER_NAME}`"
+            color="neutral"
+            variant="link"
+            size="xs"
+            :disabled="loading || disabled"
+            @click="selectCounterCustomer"
+          />
+        </template>
       </UFormField>
 
       <div
-        v-if="selectedCustomer && (selectedCustomerPhone || selectedCustomerAddress)"
+        v-if="!props.counterSale
+          && selectedCustomer
+          && (selectedCustomerPhone || selectedCustomerAddress)"
         class="grid gap-4 sm:col-span-2 sm:grid-cols-2"
       >
         <div v-if="selectedCustomerPhone">
@@ -181,6 +212,7 @@ function onCustomerCreated(customer: SiigoCustomer) {
       </div>
 
       <OrdersOrderCustomerCreateModal
+        v-if="!props.counterSale"
         v-model:open="createCustomerOpen"
         :customers="props.customers"
         :initial-name="createCustomerName"
@@ -217,7 +249,7 @@ function onCustomerCreated(customer: SiigoCustomer) {
       </UFormField>
 
       <UFormField
-        v-if="!props.quoteMode"
+        v-if="!props.quoteMode && !props.counterSale"
         name="repartidorId"
         label="Repartidor"
         :required="props.repartidorRequired"
@@ -234,7 +266,7 @@ function onCustomerCreated(customer: SiigoCustomer) {
       </UFormField>
 
       <UFormField
-        v-if="!props.quoteMode && props.showPayment"
+        v-if="!props.quoteMode && !props.counterSale && props.showPayment"
         name="paymentDate"
         label="Fecha de pago"
       >
@@ -245,7 +277,11 @@ function onCustomerCreated(customer: SiigoCustomer) {
         />
       </UFormField>
 
-      <UFormField v-if="!props.quoteMode" name="promisedDate" label="Fecha de entrega">
+      <UFormField
+        v-if="!props.quoteMode && !props.counterSale"
+        name="promisedDate"
+        label="Fecha de entrega"
+      >
         <OrdersOrderDatePicker
           v-model="promisedDateValue"
           :disabled="disabled"
@@ -254,7 +290,7 @@ function onCustomerCreated(customer: SiigoCustomer) {
       </UFormField>
 
       <UFormField
-        v-if="!props.quoteMode && props.showPayment"
+        v-if="!props.quoteMode && !props.counterSale && props.showPayment"
         name="paymentStatus"
         label="Estado de pago"
         required
@@ -283,11 +319,15 @@ function onCustomerCreated(customer: SiigoCustomer) {
         />
       </UFormField>
 
-      <UFormField v-if="!props.quoteMode" name="requiresInvoice" label="Facturación">
+      <UFormField
+        v-if="!props.quoteMode && !props.counterSale"
+        name="requiresInvoice"
+        label="Facturación"
+      >
         <USwitch v-model="requiresInvoice" :disabled="disabled" label="Requiere factura" />
       </UFormField>
 
-      <UFormField name="tags" label="Etiquetas">
+      <UFormField v-if="!props.counterSale" name="tags" label="Etiquetas">
         <!-- Mismo caveat de create-item que el selector de cliente: `position`
           explícito o el ítem de creación no se renderiza. -->
         <USelectMenu

@@ -1,6 +1,6 @@
 import type { SiigoCustomer, SiigoListResponse } from '~/types/siigo'
 
-export function useCustomersCatalog() {
+export function useCustomersCatalog(options: { immediate?: boolean } = {}) {
   const catalog = useState<SiigoListResponse<SiigoCustomer> | null>('customers-catalog-data', () => null)
   // El endpoint pagina TODO el catálogo de Siigo en el servidor (docenas de
   // llamadas secuenciales): con `lazy` puede no terminar antes de que el SSR
@@ -11,7 +11,8 @@ export function useCustomersCatalog() {
     key: 'customers-catalog-request',
     query: { all: 'true' },
     lazy: true,
-    server: false
+    server: false,
+    immediate: options.immediate ?? true
   })
 
   watch(data, (value) => {

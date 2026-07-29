@@ -41,6 +41,11 @@ const orderFieldsSchema = z.object({
   paymentStatus: z.enum(PAYMENT_STATUS_KEYS as [string, ...string[]]).default('pendiente_pago'),
   paymentMethod: z.enum(PAYMENT_METHOD_KEYS as [string, ...string[]]).nullable().optional(),
   paymentDate: dateSchema.nullable().optional(),
+  initialPayment: z.object({
+    requestId: z.string().uuid(),
+    paymentMethod: z.enum(PAYMENT_METHOD_KEYS as [string, ...string[]]),
+    date: dateSchema
+  }).optional(),
   ...discountFields,
   lines: z.array(z.object({
     productId: z.string().uuid('Selecciona un producto válido.'),
@@ -94,12 +99,6 @@ export const updateOrderRemisionSchema = z.object({
   version: z.number().int().positive()
 })
 
-export const updateOrderPaymentSchema = z.object({
-  paymentStatus: z.enum(PAYMENT_STATUS_KEYS as [string, ...string[]]),
-  paymentMethod: z.enum(PAYMENT_METHOD_KEYS as [string, ...string[]]).nullable().optional(),
-  version: z.number().int().positive()
-})
-
 export const updateOrderRepartidorSchema = z.object({
   repartidorId: z.string().uuid('Selecciona un repartidor válido.'),
   version: z.number().int().positive()
@@ -128,7 +127,6 @@ export type CreateOrderInput = z.output<typeof createOrderSchema>
 export type UpdateQuoteInput = z.output<typeof updateQuoteSchema>
 export type UpdateOrderStatusInput = z.output<typeof updateOrderStatusSchema>
 export type UpdateOrderRemisionInput = z.output<typeof updateOrderRemisionSchema>
-export type UpdateOrderPaymentInput = z.output<typeof updateOrderPaymentSchema>
 export type UpdateOrderRepartidorInput = z.output<typeof updateOrderRepartidorSchema>
 export type UpdateOrderTagsInput = z.output<typeof updateOrderTagsSchema>
 export type UpdateOrderItemPriceInput = z.output<typeof updateOrderItemPriceSchema>

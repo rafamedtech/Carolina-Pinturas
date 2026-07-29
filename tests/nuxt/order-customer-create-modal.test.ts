@@ -105,7 +105,7 @@ describe('OrderCustomerCreateModal', () => {
     // La ciudad se tomó de los clientes existentes y el payload usa el contrato interno.
     expect(receivedBody).toMatchObject({
       personType: 'Physical',
-      name: ['María', 'López'],
+      name: ['MARÍA', 'LÓPEZ'],
       rfcId: 'LOMA850101AB1',
       address: {
         street: 'Av. Reforma 123',

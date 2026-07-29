@@ -113,6 +113,10 @@ export interface SiigoInvoice {
   id: string
   name: string
   date: string
+  document?: {
+    id?: number
+  }
+  number?: number
   customer?: {
     id?: string
     identification?: string
@@ -120,6 +124,7 @@ export interface SiigoInvoice {
     name?: string
   }
   total?: number
+  balance?: number
   status?: string
 }
 

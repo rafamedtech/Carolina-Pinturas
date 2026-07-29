@@ -6,7 +6,6 @@ import type {
   CreateOrderInput,
   UpdateQuoteInput,
   UpdateOrderRemisionInput,
-  UpdateOrderPaymentInput,
   UpdateOrderRepartidorInput,
   UpdateOrderTagsInput,
   UpdateOrderStatusInput,
@@ -560,6 +559,9 @@ export async function createOrder(
     input.statusKey,
     repartidor?.esMostrador ?? false
   )
+  const initialPaymentDate = input.initialPayment
+    ? new Date(`${input.initialPayment.date}T00:00:00.000Z`)
+    : null
 
   const created = await prisma.$transaction(async (tx) => {
     const status = await tx.orderStatus.findFirst({
@@ -589,9 +591,9 @@ export async function createOrder(
         remision: input.remision || null,
         requiresInvoice: input.requiresInvoice,
         tags: input.tags,
-        paymentStatus: input.paymentStatus,
-        paymentMethod: input.paymentMethod ?? null,
-        paymentDate: input.paymentDate ? new Date(`${input.paymentDate}T00:00:00.000Z`) : null,
+        paymentStatus: input.initialPayment ? 'pago_recibido' : 'pendiente_pago',
+        paymentMethod: input.initialPayment?.paymentMethod ?? null,
+        paymentDate: initialPaymentDate,
         currencyCode: lines[0]?.currencyCode || 'MXN',
         subtotal: totals.subtotal.toString(),
         discountType: input.discountType,
@@ -618,6 +620,23 @@ export async function createOrder(
       }))
     })
     await createLinePriceHistory(tx, order.id, lines, user)
+    if (input.initialPayment) {
+      await tx.salesOrderPayment.create({
+        data: {
+          requestId: input.initialPayment.requestId,
+          orderId: order.id,
+          provider: 'local',
+          externalStatus: 'not_applicable',
+          paymentMethod: input.initialPayment.paymentMethod,
+          amount: totals.total.toDecimalPlaces(2).toString(),
+          currencyCode: lines[0]?.currencyCode || 'MXN',
+          paymentDate: initialPaymentDate!,
+          createdByName: user.name,
+          createdByEmail: user.email,
+          createdByRole: user.role
+        }
+      })
+    }
     await tx.salesOrderStatusHistory.create({
       data: {
         orderId: order.id,
@@ -835,8 +854,8 @@ export async function listOrders(options: {
       searchFilter
     ]
   }
-  const [orders, totalResults, totalAmount] = await prisma.$transaction([
-    prisma.salesOrder.findMany({
+  const [orders, totalResults, totalAmount] = await prisma.$transaction(async (tx) => {
+    const orders = await tx.salesOrder.findMany({
       where,
       include: {
         status: true,
@@ -853,13 +872,15 @@ export async function listOrders(options: {
       orderBy: [{ orderDate: 'desc' }, { folio: 'desc' }],
       skip: (options.page - 1) * options.pageSize,
       take: options.pageSize
-    }),
-    prisma.salesOrder.count({ where }),
-    prisma.salesOrder.aggregate({
+    })
+    const totalResults = await tx.salesOrder.count({ where })
+    const totalAmount = await tx.salesOrder.aggregate({
       where,
       _sum: { total: true }
     })
-  ])
+
+    return [orders, totalResults, totalAmount] as const
+  })
 
   return {
     results: orders.map(listItem),
@@ -980,57 +1001,6 @@ export async function updateOrderRemision(
     where: { id, version: input.version },
     data: {
       remision: input.remision || null,
-      updatedByEmail: user.email,
-      version: { increment: 1 }
-    }
-  })
-  if (result.count !== 1) {
-    throw createError({
-      statusCode: 409,
-      statusMessage: 'El pedido cambió mientras se actualizaba. Intenta de nuevo.'
-    })
-  }
-
-  return getOrder(id, user)
-}
-
-export async function updateOrderPayment(
-  id: string,
-  input: UpdateOrderPaymentInput,
-  user: AppUser
-) {
-  const prisma = usePrisma()
-
-  if (!canManageOrderLogistics(user.role)) {
-    throw createError({
-      statusCode: 403,
-      statusMessage: 'No tienes permiso para modificar el pago.'
-    })
-  }
-
-  const order = await prisma.salesOrder.findFirst({
-    where: {
-      id,
-      AND: [orderVisibilityFilter(user)]
-    },
-    select: { version: true }
-  })
-
-  if (!order) {
-    throw createError({ statusCode: 404, statusMessage: 'No se encontró el pedido.' })
-  }
-  if (order.version !== input.version) {
-    throw createError({
-      statusCode: 409,
-      statusMessage: 'El pedido cambió desde que lo abriste. Actualiza la página e intenta de nuevo.'
-    })
-  }
-
-  const result = await prisma.salesOrder.updateMany({
-    where: { id, version: input.version },
-    data: {
-      paymentStatus: input.paymentStatus,
-      paymentMethod: input.paymentMethod ?? null,
       updatedByEmail: user.email,
       version: { increment: 1 }
     }

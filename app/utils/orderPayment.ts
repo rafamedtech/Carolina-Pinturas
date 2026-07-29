@@ -7,7 +7,9 @@ export const PAYMENT_STATUSES = [
 export const PAYMENT_METHODS = [
   { key: 'efectivo', label: 'Efectivo' },
   { key: 'transferencia', label: 'Transferencia' },
-  { key: 'tarjeta', label: 'Tarjeta' }
+  { key: 'tarjeta', label: 'Tarjeta' },
+  { key: 'cheque', label: 'Cheque' },
+  { key: 'otro', label: 'Otro' }
 ] as const
 
 export type PaymentStatusKey = typeof PAYMENT_STATUSES[number]['key']

@@ -6,8 +6,6 @@ import {
   editableOrderStatusKeys
 } from '~/utils/roleAccess'
 import {
-  PAYMENT_STATUSES,
-  PAYMENT_METHODS,
   paymentStatusColor,
   paymentStatusLabel,
   paymentMethodLabel
@@ -24,9 +22,6 @@ const statusNote = shallowRef('')
 const savingStatus = shallowRef(false)
 const selectedRepartidor = shallowRef('')
 const savingRepartidor = shallowRef(false)
-const selectedPaymentStatus = shallowRef('')
-const selectedPaymentMethod = shallowRef('')
-const savingPayment = shallowRef(false)
 const selectedTags = shallowRef<string[]>([])
 const savingTags = shallowRef(false)
 const toast = useToast()
@@ -60,24 +55,12 @@ watch(() => order.value?.repartidor?.id, (value) => {
   selectedRepartidor.value = value || ''
 }, { immediate: true })
 
-watch(() => order.value?.paymentStatus, (value) => {
-  selectedPaymentStatus.value = value || ''
-}, { immediate: true })
-
-watch(() => order.value?.paymentMethod, (value) => {
-  selectedPaymentMethod.value = value || ''
-}, { immediate: true })
-
 watch(() => order.value?.tags, (value) => {
   selectedTags.value = value || []
 }, { immediate: true })
 
 const repartidorUnchanged = computed(() => selectedRepartidor.value === (order.value?.repartidor?.id || ''))
 const statusUnchanged = computed(() => selectedStatus.value === (order.value?.status.key || ''))
-const paymentUnchanged = computed(() =>
-  selectedPaymentStatus.value === (order.value?.paymentStatus || '')
-  && selectedPaymentMethod.value === (order.value?.paymentMethod || '')
-)
 const tagsUnchanged = computed(() =>
   selectedTags.value.join('|') === (order.value?.tags || []).join('|'))
 const tagItems = computed(() => [...new Set([...(tagOptions.value || []), ...selectedTags.value])])
@@ -102,6 +85,7 @@ function openCotizacion(action?: 'print' | 'pdf') {
 }
 const { printTicket, openTicketPreview } = useTicketPrinter()
 const printerSettingsOpen = shallowRef(false)
+const paymentsOpen = shallowRef(false)
 const documentOptions = computed(() => {
   const groups = [[
     { label: 'Ver documento', icon: 'i-lucide-eye', onSelect: () => openCotizacion() },
@@ -144,11 +128,10 @@ const backPath = computed(() =>
   orderListReturnPath(route.query.returnTo, defaultBackPath.value)
 )
 const savingChanges = computed(() =>
-  savingRepartidor.value || savingPayment.value || savingStatus.value || savingTags.value
+  savingRepartidor.value || savingStatus.value || savingTags.value
 )
 const hasChanges = computed(() =>
   (mayManageLogistics.value && !repartidorUnchanged.value)
-  || (mayManagePayment.value && !paymentUnchanged.value)
   || (mayManageLogistics.value && !tagsUnchanged.value)
   || !statusUnchanged.value
 )
@@ -175,15 +158,6 @@ const repartidorOptions = computed(() => repartidores.value.map(repartidor => ({
   description: repartidor.telefono || undefined,
   value: repartidor.id
 })))
-
-const paymentStatusOptions = PAYMENT_STATUSES.map(status => ({
-  label: status.label,
-  value: status.key as string
-}))
-const paymentMethodOptions = PAYMENT_METHODS.map(method => ({
-  label: method.label,
-  value: method.key as string
-}))
 
 async function updateRepartidor() {
   if (
@@ -221,41 +195,6 @@ async function updateRepartidor() {
     await refresh()
   } finally {
     savingRepartidor.value = false
-  }
-}
-
-async function updatePayment() {
-  if (!mayManagePayment.value || !order.value || paymentUnchanged.value) return
-  savingPayment.value = true
-
-  try {
-    order.value = await $fetch<SalesOrderDetail>(
-      `/api/orders/${encodeURIComponent(props.orderId)}/pago`,
-      {
-        method: 'PATCH',
-        body: {
-          paymentStatus: selectedPaymentStatus.value,
-          paymentMethod: selectedPaymentMethod.value || null,
-          version: order.value.version
-        }
-      }
-    )
-    toast.add({
-      title: 'Pago actualizado',
-      color: 'success',
-      icon: 'i-lucide-circle-check'
-    })
-  } catch (fetchError: unknown) {
-    const response = fetchError as { data?: { statusMessage?: string }, message?: string }
-    toast.add({
-      title: 'No se pudo actualizar el pago',
-      description: response.data?.statusMessage || response.message || 'Intenta de nuevo.',
-      color: 'error',
-      icon: 'i-lucide-circle-alert'
-    })
-    await refresh()
-  } finally {
-    savingPayment.value = false
   }
 }
 
@@ -334,7 +273,6 @@ async function saveChanges() {
   if (!hasChanges.value || savingChanges.value) return
 
   await updateRepartidor()
-  await updatePayment()
   await updateTags()
   await updateStatus()
 }
@@ -453,6 +391,14 @@ async function convertToPedido() {
             />
           </div>
           <div class="[grid-area:acciones] flex flex-wrap items-center gap-4 lg:justify-end">
+            <UButton
+              v-if="!isQuote && mayManagePayment"
+              label="Pagos"
+              icon="i-lucide-hand-coins"
+              color="neutral"
+              variant="outline"
+              @click="paymentsOpen = true"
+            />
             <UDropdownMenu :items="documentOptions">
               <UButton
                 label="Opciones"
@@ -463,6 +409,21 @@ async function convertToPedido() {
               />
             </UDropdownMenu>
             <OrdersPrinterSettingsModal v-model:open="printerSettingsOpen" />
+            <UModal
+              v-if="!isQuote && mayManagePayment"
+              v-model:open="paymentsOpen"
+              :title="`Pagos · ${order.number}`"
+              description="Consulta los pagos recibidos o registra un nuevo pago para este pedido."
+              scrollable
+              :ui="{ content: 'max-w-3xl' }"
+            >
+              <template #body>
+                <OrdersPaymentsOrderPaymentsCard
+                  :order-id="order.id"
+                  @created="() => refresh()"
+                />
+              </template>
+            </UModal>
             <UButton
               v-if="isQuote && mayEditQuote"
               :to="{
@@ -579,17 +540,7 @@ async function convertToPedido() {
                   Estado de pago
                 </dt>
                 <dd class="mt-1">
-                  <USelect
-                    v-if="mayManagePayment"
-                    v-model="selectedPaymentStatus"
-                    :items="paymentStatusOptions"
-                    value-key="value"
-                    :disabled="savingPayment"
-                    placeholder="Estado de pago"
-                    class="w-full max-w-xs"
-                  />
                   <UBadge
-                    v-else
                     :color="paymentStatusColor(order.paymentStatus)"
                     variant="subtle"
                     :label="paymentStatusLabel(order.paymentStatus)"
@@ -601,16 +552,7 @@ async function convertToPedido() {
                   Método de pago
                 </dt>
                 <dd class="mt-1">
-                  <USelect
-                    v-if="mayManagePayment"
-                    v-model="selectedPaymentMethod"
-                    :items="paymentMethodOptions"
-                    value-key="value"
-                    :disabled="savingPayment"
-                    placeholder="Selecciona un método"
-                    class="w-full max-w-xs"
-                  />
-                  <span v-else class="font-medium">
+                  <span class="font-medium">
                     {{ paymentMethodLabel(order.paymentMethod) }}
                   </span>
                 </dd>
@@ -702,6 +644,11 @@ async function convertToPedido() {
               :saving="savingStatus"
               :entries="order.statusHistory"
               :editable="!isQuote"
+            />
+            <OrdersSiigoOrderSiigoInvoiceCard
+              v-if="!isQuote && mayManagePayment && order.requiresInvoice"
+              :order-id="order.id"
+              @created="() => refresh()"
             />
           </div>
 

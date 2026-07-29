@@ -31,7 +31,8 @@ export default defineNuxtConfig({
       apiUrl: 'https://api.siigo.mx',
       username: '',
       accessKey: '',
-      applicationId: 'CarolinaPinturas'
+      applicationId: 'CarolinaPinturas',
+      fiscalWritesEnabled: false
     },
     public: {
       siteUrl: 'http://localhost:3000',

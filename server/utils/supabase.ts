@@ -54,8 +54,17 @@ export async function getVerifiedSupabaseClaims(event: H3Event): Promise<JwtPayl
     return cachedAuth.claims
   }
 
-  const { data, error } = await useServerSupabase(event).auth.getClaims()
-  const claims = error ? null : data?.claims ?? null
+  let claims: JwtPayload | null
+
+  try {
+    const { data, error } = await useServerSupabase(event).auth.getClaims()
+    claims = error ? null : data?.claims ?? null
+  } catch {
+    throw createError({
+      statusCode: 503,
+      statusMessage: 'No fue posible validar la sesión con Supabase. Intenta de nuevo.'
+    })
+  }
 
   event.context.supabaseAuth = {
     resolved: true,

@@ -1,8 +1,13 @@
 import type { SiigoCustomer, SiigoProduct } from '~/types/siigo'
-import { canCreateOrderWithStatus, ORDER_ENTRY_ROLES } from '~/utils/roleAccess'
+import {
+  canCreateOrderWithStatus,
+  canManageOrderLogistics,
+  ORDER_ENTRY_ROLES
+} from '~/utils/roleAccess'
 import { requireRole } from '../../utils/auth'
 import { createOrder } from '../../utils/orders'
 import { createOrderSchema } from '../../utils/order-validation'
+import { assertInitialLocalPaymentAllowed } from '../../utils/order-payments'
 import { usePrisma } from '../../utils/prisma'
 import { siigoRequest } from '../../utils/siigo'
 
@@ -40,6 +45,18 @@ export default eventHandler(async (event) => {
 
   if (repartidorId && !repartidor) {
     throw createError({ statusCode: 422, statusMessage: 'El repartidor seleccionado no está disponible.' })
+  }
+  if (parsed.data.initialPayment) {
+    if (!canManageOrderLogistics(user.role)) {
+      throw createError({
+        statusCode: 403,
+        statusMessage: 'No tienes permiso para registrar pagos.'
+      })
+    }
+    assertInitialLocalPaymentAllowed(
+      parsed.data.requiresInvoice,
+      repartidor?.esMostrador ?? false
+    )
   }
 
   return createOrder(parsed.data, user, customer, productsById, repartidor)

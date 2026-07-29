@@ -40,14 +40,14 @@ model OrderStatus {
 }
 
 model Repartidor {
-  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   userId      String?  @unique(map: "repartidores_user_id_key") @map("user_id") @db.Uuid
   nombre      String
   telefono    String?
   activo      Boolean  @default(true)
   esMostrador Boolean  @default(false) @map("es_mostrador")
-  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   appUser AppUser?     @relation(fields: [userId], references: [userId], onDelete: SetNull, onUpdate: NoAction)
   orders  SalesOrder[]
@@ -250,12 +250,14 @@ model SalesOrder {
   createdAt                  DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt                  DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  status        OrderStatus               @relation(fields: [statusKey], references: [key], onDelete: Restrict)
-  customer      SiigoCustomer             @relation(fields: [customerId], references: [id], onDelete: Restrict)
-  repartidor    Repartidor?               @relation(fields: [repartidorId], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  items             SalesOrderItem[]
-  statusHistory     SalesOrderStatusHistory[]
-  itemPriceHistory  SalesOrderItemPriceHistory[]
+  status           OrderStatus                  @relation(fields: [statusKey], references: [key], onDelete: Restrict)
+  customer         SiigoCustomer                @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  repartidor       Repartidor?                  @relation(fields: [repartidorId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  items            SalesOrderItem[]
+  statusHistory    SalesOrderStatusHistory[]
+  itemPriceHistory SalesOrderItemPriceHistory[]
+  siigoInvoice     SalesOrderSiigoInvoice?
+  payments         SalesOrderPayment[]
 
   @@index([statusKey, orderDate])
   @@index([customerId, orderDate])
@@ -263,6 +265,75 @@ model SalesOrder {
   @@index([repartidorId])
   @@index([createdAt])
   @@map("sales_orders")
+}
+
+model SalesOrderSiigoInvoice {
+  id               String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  orderId          String   @unique @map("order_id") @db.Uuid
+  status           String   @db.VarChar(16)
+  siigoInvoiceId   String?  @unique @map("siigo_invoice_id") @db.Uuid
+  siigoInvoiceName String?  @map("siigo_invoice_name")
+  documentTypeId   Int      @map("document_type_id")
+  sellerId         Int      @map("seller_id")
+  paymentTypeId    Int      @map("payment_type_id")
+  costCenterId     Int?     @map("cost_center_id")
+  warehouseId      Int?     @map("warehouse_id")
+  invoiceNumber    Int?     @map("invoice_number")
+  useCfdi          String   @map("use_cfdi") @db.VarChar(8)
+  paymentMethod    String   @map("payment_method") @db.VarChar(3)
+  invoiceDate      DateTime @map("invoice_date") @db.Date
+  dueDate          DateTime @map("due_date") @db.Date
+  total            Decimal  @db.Decimal(20, 2)
+  lastError        String?  @map("last_error")
+  rawPayload       Json?    @map("raw_payload") @db.JsonB
+  createdByName    String   @map("created_by_name")
+  createdByEmail   String   @map("created_by_email")
+  createdByRole    String   @map("created_by_role") @db.VarChar(32)
+  requestedAt      DateTime @default(now()) @map("requested_at") @db.Timestamptz(6)
+  createdAt        DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt        DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  order SalesOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([status, requestedAt])
+  @@map("sales_order_siigo_invoices")
+}
+
+model SalesOrderPayment {
+  id                    String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  requestId             String   @unique @default(dbgenerated("gen_random_uuid()")) @map("request_id") @db.Uuid
+  orderId               String   @map("order_id") @db.Uuid
+  provider              String   @default("local") @db.VarChar(32)
+  externalStatus        String   @default("not_applicable") @map("external_status") @db.VarChar(24)
+  externalError         String?  @map("external_error")
+  paymentMethod         String   @map("payment_method") @db.VarChar(32)
+  amount                Decimal  @db.Decimal(20, 2)
+  currencyCode          String   @default("MXN") @map("currency_code") @db.VarChar(3)
+  paymentDate           DateTime @map("payment_date") @db.Date
+  reference             String?
+  observations          String?
+  siigoVoucherId        String?  @unique @map("siigo_voucher_id") @db.Uuid
+  siigoVoucherName      String?  @map("siigo_voucher_name")
+  siigoInvoiceId        String?  @map("siigo_invoice_id") @db.Uuid
+  siigoInvoiceName      String?  @map("siigo_invoice_name")
+  siigoDocumentTypeId   Int?     @map("siigo_document_type_id")
+  siigoPaymentTypeId    Int?     @map("siigo_payment_type_id")
+  siigoCostCenterId     Int?     @map("siigo_cost_center_id")
+  siigoCfdiCode         String?  @map("siigo_cfdi_code") @db.VarChar(8)
+  siigoPaymentMethod    String?  @map("siigo_payment_method") @db.VarChar(3)
+  siigoQuote            Int?     @map("siigo_quote")
+  externalPayload       Json?    @map("external_payload") @db.JsonB
+  createdByName         String   @map("created_by_name")
+  createdByEmail        String   @map("created_by_email")
+  createdByRole         String   @map("created_by_role") @db.VarChar(32)
+  createdAt             DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  order SalesOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId, createdAt])
+  @@index([siigoInvoiceId])
+  @@index([provider, externalStatus])
+  @@map("sales_order_payments")
 }
 
 model SalesOrderItem {
@@ -291,9 +362,9 @@ model SalesOrderItem {
   observations               String?  @map("observations")
   createdAt                  DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
 
-  order         SalesOrder                   @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  product       SiigoProduct                 @relation(fields: [productId], references: [id], onDelete: Restrict)
-  priceHistory  SalesOrderItemPriceHistory[]
+  order        SalesOrder                   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product      SiigoProduct                 @relation(fields: [productId], references: [id], onDelete: Restrict)
+  priceHistory SalesOrderItemPriceHistory[]
 
   @@unique([orderId, position])
   @@index([productId])

@@ -32,6 +32,7 @@ export interface RepartidorDetail {
 }
 
 export type OrderDiscountType = 'porcentaje' | 'monto'
+export type OrderSaleType = 'counter' | 'delivery'
 
 export interface OrderStatus {
   key: string

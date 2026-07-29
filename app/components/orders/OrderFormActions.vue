@@ -1,11 +1,16 @@
 <script setup lang="ts">
-defineProps<{
+withDefaults(defineProps<{
   saving: boolean
   savingDraft: boolean
   disabled: boolean
   quoteMode?: boolean
+  showSaveDraft?: boolean
   cancelTo?: string
-}>()
+}>(), {
+  quoteMode: false,
+  showSaveDraft: true,
+  cancelTo: undefined
+})
 
 const emit = defineEmits<{
   saveDraft: []
@@ -28,6 +33,7 @@ const emit = defineEmits<{
         :disabled="saving"
       />
       <UButton
+        v-if="showSaveDraft"
         :label="quoteMode ? 'Guardar cotización' : 'Guardar como cotización'"
         icon="i-lucide-file-text"
         color="neutral"

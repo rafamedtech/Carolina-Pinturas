@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import * as z from 'zod'
 import type { FormSubmitEvent } from '@nuxt/ui'
-import type { OrderStatus, SalesOrderDetail } from '~/types/orders'
+import type { OrderSaleType, OrderStatus, SalesOrderDetail } from '~/types/orders'
 import type { SiigoCustomer, SiigoProduct } from '~/types/siigo'
 import { submittedOrderStatusKey, canManageOrderLogistics } from '~/utils/roleAccess'
-import { DEFAULT_PAYMENT_STATUS } from '~/utils/orderPayment'
+import { DEFAULT_PAYMENT_STATUS, paymentMethodLabel } from '~/utils/orderPayment'
 import { discountAmountOf } from '~/utils/orderDiscount'
 import { orderListReturnPath } from '~/utils/orderNavigation'
 import { resolveCreatedOrderStatusKey } from '~/utils/orderCreation'
@@ -13,13 +13,16 @@ import { draftLineTotal } from '~/composables/useOrderDraft'
 const props = withDefaults(defineProps<{
   mode?: 'order' | 'quote'
   orderId?: string
+  saleType?: OrderSaleType
 }>(), {
   mode: 'order',
-  orderId: undefined
+  orderId: undefined,
+  saleType: undefined
 })
 const route = useRoute()
 const router = useRouter()
 const isQuoteMode = computed(() => props.mode === 'quote')
+const isCounterSale = computed(() => props.saleType === 'counter')
 const isEditing = computed(() => Boolean(props.orderId))
 const returnPath = computed(() => orderListReturnPath(route.query.returnTo))
 
@@ -41,7 +44,11 @@ const documentWithArticle = computed(() => isQuoteMode.value ? 'la cotización' 
 const documentOf = computed(() => isQuoteMode.value ? 'de la cotización' : 'del pedido')
 const pageTitle = computed(() => isEditing.value
   ? 'Editar cotización'
-  : isQuoteMode.value ? 'Nueva cotización' : 'Nuevo pedido')
+  : isQuoteMode.value
+    ? 'Nueva cotización'
+    : props.saleType === 'counter'
+      ? 'Venta mostrador'
+      : props.saleType === 'delivery' ? 'Venta a domicilio' : 'Nuevo pedido')
 
 // Repartidor is optional while the order is borrador/ingresado; required to confirm.
 const STATUS_KEYS_REQUIRING_REPARTIDOR = ['confirmado', 'surtido', 'en_espera']
@@ -111,7 +118,8 @@ const state = reactive<Schema>({
   observations: ''
 })
 const saving = shallowRef(false)
-const submittingStatusKey = shallowRef<string | null>(null)
+const submissionIntent = shallowRef<'draft' | 'save' | 'save-and-pay' | null>(null)
+const initialPaymentRequestId = shallowRef('')
 // Los catálogos de clientes/productos se cargan con `server: false` (evita
 // un hydration mismatch cuando el SSR no alcanza a paginar todo el catálogo
 // de Siigo). Eso hace que `status` pase a 'pending' apenas se monta en el
@@ -159,7 +167,17 @@ const {
   data: customers,
   status: customerStatus,
   error: customerError
-} = useCustomersCatalog()
+} = useCustomersCatalog({ immediate: !isCounterSale.value })
+const {
+  data: counterCustomer,
+  status: counterCustomerStatus,
+  error: counterCustomerError
+} = useFetch<SiigoCustomer | null>('/api/orders/counter-customer', {
+  key: 'counter-customer-request',
+  immediate: isCounterSale.value,
+  server: false,
+  default: () => null
+})
 const {
   data: products,
   status: productStatus,
@@ -185,9 +203,27 @@ const { data: tagOptions } = useFetch<string[]>('/api/orders/tags', {
   default: () => []
 })
 
-// Mostrador attends walk-in customers, so the order defaults to the in-store
-// "Mostrador" repartidor; they can still pick a real one for home delivery.
+const availableCustomers = computed(() =>
+  isCounterSale.value
+    ? counterCustomer.value ? [counterCustomer.value] : []
+    : customers.value?.results || []
+)
+
+watch(() => counterCustomer.value?.id || '', (customerId) => {
+  if (!state.customerId && customerId) state.customerId = customerId
+}, { immediate: true })
+
+// La opción elegida en /ventas define el destino inicial. La ruta anterior,
+// sin tipo, conserva el comportamiento basado en el rol del usuario.
 const defaultRepartidorId = computed(() => {
+  if (props.saleType === 'counter') {
+    return repartidores.value.find(repartidor => repartidor.esMostrador)?.id || ''
+  }
+  if (props.saleType === 'delivery') {
+    return repartidores.value.find(repartidor =>
+      repartidor.id === user.value?.repartidorId && !repartidor.esMostrador
+    )?.id || ''
+  }
   if (user.value?.role === 'mostrador') {
     return repartidores.value.find(repartidor => repartidor.esMostrador)?.id || ''
   }
@@ -216,7 +252,9 @@ const existingOrderStatusError = computed(() =>
 const catalogError = computed(() =>
   existingOrderStatusError.value
   || existingOrderError.value?.data?.statusMessage
-  || customerError.value?.data?.statusMessage
+  || (isCounterSale.value
+    ? counterCustomerError.value?.data?.statusMessage
+    : customerError.value?.data?.statusMessage)
   || productError.value?.data?.statusMessage
   || statusError.value?.data?.statusMessage
   || repartidorError.value?.data?.statusMessage
@@ -226,7 +264,9 @@ const catalogsLoading = computed(() =>
   isHydrated.value
   && (
     (isEditing.value && existingOrderStatus.value !== 'success')
-    || customerStatus.value === 'pending'
+    || (isCounterSale.value
+      ? counterCustomerStatus.value === 'pending'
+      : customerStatus.value === 'pending')
     || productStatus.value === 'pending'
     || statusStatus.value === 'pending'
     || repartidorStatus.value === 'pending'
@@ -330,7 +370,7 @@ const canSubmit = computed(() =>
 )
 
 const selectedCustomer = computed(() =>
-  customers.value?.results.find(customer => customer.id === state.customerId)
+  availableCustomers.value.find(customer => customer.id === state.customerId)
 )
 const selectedCustomerName = computed(() =>
   selectedCustomer.value?.name?.filter(Boolean).join(' ') || selectedCustomer.value?.rfc_id || '—'
@@ -382,6 +422,7 @@ async function addSelectedProduct(product: SiigoProduct, quantity: number) {
 
 function reviewOrder(event: FormSubmitEvent<Schema>) {
   if (!canSubmit.value) return
+  if (!initialPaymentRequestId.value) initialPaymentRequestId.value = crypto.randomUUID()
   pendingSubmission.value = event.data
   modalPhase.value = 'review'
   createdOrder.value = null
@@ -393,16 +434,19 @@ function editOrder() {
   summaryOpen.value = false
 }
 
-const savingDraft = computed(() => saving.value && submittingStatusKey.value === 'borrador')
+const savingDraft = computed(() => saving.value && submissionIntent.value === 'draft')
 
 // Save straight as a quote (borrador) without opening the review summary.
 function saveAsQuote() {
   if (!canSubmit.value || saving.value) return
   pendingSubmission.value = { ...state }
-  confirmSubmit('borrador')
+  confirmSubmit('borrador', 'draft')
 }
 
-async function confirmSubmit(statusKey: string) {
+async function confirmSubmit(
+  statusKey: string,
+  intent: 'draft' | 'save' | 'save-and-pay' = statusKey === 'borrador' ? 'draft' : 'save'
+) {
   if (!pendingSubmission.value || !canSubmit.value) return
 
   if (STATUS_KEYS_REQUIRING_REPARTIDOR.includes(statusKey) && !pendingSubmission.value.repartidorId) {
@@ -417,7 +461,7 @@ async function confirmSubmit(statusKey: string) {
 
   const data = { ...pendingSubmission.value, statusKey }
   saving.value = true
-  submittingStatusKey.value = statusKey
+  submissionIntent.value = intent
   modalPhase.value = 'sending'
   summaryOpen.value = true
 
@@ -457,6 +501,15 @@ async function confirmSubmit(statusKey: string) {
             paymentMethod: data.paymentMethod || null,
             paymentDate: data.paymentDate || null,
             observations: data.observations || null,
+            ...(intent === 'save-and-pay'
+              ? {
+                  initialPayment: {
+                    requestId: initialPaymentRequestId.value,
+                    paymentMethod: data.paymentMethod,
+                    date: data.paymentDate || mexicoToday()
+                  }
+                }
+              : {}),
             lines: requestLines
           }
         })
@@ -466,7 +519,9 @@ async function confirmSubmit(statusKey: string) {
         ? `Cotización ${order.number} actualizada`
         : statusKey === 'borrador'
           ? `Cotización ${order.number} guardada`
-          : `Pedido ${order.number} guardado`,
+          : intent === 'save-and-pay'
+            ? `Pedido ${order.number} guardado y pagado`
+            : `Pedido ${order.number} guardado`,
       color: 'success',
       icon: 'i-lucide-circle-check'
     })
@@ -489,7 +544,7 @@ async function confirmSubmit(statusKey: string) {
     })
   } finally {
     saving.value = false
-    submittingStatusKey.value = null
+    submissionIntent.value = null
   }
 }
 </script>
@@ -540,7 +595,7 @@ async function confirmSubmit(statusKey: string) {
             v-model:requires-invoice="state.requiresInvoice"
             v-model:tags="state.tags"
             v-model:observations="state.observations"
-            :customers="customers?.results || []"
+            :customers="availableCustomers"
             :statuses="statuses"
             :repartidores="repartidores"
             :tag-options="tagOptions"
@@ -550,6 +605,7 @@ async function confirmSubmit(statusKey: string) {
             :show-status="mayChooseInitialStatus && !isQuoteMode"
             :show-payment="mayManagePayment"
             :quote-mode="isQuoteMode"
+            :counter-sale="props.saleType === 'counter'"
             @customer-created="onCustomerCreated"
           />
 
@@ -582,6 +638,7 @@ async function confirmSubmit(statusKey: string) {
           :saving-draft="savingDraft"
           :disabled="!canSubmit"
           :quote-mode="isQuoteMode"
+          :show-save-draft="!isCounterSale"
           :cancel-to="cancelPath"
           @save-draft="saveAsQuote"
         />
@@ -601,7 +658,9 @@ async function confirmSubmit(statusKey: string) {
           <div v-if="modalPhase === 'sending'" class="flex flex-col items-center justify-center gap-3 py-10">
             <UIcon name="i-lucide-loader-circle" class="size-8 animate-spin text-primary" />
             <p class="text-sm text-muted">
-              Enviando {{ documentWithArticle }}…
+              {{ submissionIntent === 'save-and-pay'
+                ? 'Guardando el pedido y registrando el pago…'
+                : `Enviando ${documentWithArticle}…` }}
             </p>
           </div>
           <div v-else-if="modalPhase === 'done'" class="flex flex-col items-center justify-center gap-3 py-10 text-center">
@@ -622,12 +681,20 @@ async function confirmSubmit(statusKey: string) {
                 {{ selectedCustomerName }}
               </p>
             </div>
-            <div>
+            <div v-if="!isCounterSale">
               <p class="text-sm text-muted">
                 Fecha de entrega
               </p>
               <p class="font-medium">
                 {{ formatDate(pendingSubmission.promisedDate) }}
+              </p>
+            </div>
+            <div v-if="isCounterSale">
+              <p class="text-sm text-muted">
+                Método de pago
+              </p>
+              <p class="font-medium">
+                {{ paymentMethodLabel(pendingSubmission.paymentMethod) }}
               </p>
             </div>
             <div v-if="pendingSubmission.tags.length">
@@ -739,7 +806,7 @@ async function confirmSubmit(statusKey: string) {
           </div>
           <div v-else class="flex w-full flex-col gap-2 sm:flex-row sm:justify-end">
             <UButton
-              :label="`Editar ${documentNoun}`"
+              :label="isCounterSale ? 'Editar' : `Editar ${documentNoun}`"
               icon="i-lucide-pencil"
               color="neutral"
               variant="outline"
@@ -748,23 +815,33 @@ async function confirmSubmit(statusKey: string) {
               @click="editOrder"
             />
             <UButton
-              v-if="maySaveDraft"
-              label="Guardar cotización"
+              v-if="isCounterSale || maySaveDraft"
+              :label="isCounterSale ? 'Guardar pedido' : 'Guardar cotización'"
               icon="i-lucide-save"
               color="neutral"
               variant="soft"
               class="justify-center"
-              :loading="saving && submittingStatusKey === 'borrador'"
+              :loading="saving && (isCounterSale
+                ? submissionIntent === 'save'
+                : submissionIntent === 'draft')"
               :disabled="saving"
-              @click="confirmSubmit('borrador')"
+              @click="isCounterSale
+                ? confirmSubmit(requestedSendStatusKey, 'save')
+                : confirmSubmit('borrador', 'draft')"
             />
             <UButton
-              :label="sendButtonLabel"
-              icon="i-lucide-send"
+              v-if="!isCounterSale || mayManagePayment"
+              :label="isCounterSale ? 'Guardar y pagar' : sendButtonLabel"
+              :icon="isCounterSale ? 'i-lucide-circle-dollar-sign' : 'i-lucide-send'"
               class="justify-center"
-              :loading="saving && submittingStatusKey === requestedSendStatusKey"
+              :loading="saving && (isCounterSale
+                ? submissionIntent === 'save-and-pay'
+                : submissionIntent === 'save')"
               :disabled="saving || sendBlockedByRepartidor"
-              @click="confirmSubmit(requestedSendStatusKey)"
+              @click="confirmSubmit(
+                requestedSendStatusKey,
+                isCounterSale ? 'save-and-pay' : 'save'
+              )"
             />
           </div>
         </template>

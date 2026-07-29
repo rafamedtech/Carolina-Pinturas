@@ -12,6 +12,7 @@ const existingCustomer: SiigoCustomer = {
   id: 'existente-id',
   name: ['Pinturas', 'Centro'],
   rfc_id: 'PIN900101AB1',
+  phones: [{ number: '5551234567' }],
   address: {
     street: 'Calle 5',
     city: {
@@ -31,18 +32,24 @@ const commercialNameCustomer: SiigoCustomer = {
   rfc_id: 'IPF1611092Z3'
 }
 
+const counterCustomer: SiigoCustomer = {
+  id: 'mostrador-id',
+  name: ['MOSTRADOR', '.'],
+  rfc_id: 'XAXX010101000'
+}
+
 let wrapper: VueWrapper | null = null
 
-async function mountFields() {
+async function mountFields(options: { counterSale?: boolean, customerId?: string } = {}) {
   wrapper = await mountSuspended(OrderCustomerFields, {
     props: {
-      customers: [existingCustomer, commercialNameCustomer],
+      customers: [existingCustomer, commercialNameCustomer, counterCustomer],
       statuses: [],
       repartidores: [],
       tagOptions: [],
       loading: false,
       disabled: false,
-      customerId: '',
+      customerId: options.customerId || '',
       statusKey: 'borrador',
       repartidorId: '',
       orderDate: '2026-07-06',
@@ -52,7 +59,8 @@ async function mountFields() {
       paymentDate: '',
       requiresInvoice: false,
       tags: [],
-      observations: ''
+      observations: '',
+      counterSale: options.counterSale || false
     }
   })
   return wrapper
@@ -70,10 +78,41 @@ afterEach(() => {
 })
 
 describe('OrderCustomerFields', () => {
+  it('muestra un cliente fijo y oculta buscador y contacto en una venta de mostrador', async () => {
+    const mounted = await mountFields({
+      counterSale: true,
+      customerId: existingCustomer.id
+    })
+
+    expect(mounted.text()).toContain('Cliente')
+    expect(mounted.text()).toContain('MOSTRADOR')
+    expect(mounted.find('[placeholder="Buscar cliente"]').exists()).toBe(false)
+    expect(mounted.text()).not.toContain('Teléfono')
+    expect(mounted.text()).not.toContain('Domicilio')
+    expect(mounted.text()).not.toContain('Repartidor')
+    expect(mounted.text()).not.toContain('Fecha de pago')
+    expect(mounted.text()).not.toContain('Fecha de entrega')
+    expect(mounted.text()).not.toContain('Estado de pago')
+    expect(mounted.text()).not.toContain('Requiere factura')
+    expect(mounted.text()).not.toContain('Etiquetas')
+    expect(mounted.findComponent(OrderCustomerCreateModal).exists()).toBe(false)
+  })
+
+  it('selecciona al cliente MOSTRADOR . desde la acción de cliente genérico', async () => {
+    const mounted = await mountFields()
+    const button = mounted.findAll('button')
+      .find(item => item.text().includes('Usar MOSTRADOR .'))
+
+    expect(button).toBeTruthy()
+    await button!.trigger('click')
+
+    expect(mounted.emitted('update:customerId')).toEqual([['mostrador-id']])
+  })
+
   it('permite encontrar un cliente por su nombre comercial cuando la razón social viene vacía', async () => {
     const mounted = await mountFields()
 
-    await mounted.find('[data-slot="base"]').trigger('click')
+    await customerSelect(mounted).find('[data-slot="base"]').trigger('click')
     await nextTick()
 
     const searchInput = await vi.waitFor(() => {
@@ -116,7 +155,7 @@ describe('OrderCustomerFields', () => {
     // opción de crear aunque no exista ningún cliente llamado solo "Pinturas".
     const mounted = await mountFields()
 
-    await mounted.find('[data-slot="base"]').trigger('click')
+    await customerSelect(mounted).find('[data-slot="base"]').trigger('click')
     await nextTick()
 
     const searchInput = await vi.waitFor(() => {
@@ -152,7 +191,7 @@ describe('OrderCustomerFields', () => {
 
     const modal = mounted.findComponent(OrderCustomerCreateModal)
     expect(modal.props('open')).toBe(true)
-    expect(modal.props('initialName')).toBe('Pinturas')
+    expect(modal.props('initialName')).toBe('PINTURAS')
   })
 
   it('abre el modal de alta con el texto buscado al elegir crear', async () => {

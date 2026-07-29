@@ -47,6 +47,14 @@ const allLinks: AppNavigationItem[] = [{
     open.value = false
   }
 }, {
+  label: 'Pagos',
+  icon: 'i-lucide-hand-coins',
+  to: '/pagos',
+  roles: managementRoles,
+  onSelect: () => {
+    open.value = false
+  }
+}, {
   label: 'Igualaciones',
   icon: 'i-lucide-palette',
   to: '/igualaciones',

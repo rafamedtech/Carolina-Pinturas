@@ -49,7 +49,7 @@ defineProps<{
             </div>
             <div class="text-right">
               <p class="text-sm font-semibold text-highlighted">
-                {{ dashboardCompactCurrency.format(item.amount) }}
+                {{ dashboardCompactCurrency(item.amount) }}
               </p>
               <p class="text-xs text-muted">
                 {{ item.percentage }}%
@@ -95,7 +95,7 @@ defineProps<{
           :to="`/ventas?status=${item.key}`"
           :aria-label="`Ver pedidos en etapa ${item.label}`"
           :title="`${item.count} ${item.count === 1 ? 'pedido' : 'pedidos'}`"
-          :description="`${item.percentage}% del mes · ${dashboardCompactCurrency.format(item.amount)}`"
+          :description="`${item.percentage}% del mes · ${dashboardCompactCurrency(item.amount)}`"
           variant="subtle"
           :ui="{ container: 'gap-y-2 p-4 sm:p-4' }"
         >
