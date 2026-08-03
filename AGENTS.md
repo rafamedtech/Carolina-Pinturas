@@ -5,3 +5,7 @@
 - Cuando una tarea requiera probar o verificar algo en un navegador, usa el Google Chrome del usuario.
 - Si la página requiere autenticación, abre la página en Chrome para que el usuario pueda iniciar sesión y, una vez autenticado, continúa las pruebas en esa misma sesión.
 - No solicites ni captures credenciales del usuario.
+
+## Campos de fecha
+
+- Cada vez que implementes un campo de fecha, usa el componente de calendario de Nuxt UI mediante el selector de fecha reutilizable del proyecto.

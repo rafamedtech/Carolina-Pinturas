@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { parseDate } from '@internationalized/date'
+import type { DateValue } from '@internationalized/date'
 import * as z from 'zod'
 import type { FormSubmitEvent } from '@nuxt/ui'
 import type {
@@ -79,6 +81,13 @@ const state = reactive<Partial<Schema>>({
   confirmed: false
 })
 
+const paymentDate = computed<DateValue | undefined>({
+  get: () => state.date ? parseDate(state.date) : undefined,
+  set: (value) => {
+    state.date = value?.toString() ?? ''
+  }
+})
+
 const methodItems = PAYMENT_METHODS.map(method => ({ label: method.label, value: method.key }))
 const invoiceItems = computed(() => props.context.siigo.invoices.map(invoice => ({
   label: invoice.name,
@@ -124,7 +133,7 @@ const maxAmount = computed(() =>
 const submitLabel = computed(() => isSiigo.value ? 'Guardar y crear en Siigo' : 'Guardar pago')
 const modalDescription = computed(() => isSiigo.value
   ? 'Guarda el pago en PostgreSQL y crea la recepción vinculada con la factura de Siigo.'
-  : 'Guarda el pago del pedido en PostgreSQL.'
+  : 'Agrega abonos o liquida el pedido en su totalidad'
 )
 const siigoUnavailableDescription = computed(() => {
   if (props.context.siigo.unavailableReason) return props.context.siigo.unavailableReason
@@ -331,7 +340,11 @@ function onSubmit(event: FormSubmitEvent<Schema>) {
           </UFormField>
         </template>
 
-        <UFormField name="amount" label="Importe" required>
+        <UFormField
+          name="amount"
+          label="Importe"
+          required
+        >
           <UInputNumber
             v-model="state.amount"
             :min="0.01"
@@ -342,12 +355,15 @@ function onSubmit(event: FormSubmitEvent<Schema>) {
         </UFormField>
 
         <UFormField name="date" label="Fecha de pago" required>
-          <UInput v-model="state.date" type="date" class="w-full" />
+          <OrdersOrderDatePicker
+            v-model="paymentDate"
+            :disabled="saving"
+            placeholder="Seleccionar fecha de pago"
+          />
         </UFormField>
 
         <UFormField
           v-if="!isSiigo"
-          class="sm:col-span-2"
           name="reference"
           label="Referencia"
           hint="Opcional"
