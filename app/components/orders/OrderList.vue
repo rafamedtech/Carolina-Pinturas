@@ -20,6 +20,11 @@ function queryPage(value: unknown) {
   return Number.isInteger(parsedPage) && parsedPage > 0 ? parsedPage : 1
 }
 
+function queryBoolean(value: unknown) {
+  const normalized = queryValue(value)
+  return normalized === 'true' || normalized === '1'
+}
+
 function queryDateRange(from: unknown, to: unknown): OrderDateRange | null {
   const start = queryValue(from)
   const end = queryValue(to)
@@ -38,6 +43,8 @@ const filter = shallowRef(queryValue(route.query.search))
 const statusKey = shallowRef(queryValue(route.query.status) || 'all')
 const paymentStatusKey = shallowRef(queryValue(route.query.payment_status) || 'all')
 const paymentMethodKey = shallowRef(queryValue(route.query.payment_method) || 'all')
+const hideCancelled = shallowRef(queryBoolean(route.query.hide_cancelled))
+const hideQuotes = shallowRef(queryBoolean(route.query.hide_quotes))
 const dateRange = shallowRef<OrderDateRange | null>(
   queryDateRange(route.query.date_from, route.query.date_to)
 )
@@ -52,7 +59,7 @@ onMounted(() => {
   isHydrated.value = true
 })
 
-watch([filter, statusKey, paymentStatusKey, paymentMethodKey, dateRange], () => {
+watch([filter, statusKey, paymentStatusKey, paymentMethodKey, hideCancelled, hideQuotes, dateRange], () => {
   page.value = 1
 })
 
@@ -67,6 +74,8 @@ const listQuery = computed(() => ({
   ...(statusKey.value !== 'all' ? { status: statusKey.value } : {}),
   ...(paymentStatusKey.value !== 'all' ? { payment_status: paymentStatusKey.value } : {}),
   ...(paymentMethodKey.value !== 'all' ? { payment_method: paymentMethodKey.value } : {}),
+  ...(hideCancelled.value ? { hide_cancelled: 'true' } : {}),
+  ...(hideQuotes.value ? { hide_quotes: 'true' } : {}),
   ...(dateFrom.value ? { date_from: dateFrom.value } : {}),
   ...(dateTo.value ? { date_to: dateTo.value } : {}),
   ...(page.value > 1 ? { page: String(page.value) } : {})
@@ -77,7 +86,7 @@ const returnTo = computed(() => router.resolve({
 }).fullPath)
 
 watch(
-  [debouncedFilter, statusKey, paymentStatusKey, paymentMethodKey, dateFrom, dateTo, page],
+  [debouncedFilter, statusKey, paymentStatusKey, paymentMethodKey, hideCancelled, hideQuotes, dateFrom, dateTo, page],
   () => {
     void router.replace({ query: listQuery.value })
   }
@@ -97,6 +106,8 @@ const {
     status: computed(() => statusKey.value === 'all' ? undefined : statusKey.value),
     payment_status: computed(() => paymentStatusKey.value === 'all' ? undefined : paymentStatusKey.value),
     payment_method: computed(() => paymentMethodKey.value === 'all' ? undefined : paymentMethodKey.value),
+    hide_cancelled: computed(() => hideCancelled.value ? 'true' : undefined),
+    hide_quotes: computed(() => hideQuotes.value ? 'true' : undefined),
     date_from: dateFrom,
     date_to: dateTo,
     igualacion: props.igualacion ? 'true' : undefined
@@ -165,6 +176,8 @@ const statusTabItems = computed(() => {
         v-model:status="statusKey"
         v-model:payment-status="paymentStatusKey"
         v-model:payment-method="paymentMethodKey"
+        v-model:hide-cancelled="hideCancelled"
+        v-model:hide-quotes="hideQuotes"
         v-model:date-range="dateRange"
         :statuses="statuses"
         :igualacion="igualacion"

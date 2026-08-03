@@ -17,7 +17,10 @@ const filter = defineModel<string>('filter', { required: true })
 const status = defineModel<string>('status', { required: true })
 const paymentStatus = defineModel<string>('paymentStatus', { required: true })
 const paymentMethod = defineModel<string>('paymentMethod', { required: true })
+const hideCancelled = defineModel<boolean>('hideCancelled', { required: true })
+const hideQuotes = defineModel<boolean>('hideQuotes', { required: true })
 const dateRange = defineModel<OrderDateRange | null>('dateRange', { required: true })
+const moreFiltersOpen = shallowRef(false)
 
 const IGUALACION_STATUS_KEYS = ['confirmado', 'surtido', 'en_espera']
 
@@ -45,7 +48,7 @@ const paymentStatusOptions = [{
 const paymentMethodOptions = [{
   label: 'Todos los métodos',
   value: 'all'
-}, ...PAYMENT_METHODS.map(item => ({
+}, ...PAYMENT_METHODS.filter(item => !['cheque', 'otro'].includes(item.key)).map(item => ({
   label: item.label,
   value: item.key as string
 }))]
@@ -82,6 +85,38 @@ const newOrderItems = computed<DropdownMenuItem[][]>(() => [[
     }
   }
 ]])
+
+const hasActiveFilters = computed(() => Boolean(
+  filter.value
+  || status.value !== 'all'
+  || paymentStatus.value !== 'all'
+  || paymentMethod.value !== 'all'
+  || hideCancelled.value
+  || hideQuotes.value
+  || dateRange.value
+))
+
+function applyMoreFilters(filters: {
+  paymentStatus: string
+  paymentMethod: string
+  hideCancelled: boolean
+  hideQuotes: boolean
+}) {
+  paymentStatus.value = filters.paymentStatus
+  paymentMethod.value = filters.paymentMethod
+  hideCancelled.value = filters.hideCancelled
+  hideQuotes.value = filters.hideQuotes
+}
+
+function clearFilters() {
+  filter.value = ''
+  status.value = 'all'
+  paymentStatus.value = 'all'
+  paymentMethod.value = 'all'
+  hideCancelled.value = false
+  hideQuotes.value = false
+  dateRange.value = null
+}
 </script>
 
 <template>
@@ -99,21 +134,26 @@ const newOrderItems = computed<DropdownMenuItem[][]>(() => [[
         value-key="value"
         class="w-full sm:hidden"
       />
-      <USelect
-        v-if="!igualacion"
-        v-model="paymentStatus"
-        :items="paymentStatusOptions"
-        value-key="value"
-        class="w-full sm:w-48"
-      />
-      <USelect
-        v-if="!igualacion"
-        v-model="paymentMethod"
-        :items="paymentMethodOptions"
-        value-key="value"
-        class="w-full sm:w-48"
-      />
       <OrdersOrderDateRangePicker v-model="dateRange" />
+      <div v-if="!igualacion" class="flex w-full gap-2 sm:w-auto">
+        <UButton
+          label="Más filtros"
+          icon="i-lucide-sliders-horizontal"
+          color="neutral"
+          variant="outline"
+          class="flex-1 justify-center sm:flex-none"
+          @click="moreFiltersOpen = true"
+        />
+        <UButton
+          v-if="hasActiveFilters"
+          label="Quitar filtros"
+          icon="i-lucide-x"
+          color="neutral"
+          variant="ghost"
+          class="flex-1 justify-center sm:flex-none"
+          @click="clearFilters"
+        />
+      </div>
     </div>
 
     <UDropdownMenu
@@ -129,5 +169,17 @@ const newOrderItems = computed<DropdownMenuItem[][]>(() => [[
         class="w-full justify-center data-[state=open]:bg-primary/90 sm:w-auto"
       />
     </UDropdownMenu>
+
+    <OrdersOrderListMoreFiltersModal
+      v-if="!igualacion"
+      v-model:open="moreFiltersOpen"
+      :payment-status="paymentStatus"
+      :payment-method="paymentMethod"
+      :hide-cancelled="hideCancelled"
+      :hide-quotes="hideQuotes"
+      :payment-status-options="paymentStatusOptions"
+      :payment-method-options="paymentMethodOptions"
+      @apply="applyMoreFilters"
+    />
   </div>
 </template>

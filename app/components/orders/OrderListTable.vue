@@ -4,7 +4,7 @@ import type { TableColumn } from '@nuxt/ui'
 import type { Column, SortingState, VisibilityState } from '@tanstack/table-core'
 import OrderListCards from './OrderListCards.vue'
 import type { SalesOrderListItem } from '~/types/orders'
-import { paymentMethodLabel, paymentStatusColor, paymentStatusLabel } from '~/utils/orderPayment'
+import { paymentStatusColor, paymentStatusLabel } from '~/utils/orderPayment'
 
 const props = withDefaults(defineProps<{
   orders: readonly SalesOrderListItem[]
@@ -121,13 +121,6 @@ const paymentStatusColumn: TableColumn<SalesOrderListItem> = {
   })
 }
 
-const paymentMethodColumn: TableColumn<SalesOrderListItem> = {
-  id: 'paymentMethod',
-  accessorFn: row => paymentMethodLabel(row.paymentMethod),
-  header: sortableHeader('Método de pago'),
-  cell: ({ row }) => paymentMethodLabel(row.original.paymentMethod)
-}
-
 const totalColumn: TableColumn<SalesOrderListItem> = {
   accessorKey: 'total',
   header: sortableHeader('Total', 'right'),
@@ -193,7 +186,7 @@ const columns = computed<TableColumn<SalesOrderListItem>[]>(() => [numberColumn,
 }, {
   accessorKey: 'itemCount',
   header: sortableHeader('Partidas')
-}, ...(props.igualacion ? [igualacionColumn] : [paymentStatusColumn, paymentMethodColumn]), {
+}, ...(props.igualacion ? [igualacionColumn] : [paymentStatusColumn]), {
   id: 'status',
   accessorFn: row => row.status.sortOrder,
   header: sortableHeader('Estado'),

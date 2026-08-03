@@ -27,6 +27,8 @@ export default eventHandler(async (event) => {
     statusKey: typeof query.status === 'string' ? query.status.trim().slice(0, 32) : undefined,
     paymentStatus: typeof query.payment_status === 'string' ? query.payment_status.trim().slice(0, 32) : undefined,
     paymentMethod: typeof query.payment_method === 'string' ? query.payment_method.trim().slice(0, 32) : undefined,
+    hideCancelled: query.hide_cancelled === 'true' || query.hide_cancelled === '1',
+    hideQuotes: query.hide_quotes === 'true' || query.hide_quotes === '1',
     dateFrom: dateOnly(query.date_from),
     dateTo: dateOnly(query.date_to),
     igualacion: query.igualacion === 'true' || query.igualacion === '1'

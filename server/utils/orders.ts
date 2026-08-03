@@ -29,6 +29,9 @@ import {
 const orderDetailInclude = {
   status: true,
   customer: true,
+  repartidor: {
+    select: { esMostrador: true }
+  },
   siigoInvoice: {
     select: { status: true }
   },
@@ -439,6 +442,7 @@ function detail(order: OrderDetailRecord): SalesOrderDetail {
     observations: order.observations,
     remision: order.remision,
     requiresInvoice: order.requiresInvoice,
+    isCounterSale: order.repartidor?.esMostrador ?? false,
     invoiceCreated: order.siigoInvoice?.status === 'created',
     tags: order.tags,
     paymentStatus: order.paymentStatus,
@@ -798,6 +802,8 @@ export async function listOrders(options: {
   statusKey?: string
   paymentStatus?: string
   paymentMethod?: string
+  hideCancelled?: boolean
+  hideQuotes?: boolean
   dateFrom?: string
   dateTo?: string
   igualacion?: boolean
@@ -820,6 +826,13 @@ export async function listOrders(options: {
     : {}
   const paymentMethodFilter: Prisma.SalesOrderWhereInput = options.paymentMethod
     ? { paymentMethod: options.paymentMethod }
+    : {}
+  const excludedStatusKeys = [
+    ...(options.hideCancelled ? ['cancelado'] : []),
+    ...(options.hideQuotes ? ['borrador'] : [])
+  ]
+  const visibilityStatusFilter: Prisma.SalesOrderWhereInput = !isIgualacionesView && !options.statusKey && excludedStatusKeys.length
+    ? { statusKey: { notIn: excludedStatusKeys } }
     : {}
   const dateFilter: Prisma.SalesOrderWhereInput = options.dateFrom || options.dateTo
     ? {
@@ -853,6 +866,7 @@ export async function listOrders(options: {
   const where: Prisma.SalesOrderWhereInput = {
     AND: [
       statusFilter,
+      visibilityStatusFilter,
       paymentStatusFilter,
       paymentMethodFilter,
       dateFilter,

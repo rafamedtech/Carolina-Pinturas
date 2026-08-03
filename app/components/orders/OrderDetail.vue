@@ -74,6 +74,7 @@ function onCreateTag(value: string) {
 // A borrador order is a quotation document; once it advances to ingresado /
 // confirmado (or later) it becomes a regular order with delivery logistics.
 const isQuote = computed(() => order.value?.status.key === 'borrador')
+const isCounterSale = computed(() => Boolean(order.value?.isCounterSale))
 const documentLabel = computed(() => isQuote.value ? 'Cotización' : 'Pedido')
 const detailTitle = computed(() => isQuote.value ? 'Detalle de la cotización' : 'Detalle del pedido')
 
@@ -380,6 +381,13 @@ async function convertToPedido() {
                 variant="subtle"
                 :label="paymentStatusLabel(order.paymentStatus)"
               />
+              <UBadge
+                v-if="!isQuote && order.requiresInvoice"
+                class="hidden lg:inline-flex"
+                color="success"
+                variant="subtle"
+                label="Requiere factura"
+              />
             </div>
             <p class="mt-1 text-sm text-muted">
               {{ formatDate(order.orderDate) }}
@@ -387,12 +395,19 @@ async function convertToPedido() {
           </div>
           <div class="[grid-area:estados] flex flex-col items-end gap-2 lg:hidden">
             <OrdersOrderStatusBadge :status="order.status" />
-            <UBadge
-              v-if="!isQuote"
-              :color="paymentStatusColor(order.paymentStatus)"
-              variant="subtle"
-              :label="paymentStatusLabel(order.paymentStatus)"
-            />
+            <div v-if="!isQuote" class="flex flex-wrap justify-end gap-2">
+              <UBadge
+                :color="paymentStatusColor(order.paymentStatus)"
+                variant="subtle"
+                :label="paymentStatusLabel(order.paymentStatus)"
+              />
+              <UBadge
+                v-if="order.requiresInvoice"
+                color="success"
+                variant="subtle"
+                label="Requiere factura"
+              />
+            </div>
           </div>
           <div class="[grid-area:acciones] flex flex-wrap items-center gap-4 lg:justify-end">
             <UButton
@@ -488,12 +503,6 @@ async function convertToPedido() {
                 <h2 class="font-semibold text-primary">
                   {{ isQuote ? 'Cliente' : 'Cliente y entrega' }}
                 </h2>
-                <UBadge
-                  v-if="!isQuote"
-                  :color="order.requiresInvoice ? 'success' : 'neutral'"
-                  variant="subtle"
-                  :label="order.requiresInvoice ? 'Requiere factura' : 'No requiere factura'"
-                />
               </div>
             </template>
             <dl class="grid gap-4 sm:grid-cols-2">
@@ -505,7 +514,7 @@ async function convertToPedido() {
                   {{ order.customer.name }}
                 </dd>
               </div>
-              <div>
+              <div v-if="!isCounterSale">
                 <dt class="text-sm text-muted">
                   RFC
                 </dt>
@@ -513,7 +522,7 @@ async function convertToPedido() {
                   {{ order.customer.rfc || '—' }}
                 </dd>
               </div>
-              <div>
+              <div v-if="!isCounterSale">
                 <dt class="text-sm text-muted">
                   Teléfono
                 </dt>
@@ -521,7 +530,7 @@ async function convertToPedido() {
                   {{ order.customer.phone || '—' }}
                 </dd>
               </div>
-              <div>
+              <div v-if="!isCounterSale">
                 <dt class="text-sm text-muted">
                   Domicilio
                 </dt>
@@ -529,7 +538,7 @@ async function convertToPedido() {
                   {{ order.customer.address || '—' }}
                 </dd>
               </div>
-              <div v-if="!isQuote">
+              <div v-if="!isQuote && !isCounterSale">
                 <dt class="text-sm text-muted">
                   Fecha de entrega
                 </dt>
@@ -553,7 +562,7 @@ async function convertToPedido() {
                   {{ order.vendedor.name }}
                 </dd>
               </div>
-              <div v-if="!isQuote">
+              <div v-if="!isQuote && !isCounterSale">
                 <dt class="text-sm text-muted">
                   Repartidor
                 </dt>
