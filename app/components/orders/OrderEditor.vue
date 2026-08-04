@@ -83,6 +83,7 @@ const schema = z.object({
 })
 
 type Schema = z.output<typeof schema>
+type OrderReviewSubmissionIntent = 'draft' | 'save' | 'save-and-pay'
 
 function productPrice(product: SiigoProduct) {
   const price = product.prices?.find(item =>
@@ -355,9 +356,6 @@ const sendBlockedByRepartidor = computed(() =>
     && !pendingSubmission.value.repartidorId
   )
 )
-const useDeliveryPaymentActions = computed(() =>
-  Boolean(isDeliverySale.value && pendingSubmission.value && !pendingSubmission.value.requiresInvoice)
-)
 const canSubmit = computed(() =>
   Boolean(state.customerId)
   && Boolean(state.statusKey)
@@ -545,6 +543,11 @@ async function confirmSubmit(
     saving.value = false
     submissionIntent.value = null
   }
+}
+
+function submitReview(intent: OrderReviewSubmissionIntent) {
+  const statusKey = intent === 'draft' ? 'borrador' : requestedSendStatusKey.value
+  void confirmSubmit(statusKey, intent)
 }
 </script>
 
@@ -812,66 +815,20 @@ async function confirmSubmit(
               @click="printTicket(createdOrder)"
             />
           </div>
-          <div v-else class="flex w-full flex-col gap-2 sm:flex-row sm:justify-end">
-            <UButton
-              :label="isCounterSale || isDeliverySale ? 'Editar' : `Editar ${documentNoun}`"
-              icon="i-lucide-pencil"
-              color="neutral"
-              variant="outline"
-              class="justify-center"
-              :disabled="saving"
-              @click="editOrder"
-            />
-            <UButton
-              v-if="useDeliveryPaymentActions"
-              label="Enviar"
-              icon="i-lucide-send"
-              color="neutral"
-              variant="soft"
-              class="justify-center"
-              :loading="saving && submissionIntent === 'save'"
-              :disabled="saving || sendBlockedByRepartidor"
-              @click="confirmSubmit(requestedSendStatusKey, 'save')"
-            />
-            <UButton
-              v-else-if="isCounterSale || maySaveDraft"
-              :label="isCounterSale ? 'Guardar pedido' : 'Guardar cotización'"
-              icon="i-lucide-save"
-              color="neutral"
-              variant="soft"
-              class="justify-center"
-              :loading="saving && (isCounterSale
-                ? submissionIntent === 'save'
-                : submissionIntent === 'draft')"
-              :disabled="saving"
-              @click="isCounterSale
-                ? confirmSubmit(requestedSendStatusKey, 'save')
-                : confirmSubmit('borrador', 'draft')"
-            />
-            <UButton
-              v-if="useDeliveryPaymentActions && mayManagePayment"
-              label="Enviar y pagar"
-              icon="i-lucide-circle-dollar-sign"
-              class="justify-center"
-              :loading="saving && submissionIntent === 'save-and-pay'"
-              :disabled="saving || sendBlockedByRepartidor"
-              @click="confirmSubmit(requestedSendStatusKey, 'save-and-pay')"
-            />
-            <UButton
-              v-else-if="!useDeliveryPaymentActions && (!isCounterSale || mayManagePayment)"
-              :label="isCounterSale ? 'Guardar y pagar' : sendButtonLabel"
-              :icon="isCounterSale ? 'i-lucide-circle-dollar-sign' : 'i-lucide-send'"
-              class="justify-center"
-              :loading="saving && (isCounterSale
-                ? submissionIntent === 'save-and-pay'
-                : submissionIntent === 'save')"
-              :disabled="saving || sendBlockedByRepartidor"
-              @click="confirmSubmit(
-                requestedSendStatusKey,
-                isCounterSale ? 'save-and-pay' : 'save'
-              )"
-            />
-          </div>
+          <OrdersOrderReviewActions
+            v-else
+            :is-delivery-sale="isDeliverySale"
+            :is-counter-sale="isCounterSale"
+            :may-save-draft="maySaveDraft"
+            :may-manage-payment="mayManagePayment"
+            :saving="saving"
+            :submission-intent="submissionIntent"
+            :send-blocked="sendBlockedByRepartidor"
+            :send-button-label="sendButtonLabel"
+            :document-noun="documentNoun"
+            @edit="editOrder"
+            @submit="submitReview"
+          />
         </template>
       </UModal>
     </template>

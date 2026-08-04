@@ -85,15 +85,13 @@ export async function deleteOrderPayment(orderId: string, paymentId: string, use
   const { usePrisma } = await import('./prisma')
 
   return usePrisma().$transaction(async (tx: Prisma.TransactionClient) => {
-    const [order, payment] = await Promise.all([
-      tx.salesOrder.findUnique({
-        where: { id: orderId },
-        select: { total: true }
-      }),
-      tx.salesOrderPayment.findFirst({
-        where: { id: paymentId, orderId }
-      })
-    ])
+    const order = await tx.salesOrder.findUnique({
+      where: { id: orderId },
+      select: { total: true }
+    })
+    const payment = await tx.salesOrderPayment.findFirst({
+      where: { id: paymentId, orderId }
+    })
 
     if (!order) {
       throw createError({ statusCode: 404, statusMessage: 'No se encontró el pedido.' })
@@ -110,17 +108,15 @@ export async function deleteOrderPayment(orderId: string, paymentId: string, use
 
     await tx.salesOrderPayment.delete({ where: { id: payment.id } })
 
-    const [totals, latestPayment] = await Promise.all([
-      tx.salesOrderPayment.aggregate({
-        where: { orderId },
-        _sum: { amount: true }
-      }),
-      tx.salesOrderPayment.findFirst({
-        where: { orderId },
-        orderBy: { createdAt: 'desc' },
-        select: { paymentMethod: true, paymentDate: true }
-      })
-    ])
+    const totals = await tx.salesOrderPayment.aggregate({
+      where: { orderId },
+      _sum: { amount: true }
+    })
+    const latestPayment = await tx.salesOrderPayment.findFirst({
+      where: { orderId },
+      orderBy: { createdAt: 'desc' },
+      select: { paymentMethod: true, paymentDate: true }
+    })
     const totalPaid = Number(totals._sum.amount?.toString() || 0)
 
     await tx.salesOrder.update({
