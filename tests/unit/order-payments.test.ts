@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   assertInitialLocalPaymentAllowed,
+  assertOrderPaymentDeletionRole,
   assertPaymentFitsBalance,
   createOrderPaymentSchema,
   paymentDestinationForOrder,
@@ -8,6 +9,7 @@ import {
   paymentStatus
 } from '../../server/utils/order-payments'
 import { createOrderSchema } from '../../server/utils/order-validation'
+import { canDeletePaymentRecord } from '../../app/utils/orderPayment'
 
 const requestId = '19ee1240-591d-4b72-87da-ee034838553c'
 const orderInput = {
@@ -95,5 +97,19 @@ describe('pagos unificados de pedidos', () => {
   it('permite el pago inicial local en pedidos sin factura', () => {
     expect(() => assertInitialLocalPaymentAllowed(false)).not.toThrow()
     expect(() => assertInitialLocalPaymentAllowed(true)).toThrow()
+  })
+
+  it('reserva la eliminación de pagos para administradores', () => {
+    expect(() => assertOrderPaymentDeletionRole('admin')).not.toThrow()
+    expect(() => assertOrderPaymentDeletionRole('vendedor')).toThrowError(
+      'Solo un administrador puede eliminar pagos.'
+    )
+  })
+
+  it('permite eliminar pagos locales y bloquea recepciones posiblemente creadas en Siigo', () => {
+    expect(canDeletePaymentRecord('local', 'not_applicable', null)).toBe(true)
+    expect(canDeletePaymentRecord('siigo', 'failed', null)).toBe(true)
+    expect(canDeletePaymentRecord('siigo', 'synced', '19ee1240-591d-4b72-87da-ee034838553c')).toBe(false)
+    expect(canDeletePaymentRecord('siigo', 'unknown', null)).toBe(false)
   })
 })

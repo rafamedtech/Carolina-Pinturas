@@ -490,6 +490,7 @@ async function convertToPedido() {
                 <OrdersPaymentsOrderPaymentsCard
                   :order-id="order.id"
                   @created="() => refresh()"
+                  @deleted="() => refresh()"
                 />
               </template>
             </UModal>

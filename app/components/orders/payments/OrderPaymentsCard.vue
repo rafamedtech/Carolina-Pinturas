@@ -4,7 +4,7 @@ import type {
   OrderPayment,
   OrderPaymentContext
 } from '~/types/siigo-payments'
-import { paymentMethodLabel } from '~/utils/orderPayment'
+import { canDeletePaymentRecord, paymentMethodLabel } from '~/utils/orderPayment'
 
 const props = defineProps<{
   orderId: string
@@ -12,11 +12,15 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   created: [payment: OrderPayment]
+  deleted: [paymentId: string]
 }>()
 
 const open = shallowRef(false)
 const saving = shallowRef(false)
+const deleteOpen = shallowRef(false)
+const deletingPayment = shallowRef<OrderPayment | null>(null)
 const toast = useToast()
+const { user } = useAuth()
 const {
   data: context,
   status,
@@ -50,6 +54,28 @@ function paymentTitle(payment: OrderPayment) {
     return payment.siigo.voucherName || `Recepción Siigo pendiente · ${payment.siigo.invoiceName}`
   }
   return payment.reference || paymentMethodLabel(payment.paymentMethod)
+}
+
+const mayDeletePayments = computed(() => user.value?.role === 'admin')
+
+function paymentCanBeDeleted(payment: OrderPayment) {
+  return canDeletePaymentRecord(
+    payment.provider,
+    payment.externalStatus,
+    payment.siigo?.voucherId
+  )
+}
+
+function openDeletePayment(payment: OrderPayment) {
+  if (!mayDeletePayments.value || !paymentCanBeDeleted(payment)) return
+  deletingPayment.value = payment
+  deleteOpen.value = true
+}
+
+async function onPaymentDeleted(paymentId: string) {
+  await refresh()
+  deletingPayment.value = null
+  emit('deleted', paymentId)
 }
 
 async function createPayment(input: CreateOrderPaymentInput) {
@@ -196,11 +222,31 @@ async function createPayment(input: CreateOrderPaymentInput) {
               {{ payment.externalError }}
             </p>
           </div>
-          <UBadge
-            color="success"
-            variant="subtle"
-            :label="formatCurrency(payment.amount, payment.currencyCode)"
-          />
+          <div class="flex items-center gap-1">
+            <UBadge
+              color="success"
+              variant="subtle"
+              :label="formatCurrency(payment.amount, payment.currencyCode)"
+            />
+            <UTooltip
+              v-if="mayDeletePayments"
+              :text="paymentCanBeDeleted(payment)
+                ? 'Eliminar pago'
+                : 'Los pagos vinculados con Siigo no se pueden eliminar desde la aplicación.'"
+            >
+              <span class="inline-flex">
+                <UButton
+                  icon="i-lucide-trash-2"
+                  color="error"
+                  variant="ghost"
+                  size="xs"
+                  :disabled="!paymentCanBeDeleted(payment)"
+                  :aria-label="`Eliminar pago de ${formatCurrency(payment.amount, payment.currencyCode)}`"
+                  @click="openDeletePayment(payment)"
+                />
+              </span>
+            </UTooltip>
+          </div>
         </li>
       </ul>
 
@@ -213,6 +259,13 @@ async function createPayment(input: CreateOrderPaymentInput) {
         :context="context"
         :saving="saving"
         @submit="createPayment"
+      />
+      <OrdersPaymentsOrderPaymentDeleteModal
+        v-if="deletingPayment"
+        v-model:open="deleteOpen"
+        :order-id="orderId"
+        :payment="deletingPayment"
+        @deleted="onPaymentDeleted"
       />
     </template>
   </div>

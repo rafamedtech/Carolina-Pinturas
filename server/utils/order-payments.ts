@@ -1,8 +1,15 @@
 import * as z from 'zod'
-import type { SalesOrderPayment } from '../../generated/prisma/client'
+import type { Prisma, SalesOrderPayment } from '../../generated/prisma/client'
+import type { AppUser, UserRole } from '~/types/siigo'
 import type { OrderPayment } from '~/types/siigo-payments'
-import { PAYMENT_METHOD_KEYS } from '~/utils/orderPayment'
+import { canDeletePaymentRecord, PAYMENT_METHOD_KEYS } from '~/utils/orderPayment'
 import { createOrderSiigoPaymentSchema as siigoPaymentSchema } from './siigo-vouchers'
+
+const PAYMENT_DELETE_TRANSACTION_OPTIONS = {
+  isolationLevel: 'Serializable' as const,
+  maxWait: 5_000,
+  timeout: 15_000
+}
 
 const dateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Usa una fecha con formato AAAA-MM-DD.')
 const amountSchema = z.number().positive('El importe debe ser mayor a cero.')
@@ -58,6 +65,77 @@ export function assertPaymentFitsBalance(amount: number, paidTotal: number, orde
       statusMessage: `El importe supera el saldo pendiente de ${balance.toFixed(2)}.`
     })
   }
+}
+
+export function assertOrderPaymentDeletionRole(role: UserRole) {
+  if (role !== 'admin') {
+    throw createError({
+      statusCode: 403,
+      statusMessage: 'Solo un administrador puede eliminar pagos.'
+    })
+  }
+}
+
+export function canDeleteOrderPayment(payment: Pick<SalesOrderPayment, 'provider' | 'externalStatus' | 'siigoVoucherId'>) {
+  return canDeletePaymentRecord(payment.provider, payment.externalStatus, payment.siigoVoucherId)
+}
+
+export async function deleteOrderPayment(orderId: string, paymentId: string, user: AppUser) {
+  assertOrderPaymentDeletionRole(user.role)
+  const { usePrisma } = await import('./prisma')
+
+  return usePrisma().$transaction(async (tx: Prisma.TransactionClient) => {
+    const [order, payment] = await Promise.all([
+      tx.salesOrder.findUnique({
+        where: { id: orderId },
+        select: { total: true }
+      }),
+      tx.salesOrderPayment.findFirst({
+        where: { id: paymentId, orderId }
+      })
+    ])
+
+    if (!order) {
+      throw createError({ statusCode: 404, statusMessage: 'No se encontró el pedido.' })
+    }
+    if (!payment) {
+      throw createError({ statusCode: 404, statusMessage: 'No se encontró el pago.' })
+    }
+    if (!canDeleteOrderPayment(payment)) {
+      throw createError({
+        statusCode: 409,
+        statusMessage: 'Este pago puede estar vinculado con una recepción en Siigo y no se puede eliminar únicamente en la aplicación.'
+      })
+    }
+
+    await tx.salesOrderPayment.delete({ where: { id: payment.id } })
+
+    const [totals, latestPayment] = await Promise.all([
+      tx.salesOrderPayment.aggregate({
+        where: { orderId },
+        _sum: { amount: true }
+      }),
+      tx.salesOrderPayment.findFirst({
+        where: { orderId },
+        orderBy: { createdAt: 'desc' },
+        select: { paymentMethod: true, paymentDate: true }
+      })
+    ])
+    const totalPaid = Number(totals._sum.amount?.toString() || 0)
+
+    await tx.salesOrder.update({
+      where: { id: orderId },
+      data: {
+        paymentStatus: paymentStatus(totalPaid, Number(order.total.toString())),
+        paymentMethod: latestPayment?.paymentMethod ?? null,
+        paymentDate: latestPayment?.paymentDate ?? null,
+        updatedByEmail: user.email,
+        version: { increment: 1 }
+      }
+    })
+
+    return { id: payment.id }
+  }, PAYMENT_DELETE_TRANSACTION_OPTIONS)
 }
 
 function decimal(value: { toString(): string }) {

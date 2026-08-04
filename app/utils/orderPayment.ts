@@ -31,3 +31,12 @@ export function paymentStatusColor(key: string | null | undefined) {
 export function paymentMethodLabel(key: string | null | undefined) {
   return PAYMENT_METHODS.find(method => method.key === key)?.label ?? '—'
 }
+
+export function canDeletePaymentRecord(
+  provider: string,
+  externalStatus: string,
+  siigoVoucherId: string | null | undefined
+) {
+  return provider === 'local'
+    || (provider === 'siigo' && externalStatus === 'failed' && !siigoVoucherId)
+}
