@@ -115,6 +115,11 @@ export const updateOrderItemPriceSchema = z.object({
   version: z.number().int().positive()
 })
 
+export const updateOrderItemQuantitySchema = z.object({
+  quantity: z.number().positive('La cantidad debe ser mayor a cero.').max(1_000_000),
+  version: z.number().int().positive()
+})
+
 // IPv4 literal only: hostnames are rejected to avoid DNS rebinding on the
 // server-side printer socket (see server/utils/ticket-printer.ts).
 export const ticketPrintSchema = z.object({
@@ -130,4 +135,5 @@ export type UpdateOrderRemisionInput = z.output<typeof updateOrderRemisionSchema
 export type UpdateOrderRepartidorInput = z.output<typeof updateOrderRepartidorSchema>
 export type UpdateOrderTagsInput = z.output<typeof updateOrderTagsSchema>
 export type UpdateOrderItemPriceInput = z.output<typeof updateOrderItemPriceSchema>
+export type UpdateOrderItemQuantityInput = z.output<typeof updateOrderItemQuantitySchema>
 export type TicketPrintInput = z.output<typeof ticketPrintSchema>

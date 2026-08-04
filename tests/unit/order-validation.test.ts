@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import { createOrderSchema } from '../../server/utils/order-validation'
+import {
+  createOrderSchema,
+  updateOrderItemQuantitySchema
+} from '../../server/utils/order-validation'
 
 const orderInput = {
   customerId: '048fac97-d25e-4724-bbea-c9c731c22656',
@@ -32,5 +35,25 @@ describe('validación de pedidos', () => {
     })
 
     expect(result.success).toBe(true)
+  })
+
+  it('acepta cantidades positivas al editar una partida', () => {
+    expect(updateOrderItemQuantitySchema.safeParse({
+      quantity: 2.5,
+      version: 1
+    }).success).toBe(true)
+  })
+
+  it('rechaza cantidades en cero al editar una partida', () => {
+    const result = updateOrderItemQuantitySchema.safeParse({
+      quantity: 0,
+      version: 1
+    })
+
+    expect(result.success).toBe(false)
+    if (!result.success) {
+      expect(result.error.flatten().fieldErrors.quantity)
+        .toContain('La cantidad debe ser mayor a cero.')
+    }
   })
 })

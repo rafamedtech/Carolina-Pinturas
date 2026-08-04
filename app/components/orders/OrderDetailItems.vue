@@ -29,6 +29,11 @@ const editPrice = shallowRef(0)
 const editNote = shallowRef('')
 const savingPrice = shallowRef(false)
 const priceError = shallowRef('')
+const quantityEditOpen = shallowRef(false)
+const quantityEditingItem = shallowRef<SalesOrderItem | null>(null)
+const editQuantity = shallowRef(0)
+const savingQuantity = shallowRef(false)
+const quantityError = shallowRef('')
 
 function openEdit(item: SalesOrderItem) {
   editingItem.value = item
@@ -70,6 +75,53 @@ async function submitPriceEdit() {
   }
 }
 
+function openQuantityEdit(item: SalesOrderItem) {
+  quantityEditingItem.value = item
+  editQuantity.value = item.quantity
+  quantityError.value = ''
+  quantityEditOpen.value = true
+}
+
+const canSaveQuantity = computed(() =>
+  Boolean(
+    quantityEditingItem.value
+    && Number.isFinite(editQuantity.value)
+    && editQuantity.value > 0
+    && editQuantity.value !== quantityEditingItem.value.quantity
+  )
+)
+
+async function submitQuantityEdit() {
+  if (!quantityEditingItem.value || !canSaveQuantity.value || savingQuantity.value) return
+  savingQuantity.value = true
+  quantityError.value = ''
+
+  try {
+    const updated = await $fetch<SalesOrderDetail>(
+      `/api/orders/${encodeURIComponent(props.orderId)}/items/${encodeURIComponent(quantityEditingItem.value.id)}/cantidad`,
+      {
+        method: 'PATCH',
+        body: {
+          quantity: editQuantity.value,
+          version: props.version
+        }
+      }
+    )
+    emit('updated', updated)
+    quantityEditOpen.value = false
+    toast.add({
+      title: 'Cantidad actualizada',
+      color: 'success',
+      icon: 'i-lucide-circle-check'
+    })
+  } catch (fetchError: unknown) {
+    const response = fetchError as { data?: { statusMessage?: string }, message?: string }
+    quantityError.value = response.data?.statusMessage || response.message || 'No se pudo actualizar la cantidad.'
+  } finally {
+    savingQuantity.value = false
+  }
+}
+
 const historyOpen = shallowRef(false)
 const historyItem = shallowRef<SalesOrderItem | null>(null)
 
@@ -101,7 +153,19 @@ const columns: TableColumn<SalesOrderItem>[] = [{
 }, {
   accessorKey: 'quantity',
   header: () => h('div', { class: 'text-right' }, 'Cantidad'),
-  cell: ({ row }) => h('div', { class: 'text-right' }, String(row.original.quantity))
+  cell: ({ row }) => h('div', { class: 'flex items-center justify-end gap-1' }, [
+    h('span', String(row.original.quantity)),
+    props.editable
+      ? h(UButton, {
+          'icon': 'i-lucide-pencil',
+          'color': 'neutral',
+          'variant': 'ghost',
+          'size': 'xs',
+          'aria-label': `Editar cantidad de ${row.original.name}`,
+          'onClick': () => openQuantityEdit(row.original)
+        })
+      : null
+  ])
 }, {
   id: 'unit',
   header: 'Unidad',
@@ -173,15 +237,6 @@ const columns: TableColumn<SalesOrderItem>[] = [{
 
           <div class="flex shrink-0 items-center gap-1">
             <UButton
-              v-if="editable"
-              icon="i-lucide-pencil"
-              color="neutral"
-              variant="ghost"
-              size="sm"
-              :aria-label="`Editar precio de ${item.name}`"
-              @click="openEdit(item)"
-            />
-            <UButton
               v-if="item.priceHistory.length"
               icon="i-lucide-history"
               color="neutral"
@@ -198,17 +253,39 @@ const columns: TableColumn<SalesOrderItem>[] = [{
             <p class="text-muted">
               Cantidad
             </p>
-            <p class="font-medium text-highlighted">
-              {{ item.quantity }} {{ item.unit.name || item.unit.code || '' }}
-            </p>
+            <div class="flex items-center gap-1">
+              <p class="font-medium text-highlighted">
+                {{ item.quantity }} {{ item.unit.name || item.unit.code || '' }}
+              </p>
+              <UButton
+                v-if="editable"
+                icon="i-lucide-pencil"
+                color="neutral"
+                variant="ghost"
+                size="xs"
+                :aria-label="`Editar cantidad de ${item.name}`"
+                @click="openQuantityEdit(item)"
+              />
+            </div>
           </div>
           <div class="text-right">
             <p class="text-muted">
               Precio unitario
             </p>
-            <p class="font-medium text-highlighted">
-              {{ currency.format(item.unitPrice) }}
-            </p>
+            <div class="flex items-center justify-end gap-1">
+              <p class="font-medium text-highlighted">
+                {{ currency.format(item.unitPrice) }}
+              </p>
+              <UButton
+                v-if="editable"
+                icon="i-lucide-pencil"
+                color="neutral"
+                variant="ghost"
+                size="xs"
+                :aria-label="`Editar precio de ${item.name}`"
+                @click="openEdit(item)"
+              />
+            </div>
           </div>
         </div>
 
@@ -302,6 +379,62 @@ const columns: TableColumn<SalesOrderItem>[] = [{
             label="Guardar"
             :loading="savingPrice"
             @click="submitPriceEdit"
+          />
+        </div>
+      </template>
+    </UModal>
+
+    <UModal v-model:open="quantityEditOpen" title="Editar cantidad">
+      <template #body>
+        <div v-if="quantityEditingItem" class="space-y-4">
+          <div>
+            <p class="text-sm text-muted">
+              Producto
+            </p>
+            <p class="font-medium">
+              {{ quantityEditingItem.name }}
+            </p>
+            <p class="text-sm text-muted">
+              Cantidad actual: {{ quantityEditingItem.quantity }} {{ quantityEditingItem.unit.name || quantityEditingItem.unit.code || '' }}
+            </p>
+          </div>
+
+          <UFormField label="Cantidad nueva">
+            <UInputNumber
+              v-model="editQuantity"
+              :min="0.000001"
+              :max="1000000"
+              :step="1"
+              :step-snapping="false"
+              :format-options="{ maximumFractionDigits: 6 }"
+              class="w-full"
+            />
+          </UFormField>
+
+          <UAlert
+            v-if="quantityError"
+            color="error"
+            variant="subtle"
+            :description="quantityError"
+            icon="i-lucide-circle-alert"
+          />
+        </div>
+      </template>
+
+      <template #footer>
+        <div class="flex w-full justify-end gap-2">
+          <UButton
+            label="Cancelar"
+            color="neutral"
+            variant="outline"
+            :disabled="savingQuantity"
+            @click="quantityEditOpen = false"
+          />
+          <UButton
+            label="Guardar"
+            :loading="savingQuantity"
+            :disabled="!canSaveQuantity"
+            @click="submitQuantityEdit"
           />
         </div>
       </template>

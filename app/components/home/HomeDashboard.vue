@@ -1,7 +1,11 @@
 <script setup lang="ts">
 import { dashboardCurrency } from '~/utils/dashboardFormatters'
 
-const { data, status, error, refresh } = useSalesDashboard()
+const props = defineProps<{
+  month: string
+}>()
+
+const { data, status, error, refresh } = useSalesDashboard(toRef(props, 'month'))
 
 const errorMessage = computed(() =>
   error.value?.data?.statusMessage || 'No fue posible cargar el resumen mensual.'

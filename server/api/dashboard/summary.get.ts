@@ -20,13 +20,20 @@ function dateOnly(value: Date) {
   return value.toISOString().slice(0, 10)
 }
 
-function monthBounds(now = new Date()) {
-  const year = now.getUTCFullYear()
-  const month = now.getUTCMonth()
+function monthBounds(selectedMonth: string | undefined, now = new Date()) {
+  if (selectedMonth && !/^\d{4}-(0[1-9]|1[0-2])$/.test(selectedMonth)) {
+    throw createError({ statusCode: 400, statusMessage: 'El mes seleccionado no es válido.' })
+  }
+
+  const [selectedYear, selectedMonthNumber] = selectedMonth?.split('-').map(Number) ?? []
+  const year = selectedYear ?? now.getUTCFullYear()
+  const month = selectedMonthNumber ? selectedMonthNumber - 1 : now.getUTCMonth()
   const start = new Date(Date.UTC(year, month, 1))
   const end = new Date(Date.UTC(year, month + 1, 1))
   const previousStart = new Date(Date.UTC(year, month - 1, 1))
-  const elapsedDays = Math.min(now.getUTCDate(), new Date(Date.UTC(year, month + 1, 0)).getUTCDate())
+  const totalDays = new Date(Date.UTC(year, month + 1, 0)).getUTCDate()
+  const isCurrentMonth = year === now.getUTCFullYear() && month === now.getUTCMonth()
+  const elapsedDays = isCurrentMonth ? Math.min(now.getUTCDate(), totalDays) : totalDays
 
   return { start, end, previousStart, elapsedDays }
 }
@@ -38,7 +45,9 @@ function percentage(amount: number, total: number) {
 export default eventHandler(async (event) => {
   await requireRole(event, ORDER_LOGISTICS_ROLES)
   const prisma = usePrisma()
-  const { start, end, previousStart, elapsedDays } = monthBounds()
+  const query = getQuery(event)
+  const selectedMonth = typeof query.month === 'string' ? query.month : undefined
+  const { start, end, previousStart, elapsedDays } = monthBounds(selectedMonth)
   const salesWhere = {
     statusKey: { notIn: EXCLUDED_SALES_STATUSES },
     orderDate: { gte: start, lt: end }

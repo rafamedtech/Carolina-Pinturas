@@ -9,7 +9,8 @@ import type {
   UpdateOrderRepartidorInput,
   UpdateOrderTagsInput,
   UpdateOrderStatusInput,
-  UpdateOrderItemPriceInput
+  UpdateOrderItemPriceInput,
+  UpdateOrderItemQuantityInput
 } from './order-validation'
 import { STATUS_KEYS_REQUIRING_REPARTIDOR } from './order-validation'
 import { usePrisma } from './prisma'
@@ -1231,6 +1232,112 @@ export async function updateOrderItemPrice(
         changedByName: user.name,
         changedByEmail: user.email,
         changedByRole: user.role
+      }
+    })
+
+    const items = await tx.salesOrderItem.findMany({ where: { orderId } })
+    const totals = orderTotals(items.map(current => ({
+      subtotal: current.subtotal.toString(),
+      discountAmount: current.discountAmount.toString(),
+      taxAmount: current.taxAmount.toString(),
+      total: current.total.toString()
+    })), order.discountType, order.discountValue.toString())
+
+    const result = await tx.salesOrder.updateMany({
+      where: { id: orderId, version: input.version },
+      data: {
+        subtotal: totals.subtotal.toString(),
+        discountAmount: totals.discountAmount.toString(),
+        discountTotal: totals.discountTotal.toString(),
+        taxTotal: totals.taxTotal.toString(),
+        total: totals.total.toString(),
+        updatedByEmail: user.email,
+        version: { increment: 1 }
+      }
+    })
+    if (result.count !== 1) {
+      throw createError({
+        statusCode: 409,
+        statusMessage: 'El pedido cambió mientras se actualizaba. Intenta de nuevo.'
+      })
+    }
+  })
+
+  return getOrder(orderId, user)
+}
+
+export async function updateOrderItemQuantity(
+  orderId: string,
+  itemId: string,
+  input: UpdateOrderItemQuantityInput,
+  user: AppUser
+) {
+  const prisma = usePrisma()
+
+  if (!canManageOrderLogistics(user.role)) {
+    throw createError({
+      statusCode: 403,
+      statusMessage: 'No tienes permiso para modificar la cantidad de esta partida.'
+    })
+  }
+
+  const order = await prisma.salesOrder.findFirst({
+    where: {
+      id: orderId,
+      AND: [orderVisibilityFilter(user)]
+    },
+    select: { statusKey: true, version: true, discountType: true, discountValue: true }
+  })
+  if (!order) {
+    throw createError({ statusCode: 404, statusMessage: 'No se encontró el pedido.' })
+  }
+  if (order.statusKey === 'borrador') {
+    throw createError({
+      statusCode: 409,
+      statusMessage: 'Edita la cantidad desde la cotización mientras sigue siendo un borrador.'
+    })
+  }
+  if (order.version !== input.version) {
+    throw createError({
+      statusCode: 409,
+      statusMessage: 'El pedido cambió desde que lo abriste. Actualiza la página e intenta de nuevo.'
+    })
+  }
+
+  const item = await prisma.salesOrderItem.findFirst({ where: { id: itemId, orderId } })
+  if (!item) {
+    throw createError({ statusCode: 404, statusMessage: 'No se encontró la partida.' })
+  }
+
+  const previousQuantity = money(item.quantity)
+  const newQuantity = money(input.quantity)
+  if (previousQuantity.equals(newQuantity)) {
+    throw createError({
+      statusCode: 422,
+      statusMessage: 'La cantidad nueva debe ser diferente a la actual.'
+    })
+  }
+
+  const unitPrice = money(item.unitPrice)
+  const taxPercentage = taxPercentageFromPayload(item.taxPayload)
+  const { subtotal, discountAmount, taxAmount, total } = lineAmounts(
+    newQuantity,
+    unitPrice,
+    taxPercentage,
+    item.taxIncluded,
+    item.discountType,
+    item.discountValue
+  )
+
+  await prisma.$transaction(async (tx) => {
+    await tx.salesOrderItem.update({
+      where: { id: itemId },
+      data: {
+        quantity: newQuantity.toString(),
+        subtotal: subtotal.toString(),
+        discountAmount: discountAmount.toString(),
+        taxAmount: taxAmount.toString(),
+        total: total.toString()
       }
     })
 

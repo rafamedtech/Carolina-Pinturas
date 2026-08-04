@@ -3,7 +3,7 @@ import { h, resolveComponent } from 'vue'
 import type { TableColumn } from '@nuxt/ui'
 import type { DashboardRecentOrder } from '~/types/dashboard'
 import { dashboardCurrency, dashboardDate } from '~/utils/dashboardFormatters'
-import { paymentMethodLabel, paymentStatusColor, paymentStatusLabel } from '~/utils/orderPayment'
+import { paymentStatusColor, paymentStatusLabel } from '~/utils/orderPayment'
 
 const NuxtLink = resolveComponent('NuxtLink')
 const OrderStatusBadge = resolveComponent('OrdersOrderStatusBadge')
@@ -44,10 +44,6 @@ const columns: TableColumn<DashboardRecentOrder>[] = [{
     color: paymentStatusColor(row.original.paymentStatus),
     variant: 'subtle'
   })
-}, {
-  id: 'paymentMethod',
-  header: 'Método de pago',
-  cell: ({ row }) => paymentMethodLabel(row.original.paymentMethod)
 }, {
   id: 'status',
   header: 'Estado',

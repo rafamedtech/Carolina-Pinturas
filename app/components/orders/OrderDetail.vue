@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import type { DropdownMenuItem } from '@nuxt/ui'
 import type { OrderStatus, SalesOrderDetail } from '~/types/orders'
 import {
   canCreateOrders,
@@ -88,8 +89,20 @@ const { printTicket } = useTicketPrinter()
 const printerSettingsOpen = shallowRef(false)
 const paymentsOpen = shallowRef(false)
 const siigoInvoiceOpen = shallowRef(false)
-const documentOptions = computed(() => {
-  const groups = [[
+const cancelOrderOpen = shallowRef(false)
+const mayManageLogistics = computed(() =>
+  Boolean(user.value && canManageOrderLogistics(user.value.role))
+)
+const mayCancelOrder = computed(() =>
+  Boolean(
+    order.value
+    && !isQuote.value
+    && mayManageLogistics.value
+    && order.value.status.key !== 'cancelado'
+  )
+)
+const documentOptions = computed<DropdownMenuItem[][]>(() => {
+  const groups: DropdownMenuItem[][] = [[
     { label: 'Ver documento', icon: 'i-lucide-eye', onSelect: () => openCotizacion() },
     { label: 'Descargar PDF', icon: 'i-lucide-download', onSelect: () => openCotizacion('pdf') }
   ]]
@@ -101,12 +114,18 @@ const documentOptions = computed(() => {
     ])
   }
 
+  if (mayCancelOrder.value) {
+    groups.push([{
+      label: 'Cancelar pedido',
+      icon: 'i-lucide-ban',
+      color: 'error',
+      onSelect: () => { cancelOrderOpen.value = true }
+    }])
+  }
+
   return groups
 })
 
-const mayManageLogistics = computed(() =>
-  Boolean(user.value && canManageOrderLogistics(user.value.role))
-)
 const mayManagePayment = mayManageLogistics
 const mayEditQuote = computed(() =>
   Boolean(user.value && canCreateOrders(user.value.role))
@@ -156,6 +175,12 @@ function formatCurrency(value: number | undefined) {
 function formatDate(value: string | null | undefined) {
   if (!value) return '—'
   return value.split('-').reverse().join('/')
+}
+
+function onOrderCancelled(updatedOrder: SalesOrderDetail) {
+  order.value = updatedOrder
+  selectedStatus.value = updatedOrder.status.key
+  statusNote.value = ''
 }
 
 const repartidorOptions = computed(() => repartidores.value.map(repartidor => ({
@@ -444,6 +469,15 @@ async function convertToPedido() {
               />
             </UDropdownMenu>
             <OrdersPrinterSettingsModal v-model:open="printerSettingsOpen" />
+            <OrdersOrderCancelModal
+              v-if="mayCancelOrder"
+              v-model:open="cancelOrderOpen"
+              :order-id="order.id"
+              :order-number="order.number"
+              :version="order.version"
+              @cancelled="onOrderCancelled"
+              @failed="() => refresh()"
+            />
             <UModal
               v-if="!isQuote && mayManagePayment"
               v-model:open="paymentsOpen"
