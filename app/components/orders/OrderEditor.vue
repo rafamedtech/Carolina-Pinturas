@@ -61,6 +61,19 @@ const documentNounCapitalized = computed(() =>
   documentNoun.value.charAt(0).toUpperCase() + documentNoun.value.slice(1))
 const documentWithArticle = computed(() => isQuoteMode.value ? 'la cotización' : 'el pedido')
 const documentOf = computed(() => isQuoteMode.value ? 'de la cotización' : 'del pedido')
+const completionTitle = computed(() =>
+  isQuoteMode.value ? 'Cotización creada' : 'Pedido enviado'
+)
+const completionMessage = computed(() =>
+  isQuoteMode.value ? '¡Creada con éxito!' : '¡Enviado con éxito!'
+)
+const completionDetail = computed(() => createdOrder.value
+  ? `${documentNounCapitalized.value} ${createdOrder.value.number} guardad${isQuoteMode.value ? 'a' : 'o'}.`
+  : ''
+)
+const viewDocumentLabel = computed(() =>
+  isQuoteMode.value ? 'Ver cotización' : 'Ver pedido'
+)
 const pageTitle = computed(() => isEditing.value
   ? isQuoteMode.value ? 'Editar cotización' : 'Editar pedido'
   : isQuoteMode.value
@@ -165,6 +178,36 @@ const {
   setDiscount,
   replaceLines
 } = useOrderDraft()
+const lineRequestPayload = computed(() => lines.value.map(line => ({
+  productId: line.productId,
+  quantity: line.quantity,
+  discountType: line.discountType,
+  discountValue: line.discountValue,
+  ...(line.unitPrice !== line.catalogPrice
+    ? { unitPrice: line.unitPrice, priceNote: line.priceNote.trim() || null }
+    : {}),
+  observations: line.observations.trim() || null
+})))
+const initialEditorSnapshot = shallowRef<string | null>(null)
+
+function editorSnapshot() {
+  return JSON.stringify({
+    customerId: state.customerId,
+    repartidorId: state.repartidorId || null,
+    orderDate: state.orderDate,
+    promisedDate: state.promisedDate || null,
+    observations: state.observations.trim() || null,
+    requiresInvoice: state.requiresInvoice,
+    tags: state.tags,
+    paymentStatus: state.paymentStatus,
+    paymentMethod: state.paymentMethod || null,
+    paymentDate: state.paymentDate || null,
+    discountType: state.discountType,
+    discountValue: state.discountValue,
+    lines: lineRequestPayload.value
+  })
+}
+
 const orderDiscountAmount = computed(() =>
   discountAmountOf(total.value, state.discountType, state.discountValue))
 const grandTotal = computed(() => total.value - orderDiscountAmount.value)
@@ -239,7 +282,8 @@ watch(
   [defaultRepartidorId, repartidores],
   ([desiredId, availableRepartidores]) => {
     if (
-      !state.repartidorId
+      !isEditing.value
+      && !state.repartidorId
       && desiredId
       && availableRepartidores.some(repartidor => repartidor.id === desiredId)
     ) {
@@ -328,6 +372,7 @@ watch(existingOrder, (value) => {
     }
   }))
   initializedOrderId.value = value.id
+  initialEditorSnapshot.value = editorSnapshot()
 }, { immediate: true })
 const formDisabled = computed(() => saving.value || Boolean(catalogError.value))
 const mayChooseInitialStatus = computed(() => !isEditing.value && user.value?.role === 'admin')
@@ -378,6 +423,14 @@ const canSubmit = computed(() =>
   && lines.value.length > 0
   && !catalogsLoading.value
   && !formDisabled.value
+)
+const hasEditorChanges = computed(() =>
+  initialEditorSnapshot.value !== null
+  && editorSnapshot() !== initialEditorSnapshot.value
+)
+const reviewDisabled = computed(() =>
+  !canSubmit.value
+  || (isEditing.value && isQuoteMode.value && !hasEditorChanges.value)
 )
 
 const selectedCustomer = computed(() =>
@@ -432,7 +485,7 @@ async function addSelectedProduct(product: SiigoProduct, quantity: number) {
 }
 
 function reviewOrder(event: FormSubmitEvent<Schema>) {
-  if (!canSubmit.value) return
+  if (reviewDisabled.value) return
   if (!initialPaymentRequestId.value) initialPaymentRequestId.value = crypto.randomUUID()
   pendingSubmission.value = event.data
   modalPhase.value = 'review'
@@ -479,16 +532,7 @@ async function confirmSubmit(
   try {
     // El precio sólo viaja cuando el usuario lo editó; si no, el servidor usa
     // el precio de lista vigente en Siigo.
-    const requestLines = lines.value.map(line => ({
-      productId: line.productId,
-      quantity: line.quantity,
-      discountType: line.discountType,
-      discountValue: line.discountValue,
-      ...(line.unitPrice !== line.catalogPrice
-        ? { unitPrice: line.unitPrice, priceNote: line.priceNote || null }
-        : {}),
-      observations: line.observations || null
-    }))
+    const requestLines = lineRequestPayload.value
     const order = isEditing.value && props.orderId && existingOrder.value
       ? await $fetch<SalesOrderDetail>(`/api/orders/${encodeURIComponent(props.orderId)}`, {
           method: 'PUT',
@@ -533,7 +577,7 @@ async function confirmSubmit(
 
     toast.add({
       title: isEditing.value
-        ? `${documentNounCapitalized.value} ${order.number} actualizado${isQuoteMode.value ? 'a' : ''}`
+        ? `${documentNounCapitalized.value} ${order.number} actualizad${isQuoteMode.value ? 'a' : 'o'}`
         : statusKey === 'borrador'
           ? `Cotización ${order.number} guardada`
           : intent === 'save-and-pay'
@@ -660,7 +704,7 @@ function submitReview(intent: OrderReviewSubmissionIntent) {
         <OrdersOrderFormActions
           :saving="saving"
           :saving-draft="savingDraft"
-          :disabled="!canSubmit"
+          :disabled="reviewDisabled"
           :quote-mode="isQuoteMode"
           :editing="isEditing"
           :show-save-draft="!isEditing && !isCounterSale"
@@ -674,7 +718,7 @@ function submitReview(intent: OrderReviewSubmissionIntent) {
         :title="modalPhase === 'sending'
           ? undefined
           : modalPhase === 'done'
-            ? `${documentNounCapitalized} enviado`
+            ? completionTitle
             : `Resumen ${documentOf}`"
         :close="false"
         :dismissible="false"
@@ -685,16 +729,18 @@ function submitReview(intent: OrderReviewSubmissionIntent) {
             <p class="text-sm text-muted">
               {{ submissionIntent === 'save-and-pay'
                 ? 'Guardando el pedido y registrando el pago…'
-                : `Enviando ${documentWithArticle}…` }}
+                : isEditing && isQuoteMode
+                  ? 'Actualizando cotización…'
+                  : `Enviando ${documentWithArticle}…` }}
             </p>
           </div>
           <div v-else-if="modalPhase === 'done'" class="flex flex-col items-center justify-center gap-3 py-10 text-center">
             <UIcon name="i-lucide-circle-check" class="size-10 text-success" />
             <p class="text-lg font-semibold">
-              ¡Enviado con éxito!
+              {{ completionMessage }}
             </p>
             <p v-if="createdOrder" class="text-sm text-muted">
-              {{ documentNounCapitalized }} {{ createdOrder.number }} guardado.
+              {{ completionDetail }}
             </p>
           </div>
           <div v-else-if="pendingSubmission" class="space-y-4">
@@ -821,7 +867,7 @@ function submitReview(intent: OrderReviewSubmissionIntent) {
             />
             <UButton
               v-if="createdOrder"
-              label="Ver pedido"
+              :label="viewDocumentLabel"
               icon="i-lucide-eye"
               color="neutral"
               variant="soft"
@@ -829,7 +875,7 @@ function submitReview(intent: OrderReviewSubmissionIntent) {
               @click="navigateTo(orderDetailLocation(createdOrder.id))"
             />
             <UButton
-              v-if="createdOrder"
+              v-if="createdOrder && createdOrder.status.key !== 'borrador'"
               label="Imprimir ticket"
               icon="i-lucide-printer"
               class="justify-center"

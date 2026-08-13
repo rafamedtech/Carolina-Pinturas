@@ -46,7 +46,7 @@ const emit = defineEmits<{
         @click="emit('saveDraft')"
       />
       <UButton
-        v-if="!quoteMode"
+        v-if="!quoteMode || editing"
         type="submit"
         :label="editing ? 'Revisar cambios' : 'Revisar pedido'"
         icon="i-lucide-clipboard-check"

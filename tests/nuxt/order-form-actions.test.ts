@@ -34,4 +34,36 @@ describe('OrderFormActions', () => {
     expect(wrapper.text()).toContain('Revisar cambios')
     expect(wrapper.text()).not.toContain('Guardar como cotización')
   })
+
+  it('permite revisar los cambios al editar una cotización', async () => {
+    const wrapper = await mountSuspended(OrderFormActions, {
+      props: {
+        saving: false,
+        savingDraft: false,
+        disabled: false,
+        editing: true,
+        quoteMode: true,
+        showSaveDraft: false
+      }
+    })
+
+    expect(wrapper.text()).toContain('Cancelar')
+    expect(wrapper.findAll('button').map(button => button.text().trim()))
+      .toEqual(['Revisar cambios'])
+  })
+
+  it('deshabilita revisar cambios cuando la cotización no fue modificada', async () => {
+    const wrapper = await mountSuspended(OrderFormActions, {
+      props: {
+        saving: false,
+        savingDraft: false,
+        disabled: true,
+        editing: true,
+        quoteMode: true,
+        showSaveDraft: false
+      }
+    })
+
+    expect(wrapper.get('button').attributes('disabled')).toBeDefined()
+  })
 })
