@@ -15,16 +15,34 @@ const props = withDefaults(defineProps<{
   orderId?: string
   saleType?: OrderSaleType
 }>(), {
-  mode: 'order',
+  mode: undefined,
   orderId: undefined,
   saleType: undefined
 })
 const route = useRoute()
 const router = useRouter()
-const isQuoteMode = computed(() => props.mode === 'quote')
-const isCounterSale = computed(() => props.saleType === 'counter')
-const isDeliverySale = computed(() => props.saleType === 'delivery')
 const isEditing = computed(() => Boolean(props.orderId))
+const {
+  data: existingOrder,
+  status: existingOrderStatus,
+  error: existingOrderError
+} = useFetch<SalesOrderDetail>(
+  () => `/api/orders/${encodeURIComponent(props.orderId || '')}`,
+  {
+    key: `edit-order-${props.orderId || 'new'}`,
+    lazy: true,
+    immediate: isEditing.value
+  }
+)
+const isQuoteMode = computed(() =>
+  props.mode === 'quote' || (isEditing.value && existingOrder.value?.status.key === 'borrador')
+)
+const isCounterSale = computed(() =>
+  props.saleType === 'counter' || Boolean(isEditing.value && existingOrder.value?.isCounterSale)
+)
+const isDeliverySale = computed(() =>
+  props.saleType === 'delivery' || Boolean(isEditing.value && existingOrder.value && !existingOrder.value.isCounterSale)
+)
 const returnPath = computed(() => orderListReturnPath(route.query.returnTo))
 
 function orderDetailLocation(orderId: string) {
@@ -44,7 +62,7 @@ const documentNounCapitalized = computed(() =>
 const documentWithArticle = computed(() => isQuoteMode.value ? 'la cotización' : 'el pedido')
 const documentOf = computed(() => isQuoteMode.value ? 'de la cotización' : 'del pedido')
 const pageTitle = computed(() => isEditing.value
-  ? 'Editar cotización'
+  ? isQuoteMode.value ? 'Editar cotización' : 'Editar pedido'
   : isQuoteMode.value
     ? 'Nueva cotización'
     : props.saleType === 'counter'
@@ -151,18 +169,6 @@ const orderDiscountAmount = computed(() =>
   discountAmountOf(total.value, state.discountType, state.discountValue))
 const grandTotal = computed(() => total.value - orderDiscountAmount.value)
 const {
-  data: existingOrder,
-  status: existingOrderStatus,
-  error: existingOrderError
-} = useFetch<SalesOrderDetail>(
-  () => `/api/orders/${encodeURIComponent(props.orderId || '')}`,
-  {
-    key: `edit-quote-${props.orderId || 'new'}`,
-    lazy: true,
-    immediate: isEditing.value
-  }
-)
-const {
   data: customers,
   status: customerStatus,
   error: customerError
@@ -203,7 +209,7 @@ const { data: tagOptions } = useFetch<string[]>('/api/orders/tags', {
 })
 
 const availableCustomers = computed(() =>
-  isCounterSale.value
+  isCounterSale.value && !isEditing.value
     ? counterCustomer.value ? [counterCustomer.value] : []
     : customers.value?.results || []
 )
@@ -244,14 +250,14 @@ watch(
 )
 
 const existingOrderStatusError = computed(() =>
-  existingOrder.value && existingOrder.value.status.key !== 'borrador'
-    ? 'Este documento ya no es una cotización y no puede editarse.'
+  existingOrder.value?.status.key === 'entregado'
+    ? 'Los pedidos entregados no se pueden editar.'
     : ''
 )
 const catalogError = computed(() =>
   existingOrderStatusError.value
   || existingOrderError.value?.data?.statusMessage
-  || (isCounterSale.value
+  || (isCounterSale.value && !isEditing.value
     ? counterCustomerError.value?.data?.statusMessage
     : customerError.value?.data?.statusMessage)
   || productError.value?.data?.statusMessage
@@ -263,7 +269,7 @@ const catalogsLoading = computed(() =>
   isHydrated.value
   && (
     (isEditing.value && existingOrderStatus.value !== 'success')
-    || (isCounterSale.value
+    || (isCounterSale.value && !isEditing.value
       ? counterCustomerStatus.value === 'pending'
       : customerStatus.value === 'pending')
     || productStatus.value === 'pending'
@@ -278,7 +284,13 @@ watch(existingOrder, (value) => {
 
   state.customerId = value.customer.id
   state.statusKey = value.status.key
+  state.repartidorId = value.repartidor?.id || ''
   state.orderDate = value.orderDate
+  state.promisedDate = value.promisedDate || ''
+  state.paymentStatus = value.paymentStatus
+  state.paymentMethod = value.paymentMethod || ''
+  state.paymentDate = value.paymentDate || ''
+  state.requiresInvoice = value.requiresInvoice
   state.tags = value.tags || []
   state.discountType = value.discountType
   state.discountValue = value.discountValue
@@ -318,7 +330,7 @@ watch(existingOrder, (value) => {
   initializedOrderId.value = value.id
 }, { immediate: true })
 const formDisabled = computed(() => saving.value || Boolean(catalogError.value))
-const mayChooseInitialStatus = computed(() => user.value?.role === 'admin')
+const mayChooseInitialStatus = computed(() => !isEditing.value && user.value?.role === 'admin')
 const mayManagePayment = computed(() =>
   Boolean(user.value && canManageOrderLogistics(user.value.role)))
 // Mismo permiso que el editor de precio del detalle del pedido.
@@ -344,9 +356,11 @@ const sendStatusLabel = computed(() =>
   || sendStatusKey.value
 )
 const sendButtonLabel = computed(() =>
-  mayChooseInitialStatus.value
-    ? `Guardar como ${sendStatusLabel.value.toLowerCase()}`
-    : 'Enviar'
+  isEditing.value
+    ? 'Guardar cambios'
+    : mayChooseInitialStatus.value
+      ? `Guardar como ${sendStatusLabel.value.toLowerCase()}`
+      : 'Enviar'
 )
 const repartidorRequired = computed(() => !isQuoteMode.value)
 const sendBlockedByRepartidor = computed(() =>
@@ -480,9 +494,15 @@ async function confirmSubmit(
           method: 'PUT',
           body: {
             customerId: data.customerId,
+            repartidorId: data.repartidorId || null,
             orderDate: data.orderDate,
+            promisedDate: data.promisedDate || null,
             observations: data.observations || null,
+            requiresInvoice: data.requiresInvoice,
             tags: data.tags,
+            paymentStatus: data.paymentStatus,
+            paymentMethod: data.paymentMethod || null,
+            paymentDate: data.paymentDate || null,
             discountType: data.discountType,
             discountValue: data.discountValue,
             lines: requestLines,
@@ -513,7 +533,7 @@ async function confirmSubmit(
 
     toast.add({
       title: isEditing.value
-        ? `Cotización ${order.number} actualizada`
+        ? `${documentNounCapitalized.value} ${order.number} actualizado${isQuoteMode.value ? 'a' : ''}`
         : statusKey === 'borrador'
           ? `Cotización ${order.number} guardada`
           : intent === 'save-and-pay'
@@ -557,11 +577,11 @@ function submitReview(intent: OrderReviewSubmissionIntent) {
       <UDashboardNavbar :title="pageTitle">
         <template #leading>
           <UButton
-            :to="returnPath"
+            :to="cancelPath"
             icon="i-lucide-arrow-left"
             color="neutral"
             variant="ghost"
-            aria-label="Volver a ventas"
+            :aria-label="isEditing ? `Volver al detalle ${documentOf}` : 'Volver a ventas'"
           />
         </template>
       </UDashboardNavbar>
@@ -603,6 +623,7 @@ function submitReview(intent: OrderReviewSubmissionIntent) {
             :tag-options="tagOptions"
             :loading="catalogsLoading"
             :disabled="formDisabled"
+            :lock-order-fields="isEditing && !isQuoteMode"
             :repartidor-required="repartidorRequired"
             :show-status="mayChooseInitialStatus && !isQuoteMode"
             :show-payment="mayManagePayment"
@@ -641,7 +662,8 @@ function submitReview(intent: OrderReviewSubmissionIntent) {
           :saving-draft="savingDraft"
           :disabled="!canSubmit"
           :quote-mode="isQuoteMode"
-          :show-save-draft="!isCounterSale"
+          :editing="isEditing"
+          :show-save-draft="!isEditing && !isCounterSale"
           :cancel-to="cancelPath"
           @save-draft="saveAsQuote"
         />
@@ -817,6 +839,7 @@ function submitReview(intent: OrderReviewSubmissionIntent) {
           </div>
           <OrdersOrderReviewActions
             v-else
+            :editing="isEditing"
             :is-delivery-sale="isDeliverySale"
             :is-counter-sale="isCounterSale"
             :may-save-draft="maySaveDraft"

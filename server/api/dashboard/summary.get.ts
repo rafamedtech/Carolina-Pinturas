@@ -53,8 +53,8 @@ export default eventHandler(async (event) => {
     orderDate: { gte: start, lt: end }
   } satisfies Prisma.SalesOrderWhereInput
 
-  const [orders, previous] = await prisma.$transaction(async (tx) => {
-    const orders = await tx.salesOrder.findMany({
+  const [orders, previous] = await Promise.all([
+    prisma.salesOrder.findMany({
       where: salesWhere,
       select: {
         id: true,
@@ -78,17 +78,15 @@ export default eventHandler(async (event) => {
         }
       },
       orderBy: [{ orderDate: 'desc' }, { folio: 'desc' }]
-    })
-    const previous = await tx.salesOrder.aggregate({
+    }),
+    prisma.salesOrder.aggregate({
       where: {
         statusKey: { notIn: EXCLUDED_SALES_STATUSES },
         orderDate: { gte: previousStart, lt: start }
       },
       _sum: { total: true }
     })
-
-    return [orders, previous] as const
-  })
+  ] as const)
 
   const sales = orders.reduce((sum, order) => sum + numeric(order.total), 0)
   const previousSales = numeric(previous._sum.total)

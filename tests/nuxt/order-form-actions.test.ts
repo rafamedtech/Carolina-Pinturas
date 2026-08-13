@@ -18,4 +18,20 @@ describe('OrderFormActions', () => {
     expect(wrapper.text()).not.toContain('Guardar como cotización')
     expect(wrapper.text()).toContain('Revisar pedido')
   })
+
+  it('identifica la revisión de cambios al editar', async () => {
+    const wrapper = await mountSuspended(OrderFormActions, {
+      props: {
+        saving: false,
+        savingDraft: false,
+        disabled: false,
+        editing: true,
+        quoteMode: false,
+        showSaveDraft: false
+      }
+    })
+
+    expect(wrapper.text()).toContain('Revisar cambios')
+    expect(wrapper.text()).not.toContain('Guardar como cotización')
+  })
 })

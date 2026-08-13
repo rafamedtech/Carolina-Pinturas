@@ -34,6 +34,11 @@ const quantityEditingItem = shallowRef<SalesOrderItem | null>(null)
 const editQuantity = shallowRef(0)
 const savingQuantity = shallowRef(false)
 const quantityError = shallowRef('')
+const observationsEditOpen = shallowRef(false)
+const observationsEditingItem = shallowRef<SalesOrderItem | null>(null)
+const editObservations = shallowRef('')
+const savingObservations = shallowRef(false)
+const observationsError = shallowRef('')
 
 function openEdit(item: SalesOrderItem) {
   editingItem.value = item
@@ -122,6 +127,52 @@ async function submitQuantityEdit() {
   }
 }
 
+function openObservationsEdit(item: SalesOrderItem) {
+  observationsEditingItem.value = item
+  editObservations.value = item.observations || ''
+  observationsError.value = ''
+  observationsEditOpen.value = true
+}
+
+const canSaveObservations = computed(() =>
+  Boolean(
+    observationsEditingItem.value
+    && editObservations.value.trim() !== (observationsEditingItem.value.observations || '').trim()
+    && editObservations.value.trim().length <= 5000
+  )
+)
+
+async function submitObservationsEdit() {
+  if (!observationsEditingItem.value || !canSaveObservations.value || savingObservations.value) return
+  savingObservations.value = true
+  observationsError.value = ''
+
+  try {
+    const updated = await $fetch<SalesOrderDetail>(
+      `/api/orders/${encodeURIComponent(props.orderId)}/items/${encodeURIComponent(observationsEditingItem.value.id)}/observaciones`,
+      {
+        method: 'PATCH',
+        body: {
+          observations: editObservations.value.trim() || null,
+          version: props.version
+        }
+      }
+    )
+    emit('updated', updated)
+    observationsEditOpen.value = false
+    toast.add({
+      title: 'Observaciones actualizadas',
+      color: 'success',
+      icon: 'i-lucide-circle-check'
+    })
+  } catch (fetchError: unknown) {
+    const response = fetchError as { data?: { statusMessage?: string }, message?: string }
+    observationsError.value = response.data?.statusMessage || response.message || 'No se pudieron actualizar las observaciones.'
+  } finally {
+    savingObservations.value = false
+  }
+}
+
 const historyOpen = shallowRef(false)
 const historyItem = shallowRef<SalesOrderItem | null>(null)
 
@@ -147,9 +198,23 @@ const columns: TableColumn<SalesOrderItem>[] = [{
 }, {
   accessorKey: 'observations',
   header: 'Observaciones',
-  cell: ({ row }) => row.original.observations
-    ? h('span', { class: 'text-sm' }, row.original.observations)
-    : h('span', { class: 'text-muted' }, '—')
+  cell: ({ row }) => h('div', { class: 'flex items-start gap-1' }, [
+    h(
+      'span',
+      { class: row.original.observations ? 'whitespace-pre-wrap text-sm' : 'text-muted' },
+      row.original.observations || '—'
+    ),
+    props.editable
+      ? h(UButton, {
+          'icon': 'i-lucide-pencil',
+          'color': 'neutral',
+          'variant': 'ghost',
+          'size': 'xs',
+          'aria-label': `Editar observaciones de ${row.original.name}`,
+          'onClick': () => openObservationsEdit(row.original)
+        })
+      : null
+  ])
 }, {
   accessorKey: 'quantity',
   header: () => h('div', { class: 'text-right' }, 'Cantidad'),
@@ -289,13 +354,24 @@ const columns: TableColumn<SalesOrderItem>[] = [{
           </div>
         </div>
 
-        <div v-if="item.observations">
+        <div v-if="item.observations || editable">
           <p class="text-sm text-muted">
             Observaciones
           </p>
-          <p class="text-sm whitespace-pre-wrap">
-            {{ item.observations }}
-          </p>
+          <div class="flex items-start gap-1">
+            <p :class="item.observations ? 'whitespace-pre-wrap text-sm' : 'text-sm text-muted'">
+              {{ item.observations || '—' }}
+            </p>
+            <UButton
+              v-if="editable"
+              icon="i-lucide-pencil"
+              color="neutral"
+              variant="ghost"
+              size="xs"
+              :aria-label="`Editar observaciones de ${item.name}`"
+              @click="openObservationsEdit(item)"
+            />
+          </div>
         </div>
 
         <div class="flex items-end justify-between gap-4 border-t border-default pt-3">
@@ -379,6 +455,57 @@ const columns: TableColumn<SalesOrderItem>[] = [{
             label="Guardar"
             :loading="savingPrice"
             @click="submitPriceEdit"
+          />
+        </div>
+      </template>
+    </UModal>
+
+    <UModal v-model:open="observationsEditOpen" title="Editar observaciones">
+      <template #body>
+        <div v-if="observationsEditingItem" class="space-y-4">
+          <div>
+            <p class="text-sm text-muted">
+              Producto
+            </p>
+            <p class="font-medium">
+              {{ observationsEditingItem.name }}
+            </p>
+          </div>
+
+          <UFormField label="Observaciones nuevas">
+            <UTextarea
+              v-model="editObservations"
+              :maxlength="5000"
+              :rows="5"
+              placeholder="Agrega indicaciones para esta partida…"
+              class="w-full"
+            />
+          </UFormField>
+
+          <UAlert
+            v-if="observationsError"
+            color="error"
+            variant="subtle"
+            :description="observationsError"
+            icon="i-lucide-circle-alert"
+          />
+        </div>
+      </template>
+
+      <template #footer>
+        <div class="flex w-full justify-end gap-2">
+          <UButton
+            label="Cancelar"
+            color="neutral"
+            variant="outline"
+            :disabled="savingObservations"
+            @click="observationsEditOpen = false"
+          />
+          <UButton
+            label="Guardar"
+            :loading="savingObservations"
+            :disabled="!canSaveObservations"
+            @click="submitObservationsEdit"
           />
         </div>
       </template>

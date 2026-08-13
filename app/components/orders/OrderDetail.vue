@@ -22,8 +22,6 @@ const statusNote = shallowRef('')
 const savingStatus = shallowRef(false)
 const selectedRepartidor = shallowRef('')
 const savingRepartidor = shallowRef(false)
-const selectedTags = shallowRef<string[]>([])
-const savingTags = shallowRef(false)
 const hiddenSeguimientoStatusKeys = new Set(['borrador', 'ingresado', 'facturado', 'cancelado'])
 const toast = useToast()
 const { user } = useAuth()
@@ -42,11 +40,6 @@ const { data: statuses } = useFetch<OrderStatus[]>('/api/orders/statuses', {
   default: () => []
 })
 const { data: repartidores } = useRepartidoresCatalog()
-const { data: tagOptions } = useFetch<string[]>('/api/orders/tags', {
-  key: 'order-tags',
-  lazy: true,
-  default: () => []
-})
 
 watch(() => order.value?.status.key, (value) => {
   selectedStatus.value = value || ''
@@ -56,21 +49,8 @@ watch(() => order.value?.repartidor?.id, (value) => {
   selectedRepartidor.value = value || ''
 }, { immediate: true })
 
-watch(() => order.value?.tags, (value) => {
-  selectedTags.value = value || []
-}, { immediate: true })
-
 const repartidorUnchanged = computed(() => selectedRepartidor.value === (order.value?.repartidor?.id || ''))
 const statusUnchanged = computed(() => selectedStatus.value === (order.value?.status.key || ''))
-const tagsUnchanged = computed(() =>
-  selectedTags.value.join('|') === (order.value?.tags || []).join('|'))
-const tagItems = computed(() => [...new Set([...(tagOptions.value || []), ...selectedTags.value])])
-
-function onCreateTag(value: string) {
-  const tag = value.trim()
-  if (!tag || selectedTags.value.includes(tag)) return
-  selectedTags.value = [...selectedTags.value, tag]
-}
 
 // A borrador order is a quotation document; once it advances to ingresado /
 // confirmado (or later) it becomes a regular order with delivery logistics.
@@ -101,11 +81,29 @@ const mayCancelOrder = computed(() =>
     && order.value.status.key !== 'cancelado'
   )
 )
+const mayEditOrder = computed(() =>
+  Boolean(user.value && canCreateOrders(user.value.role) && !isQuote.value)
+)
+const orderIsDelivered = computed(() => order.value?.status.key === 'entregado')
 const documentOptions = computed<DropdownMenuItem[][]>(() => {
-  const groups: DropdownMenuItem[][] = [[
+  const documentActions: DropdownMenuItem[] = [
     { label: 'Ver documento', icon: 'i-lucide-eye', onSelect: () => openCotizacion() },
     { label: 'Descargar PDF', icon: 'i-lucide-download', onSelect: () => openCotizacion('pdf') }
-  ]]
+  ]
+
+  if (mayEditOrder.value && order.value) {
+    documentActions.unshift({
+      label: 'Editar pedido',
+      icon: 'i-lucide-pencil',
+      disabled: orderIsDelivered.value,
+      to: {
+        path: `/ventas/${order.value.id}/editar`,
+        query: { returnTo: backPath.value }
+      }
+    })
+  }
+
+  const groups: DropdownMenuItem[][] = [documentActions]
 
   if (!isQuote.value) {
     groups.push([
@@ -152,11 +150,10 @@ const backPath = computed(() =>
   orderListReturnPath(route.query.returnTo, defaultBackPath.value)
 )
 const savingChanges = computed(() =>
-  savingRepartidor.value || savingStatus.value || savingTags.value
+  savingRepartidor.value || savingStatus.value
 )
 const hasChanges = computed(() =>
   (mayManageLogistics.value && !repartidorUnchanged.value)
-  || (mayManageLogistics.value && !tagsUnchanged.value)
   || !statusUnchanged.value
 )
 
@@ -228,40 +225,6 @@ async function updateRepartidor() {
   }
 }
 
-async function updateTags() {
-  if (!mayManageLogistics.value || !order.value || tagsUnchanged.value) return
-  savingTags.value = true
-
-  try {
-    order.value = await $fetch<SalesOrderDetail>(
-      `/api/orders/${encodeURIComponent(props.orderId)}/tags`,
-      {
-        method: 'PATCH',
-        body: {
-          tags: selectedTags.value,
-          version: order.value.version
-        }
-      }
-    )
-    toast.add({
-      title: 'Etiquetas actualizadas',
-      color: 'success',
-      icon: 'i-lucide-circle-check'
-    })
-  } catch (fetchError: unknown) {
-    const response = fetchError as { data?: { statusMessage?: string }, message?: string }
-    toast.add({
-      title: 'No se pudieron actualizar las etiquetas',
-      description: response.data?.statusMessage || response.message || 'Intenta de nuevo.',
-      color: 'error',
-      icon: 'i-lucide-circle-alert'
-    })
-    await refresh()
-  } finally {
-    savingTags.value = false
-  }
-}
-
 async function updateStatus() {
   if (!order.value || selectedStatus.value === order.value.status.key) return
   savingStatus.value = true
@@ -303,7 +266,6 @@ async function saveChanges() {
   if (!hasChanges.value || savingChanges.value) return
 
   await updateRepartidor()
-  await updateTags()
   await updateStatus()
 }
 
@@ -614,54 +576,6 @@ async function convertToPedido() {
                   <span v-else class="font-medium">
                     {{ order.repartidor?.name || 'Sin asignar' }}
                   </span>
-                </dd>
-              </div>
-              <div v-if="!isQuote">
-                <dt class="text-sm text-muted">
-                  Etiquetas
-                </dt>
-                <dd class="mt-1">
-                  <USelectMenu
-                    v-if="mayManageLogistics"
-                    v-model="selectedTags"
-                    :items="tagItems"
-                    multiple
-                    :disabled="savingTags"
-                    :create-item="{ when: 'always', position: 'bottom' }"
-                    placeholder="Agregar etiquetas"
-                    class="w-full max-w-xs"
-                    @create="onCreateTag"
-                  >
-                    <template #default="{ modelValue }">
-                      <span v-if="Array.isArray(modelValue) && modelValue.length" class="flex h-6 items-center gap-2 overflow-hidden">
-                        <UBadge
-                          v-for="tag in modelValue"
-                          :key="tag"
-                          class="shrink-0"
-                          color="neutral"
-                          variant="subtle"
-                          size="md"
-                          :label="tag"
-                        />
-                      </span>
-                      <span v-else class="truncate text-dimmed">Agregar etiquetas</span>
-                    </template>
-                    <template #create-item-label="{ item }">
-                      Crear etiqueta “{{ item }}”
-                    </template>
-                  </USelectMenu>
-                  <template v-else>
-                    <div v-if="order.tags.length" class="flex flex-wrap gap-1.5">
-                      <UBadge
-                        v-for="tag in order.tags"
-                        :key="tag"
-                        color="neutral"
-                        variant="subtle"
-                        :label="tag"
-                      />
-                    </div>
-                    <span v-else class="font-medium">Sin etiquetas</span>
-                  </template>
                 </dd>
               </div>
             </dl>

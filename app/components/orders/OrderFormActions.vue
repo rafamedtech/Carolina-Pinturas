@@ -4,10 +4,12 @@ withDefaults(defineProps<{
   savingDraft: boolean
   disabled: boolean
   quoteMode?: boolean
+  editing?: boolean
   showSaveDraft?: boolean
   cancelTo?: string
 }>(), {
   quoteMode: false,
+  editing: false,
   showSaveDraft: true,
   cancelTo: undefined
 })
@@ -46,7 +48,7 @@ const emit = defineEmits<{
       <UButton
         v-if="!quoteMode"
         type="submit"
-        label="Revisar pedido"
+        :label="editing ? 'Revisar cambios' : 'Revisar pedido'"
         icon="i-lucide-clipboard-check"
         class="justify-center"
         :loading="saving && !savingDraft"

@@ -1,8 +1,9 @@
 import type { SiigoCustomer, SiigoProduct } from '~/types/siigo'
 import { ORDER_ENTRY_ROLES } from '~/utils/roleAccess'
 import { requireRole } from '../../utils/auth'
-import { updateQuoteSchema } from '../../utils/order-validation'
-import { updateQuote } from '../../utils/orders'
+import { updateOrderSchema } from '../../utils/order-validation'
+import { updateOrder } from '../../utils/orders'
+import { usePrisma } from '../../utils/prisma'
 import { siigoRequest } from '../../utils/siigo'
 
 export default eventHandler(async (event) => {
@@ -10,26 +11,34 @@ export default eventHandler(async (event) => {
   const id = getRouterParam(event, 'id')
 
   if (!id) {
-    throw createError({ statusCode: 400, statusMessage: 'Falta el identificador de la cotización.' })
+    throw createError({ statusCode: 400, statusMessage: 'Falta el identificador del pedido.' })
   }
 
-  const parsed = updateQuoteSchema.safeParse(await readBody(event))
+  const parsed = updateOrderSchema.safeParse(await readBody(event))
   if (!parsed.success) {
     throw createError({
       statusCode: 400,
-      statusMessage: 'Revisa los datos de la cotización.',
+      statusMessage: 'Revisa los datos del pedido.',
       data: parsed.error.flatten()
     })
   }
 
   const productIds = [...new Set(parsed.data.lines.map(line => line.productId))]
-  const [customer, ...products] = await Promise.all([
+  const repartidorId = parsed.data.repartidorId
+  const [customer, repartidor, ...products] = await Promise.all([
     siigoRequest<SiigoCustomer>(`/v1/customers/${encodeURIComponent(parsed.data.customerId)}`),
+    repartidorId
+      ? usePrisma().repartidor.findUnique({ where: { id: repartidorId } })
+      : Promise.resolve(null),
     ...productIds.map(productId =>
       siigoRequest<SiigoProduct>(`/v1/products/${encodeURIComponent(productId)}`)
     )
   ])
   const productsById = new Map(products.map(product => [product.id, product]))
 
-  return updateQuote(id, parsed.data, user, customer, productsById)
+  if (repartidorId && !repartidor) {
+    throw createError({ statusCode: 422, statusMessage: 'El repartidor seleccionado no está disponible.' })
+  }
+
+  return updateOrder(id, parsed.data, user, customer, productsById, repartidor)
 })

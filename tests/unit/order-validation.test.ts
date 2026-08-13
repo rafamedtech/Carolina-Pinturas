@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import {
   createOrderSchema,
+  updateOrderSchema,
+  updateOrderItemObservationsSchema,
   updateOrderItemQuantitySchema
 } from '../../server/utils/order-validation'
 
@@ -37,6 +39,27 @@ describe('validación de pedidos', () => {
     expect(result.success).toBe(true)
   })
 
+  it('acepta los campos editables de un pedido existente', () => {
+    const result = updateOrderSchema.safeParse({
+      customerId: orderInput.customerId,
+      repartidorId: 'bc54ea0f-6e1a-42da-860a-94242847995b',
+      orderDate: orderInput.orderDate,
+      promisedDate: '2026-07-30',
+      observations: 'Entregar por la tarde',
+      requiresInvoice: true,
+      tags: ['urgente'],
+      paymentStatus: 'pendiente_pago',
+      paymentMethod: 'efectivo',
+      paymentDate: '2026-07-29',
+      discountType: 'porcentaje',
+      discountValue: 0,
+      lines: orderInput.lines,
+      version: 2
+    })
+
+    expect(result.success).toBe(true)
+  })
+
   it('acepta cantidades positivas al editar una partida', () => {
     expect(updateOrderItemQuantitySchema.safeParse({
       quantity: 2.5,
@@ -54,6 +77,30 @@ describe('validación de pedidos', () => {
     if (!result.success) {
       expect(result.error.flatten().fieldErrors.quantity)
         .toContain('La cantidad debe ser mayor a cero.')
+    }
+  })
+
+  it('permite actualizar o eliminar las observaciones de una partida', () => {
+    expect(updateOrderItemObservationsSchema.safeParse({
+      observations: 'Entregar en cubeta separada',
+      version: 1
+    }).success).toBe(true)
+    expect(updateOrderItemObservationsSchema.safeParse({
+      observations: null,
+      version: 1
+    }).success).toBe(true)
+  })
+
+  it('limita las observaciones de una partida a 5000 caracteres', () => {
+    const result = updateOrderItemObservationsSchema.safeParse({
+      observations: 'a'.repeat(5001),
+      version: 1
+    })
+
+    expect(result.success).toBe(false)
+    if (!result.success) {
+      expect(result.error.flatten().fieldErrors.observations)
+        .toContain('Las observaciones no pueden exceder 5000 caracteres.')
     }
   })
 })

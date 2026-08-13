@@ -13,6 +13,7 @@ const props = withDefaults(defineProps<{
   tagOptions: string[]
   loading: boolean
   disabled: boolean
+  lockOrderFields?: boolean
   repartidorRequired?: boolean
   showStatus?: boolean
   showPayment?: boolean
@@ -21,6 +22,7 @@ const props = withDefaults(defineProps<{
   counterSale?: boolean
 }>(), {
   repartidorRequired: false,
+  lockOrderFields: false,
   showStatus: true,
   showPayment: true,
   showPaymentSelectors: true,
@@ -166,7 +168,7 @@ function selectCounterCustomer() {
           :items="customerOptions"
           value-key="value"
           :loading="loading"
-          :disabled="disabled"
+          :disabled="disabled || props.lockOrderFields"
           :create-item="{ when: 'always', position: 'bottom' }"
           placeholder="Buscar cliente"
           class="w-full"
@@ -178,7 +180,7 @@ function selectCounterCustomer() {
         </USelectMenu>
         <template v-if="!props.counterSale" #hint>
           <UButton
-            v-if="counterCustomer"
+            v-if="counterCustomer && !props.lockOrderFields"
             :label="`Usar ${COUNTER_CUSTOMER_NAME}`"
             color="neutral"
             variant="link"
@@ -214,7 +216,7 @@ function selectCounterCustomer() {
       </div>
 
       <OrdersOrderCustomerCreateModal
-        v-if="!props.counterSale"
+        v-if="!props.counterSale && !props.lockOrderFields"
         v-model:open="createCustomerOpen"
         :customers="props.customers"
         :initial-name="createCustomerName"
@@ -245,7 +247,7 @@ function selectCounterCustomer() {
       >
         <OrdersOrderDatePicker
           v-model="orderDateValue"
-          :disabled="disabled"
+          :disabled="disabled || props.lockOrderFields"
           placeholder="Seleccionar fecha del pedido"
         />
       </UFormField>
@@ -295,7 +297,8 @@ function selectCounterCustomer() {
         v-if="!props.quoteMode
           && !props.counterSale
           && props.showPayment
-          && props.showPaymentSelectors"
+          && props.showPaymentSelectors
+          && !props.lockOrderFields"
         name="paymentStatus"
         label="Estado de pago"
         required
@@ -310,7 +313,10 @@ function selectCounterCustomer() {
       </UFormField>
 
       <UFormField
-        v-if="!props.quoteMode && props.showPayment && props.showPaymentSelectors"
+        v-if="!props.quoteMode
+          && props.showPayment
+          && props.showPaymentSelectors
+          && !props.lockOrderFields"
         name="paymentMethod"
         label="Método de pago"
       >
@@ -325,14 +331,18 @@ function selectCounterCustomer() {
       </UFormField>
 
       <UFormField
-        v-if="!props.quoteMode && !props.counterSale"
+        v-if="!props.quoteMode && !props.counterSale && !props.lockOrderFields"
         name="requiresInvoice"
         label="Facturación"
       >
         <USwitch v-model="requiresInvoice" :disabled="disabled" label="Requiere factura" />
       </UFormField>
 
-      <UFormField v-if="!props.counterSale" name="tags" label="Etiquetas">
+      <UFormField
+        v-if="!props.counterSale && !props.lockOrderFields"
+        name="tags"
+        label="Etiquetas"
+      >
         <!-- Mismo caveat de create-item que el selector de cliente: `position`
           explícito o el ítem de creación no se renderiza. -->
         <USelectMenu

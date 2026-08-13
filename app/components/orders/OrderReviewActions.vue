@@ -1,7 +1,8 @@
 <script setup lang="ts">
 type OrderReviewSubmissionIntent = 'draft' | 'save' | 'save-and-pay'
 
-defineProps<{
+withDefaults(defineProps<{
+  editing?: boolean
   isDeliverySale: boolean
   isCounterSale: boolean
   maySaveDraft: boolean
@@ -11,7 +12,9 @@ defineProps<{
   sendBlocked: boolean
   sendButtonLabel: string
   documentNoun: string
-}>()
+}>(), {
+  editing: false
+})
 
 const emit = defineEmits<{
   edit: []
@@ -22,7 +25,7 @@ const emit = defineEmits<{
 <template>
   <div class="flex w-full flex-col gap-2 sm:flex-row sm:justify-end">
     <UButton
-      :label="isCounterSale || isDeliverySale ? 'Editar' : `Editar ${documentNoun}`"
+      :label="editing || isCounterSale || isDeliverySale ? 'Editar' : `Editar ${documentNoun}`"
       icon="i-lucide-pencil"
       color="neutral"
       variant="outline"
@@ -32,8 +35,8 @@ const emit = defineEmits<{
     />
 
     <UButton
-      v-if="isDeliverySale"
-      label="Enviar"
+      v-if="editing || isDeliverySale"
+      :label="editing ? 'Guardar cambios' : 'Enviar'"
       icon="i-lucide-send"
       class="justify-center"
       :loading="saving && submissionIntent === 'save'"

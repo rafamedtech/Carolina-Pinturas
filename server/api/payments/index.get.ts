@@ -71,8 +71,8 @@ export default eventHandler(async (event): Promise<PaymentListResponse> => {
     ]
   }
   const prisma = usePrisma()
-  const [payments, totalResults, totalAmount] = await prisma.$transaction(async (tx) => {
-    const payments = await tx.salesOrderPayment.findMany({
+  const [payments, totalResults, totalAmount] = await Promise.all([
+    prisma.salesOrderPayment.findMany({
       where,
       include: {
         order: {
@@ -86,15 +86,13 @@ export default eventHandler(async (event): Promise<PaymentListResponse> => {
       orderBy: [{ paymentDate: 'desc' }, { createdAt: 'desc' }],
       skip: (page - 1) * pageSize,
       take: pageSize
-    })
-    const totalResults = await tx.salesOrderPayment.count({ where })
-    const totalAmount = await tx.salesOrderPayment.aggregate({
+    }),
+    prisma.salesOrderPayment.count({ where }),
+    prisma.salesOrderPayment.aggregate({
       where,
       _sum: { amount: true }
     })
-
-    return [payments, totalResults, totalAmount] as const
-  })
+  ] as const)
 
   return {
     results: payments.map(payment => ({

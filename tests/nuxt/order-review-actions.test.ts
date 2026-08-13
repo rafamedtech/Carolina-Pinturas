@@ -36,4 +36,13 @@ describe('OrderReviewActions', () => {
     expect(wrapper.text()).toContain('Guardar pedido')
     expect(wrapper.text()).toContain('Guardar y pagar')
   })
+
+  it('muestra una sola acción de guardado al editar un pedido', async () => {
+    const wrapper = await mountSuspended(OrderReviewActions, {
+      props: { ...baseProps, editing: true, isDeliverySale: true }
+    })
+
+    expect(wrapper.findAll('button').map(button => button.text().trim()))
+      .toEqual(['Editar', 'Guardar cambios'])
+  })
 })

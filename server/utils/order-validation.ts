@@ -76,11 +76,17 @@ export const createOrderSchema = orderFieldsSchema.superRefine((data, ctx) => {
   }
 })
 
-export const updateQuoteSchema = orderFieldsSchema.pick({
+export const updateOrderSchema = orderFieldsSchema.pick({
   customerId: true,
+  repartidorId: true,
   orderDate: true,
+  promisedDate: true,
   observations: true,
+  requiresInvoice: true,
   tags: true,
+  paymentStatus: true,
+  paymentMethod: true,
+  paymentDate: true,
   discountType: true,
   discountValue: true,
   lines: true
@@ -120,6 +126,11 @@ export const updateOrderItemQuantitySchema = z.object({
   version: z.number().int().positive()
 })
 
+export const updateOrderItemObservationsSchema = z.object({
+  observations: z.string().trim().max(5000, 'Las observaciones no pueden exceder 5000 caracteres.').nullable(),
+  version: z.number().int().positive()
+})
+
 // IPv4 literal only: hostnames are rejected to avoid DNS rebinding on the
 // server-side printer socket (see server/utils/ticket-printer.ts).
 export const ticketPrintSchema = z.object({
@@ -129,11 +140,12 @@ export const ticketPrintSchema = z.object({
 })
 
 export type CreateOrderInput = z.output<typeof createOrderSchema>
-export type UpdateQuoteInput = z.output<typeof updateQuoteSchema>
+export type UpdateOrderInput = z.output<typeof updateOrderSchema>
 export type UpdateOrderStatusInput = z.output<typeof updateOrderStatusSchema>
 export type UpdateOrderRemisionInput = z.output<typeof updateOrderRemisionSchema>
 export type UpdateOrderRepartidorInput = z.output<typeof updateOrderRepartidorSchema>
 export type UpdateOrderTagsInput = z.output<typeof updateOrderTagsSchema>
 export type UpdateOrderItemPriceInput = z.output<typeof updateOrderItemPriceSchema>
 export type UpdateOrderItemQuantityInput = z.output<typeof updateOrderItemQuantitySchema>
+export type UpdateOrderItemObservationsInput = z.output<typeof updateOrderItemObservationsSchema>
 export type TicketPrintInput = z.output<typeof ticketPrintSchema>

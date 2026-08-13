@@ -2,9 +2,9 @@
 const route = useRoute()
 const orderId = computed(() => String(route.params.id))
 
-useSeoMeta({ title: 'Editar cotización' })
+useSeoMeta({ title: 'Editar pedido' })
 </script>
 
 <template>
-  <OrdersOrderEditor mode="quote" :order-id="orderId" />
+  <OrdersOrderEditor :order-id="orderId" />
 </template>

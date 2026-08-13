@@ -6,6 +6,7 @@ import type { ComponentPublicInstance } from 'vue'
 import { USelectMenu } from '#components'
 import OrderCustomerFields from '~/components/orders/OrderCustomerFields.vue'
 import OrderCustomerCreateModal from '~/components/orders/OrderCustomerCreateModal.vue'
+import OrderDatePicker from '~/components/orders/OrderDatePicker.vue'
 import type { SiigoCustomer } from '~/types/siigo'
 
 const existingCustomer: SiigoCustomer = {
@@ -39,10 +40,14 @@ const counterCustomer: SiigoCustomer = {
 }
 
 let wrapper: VueWrapper | null = null
+type DisabledFieldWrapper = VueWrapper<ComponentPublicInstance<{
+  disabled?: boolean
+}>>
 
 async function mountFields(options: {
   counterSale?: boolean
   customerId?: string
+  lockOrderFields?: boolean
   showPaymentSelectors?: boolean
 } = {}) {
   wrapper = await mountSuspended(OrderCustomerFields, {
@@ -53,6 +58,7 @@ async function mountFields(options: {
       tagOptions: [],
       loading: false,
       disabled: false,
+      lockOrderFields: options.lockOrderFields || false,
       customerId: options.customerId || '',
       statusKey: 'borrador',
       repartidorId: '',
@@ -73,7 +79,7 @@ async function mountFields(options: {
 
 function customerSelect(mounted: VueWrapper) {
   // El primer USelectMenu del formulario es el selector de cliente.
-  return mounted.findAllComponents(USelectMenu)[0] as unknown as VueWrapper<ComponentPublicInstance>
+  return mounted.findAllComponents(USelectMenu)[0] as unknown as DisabledFieldWrapper
 }
 
 afterEach(() => {
@@ -118,6 +124,25 @@ describe('OrderCustomerFields', () => {
     expect(text.indexOf('Fecha del pedido')).toBeLessThan(text.indexOf('Fecha de pago'))
     expect(text.indexOf('Fecha de pago')).toBeLessThan(text.indexOf('Fecha de entrega'))
     expect(text.indexOf('Fecha de entrega')).toBeLessThan(text.indexOf('Repartidor'))
+  })
+
+  it('oculta los campos restringidos al editar un pedido', async () => {
+    const mounted = await mountFields({
+      customerId: existingCustomer.id,
+      lockOrderFields: true
+    })
+
+    const orderDatePicker = mounted.findAllComponents(OrderDatePicker)[0] as unknown as DisabledFieldWrapper
+
+    expect(customerSelect(mounted).props('disabled')).toBe(true)
+    expect(orderDatePicker.props('disabled')).toBe(true)
+    expect(mounted.text()).not.toContain('Estado de pago')
+    expect(mounted.text()).not.toContain('Método de pago')
+    expect(mounted.text()).not.toContain('Facturación')
+    expect(mounted.text()).not.toContain('Requiere factura')
+    expect(mounted.text()).not.toContain('Etiquetas')
+    expect(mounted.findComponent(OrderCustomerCreateModal).exists()).toBe(false)
+    expect(mounted.text()).not.toContain('Usar MOSTRADOR .')
   })
 
   it('selecciona al cliente MOSTRADOR . desde la acción de cliente genérico', async () => {

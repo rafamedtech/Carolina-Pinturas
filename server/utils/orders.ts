@@ -4,13 +4,14 @@ import type { AppUser, SiigoCustomer, SiigoProduct } from '~/types/siigo'
 import type { SalesOrderDetail, SalesOrderListItem } from '~/types/orders'
 import type {
   CreateOrderInput,
-  UpdateQuoteInput,
+  UpdateOrderInput,
   UpdateOrderRemisionInput,
   UpdateOrderRepartidorInput,
   UpdateOrderTagsInput,
   UpdateOrderStatusInput,
   UpdateOrderItemPriceInput,
-  UpdateOrderItemQuantityInput
+  UpdateOrderItemQuantityInput,
+  UpdateOrderItemObservationsInput
 } from './order-validation'
 import { STATUS_KEYS_REQUIRING_REPARTIDOR } from './order-validation'
 import { usePrisma } from './prisma'
@@ -575,7 +576,7 @@ export async function createOrder(
     ? new Date(`${input.paymentDate}T00:00:00.000Z`)
     : initialPaymentDate
 
-  const created = await prisma.$transaction(async (tx) => {
+  const createdOrderId = await prisma.$transaction(async (tx) => {
     const status = await tx.orderStatus.findFirst({
       where: { key: statusKey, isActive: true }
     })
@@ -660,21 +661,24 @@ export async function createOrder(
       }
     })
 
-    return tx.salesOrder.findUniqueOrThrow({
-      where: { id: order.id },
-      include: orderDetailInclude
-    })
+    return order.id
   }, ORDER_WRITE_TRANSACTION_OPTIONS)
 
-  return detail(created)
+  return getOrder(createdOrderId, user)
 }
 
-export async function updateQuote(
+export async function updateOrder(
   id: string,
-  input: UpdateQuoteInput,
+  input: UpdateOrderInput,
   user: AppUser,
   customer: SiigoCustomer,
-  products: Map<string, SiigoProduct>
+  products: Map<string, SiigoProduct>,
+  repartidor: {
+    id: string
+    nombre: string
+    telefono: string | null
+    esMostrador: boolean
+  } | null
 ) {
   const prisma = usePrisma()
   const existing = await prisma.salesOrder.findFirst({
@@ -682,16 +686,40 @@ export async function updateQuote(
       id,
       AND: [orderVisibilityFilter(user)]
     },
-    select: { statusKey: true }
+    select: {
+      statusKey: true,
+      customerId: true,
+      orderDate: true,
+      paymentStatus: true
+    }
   })
 
   if (!existing) {
-    throw createError({ statusCode: 404, statusMessage: 'No se encontró la cotización.' })
+    throw createError({ statusCode: 404, statusMessage: 'No se encontró el pedido.' })
   }
-  if (existing.statusKey !== 'borrador') {
+  if (existing.statusKey === 'entregado') {
     throw createError({
       statusCode: 409,
-      statusMessage: 'Sólo se pueden editar documentos que siguen siendo cotizaciones.'
+      statusMessage: 'Los pedidos entregados no se pueden editar.'
+    })
+  }
+  if (existing.statusKey !== 'borrador' && !repartidor) {
+    throw createError({
+      statusCode: 422,
+      statusMessage: 'Selecciona un repartidor para guardar el pedido.'
+    })
+  }
+  if (
+    existing.statusKey !== 'borrador'
+    && (
+      input.customerId !== existing.customerId
+      || input.orderDate !== dateOnly(existing.orderDate)
+      || input.paymentStatus !== existing.paymentStatus
+    )
+  ) {
+    throw createError({
+      statusCode: 422,
+      statusMessage: 'El cliente, la fecha del pedido y el estado de pago no se pueden modificar.'
     })
   }
 
@@ -709,7 +737,7 @@ export async function updateQuote(
   if (currencyCodes.size > 1) {
     throw createError({
       statusCode: 422,
-      statusMessage: 'Todos los productos de la cotización deben usar la misma moneda.'
+      statusMessage: 'Todos los productos del pedido deben usar la misma moneda.'
     })
   }
 
@@ -717,22 +745,34 @@ export async function updateQuote(
   const totals = orderTotals(lines, input.discountType, input.discountValue)
   const displayName = siigoCustomerDisplayName(customer)
 
-  const updated = await prisma.$transaction(async (tx) => {
+  await prisma.$transaction(async (tx) => {
     await upsertSiigoCustomer(tx, customer)
     for (const product of products.values()) {
       await upsertSiigoProduct(tx, product)
     }
 
     const result = await tx.salesOrder.updateMany({
-      where: { id, version: input.version, statusKey: 'borrador' },
+      where: { id, version: input.version, statusKey: { not: 'entregado' } },
       data: {
         customerId: customer.id,
         customerNameSnapshot: displayName,
         customerRfcSnapshot: customer.rfc_id || customer.identification || null,
         customerPayload: siigoJson(customer),
         orderDate: new Date(`${input.orderDate}T00:00:00.000Z`),
+        promisedDate: input.promisedDate
+          ? new Date(`${input.promisedDate}T00:00:00.000Z`)
+          : null,
         observations: input.observations || null,
+        requiresInvoice: input.requiresInvoice,
         tags: input.tags,
+        paymentStatus: input.paymentStatus,
+        paymentMethod: input.paymentMethod || null,
+        paymentDate: input.paymentDate
+          ? new Date(`${input.paymentDate}T00:00:00.000Z`)
+          : null,
+        repartidorId: repartidor?.id ?? null,
+        repartidorNombreSnapshot: repartidor?.nombre ?? null,
+        repartidorTelefonoSnapshot: repartidor?.telefono ?? null,
         currencyCode: lines[0]?.currencyCode || 'MXN',
         subtotal: totals.subtotal.toString(),
         discountType: input.discountType,
@@ -748,7 +788,7 @@ export async function updateQuote(
     if (result.count !== 1) {
       throw createError({
         statusCode: 409,
-        statusMessage: 'La cotización cambió mientras la editabas. Recarga e intenta de nuevo.'
+        statusMessage: 'El pedido cambió mientras lo editabas o ya fue entregado. Recarga e intenta de nuevo.'
       })
     }
 
@@ -763,21 +803,16 @@ export async function updateQuote(
     await tx.salesOrderStatusHistory.create({
       data: {
         orderId: id,
-        toStatusKey: 'borrador',
-        note: 'Cotización actualizada.',
+        toStatusKey: existing.statusKey,
+        note: existing.statusKey === 'borrador' ? 'Cotización actualizada.' : 'Pedido actualizado.',
         changedByName: user.name,
         changedByEmail: user.email,
         changedByRole: user.role
       }
     })
-
-    return tx.salesOrder.findUniqueOrThrow({
-      where: { id },
-      include: orderDetailInclude
-    })
   }, ORDER_WRITE_TRANSACTION_OPTIONS)
 
-  return detail(updated)
+  return getOrder(id, user)
 }
 
 export async function getOrder(id: string, user: AppUser) {
@@ -876,8 +911,8 @@ export async function listOrders(options: {
       searchFilter
     ]
   }
-  const [orders, totalResults, totalAmount] = await prisma.$transaction(async (tx) => {
-    const orders = await tx.salesOrder.findMany({
+  const [orders, totalResults, totalAmount] = await Promise.all([
+    prisma.salesOrder.findMany({
       where,
       include: {
         status: true,
@@ -894,15 +929,13 @@ export async function listOrders(options: {
       orderBy: [{ orderDate: 'desc' }, { folio: 'desc' }],
       skip: (options.page - 1) * options.pageSize,
       take: options.pageSize
-    })
-    const totalResults = await tx.salesOrder.count({ where })
-    const totalAmount = await tx.salesOrder.aggregate({
+    }),
+    prisma.salesOrder.count({ where }),
+    prisma.salesOrder.aggregate({
       where,
       _sum: { total: true }
     })
-
-    return [orders, totalResults, totalAmount] as const
-  })
+  ] as const)
 
   return {
     results: orders.map(listItem),
@@ -1357,6 +1390,84 @@ export async function updateOrderItemQuantity(
         discountTotal: totals.discountTotal.toString(),
         taxTotal: totals.taxTotal.toString(),
         total: totals.total.toString(),
+        updatedByEmail: user.email,
+        version: { increment: 1 }
+      }
+    })
+    if (result.count !== 1) {
+      throw createError({
+        statusCode: 409,
+        statusMessage: 'El pedido cambió mientras se actualizaba. Intenta de nuevo.'
+      })
+    }
+  })
+
+  return getOrder(orderId, user)
+}
+
+export async function updateOrderItemObservations(
+  orderId: string,
+  itemId: string,
+  input: UpdateOrderItemObservationsInput,
+  user: AppUser
+) {
+  const prisma = usePrisma()
+
+  if (!canManageOrderLogistics(user.role)) {
+    throw createError({
+      statusCode: 403,
+      statusMessage: 'No tienes permiso para modificar las observaciones de esta partida.'
+    })
+  }
+
+  const order = await prisma.salesOrder.findFirst({
+    where: {
+      id: orderId,
+      AND: [orderVisibilityFilter(user)]
+    },
+    select: { statusKey: true, version: true }
+  })
+  if (!order) {
+    throw createError({ statusCode: 404, statusMessage: 'No se encontró el pedido.' })
+  }
+  if (order.statusKey === 'borrador') {
+    throw createError({
+      statusCode: 409,
+      statusMessage: 'Edita las observaciones desde la cotización mientras sigue siendo un borrador.'
+    })
+  }
+  if (order.version !== input.version) {
+    throw createError({
+      statusCode: 409,
+      statusMessage: 'El pedido cambió desde que lo abriste. Actualiza la página e intenta de nuevo.'
+    })
+  }
+
+  const item = await prisma.salesOrderItem.findFirst({
+    where: { id: itemId, orderId },
+    select: { observations: true }
+  })
+  if (!item) {
+    throw createError({ statusCode: 404, statusMessage: 'No se encontró la partida.' })
+  }
+
+  const observations = input.observations || null
+  if (item.observations === observations) {
+    throw createError({
+      statusCode: 422,
+      statusMessage: 'Las observaciones nuevas deben ser diferentes a las actuales.'
+    })
+  }
+
+  await prisma.$transaction(async (tx) => {
+    await tx.salesOrderItem.update({
+      where: { id: itemId },
+      data: { observations }
+    })
+
+    const result = await tx.salesOrder.updateMany({
+      where: { id: orderId, version: input.version },
+      data: {
         updatedByEmail: user.email,
         version: { increment: 1 }
       }
