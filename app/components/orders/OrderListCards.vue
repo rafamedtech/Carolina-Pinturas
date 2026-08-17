@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { resolveComponent } from 'vue'
 import type { SalesOrderListItem } from '~/types/orders'
 
 withDefaults(defineProps<{
@@ -14,6 +15,7 @@ const emit = defineEmits<{
   open: [order: SalesOrderListItem]
 }>()
 
+const NuxtLink = resolveComponent('NuxtLink')
 const currency = new Intl.NumberFormat('es-MX', {
   style: 'currency',
   currency: 'MXN'
@@ -54,61 +56,38 @@ function igualacionItems(order: SalesOrderListItem) {
       <UCard
         v-for="order in orders"
         :key="order.id"
+        :as="igualacion ? 'button' : NuxtLink"
+        :to="igualacion
+          ? undefined
+          : {
+            path: `/ventas/${encodeURIComponent(order.id)}`,
+            query: { returnTo }
+          }"
+        :type="igualacion ? 'button' : undefined"
+        :aria-label="`${igualacion ? 'Ver' : 'Abrir'} pedido ${order.number} de ${order.customer.name}`"
+        class="block w-full cursor-pointer text-left transition-[transform,background-color,box-shadow] duration-150 ease-out hover:bg-elevated/50 active:scale-[0.985] active:bg-elevated focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 motion-reduce:transform-none motion-reduce:transition-none"
         :ui="{ body: 'flex flex-col gap-4 p-4 sm:p-4' }"
+        @click="igualacion && emit('open', order)"
       >
         <div class="flex items-start justify-between gap-3">
           <div class="min-w-0">
-            <p class="text-xs font-medium uppercase tracking-wide text-muted">
-              Pedido
+            <p class="text-xs font-medium text-muted">
+              {{ formatDate(order.orderDate) }}
             </p>
-            <NuxtLink
-              v-if="!igualacion"
-              :to="{
-                path: `/ventas/${encodeURIComponent(order.id)}`,
-                query: { returnTo }
-              }"
-              class="text-lg font-semibold text-primary hover:underline"
-              :aria-label="`Abrir pedido ${order.number}`"
-            >
+            <p class="text-lg font-semibold text-primary">
               {{ order.number }}
-            </NuxtLink>
-            <UButton
-              v-else
-              variant="link"
-              color="primary"
-              class="p-0 text-lg font-semibold"
-              :aria-label="`Ver pedido ${order.number}`"
-              @click="emit('open', order)"
-            >
-              {{ order.number }}
-            </UButton>
+            </p>
           </div>
           <OrdersOrderStatusBadge :status="order.status" />
         </div>
 
         <dl class="grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
-          <div class="col-span-2">
+          <div class="col-span-2 min-w-0">
             <dt class="text-muted">
               Cliente
             </dt>
-            <dd class="font-medium text-highlighted">
+            <dd class="break-words font-medium text-highlighted">
               {{ order.customer.name }}
-            </dd>
-          </div>
-          <div>
-            <dt class="text-muted">
-              Fecha
-            </dt>
-            <dd class="text-highlighted">
-              {{ formatDate(order.orderDate) }}
-            </dd>
-          </div>
-          <div v-if="!igualacion">
-            <dt class="text-muted">
-              Partidas
-            </dt>
-            <dd class="text-highlighted">
-              {{ order.itemCount }}
             </dd>
           </div>
           <div v-if="!igualacion" class="col-span-2 flex items-end justify-between gap-4 border-t border-default pt-3">
@@ -137,28 +116,6 @@ function igualacionItems(order: SalesOrderListItem) {
             </dd>
           </div>
         </dl>
-
-        <UButton
-          v-if="!igualacion"
-          :to="{
-            path: `/ventas/${encodeURIComponent(order.id)}`,
-            query: { returnTo }
-          }"
-          label="Ver pedido"
-          icon="i-lucide-arrow-right"
-          trailing
-          block
-          variant="soft"
-        />
-        <UButton
-          v-else
-          label="Ver pedido"
-          icon="i-lucide-arrow-right"
-          trailing
-          block
-          variant="soft"
-          @click="emit('open', order)"
-        />
       </UCard>
     </template>
 
