@@ -39,7 +39,16 @@ const lastResult = computed(() =>
       :total="totalResults"
       :items-per-page="pageSize"
       :disabled="loading"
-      class="sm:justify-self-end"
+      :sibling-count="0"
+      class="min-w-0 max-w-full justify-self-center sm:hidden"
+    />
+
+    <UPagination
+      v-model:page="page"
+      :total="totalResults"
+      :items-per-page="pageSize"
+      :disabled="loading"
+      class="hidden sm:block sm:justify-self-end"
       show-edges
     />
   </div>
