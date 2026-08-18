@@ -26,6 +26,7 @@ const customer: SiigoCustomer = {
     code: 'CLI-001',
     notes: 'Cuenta de mayoreo',
     tags: ['mayoreo', 'crédito'],
+    requires_invoice: true,
     sync_status: 'synced',
     sync_version: 1,
     synced_at: '2026-08-18T00:00:00.000Z'
@@ -58,6 +59,9 @@ describe('CustomerEditForm', () => {
     expect(inputByLabel('Razón social').value).toBe('Pinturas Industriales SA de CV')
     expect(inputByLabel('Código interno').value).toBe('CLI-001')
     expect(inputByLabel('Etiquetas').value).toBe('mayoreo, crédito')
+    const invoiceSwitch = wrapper.findAllComponents({ name: 'USwitch' })
+      .find(component => component.props('label') === 'Requiere factura')
+    expect(invoiceSwitch?.props('modelValue')).toBe(true)
     expect(wrapper.text()).toContain('601 · General de Ley Personas Morales')
     expect(wrapper.text()).toContain('2 · Baja California')
     expect(wrapper.text()).toContain('4 · Tijuana')
@@ -71,8 +75,23 @@ describe('CustomerEditForm', () => {
     const cards = wrapper.findAllComponents({ name: 'UCard' })
     const fiscalAndContactCard = cards.find(card => card.text().includes('Información fiscal y de contacto'))
     const addressCard = cards.find(card => card.text().includes('Dirección'))
+    const internalControlCard = cards.find(card => card.text().includes('Control interno'))
     expect(fiscalAndContactCard?.text()).toContain('Correo')
     expect(fiscalAndContactCard?.text()).toContain('Teléfono')
+    expect(fiscalAndContactCard?.text()).toContain('Cliente activo')
+    expect(fiscalAndContactCard?.text()).toContain('Requiere factura')
+    expect(fiscalAndContactCard?.text()).not.toContain('Cliente activo en Siigo')
+    expect(fiscalAndContactCard?.text()).not.toContain('Requiere factura por defecto')
+    expect(fiscalAndContactCard?.text()).not.toContain('Facturación predeterminada')
+    expect(fiscalAndContactCard?.text()).not.toContain('Activa Requiere factura al seleccionar este cliente en un pedido')
+    expect(internalControlCard?.text()).not.toContain('Facturación predeterminada')
+    const personTypeField = fiscalAndContactCard?.findAllComponents({ name: 'UFormField' })
+      .find(field => field.props('name') === 'personType')
+    const statusControls = fiscalAndContactCard?.find('[data-testid="customer-status-controls"]')
+    expect(personTypeField?.element.parentElement).toBe(statusControls?.element.parentElement)
+    const statusControlText = statusControls?.text() || ''
+    expect(statusControlText.indexOf('Cliente activo'))
+      .toBeLessThan(statusControlText.indexOf('Requiere factura'))
     expect(addressCard?.text()).not.toContain('Correo')
     expect(addressCard?.text()).not.toContain('Teléfono')
 
@@ -120,7 +139,12 @@ describe('CustomerEditForm', () => {
       fiscalRegime: '601',
       phone: '6641234567',
       active: false,
-      internal: { code: 'CLI-001', notes: 'Cuenta de mayoreo', tags: ['mayoreo', 'crédito'] },
+      internal: {
+        code: 'CLI-001',
+        notes: 'Cuenta de mayoreo',
+        tags: ['mayoreo', 'crédito'],
+        requiresInvoice: true
+      },
       address: {
         street: 'Calle 5',
         colony: longColony,

@@ -216,6 +216,14 @@ useSeoMeta({ title: () => fullName.value })
                   {{ customerSince }}
                 </dd>
               </div>
+              <div>
+                <dt class="text-sm text-muted">
+                  Facturación predeterminada
+                </dt>
+                <dd class="mt-1 font-medium">
+                  {{ customer.internal?.requires_invoice ? 'Requiere factura' : 'No requiere factura' }}
+                </dd>
+              </div>
             </dl>
           </UCard>
 

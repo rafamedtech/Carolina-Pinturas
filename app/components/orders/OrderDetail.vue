@@ -70,6 +70,7 @@ const printerSettingsOpen = shallowRef(false)
 const paymentsOpen = shallowRef(false)
 const siigoInvoiceOpen = shallowRef(false)
 const checkingSiigoInvoice = shallowRef(false)
+const markingInvoiceRequired = shallowRef(false)
 const cancelOrderOpen = shallowRef(false)
 const mayManageLogistics = computed(() =>
   Boolean(user.value && canManageOrderLogistics(user.value.role))
@@ -131,6 +132,9 @@ const mayEditQuote = computed(() =>
 )
 const paymentsBlockedByMissingInvoice = computed(() =>
   !isQuote.value && Boolean(order.value?.requiresInvoice && !order.value.invoiceCreated)
+)
+const invoiceActionBusy = computed(() =>
+  markingInvoiceRequired.value || checkingSiigoInvoice.value
 )
 const availableStatuses = computed(() => {
   if (!user.value) return []
@@ -270,6 +274,38 @@ async function saveChanges() {
   await updateStatus()
 }
 
+async function startInvoiceFlow() {
+  if (!order.value || invoiceActionBusy.value) return
+
+  if (order.value.requiresInvoice) {
+    siigoInvoiceOpen.value = true
+    return
+  }
+
+  markingInvoiceRequired.value = true
+  try {
+    order.value = await $fetch<SalesOrderDetail>(
+      `/api/orders/${encodeURIComponent(props.orderId)}/invoice-requirement`,
+      {
+        method: 'PATCH',
+        body: { version: order.value.version }
+      }
+    )
+    siigoInvoiceOpen.value = true
+  } catch (fetchError: unknown) {
+    const response = fetchError as { data?: { statusMessage?: string }, message?: string }
+    toast.add({
+      title: 'No se pudo solicitar la factura',
+      description: response.data?.statusMessage || response.message || 'Intenta de nuevo.',
+      color: 'error',
+      icon: 'i-lucide-circle-alert'
+    })
+    await refresh()
+  } finally {
+    markingInvoiceRequired.value = false
+  }
+}
+
 // A quote is presented to the customer as a clean document; converting it turns
 // it into a regular order (ingresado) and brings back the management sections.
 const converting = shallowRef(false)
@@ -399,14 +435,14 @@ async function convertToPedido() {
           </div>
           <div class="[grid-area:acciones] flex flex-wrap items-center gap-4 lg:justify-end">
             <UButton
-              v-if="!isQuote && mayManagePayment && order.requiresInvoice"
+              v-if="!isQuote && mayManagePayment"
               label="Facturar"
               icon="i-lucide-file-plus-2"
               color="neutral"
               variant="outline"
-              :loading="checkingSiigoInvoice"
-              :disabled="checkingSiigoInvoice"
-              @click="siigoInvoiceOpen = true"
+              :loading="invoiceActionBusy"
+              :disabled="invoiceActionBusy"
+              @click="startInvoiceFlow"
             />
             <UTooltip
               v-if="!isQuote && mayManagePayment"
@@ -460,7 +496,7 @@ async function convertToPedido() {
               </template>
             </UModal>
             <OrdersSiigoOrderSiigoInvoiceCard
-              v-if="!isQuote && mayManagePayment && order.requiresInvoice"
+              v-if="!isQuote && mayManagePayment"
               v-model:open="siigoInvoiceOpen"
               v-model:checking="checkingSiigoInvoice"
               :order-id="order.id"

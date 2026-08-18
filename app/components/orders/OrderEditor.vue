@@ -440,6 +440,13 @@ const selectedCustomerName = computed(() =>
   selectedCustomer.value?.name?.filter(Boolean).join(' ') || selectedCustomer.value?.rfc_id || '—'
 )
 
+watch(() => state.customerId, (customerId) => {
+  if (isEditing.value || isQuoteMode.value) return
+
+  const customer = availableCustomers.value.find(candidate => candidate.id === customerId)
+  state.requiresInvoice = customer?.internal?.requires_invoice ?? false
+})
+
 function formatDate(value: string) {
   if (!value) return '—'
   return value.split('-').reverse().join('/')

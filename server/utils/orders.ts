@@ -5,6 +5,7 @@ import type { SalesOrderDetail, SalesOrderListItem } from '~/types/orders'
 import type {
   CreateOrderInput,
   UpdateOrderInput,
+  RequireOrderInvoiceInput,
   UpdateOrderRemisionInput,
   UpdateOrderRepartidorInput,
   UpdateOrderTagsInput,
@@ -1119,6 +1120,63 @@ export async function updateOrderRepartidor(
       repartidorId: repartidor.id,
       repartidorNombreSnapshot: repartidor.nombre,
       repartidorTelefonoSnapshot: repartidor.telefono,
+      updatedByEmail: user.email,
+      version: { increment: 1 }
+    }
+  })
+  if (result.count !== 1) {
+    throw createError({
+      statusCode: 409,
+      statusMessage: 'El pedido cambió mientras se actualizaba. Intenta de nuevo.'
+    })
+  }
+
+  return getOrder(id, user)
+}
+
+export async function requireOrderInvoice(
+  id: string,
+  input: RequireOrderInvoiceInput,
+  user: AppUser
+) {
+  const prisma = usePrisma()
+
+  if (!canManageOrderLogistics(user.role)) {
+    throw createError({
+      statusCode: 403,
+      statusMessage: 'No tienes permiso para solicitar la factura del pedido.'
+    })
+  }
+
+  const order = await prisma.salesOrder.findFirst({
+    where: {
+      id,
+      AND: [orderVisibilityFilter(user)]
+    },
+    select: { version: true, requiresInvoice: true, statusKey: true }
+  })
+
+  if (!order) {
+    throw createError({ statusCode: 404, statusMessage: 'No se encontró el pedido.' })
+  }
+  if (order.statusKey === 'borrador') {
+    throw createError({
+      statusCode: 422,
+      statusMessage: 'Convierte la cotización en pedido antes de solicitar la factura.'
+    })
+  }
+  if (order.version !== input.version) {
+    throw createError({
+      statusCode: 409,
+      statusMessage: 'El pedido cambió desde que lo abriste. Actualiza la página e intenta de nuevo.'
+    })
+  }
+  if (order.requiresInvoice) return getOrder(id, user)
+
+  const result = await prisma.salesOrder.updateMany({
+    where: { id, version: input.version, requiresInvoice: false },
+    data: {
+      requiresInvoice: true,
       updatedByEmail: user.email,
       version: { increment: 1 }
     }

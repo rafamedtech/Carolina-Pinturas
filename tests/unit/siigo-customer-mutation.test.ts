@@ -21,6 +21,7 @@ const customer: SiigoCustomer = {
     code: 'CLI-001',
     notes: 'Mayoreo',
     tags: ['mayoreo'],
+    requires_invoice: true,
     sync_status: 'synced',
     sync_version: 2,
     synced_at: '2026-08-18T00:00:00.000Z'
@@ -36,7 +37,12 @@ describe('payload de edición de clientes', () => {
       active: false,
       email: 'ventas@example.com',
       phone: '6641234567',
-      internal: { code: 'CLI-001', notes: 'Mayoreo', tags: ['mayoreo'] },
+      internal: {
+        code: 'CLI-001',
+        notes: 'Mayoreo',
+        tags: ['mayoreo'],
+        requiresInvoice: true
+      },
       address: expect.objectContaining({
         street: 'Calle 5',
         city: { countryCode: 'Mx', stateCode: '02', cityCode: '001' }

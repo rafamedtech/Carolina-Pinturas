@@ -123,6 +123,7 @@ export interface SiigoCustomer {
     code?: string | null
     notes?: string | null
     tags: string[]
+    requires_invoice?: boolean
     sync_status: string
     sync_version: number
     synced_at: string
@@ -152,6 +153,7 @@ export interface SiigoCustomerMutationInput {
     code?: string
     notes?: string
     tags: string[]
+    requiresInvoice?: boolean
   }
   address: {
     street: string

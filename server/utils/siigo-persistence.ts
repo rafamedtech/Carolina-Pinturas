@@ -85,7 +85,8 @@ export async function upsertSiigoCustomer(
     : {
         internalCode: options.internal.code || null,
         internalNotes: options.internal.notes || null,
-        internalTags: options.internal.tags
+        internalTags: options.internal.tags,
+        requiresInvoice: options.internal.requiresInvoice
       }
 
   return tx.siigoCustomer.upsert({

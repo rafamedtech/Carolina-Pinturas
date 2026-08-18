@@ -17,6 +17,7 @@ describe('catálogo local de clientes', () => {
       internalCode: 'CLI-001',
       internalNotes: 'Cuenta de mayoreo',
       internalTags: ['mayoreo'],
+      requiresInvoice: true,
       syncStatus: 'synced',
       syncVersion: 3,
       siigoCreatedAt: new Date('2025-03-10T18:30:00.000Z'),
@@ -37,6 +38,7 @@ describe('catálogo local de clientes', () => {
         code: 'CLI-001',
         notes: 'Cuenta de mayoreo',
         tags: ['mayoreo'],
+        requires_invoice: true,
         sync_status: 'synced',
         sync_version: 3,
         synced_at: '2026-08-18T17:00:00.000Z'

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   createOrderSchema,
+  requireOrderInvoiceSchema,
   updateOrderSchema,
   updateOrderItemObservationsSchema,
   updateOrderItemQuantitySchema
@@ -65,6 +66,11 @@ describe('validación de pedidos', () => {
       quantity: 2.5,
       version: 1
     }).success).toBe(true)
+  })
+
+  it('exige la versión para marcar un pedido como requiere factura', () => {
+    expect(requireOrderInvoiceSchema.safeParse({ version: 2 }).success).toBe(true)
+    expect(requireOrderInvoiceSchema.safeParse({ version: 0 }).success).toBe(false)
   })
 
   it('rechaza cantidades en cero al editar una partida', () => {

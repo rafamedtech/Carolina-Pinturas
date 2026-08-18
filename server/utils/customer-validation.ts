@@ -15,7 +15,8 @@ export const customerInternalSchema = z.object({
   tags: z.array(z.string().trim().min(1).max(40))
     .max(20)
     .transform(tags => [...new Set(tags)])
-    .default([])
+    .default([]),
+  requiresInvoice: z.boolean().default(false)
 })
 
 export const createCustomerSchema = z.object({

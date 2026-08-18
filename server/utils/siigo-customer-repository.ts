@@ -10,6 +10,7 @@ const customerSelect = {
   internalCode: true,
   internalNotes: true,
   internalTags: true,
+  requiresInvoice: true,
   syncStatus: true,
   syncVersion: true,
   siigoCreatedAt: true,
@@ -39,6 +40,7 @@ export function localCustomerView(row: LocalCustomerRow): SiigoCustomer {
       code: row.internalCode,
       notes: row.internalNotes,
       tags: row.internalTags,
+      requires_invoice: row.requiresInvoice,
       sync_status: row.syncStatus,
       sync_version: row.syncVersion,
       synced_at: row.syncedAt.toISOString()

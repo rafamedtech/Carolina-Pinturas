@@ -64,7 +64,8 @@ const schema = z.object({
   cityCode: z.string(),
   internalCode: z.string().trim().max(64),
   internalNotes: z.string().trim().max(4000),
-  internalTags: z.string().trim().max(1000)
+  internalTags: z.string().trim().max(1000),
+  internalRequiresInvoice: z.boolean()
 }).superRefine((data, ctx) => {
   const rfc = data.rfcId.toUpperCase()
   if (data.personType === 'Physical') {
@@ -128,7 +129,8 @@ const state = reactive<Schema>({
   cityCode: '',
   internalCode: '',
   internalNotes: '',
-  internalTags: ''
+  internalTags: '',
+  internalRequiresInvoice: false
 })
 const initialState = shallowRef('')
 
@@ -170,7 +172,8 @@ watch(() => [props.customer, props.activeOverride] as const, () => {
     cityCode: normalizeSiigoMexicoCityCode(stateCode, input.address.city.cityCode),
     internalCode: input.internal?.code || '',
     internalNotes: input.internal?.notes || '',
-    internalTags: input.internal?.tags.join(', ') || ''
+    internalTags: input.internal?.tags.join(', ') || '',
+    internalRequiresInvoice: input.internal?.requiresInvoice ?? false
   })
   initialState.value = JSON.stringify(state)
 }, { immediate: true })
@@ -226,7 +229,8 @@ function onSubmit(event: FormSubmitEvent<Schema>) {
     internal: {
       code: optional(data.internalCode),
       notes: optional(data.internalNotes),
-      tags: [...new Set(data.internalTags.split(',').map(tag => tag.trim()).filter(Boolean))]
+      tags: [...new Set(data.internalTags.split(',').map(tag => tag.trim()).filter(Boolean))],
+      requiresInvoice: data.internalRequiresInvoice
     },
     address: {
       street: data.street,
@@ -276,19 +280,35 @@ function onSubmit(event: FormSubmitEvent<Schema>) {
         </h2>
       </template>
       <div class="grid gap-4 sm:grid-cols-2">
-        <UFormField
-          label="Tipo de persona"
-          name="personType"
-          required
-          class="sm:col-span-2"
-        >
-          <URadioGroup
-            v-model="state.personType"
-            :items="personTypeOptions"
-            orientation="horizontal"
-            :disabled="saving"
-          />
-        </UFormField>
+        <div class="flex flex-col gap-4 sm:col-span-2 sm:flex-row sm:items-start sm:justify-between">
+          <UFormField
+            label="Tipo de persona"
+            name="personType"
+            required
+          >
+            <URadioGroup
+              v-model="state.personType"
+              :items="personTypeOptions"
+              orientation="horizontal"
+              :disabled="saving"
+            />
+          </UFormField>
+          <div
+            data-testid="customer-status-controls"
+            class="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-6 sm:pt-6"
+          >
+            <UFormField name="active">
+              <USwitch v-model="state.active" label="Cliente activo" :disabled="saving" />
+            </UFormField>
+            <UFormField v-if="!invoiceMode" name="internalRequiresInvoice">
+              <USwitch
+                v-model="state.internalRequiresInvoice"
+                label="Requiere factura"
+                :disabled="saving"
+              />
+            </UFormField>
+          </div>
+        </div>
         <template v-if="isPhysical">
           <UFormField label="Nombres" name="nombres" required>
             <UInput v-model="state.nombres" class="w-full uppercase" :disabled="saving" />
@@ -360,9 +380,6 @@ function onSubmit(event: FormSubmitEvent<Schema>) {
             :disabled="saving"
             @input="onPhoneInput"
           />
-        </UFormField>
-        <UFormField name="active" class="sm:col-span-2">
-          <USwitch v-model="state.active" label="Cliente activo en Siigo" :disabled="saving" />
         </UFormField>
       </div>
     </UCard>

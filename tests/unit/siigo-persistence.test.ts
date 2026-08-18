@@ -80,7 +80,12 @@ describe('persistencia de snapshots de Siigo', () => {
     }
 
     await upsertSiigoCustomer(tx, customer, {
-      internal: { code: 'CLI-001', notes: 'Crédito autorizado', tags: ['mayoreo'] },
+      internal: {
+        code: 'CLI-001',
+        notes: 'Crédito autorizado',
+        tags: ['mayoreo'],
+        requiresInvoice: true
+      },
       updatedByEmail: 'vendedor@example.com'
     })
 
@@ -92,6 +97,7 @@ describe('persistencia de snapshots de Siigo', () => {
         addressCountryCode: 'MX',
         internalCode: 'CLI-001',
         internalTags: ['mayoreo'],
+        requiresInvoice: true,
         createdByEmail: 'vendedor@example.com',
         phones: { create: [expect.objectContaining({
           position: 1,
@@ -108,6 +114,7 @@ describe('persistencia de snapshots de Siigo', () => {
       }),
       update: expect.objectContaining({
         syncStatus: 'synced',
+        requiresInvoice: true,
         syncVersion: { increment: 1 },
         updatedByEmail: 'vendedor@example.com',
         phones: {

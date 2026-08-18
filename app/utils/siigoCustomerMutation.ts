@@ -38,7 +38,8 @@ export function siigoCustomerMutationInput(
     internal: {
       code: optionalText(customer.internal?.code),
       notes: optionalText(customer.internal?.notes),
-      tags: customer.internal?.tags || []
+      tags: customer.internal?.tags || [],
+      requiresInvoice: customer.internal?.requires_invoice ?? false
     },
     address: {
       street: customer.address?.street || '',

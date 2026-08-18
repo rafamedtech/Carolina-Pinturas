@@ -110,6 +110,10 @@ export const updateOrderRepartidorSchema = z.object({
   version: z.number().int().positive()
 })
 
+export const requireOrderInvoiceSchema = z.object({
+  version: z.number().int().positive()
+})
+
 export const updateOrderTagsSchema = z.object({
   tags: z.array(z.string().trim().min(1).max(50)).max(20),
   version: z.number().int().positive()
@@ -144,6 +148,7 @@ export type UpdateOrderInput = z.output<typeof updateOrderSchema>
 export type UpdateOrderStatusInput = z.output<typeof updateOrderStatusSchema>
 export type UpdateOrderRemisionInput = z.output<typeof updateOrderRemisionSchema>
 export type UpdateOrderRepartidorInput = z.output<typeof updateOrderRepartidorSchema>
+export type RequireOrderInvoiceInput = z.output<typeof requireOrderInvoiceSchema>
 export type UpdateOrderTagsInput = z.output<typeof updateOrderTagsSchema>
 export type UpdateOrderItemPriceInput = z.output<typeof updateOrderItemPriceSchema>
 export type UpdateOrderItemQuantityInput = z.output<typeof updateOrderItemQuantitySchema>

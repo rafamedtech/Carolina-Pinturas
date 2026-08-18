@@ -180,6 +180,7 @@ model SiigoCustomer {
   internalCode          String?   @unique(map: "siigo_customers_internal_code_key") @map("internal_code") @db.VarChar(64)
   internalNotes         String?   @map("internal_notes")
   internalTags          String[]  @default([]) @map("internal_tags")
+  requiresInvoice       Boolean   @default(false) @map("requires_invoice")
   syncStatus            String    @default("synced") @map("sync_status") @db.VarChar(16)
   lastSyncError         String?   @map("last_sync_error")
   syncVersion           Int       @default(1) @map("sync_version")
