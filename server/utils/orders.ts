@@ -842,6 +842,7 @@ export async function listOrders(options: {
   hideQuotes?: boolean
   dateFrom?: string
   dateTo?: string
+  customerId?: string
   igualacion?: boolean
 }, user: AppUser) {
   const prisma = usePrisma()
@@ -880,6 +881,9 @@ export async function listOrders(options: {
         }
       }
     : {}
+  const customerFilter: Prisma.SalesOrderWhereInput = options.customerId
+    ? { customerId: options.customerId }
+    : {}
   const searchFilter: Prisma.SalesOrderWhereInput = options.search
     ? {
         OR: [{
@@ -906,6 +910,7 @@ export async function listOrders(options: {
       paymentStatusFilter,
       paymentMethodFilter,
       dateFilter,
+      customerFilter,
       orderVisibilityFilter(user),
       ...(isIgualacionesView ? [igualacionFilter] : []),
       searchFilter

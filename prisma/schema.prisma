@@ -150,27 +150,45 @@ model SiigoProductComponent {
 }
 
 model SiigoCustomer {
-  id                    String   @id @db.Uuid
-  name                  Json     @db.JsonB
-  displayName           String   @map("display_name")
-  personType            String?  @map("person_type") @db.VarChar(32)
-  type                  String?  @db.VarChar(32)
+  id                    String    @id @db.Uuid
+  name                  Json      @db.JsonB
+  displayName           String    @map("display_name")
+  commercialName        String?   @map("commercial_name")
+  branchOffice          Int?      @map("branch_office")
+  personType            String?   @map("person_type") @db.VarChar(32)
+  type                  String?   @db.VarChar(32)
   identification        String?
-  rfcId                 String?  @map("rfc_id")
-  fiscalRegime          String?  @map("fiscal_regime")
+  rfcId                 String?   @map("rfc_id")
+  fiscalRegime          String?   @map("fiscal_regime")
   active                Boolean?
-  addressStreet         String?  @map("address_street")
-  addressInteriorNumber String?  @map("address_interior_number")
-  addressExteriorNumber String?  @map("address_exterior_number")
-  addressColony         String?  @map("address_colony")
-  addressLocality       String?  @map("address_locality")
-  addressCityName       String?  @map("address_city_name")
-  addressStateName      String?  @map("address_state_name")
-  addressPostalCode     String?  @map("address_postal_code")
-  rawPayload            Json     @map("raw_payload") @db.JsonB
-  syncedAt              DateTime @default(now()) @map("synced_at") @db.Timestamptz(6)
-  createdAt             DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt             DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+  comments              String?
+  sellerId              Int?      @map("seller_id")
+  collectorId           Int?      @map("collector_id")
+  addressStreet         String?   @map("address_street")
+  addressInteriorNumber String?   @map("address_interior_number")
+  addressExteriorNumber String?   @map("address_exterior_number")
+  addressColony         String?   @map("address_colony")
+  addressLocality       String?   @map("address_locality")
+  addressCountryCode    String?   @map("address_country_code") @db.VarChar(5)
+  addressStateCode      String?   @map("address_state_code") @db.VarChar(10)
+  addressCityCode       String?   @map("address_city_code") @db.VarChar(10)
+  addressCityName       String?   @map("address_city_name")
+  addressStateName      String?   @map("address_state_name")
+  addressPostalCode     String?   @map("address_postal_code")
+  siigoCreatedAt        DateTime? @map("siigo_created_at") @db.Timestamptz(6)
+  siigoUpdatedAt        DateTime? @map("siigo_updated_at") @db.Timestamptz(6)
+  internalCode          String?   @unique(map: "siigo_customers_internal_code_key") @map("internal_code") @db.VarChar(64)
+  internalNotes         String?   @map("internal_notes")
+  internalTags          String[]  @default([]) @map("internal_tags")
+  syncStatus            String    @default("synced") @map("sync_status") @db.VarChar(16)
+  lastSyncError         String?   @map("last_sync_error")
+  syncVersion           Int       @default(1) @map("sync_version")
+  createdByEmail        String?   @map("created_by_email")
+  updatedByEmail        String?   @map("updated_by_email")
+  rawPayload            Json      @map("raw_payload") @db.JsonB
+  syncedAt              DateTime  @default(now()) @map("synced_at") @db.Timestamptz(6)
+  createdAt             DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt             DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   phones   SiigoCustomerPhone[]
   contacts SiigoCustomerContact[]
@@ -178,6 +196,8 @@ model SiigoCustomer {
 
   @@index([displayName])
   @@index([rfcId])
+  @@index([rfcId, branchOffice], map: "siigo_customers_rfc_branch_office_idx")
+  @@index([syncStatus, syncedAt], map: "siigo_customers_sync_status_idx")
   @@map("siigo_customers")
 }
 
@@ -185,7 +205,9 @@ model SiigoCustomerPhone {
   id         BigInt  @id @default(autoincrement())
   customerId String  @map("customer_id") @db.Uuid
   position   Int
+  indicative String? @db.VarChar(10)
   number     String?
+  extension  String? @db.VarChar(10)
   rawPayload Json    @map("raw_payload") @db.JsonB
 
   customer SiigoCustomer @relation(fields: [customerId], references: [id], onDelete: Cascade)
@@ -195,14 +217,16 @@ model SiigoCustomerPhone {
 }
 
 model SiigoCustomerContact {
-  id         BigInt  @id @default(autoincrement())
-  customerId String  @map("customer_id") @db.Uuid
-  position   Int
-  firstName  String? @map("first_name")
-  lastName   String? @map("last_name")
-  email      String?
-  phone      String?
-  rawPayload Json    @map("raw_payload") @db.JsonB
+  id              BigInt  @id @default(autoincrement())
+  customerId      String  @map("customer_id") @db.Uuid
+  position        Int
+  firstName       String? @map("first_name")
+  lastName        String? @map("last_name")
+  email           String?
+  phone           String?
+  phoneIndicative String? @map("phone_indicative") @db.VarChar(10)
+  phoneExtension  String? @map("phone_extension") @db.VarChar(10)
+  rawPayload      Json    @map("raw_payload") @db.JsonB
 
   customer SiigoCustomer @relation(fields: [customerId], references: [id], onDelete: Cascade)
 
@@ -300,33 +324,33 @@ model SalesOrderSiigoInvoice {
 }
 
 model SalesOrderPayment {
-  id                    String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  requestId             String   @unique @default(dbgenerated("gen_random_uuid()")) @map("request_id") @db.Uuid
-  orderId               String   @map("order_id") @db.Uuid
-  provider              String   @default("local") @db.VarChar(32)
-  externalStatus        String   @default("not_applicable") @map("external_status") @db.VarChar(24)
-  externalError         String?  @map("external_error")
-  paymentMethod         String   @map("payment_method") @db.VarChar(32)
-  amount                Decimal  @db.Decimal(20, 2)
-  currencyCode          String   @default("MXN") @map("currency_code") @db.VarChar(3)
-  paymentDate           DateTime @map("payment_date") @db.Date
-  reference             String?
-  observations          String?
-  siigoVoucherId        String?  @unique @map("siigo_voucher_id") @db.Uuid
-  siigoVoucherName      String?  @map("siigo_voucher_name")
-  siigoInvoiceId        String?  @map("siigo_invoice_id") @db.Uuid
-  siigoInvoiceName      String?  @map("siigo_invoice_name")
-  siigoDocumentTypeId   Int?     @map("siigo_document_type_id")
-  siigoPaymentTypeId    Int?     @map("siigo_payment_type_id")
-  siigoCostCenterId     Int?     @map("siigo_cost_center_id")
-  siigoCfdiCode         String?  @map("siigo_cfdi_code") @db.VarChar(8)
-  siigoPaymentMethod    String?  @map("siigo_payment_method") @db.VarChar(3)
-  siigoQuote            Int?     @map("siigo_quote")
-  externalPayload       Json?    @map("external_payload") @db.JsonB
-  createdByName         String   @map("created_by_name")
-  createdByEmail        String   @map("created_by_email")
-  createdByRole         String   @map("created_by_role") @db.VarChar(32)
-  createdAt             DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  id                  String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  requestId           String   @unique @default(dbgenerated("gen_random_uuid()")) @map("request_id") @db.Uuid
+  orderId             String   @map("order_id") @db.Uuid
+  provider            String   @default("local") @db.VarChar(32)
+  externalStatus      String   @default("not_applicable") @map("external_status") @db.VarChar(24)
+  externalError       String?  @map("external_error")
+  paymentMethod       String   @map("payment_method") @db.VarChar(32)
+  amount              Decimal  @db.Decimal(20, 2)
+  currencyCode        String   @default("MXN") @map("currency_code") @db.VarChar(3)
+  paymentDate         DateTime @map("payment_date") @db.Date
+  reference           String?
+  observations        String?
+  siigoVoucherId      String?  @unique @map("siigo_voucher_id") @db.Uuid
+  siigoVoucherName    String?  @map("siigo_voucher_name")
+  siigoInvoiceId      String?  @map("siigo_invoice_id") @db.Uuid
+  siigoInvoiceName    String?  @map("siigo_invoice_name")
+  siigoDocumentTypeId Int?     @map("siigo_document_type_id")
+  siigoPaymentTypeId  Int?     @map("siigo_payment_type_id")
+  siigoCostCenterId   Int?     @map("siigo_cost_center_id")
+  siigoCfdiCode       String?  @map("siigo_cfdi_code") @db.VarChar(8)
+  siigoPaymentMethod  String?  @map("siigo_payment_method") @db.VarChar(3)
+  siigoQuote          Int?     @map("siigo_quote")
+  externalPayload     Json?    @map("external_payload") @db.JsonB
+  createdByName       String   @map("created_by_name")
+  createdByEmail      String   @map("created_by_email")
+  createdByRole       String   @map("created_by_role") @db.VarChar(32)
+  createdAt           DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
 
   order SalesOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
 

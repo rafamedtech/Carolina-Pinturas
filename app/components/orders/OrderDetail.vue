@@ -69,6 +69,7 @@ const { printTicket } = useTicketPrinter()
 const printerSettingsOpen = shallowRef(false)
 const paymentsOpen = shallowRef(false)
 const siigoInvoiceOpen = shallowRef(false)
+const checkingSiigoInvoice = shallowRef(false)
 const cancelOrderOpen = shallowRef(false)
 const mayManageLogistics = computed(() =>
   Boolean(user.value && canManageOrderLogistics(user.value.role))
@@ -403,6 +404,8 @@ async function convertToPedido() {
               icon="i-lucide-file-plus-2"
               color="neutral"
               variant="outline"
+              :loading="checkingSiigoInvoice"
+              :disabled="checkingSiigoInvoice"
               @click="siigoInvoiceOpen = true"
             />
             <UTooltip
@@ -459,8 +462,10 @@ async function convertToPedido() {
             <OrdersSiigoOrderSiigoInvoiceCard
               v-if="!isQuote && mayManagePayment && order.requiresInvoice"
               v-model:open="siigoInvoiceOpen"
+              v-model:checking="checkingSiigoInvoice"
               :order-id="order.id"
               @created="() => refresh()"
+              @checked="() => refresh()"
             />
             <UButton
               v-if="isQuote && mayEditQuote"

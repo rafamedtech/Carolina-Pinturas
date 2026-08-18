@@ -31,7 +31,7 @@ afterEach(() => {
 })
 
 describe('useCustomersCatalog', () => {
-  it('no solicita el catálogo de Siigo cuando la carga está desactivada', async () => {
+  it('no solicita el catálogo local cuando la carga está desactivada', async () => {
     const wrapper = await mountSuspended(CatalogProbe)
     await new Promise(resolve => setTimeout(resolve, 20))
 

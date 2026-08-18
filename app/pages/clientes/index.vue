@@ -1,18 +1,24 @@
 <script setup lang="ts">
 import type { TableColumn, TableRow } from '@nuxt/ui'
 import type { SiigoCustomer } from '~/types/siigo'
+import { canCreateOrders } from '~/utils/roleAccess'
 
 useSeoMeta({ title: 'Clientes' })
 
-const filter = ref('')
+const filter = shallowRef('')
 const router = useRouter()
-const { data, status, error, refresh } = useCustomersCatalog()
+const toast = useToast()
+const { user } = useAuth()
+const {
+  data,
+  status,
+  error,
+  syncing,
+  refresh,
+  synchronizeWithSiigo
+} = useCustomersCatalog()
 
-const isHydrated = shallowRef(false)
-onMounted(() => {
-  isHydrated.value = true
-})
-const loading = computed(() => isHydrated.value && status.value === 'pending')
+const loading = computed(() => status.value === 'pending')
 
 const customers = computed(() => {
   const value = filter.value.trim().toLowerCase()
@@ -53,6 +59,24 @@ const message = computed(() => error.value?.data?.statusMessage || 'No fue posib
 function openCustomer(_: Event, row: TableRow<SiigoCustomer>) {
   router.push(`/clientes/${encodeURIComponent(row.original.id)}`)
 }
+
+async function synchronizeCustomers() {
+  try {
+    const result = await synchronizeWithSiigo()
+    toast.add({
+      title: 'Clientes sincronizados',
+      description: `${result.synchronized} clientes quedaron actualizados en PostgreSQL.`,
+      color: 'success'
+    })
+  } catch (syncError: unknown) {
+    toast.add({
+      title: 'No se pudo sincronizar con Siigo',
+      description: (syncError as { data?: { statusMessage?: string } }).data?.statusMessage
+        || 'Intenta nuevamente.',
+      color: 'error'
+    })
+  }
+}
 </script>
 
 <template>
@@ -75,12 +99,21 @@ function openCustomer(_: Event, row: TableRow<SiigoCustomer>) {
         />
         <div class="flex gap-2">
           <UButton
-            label="Actualizar"
+            label="Recargar"
             icon="i-lucide-refresh-cw"
             color="neutral"
             variant="outline"
             :loading="loading"
             @click="() => refresh()"
+          />
+          <UButton
+            v-if="user && canCreateOrders(user.role)"
+            label="Sincronizar Siigo"
+            icon="i-lucide-cloud-download"
+            color="neutral"
+            variant="outline"
+            :loading="syncing"
+            @click="synchronizeCustomers"
           />
           <UButton
             label="Nuevo cliente"

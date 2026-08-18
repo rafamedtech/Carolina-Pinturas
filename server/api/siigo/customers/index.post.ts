@@ -1,16 +1,10 @@
 import { ORDER_ENTRY_ROLES } from '~/utils/roleAccess'
 import { requireRole } from '../../../utils/auth'
 import { createCustomerSchema } from '../../../utils/customer-validation'
-import {
-  buildSiigoCustomerPayload,
-  normalizeSiigoCustomer,
-  type SiigoCustomerApiResponse
-} from '../../../utils/siigo-customers'
-import { invalidateSiigoCatalog } from '../../../utils/siigo-catalog'
-import { siigoRequest } from '../../../utils/siigo'
+import { createSynchronizedSiigoCustomer } from '../../../utils/siigo-customer-sync'
 
 export default eventHandler(async (event) => {
-  await requireRole(event, ORDER_ENTRY_ROLES)
+  const user = await requireRole(event, ORDER_ENTRY_ROLES)
   const parsed = createCustomerSchema.safeParse(await readBody(event))
 
   if (!parsed.success) {
@@ -21,11 +15,5 @@ export default eventHandler(async (event) => {
     })
   }
 
-  const response = await siigoRequest<SiigoCustomerApiResponse>('/v1/customers', {
-    method: 'POST',
-    body: buildSiigoCustomerPayload(parsed.data)
-  })
-
-  invalidateSiigoCatalog('customers')
-  return normalizeSiigoCustomer(response)
+  return createSynchronizedSiigoCustomer(parsed.data, user.email)
 })

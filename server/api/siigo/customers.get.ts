@@ -1,30 +1,17 @@
-import type { SiigoListResponse } from '~/types/siigo'
 import { ORDER_ENTRY_ROLES } from '~/utils/roleAccess'
 import { requireRole } from '../../utils/auth'
-import { cachedSiigoCatalog, collectSiigoCatalog } from '../../utils/siigo-catalog'
-import { listQuery, siigoRequest } from '../../utils/siigo'
-import {
-  normalizeSiigoCustomerList,
-  type SiigoCustomerApiResponse
-} from '../../utils/siigo-customers'
-
-async function getCustomersPage(query: Record<string, string | undefined>) {
-  const response = await siigoRequest<SiigoListResponse<SiigoCustomerApiResponse>>('/v1/customers', { query })
-  return normalizeSiigoCustomerList(response)
-}
-
-async function getAllCustomers() {
-  return cachedSiigoCatalog('customers', () => collectSiigoCatalog((page, pageSize) => (
-    getCustomersPage({ page: String(page), page_size: String(pageSize) })
-  )))
-}
+import { listLocalCustomers } from '../../utils/siigo-customer-repository'
 
 export default eventHandler(async (event) => {
   await requireRole(event, ORDER_ENTRY_ROLES)
 
-  if (getQuery(event).all === 'true') {
-    return getAllCustomers()
-  }
+  const query = getQuery(event)
+  const page = typeof query.page === 'string' ? Number(query.page) : 1
+  const pageSize = typeof query.page_size === 'string' ? Number(query.page_size) : 25
 
-  return getCustomersPage(listQuery(event))
+  return listLocalCustomers({
+    all: query.all === 'true',
+    page: Number.isInteger(page) ? page : 1,
+    pageSize: Number.isInteger(pageSize) ? pageSize : 25
+  })
 })

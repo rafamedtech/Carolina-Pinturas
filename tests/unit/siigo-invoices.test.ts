@@ -4,7 +4,9 @@ import {
   assertInvoiceReferences,
   buildSiigoInvoiceDraftPayload,
   createOrderSiigoInvoiceSchema,
+  isSiigoInvoiceWriteEnabled,
   isUsableFiscalRfc,
+  missingInvoiceCustomerFields,
   normalizeCreatedInvoice,
   normalizeInvoiceDocumentTypes,
   normalizeInvoiceProduct,
@@ -35,6 +37,14 @@ const documentType = {
 }
 
 describe('Siigo invoice drafts', () => {
+  it('enables invoice writes only for an explicit true setting', () => {
+    expect(isSiigoInvoiceWriteEnabled(true)).toBe(true)
+    expect(isSiigoInvoiceWriteEnabled('true')).toBe(true)
+    expect(isSiigoInvoiceWriteEnabled(false)).toBe(false)
+    expect(isSiigoInvoiceWriteEnabled('false')).toBe(false)
+    expect(isSiigoInvoiceWriteEnabled(undefined)).toBe(false)
+  })
+
   it('requires explicit confirmation and valid dates', () => {
     expect(createOrderSiigoInvoiceSchema.safeParse(input).success).toBe(true)
     expect(createOrderSiigoInvoiceSchema.safeParse({
@@ -48,6 +58,30 @@ describe('Siigo invoice drafts', () => {
     expect(isUsableFiscalRfc('XAXX010101000')).toBe(false)
     expect(isUsableFiscalRfc('XEXX010101000')).toBe(false)
     expect(isUsableFiscalRfc('MELM8305281H0')).toBe(true)
+  })
+
+  it('detects the customer fields required before invoicing', () => {
+    const completeCustomer = {
+      id: '6b6ceb28-b2eb-4b98-b3dd-26648a933c81',
+      name: ['Rafael', 'Valenzuela'],
+      person_type: 'Physical',
+      rfc_id: 'VAGR8902073DA',
+      fiscal_regime: '612',
+      active: true,
+      address: {
+        street: 'Calle 5',
+        postal_code: '22000',
+        city: { country_code: 'Mx', state_code: '2', city_code: '4' }
+      }
+    }
+
+    expect(missingInvoiceCustomerFields(completeCustomer)).toEqual([])
+    expect(missingInvoiceCustomerFields({
+      ...completeCustomer,
+      active: false,
+      fiscal_regime: undefined,
+      address: { ...completeCustomer.address, postal_code: undefined }
+    })).toEqual(['cliente activo', 'régimen fiscal', 'código postal'])
   })
 
   it('normalizes tenant catalogs without trusting malformed entries', () => {
@@ -111,6 +145,7 @@ describe('Siigo invoice drafts', () => {
         }]
       },
       customerRfc: 'MELM8305281H0',
+      customerBranchOffice: 3,
       products: new Map([[product.code, product]]),
       documentType,
       costCenterId: null
@@ -118,7 +153,7 @@ describe('Siigo invoice drafts', () => {
 
     expect(payload).toMatchObject({
       document: { id: 59625 },
-      customer: { rfc_id: 'MELM8305281H0', branch_office: 0 },
+      customer: { rfc_id: 'MELM8305281H0', branch_office: 3 },
       seller: 35071,
       use: 'G03',
       stamp: { send: false },
@@ -131,13 +166,60 @@ describe('Siigo invoice drafts', () => {
       }],
       payment: {
         method: 'PUE',
-        conditions: {
+        conditions: [{
           id: 5636,
           value: 232,
           due_date: '2026-07-28'
-        }
+        }]
       }
     })
+    expect(Array.isArray(payload.payment.conditions)).toBe(true)
+  })
+
+  it('sends the pre-tax base when the displayed product price includes tax', () => {
+    const product = normalizeInvoiceProduct({
+      id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+      code: 'YU700-19L',
+      name: 'Producto con IVA incluido',
+      active: true,
+      tax_included: true,
+      taxes: [{ id: 8, name: 'IVA 8%', percentage: 8, type: 'IVA' }]
+    })
+    const payload = buildSiigoInvoiceDraftPayload({
+      input,
+      order: {
+        folio: 12,
+        observations: null,
+        discountAmount: 0,
+        total: 1780,
+        items: [{
+          code: 'YU700-19L',
+          description: null,
+          quantity: 1,
+          unitPrice: 1780,
+          discountAmount: 0,
+          subtotal: 1648.15,
+          taxAmount: 131.85,
+          total: 1780
+        }]
+      },
+      customerRfc: 'MELM8305281H0',
+      products: new Map([[product.code, product]]),
+      documentType,
+      costCenterId: null
+    })
+
+    expect(payload.items[0]).toMatchObject({
+      code: 'YU700-19L',
+      quantity: 1,
+      price: 1648.15,
+      taxes: [{ id: 8 }]
+    })
+    expect(payload.payment.conditions).toEqual([{
+      id: 5636,
+      value: 1780,
+      due_date: '2026-07-28'
+    }])
   })
 
   it('accepts the minimal current create response and rejects invalid ids', () => {

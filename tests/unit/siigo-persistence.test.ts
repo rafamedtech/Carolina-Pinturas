@@ -62,19 +62,54 @@ describe('persistencia de snapshots de Siigo', () => {
       id: '6b6ceb28-b2eb-4b98-b3dd-26648a933c81',
       name: ['María', 'López'],
       rfc_id: 'LOMA850101AB1',
-      phones: [{ number: '5512345678' }],
-      contacts: [{ first_name: 'María', last_name: 'López', email: 'maria@example.com' }]
+      commercial_name: 'Pinturas María',
+      branch_office: 2,
+      comments: 'Cliente preferente',
+      seller_id: 21,
+      address: {
+        street: 'Av. Reforma',
+        city: { country_code: 'MX', state_code: '02', city_code: '001' }
+      },
+      phones: [{ indicative: '52', number: '5512345678', extension: '10' }],
+      contacts: [{
+        first_name: 'María',
+        last_name: 'López',
+        email: 'maria@example.com',
+        phone: { indicative: '52', number: '5587654321', extension: '20' }
+      }]
     }
 
-    await upsertSiigoCustomer(tx, customer)
+    await upsertSiigoCustomer(tx, customer, {
+      internal: { code: 'CLI-001', notes: 'Crédito autorizado', tags: ['mayoreo'] },
+      updatedByEmail: 'vendedor@example.com'
+    })
 
     expect(upsert).toHaveBeenCalledOnce()
     expect(upsert).toHaveBeenCalledWith(expect.objectContaining({
       create: expect.objectContaining({
-        phones: { create: [expect.objectContaining({ position: 1, number: '5512345678' })] },
-        contacts: { create: [expect.objectContaining({ position: 1, firstName: 'María' })] }
+        commercialName: 'Pinturas María',
+        branchOffice: 2,
+        addressCountryCode: 'MX',
+        internalCode: 'CLI-001',
+        internalTags: ['mayoreo'],
+        createdByEmail: 'vendedor@example.com',
+        phones: { create: [expect.objectContaining({
+          position: 1,
+          indicative: '52',
+          number: '5512345678',
+          extension: '10'
+        })] },
+        contacts: { create: [expect.objectContaining({
+          position: 1,
+          firstName: 'María',
+          phoneIndicative: '52',
+          phoneExtension: '20'
+        })] }
       }),
       update: expect.objectContaining({
+        syncStatus: 'synced',
+        syncVersion: { increment: 1 },
+        updatedByEmail: 'vendedor@example.com',
         phones: {
           deleteMany: {},
           create: [expect.objectContaining({ position: 1, number: '5512345678' })]

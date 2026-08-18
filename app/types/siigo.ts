@@ -70,12 +70,20 @@ export interface SiigoCustomer {
   id: string
   name: string[]
   commercial_name?: string
+  branch_office?: number
   person_type?: string
   type?: string
   identification?: string
   rfc_id?: string
   fiscal_regime?: string
   active?: boolean
+  comments?: string
+  seller_id?: number
+  collector_id?: number
+  related_users?: {
+    seller_id?: number
+    collector_id?: number
+  }
   address?: {
     street?: string
     interior_number?: string
@@ -93,19 +101,70 @@ export interface SiigoCustomer {
     postal_code?: string
   }
   phones?: Array<{
+    indicative?: string
     number?: string
+    extension?: string
   }>
   contacts?: Array<{
     first_name?: string
     last_name?: string
     email?: string
     phone?: {
+      indicative?: string
       number?: string
+      extension?: string
     }
   }>
   metadata?: {
     created?: string
     last_updated?: string | null
+  }
+  internal?: {
+    code?: string | null
+    notes?: string | null
+    tags: string[]
+    sync_status: string
+    sync_version: number
+    synced_at: string
+  }
+}
+
+export interface SiigoCustomerSyncResult {
+  received: number
+  synchronized: number
+  synchronized_at: string
+}
+
+export interface SiigoCustomerMutationInput {
+  personType: 'Physical' | 'Moral' | 'Foreign'
+  name: string[]
+  rfcId: string
+  commercialName?: string
+  branchOffice?: number
+  fiscalRegime?: string
+  active?: boolean
+  email?: string
+  phone?: string
+  comments?: string
+  sellerId?: number
+  collectorId?: number
+  internal?: {
+    code?: string
+    notes?: string
+    tags: string[]
+  }
+  address: {
+    street: string
+    exteriorNumber?: string
+    interiorNumber?: string
+    colony?: string
+    locality?: string
+    postalCode?: string
+    city: {
+      countryCode: string
+      stateCode: string
+      cityCode: string
+    }
   }
 }
 

@@ -1,8 +1,11 @@
 <script setup lang="ts">
-import type { SiigoCustomer } from '~/types/siigo'
+import type { SiigoCustomer, SiigoCustomerMutationInput } from '~/types/siigo'
+import { SAT_FISCAL_REGIMES } from '~/utils/satFiscalRegimes'
 import { siigoCustomerPhone, siigoCustomerAddress } from '~/utils/siigoCustomer'
+import { missingSiigoCustomerFields, siigoCustomerMutationInput } from '~/utils/siigoCustomerMutation'
 
 const route = useRoute()
+const toast = useToast()
 const customerId = computed(() => String(route.params.id))
 const { data: customer, status, error, refresh } = useLazyFetch<SiigoCustomer>(
   () => `/api/siigo/customers/${encodeURIComponent(customerId.value)}`,
@@ -14,7 +17,101 @@ const contact = computed(() => customer.value?.contacts?.[0])
 const email = computed(() => contact.value?.email || '—')
 const phone = computed(() => siigoCustomerPhone(customer.value) || '—')
 const address = computed(() => siigoCustomerAddress(customer.value) || '—')
+const personTypeLabel = computed(() => {
+  const personType = customer.value?.person_type?.trim()
+  if (!personType) return '—'
+
+  return {
+    physical: 'Persona física',
+    moral: 'Persona moral',
+    foreign: 'Extranjero'
+  }[personType.toLowerCase()] || personType
+})
+const fiscalRegimeLabel = computed(() => {
+  const fiscalRegime = customer.value?.fiscal_regime?.trim()
+  if (!fiscalRegime) return '—'
+
+  return SAT_FISCAL_REGIMES.find(regime => regime.value === fiscalRegime)?.label || fiscalRegime
+})
+const customerSince = computed(() => {
+  const created = customer.value?.metadata?.created
+  return created ? formatMexicoDate(created) : '—'
+})
 const message = computed(() => error.value?.data?.statusMessage || 'No fue posible cargar el cliente.')
+const editing = shallowRef(false)
+const saving = shallowRef(false)
+const submitError = shallowRef('')
+const editNotice = shallowRef('')
+const activeOverride = shallowRef<boolean | undefined>(undefined)
+const archiveOpen = shallowRef(false)
+
+function startEditing(options: { active?: boolean, notice?: string } = {}) {
+  activeOverride.value = options.active
+  editNotice.value = options.notice || ''
+  submitError.value = ''
+  editing.value = true
+}
+
+function cancelEditing() {
+  editing.value = false
+  activeOverride.value = undefined
+  editNotice.value = ''
+  submitError.value = ''
+}
+
+async function saveCustomer(
+  input: SiigoCustomerMutationInput,
+  successTitle = 'Cliente actualizado'
+) {
+  if (saving.value) return
+  saving.value = true
+  submitError.value = ''
+
+  try {
+    const updated = await $fetch<SiigoCustomer>(
+      `/api/siigo/customers/${encodeURIComponent(customerId.value)}`,
+      { method: 'PUT', body: input }
+    )
+    customer.value = updated
+    cancelEditing()
+    archiveOpen.value = false
+    await refreshNuxtData('customers-catalog-request')
+    toast.add({
+      title: successTitle,
+      description: 'Los datos quedaron guardados en la base de datos.',
+      color: 'success',
+      icon: 'i-lucide-circle-check'
+    })
+  } catch (fetchError: unknown) {
+    const response = fetchError as { data?: { statusMessage?: string }, message?: string }
+    submitError.value = response.data?.statusMessage || response.message || 'Intenta nuevamente.'
+    toast.add({
+      title: 'No se pudo actualizar el cliente',
+      description: submitError.value,
+      color: 'error',
+      icon: 'i-lucide-circle-alert'
+    })
+  } finally {
+    saving.value = false
+  }
+}
+
+async function setCustomerActive(active: boolean) {
+  if (!customer.value) return
+  const input = siigoCustomerMutationInput(customer.value, { active })
+  const missing = missingSiigoCustomerFields(input)
+
+  if (missing.length) {
+    archiveOpen.value = false
+    startEditing({
+      active,
+      notice: `Para ${active ? 'activar' : 'archivar'} este cliente, completa: ${missing.join(', ')}.`
+    })
+    return
+  }
+
+  await saveCustomer(input, active ? 'Cliente activado' : 'Cliente archivado')
+}
 
 useSeoMeta({ title: () => fullName.value })
 </script>
@@ -22,7 +119,7 @@ useSeoMeta({ title: () => fullName.value })
 <template>
   <UDashboardPanel id="customer-detail">
     <template #header>
-      <UDashboardNavbar :title="fullName">
+      <UDashboardNavbar title="Detalle del cliente">
         <template #leading>
           <UButton
             to="/clientes"
@@ -34,6 +131,7 @@ useSeoMeta({ title: () => fullName.value })
         </template>
         <template #right>
           <UButton
+            v-if="!editing"
             label="Actualizar"
             icon="i-lucide-refresh-cw"
             color="neutral"
@@ -58,30 +156,27 @@ useSeoMeta({ title: () => fullName.value })
       <template v-else-if="customer">
         <div class="flex flex-wrap items-start justify-between gap-4">
           <div>
-            <p class="text-sm text-muted">
-              Cliente
-            </p>
-            <h1 class="text-xl font-semibold text-highlighted">
+            <h1 class="text-xl font-semibold text-primary">
               {{ fullName }}
             </h1>
-            <p class="mt-1 text-sm text-muted">
-              {{ customer.rfc_id || '—' }}
-            </p>
           </div>
           <UBadge :color="customer.active === false ? 'neutral' : 'success'" variant="subtle" size="lg">
             {{ customer.active === false ? 'Inactivo' : 'Activo' }}
           </UBadge>
         </div>
 
-        <UAlert
-          color="neutral"
-          variant="subtle"
-          title="Gestión de clientes pendiente de habilitación"
-          description="Crear, editar, eliminar y activar o desactivar se habilitarán tras validar los endpoints de escritura de Siigo México."
-          icon="i-lucide-shield-check"
+        <CustomersCustomerEditForm
+          v-if="editing"
+          :customer="customer"
+          :saving="saving"
+          :error-message="submitError"
+          :active-override="activeOverride"
+          :notice="editNotice"
+          @submit="saveCustomer"
+          @cancel="cancelEditing"
         />
 
-        <div class="grid gap-4 lg:grid-cols-2">
+        <div v-else class="grid gap-4 lg:grid-cols-2">
           <UCard>
             <template #header>
               <h2 class="font-semibold text-highlighted">
@@ -102,7 +197,7 @@ useSeoMeta({ title: () => fullName.value })
                   Tipo de cliente
                 </dt>
                 <dd class="mt-1 font-medium">
-                  {{ customer.person_type || '—' }}
+                  {{ personTypeLabel }}
                 </dd>
               </div>
               <div>
@@ -110,15 +205,15 @@ useSeoMeta({ title: () => fullName.value })
                   Régimen fiscal
                 </dt>
                 <dd class="mt-1 font-medium">
-                  {{ customer.fiscal_regime || '—' }}
+                  {{ fiscalRegimeLabel }}
                 </dd>
               </div>
               <div>
                 <dt class="text-sm text-muted">
-                  Tipo de registro
+                  Cliente desde
                 </dt>
                 <dd class="mt-1 font-medium">
-                  {{ customer.type || '—' }}
+                  {{ customerSince }}
                 </dd>
               </div>
             </dl>
@@ -159,23 +254,66 @@ useSeoMeta({ title: () => fullName.value })
           </UCard>
         </div>
 
-        <div class="flex flex-wrap gap-2 border-t border-default pt-4">
-          <UButton label="Editar cliente" icon="i-lucide-pencil" disabled />
+        <CustomersCustomerOrdersTable
+          v-if="!editing"
+          :customer-id="customer.id"
+        />
+
+        <div v-if="!editing" class="flex flex-wrap gap-2 border-t border-default pt-4">
+          <UButton label="Editar cliente" icon="i-lucide-pencil" @click="startEditing()" />
           <UButton
             :label="customer.active === false ? 'Activar cliente' : 'Desactivar cliente'"
             icon="i-lucide-power"
             color="neutral"
             variant="outline"
-            disabled
+            :loading="saving"
+            @click="setCustomerActive(customer.active === false)"
           />
           <UButton
-            label="Eliminar cliente"
-            icon="i-lucide-trash-2"
+            v-if="customer.active !== false"
+            label="Archivar cliente"
+            icon="i-lucide-archive"
             color="error"
             variant="outline"
-            disabled
+            :disabled="saving"
+            @click="archiveOpen = true"
           />
         </div>
+
+        <UModal
+          v-model:open="archiveOpen"
+          title="Archivar cliente"
+          description="Siigo México no permite eliminar clientes; se desactivará este registro en ambos sistemas."
+          :dismissible="!saving"
+          :close="saving ? false : undefined"
+          :ui="{ footer: 'justify-end' }"
+        >
+          <template #body>
+            <UAlert
+              color="warning"
+              variant="subtle"
+              title="El cliente dejará de estar activo"
+              description="Se conservarán su historial y sus datos para pedidos y facturación existentes."
+              icon="i-lucide-triangle-alert"
+            />
+          </template>
+          <template #footer>
+            <UButton
+              label="Conservar activo"
+              color="neutral"
+              variant="outline"
+              :disabled="saving"
+              @click="archiveOpen = false"
+            />
+            <UButton
+              label="Archivar cliente"
+              color="error"
+              icon="i-lucide-archive"
+              :loading="saving"
+              @click="setCustomerActive(false)"
+            />
+          </template>
+        </UModal>
       </template>
 
       <div

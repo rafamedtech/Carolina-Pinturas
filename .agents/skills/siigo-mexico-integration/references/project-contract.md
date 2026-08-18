@@ -57,7 +57,7 @@ No leer ni mostrar valores de `.env` para una revisión normal. Verificar solo p
 - Mantener productos y clientes disponibles para roles de captura definidos por `ORDER_ENTRY_ROLES`.
 - Mantener facturas y pagos bajo roles logísticos definidos por el proyecto.
 - Preservar el estado explícito de Siigo no configurado; no introducir datos simulados como fallback.
-- Mantener deshabilitadas operaciones fiscales de escritura hasta validar el contrato en un entorno seguro.
+- Por decisión explícita del usuario del 2026-08-18, la creación confirmada de facturas borrador puede habilitarse con `NUXT_SIIGO_INVOICE_WRITES_ENABLED=true`; las recepciones de pago permanecen separadas y deshabilitadas hasta autorización explícita mediante `NUXT_SIIGO_FISCAL_WRITES_ENABLED`.
 - Obtener IDs dependientes del tenant desde endpoints de catálogo, nunca desde ejemplos del blueprint.
 - Respetar el límite oficial publicado de 150 solicitudes por minuto y 5.000 por día. Evitar fan-out sin control; revisar especialmente listados completos y enriquecimiento N+1.
 
@@ -66,6 +66,11 @@ No leer ni mostrar valores de `.env` para una revisión normal. Verificar solo p
 Dar prioridad a estas regresiones locales frente a ejemplos contradictorios:
 
 - El 2026-07-06 Siigo México rechazó `contacts` como objeto con `Invalid data type: contacts`; `CustomerIn` requiere arreglos para `contacts` y `phones`.
+- El 2026-08-18 Siigo México rechazó `payment.conditions` como objeto con `Invalid data type: conditions`; `PaymentIn` exige `conditions` como arreglo aun cuando la tabla descriptiva de creación muestre campos singulares.
+- El 2026-08-18 Siigo calculó $1,922.40 para una partida local de $1,780 con IVA 8% incluido: `items.price` debe recibir la base antes de impuestos cuando también se envía `items.taxes`, o el impuesto se duplica y deja de coincidir con `payment.conditions[].value`.
+- Por decisión explícita del usuario del 2026-08-18, al pulsar **Facturar** se consulta `GET /v1/invoices/{id}` cuando existe una factura local marcada como creada. Sólo un `404` confirma que fue eliminada en Siigo y permite volver a crear el borrador; errores de red, autorización o servidor mantienen el bloqueo para evitar duplicados.
+- Por decisión explícita del usuario del 2026-08-18, si no existe una factura vigente, **Facturar** consulta el cliente actual en Siigo y exige antes de continuar: cliente activo, nombre fiscal, RFC válido no genérico, régimen fiscal, calle, código postal y códigos de país/estado/ciudad. Los faltantes se completan en un modal que actualiza primero Siigo y después PostgreSQL mediante el flujo sincronizado existente.
+- Por decisión explícita del usuario del 2026-08-18, el formulario de factura selecciona por defecto el método cuyo nombre de catálogo corresponde a **Efectivo** y al vendedor **Alexis Cordova**. Resolver siempre sus IDs desde los catálogos del tenant y conservar el primer elemento disponible como respaldo.
 - La respuesta de cliente puede devolver `name` como `string`, `string[]` o vacío. Normalizar a `string[]` y exigir `id` y un nombre utilizable.
 - Para `Physical`, enviar nombres y apellidos separados. El código existente envía un solo `string` para `Moral` y `Foreign`; conservar esta decisión mientras las pruebas/evidencia la respalden.
 - La dirección de creación usa `address.address`, aunque algunas descripciones del blueprint llaman al campo de entrada `street`. Preservar el payload comprobado y documentar el conflicto.

@@ -32,6 +32,7 @@ export default defineNuxtConfig({
       username: '',
       accessKey: '',
       applicationId: 'CarolinaPinturas',
+      invoiceWritesEnabled: false,
       fiscalWritesEnabled: false
     },
     public: {

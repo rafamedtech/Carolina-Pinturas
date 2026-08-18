@@ -116,6 +116,8 @@ Conservar status útil de errores `4xx`; mapear timeout a `504` y fallos externo
 - `expires_in: 86400` está descrito como milisegundos, incompatible con las 24 horas declaradas.
 - Varios títulos contienen `/id` literal o rutas sin `{id}`.
 - El texto tabular y los esquemas no siempre coinciden en `name`, `address`, `contacts` y `phones` de clientes.
+- En facturas, la tabla describe `payment.conditions.id`, pero `PaymentIn` y el tenant real exigen `payment.conditions` como `array[ConditionsIn]`.
+- En facturas, `items.price` se envía antes de impuestos cuando `items.taxes` está presente, incluso si la lista de precios del producto tiene `tax_included: true`.
 - La documentación oficial renderizada también puede mostrar ejemplos inconsistentes; preferir la evidencia de regresión del proyecto para formas ya observadas.
 - El blueprint no incluye versión de publicación ni changelog. La fecha del archivo local no prueba la fecha del contrato.
 

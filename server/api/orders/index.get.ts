@@ -1,5 +1,8 @@
 import { requireUser } from '../../utils/auth'
 import { listOrders } from '../../utils/orders'
+import * as z from 'zod'
+
+const optionalCustomerId = z.string().uuid().optional()
 
 function positiveInteger(value: unknown, fallback: number, maximum: number) {
   const parsed = Number(value)
@@ -19,6 +22,15 @@ function dateOnly(value: unknown) {
 export default eventHandler(async (event) => {
   const user = await requireUser(event)
   const query = getQuery(event)
+  const customerId = optionalCustomerId.safeParse(
+    typeof query.customer_id === 'string' && query.customer_id.trim()
+      ? query.customer_id.trim()
+      : undefined
+  )
+
+  if (!customerId.success) {
+    throw createError({ statusCode: 400, statusMessage: 'El identificador del cliente no es válido.' })
+  }
 
   return listOrders({
     page: positiveInteger(query.page, 1, 100_000),
@@ -31,6 +43,7 @@ export default eventHandler(async (event) => {
     hideQuotes: query.hide_quotes === 'true' || query.hide_quotes === '1',
     dateFrom: dateOnly(query.date_from),
     dateTo: dateOnly(query.date_to),
+    customerId: customerId.data,
     igualacion: query.igualacion === 'true' || query.igualacion === '1'
   }, user)
 })

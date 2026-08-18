@@ -1,6 +1,6 @@
 import Decimal from 'decimal.js'
 import * as z from 'zod'
-import type { SiigoProduct } from '~/types/siigo'
+import type { SiigoCustomer, SiigoProduct } from '~/types/siigo'
 import type {
   CreateOrderSiigoInvoiceInput,
   SiigoInvoiceDocumentType,
@@ -24,6 +24,16 @@ export const createOrderSiigoInvoiceSchema = z.object({
   dueDate: dateSchema,
   confirmation: z.literal('CREAR_BORRADOR_SIIGO')
 })
+
+export function isSiigoInvoiceWriteEnabled(value: boolean | string | null | undefined) {
+  return value === true || value === 'true'
+}
+
+export function siigoInvoiceWritesEnabled() {
+  return isSiigoInvoiceWriteEnabled(
+    useRuntimeConfig().siigo.invoiceWritesEnabled as boolean | string | null | undefined
+  )
+}
 
 type UnknownRecord = Record<string, unknown>
 
@@ -180,6 +190,25 @@ export function isUsableFiscalRfc(value: string | null | undefined) {
     && rfc !== 'XEXX010101000'
 }
 
+export function missingInvoiceCustomerFields(customer: SiigoCustomer) {
+  const missing: string[] = []
+  const personType = customer.person_type?.trim().toLowerCase()
+  const names = customer.name?.map(part => part.trim()).filter(Boolean) || []
+
+  if (customer.active === false) missing.push('cliente activo')
+  if (!names.length) missing.push('nombre o razón social')
+  if (personType === 'physical' && names.length < 2) missing.push('nombres y apellidos')
+  if (!isUsableFiscalRfc(customer.rfc_id || customer.identification)) missing.push('RFC fiscal válido')
+  if (!/^\d{3}$/.test(customer.fiscal_regime?.trim() || '')) missing.push('régimen fiscal')
+  if (!customer.address?.street?.trim()) missing.push('calle')
+  if (!/^\d{5}$/.test(customer.address?.postal_code?.trim() || '')) missing.push('código postal')
+  if (!customer.address?.city?.country_code?.trim()) missing.push('país')
+  if (!customer.address?.city?.state_code?.trim()) missing.push('estado')
+  if (!customer.address?.city?.city_code?.trim()) missing.push('ciudad')
+
+  return missing
+}
+
 export function assertInvoiceReferences(options: {
   input: CreateOrderSiigoInvoiceInput
   documentTypes: SiigoInvoiceDocumentType[]
@@ -269,6 +298,7 @@ export function buildSiigoInvoiceDraftPayload(options: {
   input: CreateOrderSiigoInvoiceInput
   order: InvoiceOrderSource
   customerRfc: string
+  customerBranchOffice?: number | null
   products: Map<string, SiigoProduct>
   documentType: SiigoInvoiceDocumentType
   costCenterId: number | null
@@ -280,13 +310,17 @@ export function buildSiigoInvoiceDraftPayload(options: {
       throw createError({ statusCode: 409, statusMessage: `El producto ${line.code} ya no está activo en Siigo.` })
     }
     const quantity = money(line.quantity)
-    const price = money(line.unitPrice)
-    if (!quantity.equals(line.quantity) || !price.equals(line.unitPrice)) {
+    const listedPrice = money(line.unitPrice)
+    if (!quantity.equals(line.quantity) || !listedPrice.equals(line.unitPrice)) {
       throw createError({
         statusCode: 422,
         statusMessage: `El producto ${line.code} debe usar cantidad y precio con máximo dos decimales para facturarse.`
       })
     }
+    // `unitPrice` conserva el precio mostrado al usuario y puede incluir IVA.
+    // Siigo vuelve a calcular los impuestos enviados en `taxes`, por lo que la
+    // factura debe recibir el valor unitario de la base antes de impuestos.
+    const price = money(new Decimal(line.subtotal).div(quantity))
     const discount = invoiceDiscount({
       line,
       orderDiscount: new Decimal(options.order.discountAmount),
@@ -319,7 +353,7 @@ export function buildSiigoInvoiceDraftPayload(options: {
     date: options.input.date,
     customer: {
       rfc_id: options.customerRfc,
-      branch_office: 0
+      branch_office: options.customerBranchOffice ?? 0
     },
     seller: options.input.sellerId,
     use: options.input.useCfdi,
@@ -330,11 +364,13 @@ export function buildSiigoInvoiceDraftPayload(options: {
     mail: { send: false },
     payment: {
       method: options.input.paymentMethod,
-      conditions: {
+      // Siigo México exige un arreglo aunque la tabla descriptiva de la
+      // documentación presente los campos como payment.conditions.id/value.
+      conditions: [{
         id: options.input.paymentTypeId,
         value: money(options.order.total).toNumber(),
         due_date: options.input.dueDate
-      }
+      }]
     }
   }
 }

@@ -3,16 +3,18 @@ import { ORDER_LOGISTICS_ROLES } from '~/utils/roleAccess'
 import { requireRole } from '../../../../utils/auth'
 import { getOrder } from '../../../../utils/orders'
 import { usePrisma } from '../../../../utils/prisma'
+import { getSiigoCustomerDetail } from '../../../../utils/siigo-customer-detail'
 import {
-  isUsableFiscalRfc,
+  missingInvoiceCustomerFields,
   normalizeInvoiceCostCenters,
   normalizeInvoiceDocumentTypes,
   normalizeInvoicePaymentTypes,
   normalizeSiigoSellers,
-  normalizeSiigoWarehouses
+  normalizeSiigoWarehouses,
+  siigoInvoiceWritesEnabled
 } from '../../../../utils/siigo-invoices'
 import { siigoRequest } from '../../../../utils/siigo'
-import { siigoFiscalWritesEnabled } from '../../../../utils/siigo-vouchers'
+import { verifyPersistedSiigoInvoice } from '../../../../utils/siigo-invoice-reconciliation'
 
 function decimal(value: { toString(): string }) {
   return Number(value.toString())
@@ -57,23 +59,61 @@ export default eventHandler(async (event): Promise<OrderSiigoInvoiceContext> => 
     throw createError({ statusCode: 400, statusMessage: 'Falta el identificador del pedido.' })
   }
 
-  const [order, persisted] = await Promise.all([
+  const prisma = usePrisma()
+  const [order, initialPersisted] = await Promise.all([
     getOrder(id, user),
-    usePrisma().salesOrderSiigoInvoice.findUnique({ where: { orderId: id } })
+    prisma.salesOrderSiigoInvoice.findUnique({ where: { orderId: id } })
   ])
+  let persisted = initialPersisted
+
+  if (persisted?.status === 'created' && persisted.siigoInvoiceId) {
+    const existsInSiigo = await verifyPersistedSiigoInvoice({
+      invoice: persisted,
+      request: siigoRequest,
+      markMissing: async (siigoInvoiceId) => {
+        await prisma.$transaction(async (tx) => {
+          const reconciled = await tx.salesOrderSiigoInvoice.updateMany({
+            where: {
+              orderId: id,
+              status: 'created',
+              siigoInvoiceId
+            },
+            data: {
+              status: 'failed',
+              siigoInvoiceId: null,
+              siigoInvoiceName: null,
+              lastError: 'La factura registrada ya no existe en Siigo. Puedes crear un nuevo borrador.'
+            }
+          })
+          if (reconciled.count !== 1) return
+
+          await tx.salesOrder.updateMany({
+            where: { id, siigoReference: siigoInvoiceId },
+            data: {
+              siigoReference: null,
+              registeredInSiigoAt: null,
+              updatedByEmail: user.email,
+              version: { increment: 1 }
+            }
+          })
+        })
+      }
+    })
+
+    if (!existsInSiigo) {
+      persisted = await prisma.salesOrderSiigoInvoice.findUnique({ where: { orderId: id } })
+    }
+  }
   const isOrder = order.status.key !== 'borrador'
-  const hasFiscalRfc = isUsableFiscalRfc(order.customer.rfc)
-  const eligible = order.requiresInvoice && isOrder && hasFiscalRfc
+  const eligible = order.requiresInvoice && isOrder
   let eligibilityMessage: string | null = null
   if (!order.requiresInvoice) {
     eligibilityMessage = 'Este pedido no requiere factura; no se creará ningún documento en Siigo.'
   } else if (!isOrder) {
     eligibilityMessage = 'Convierte la cotización en pedido antes de crear la factura borrador.'
-  } else if (!hasFiscalRfc) {
-    eligibilityMessage = 'El cliente necesita un RFC fiscal válido; el RFC genérico no se usa para este flujo.'
   }
   const base = {
-    writeEnabled: siigoFiscalWritesEnabled(),
+    writeEnabled: siigoInvoiceWritesEnabled(),
     requiresInvoice: order.requiresInvoice,
     eligible,
     eligibilityMessage,
@@ -82,12 +122,41 @@ export default eventHandler(async (event): Promise<OrderSiigoInvoiceContext> => 
     orderTotal: order.total,
     customerName: order.customer.name,
     customerRfc: order.customer.rfc,
+    customer: null,
+    customerReadyForInvoice: false,
+    missingCustomerFields: [],
     invoice: persisted ? invoiceView(persisted) : null
   }
 
   if (!eligible || (persisted && persisted.status !== 'failed')) {
     return {
       ...base,
+      documentTypes: [],
+      sellers: [],
+      paymentTypes: [],
+      costCenters: [],
+      warehouses: []
+    }
+  }
+
+  const customer = await getSiigoCustomerDetail(order.customer.id)
+  if (!customer) {
+    throw createError({
+      statusCode: 409,
+      statusMessage: 'El cliente del pedido no está disponible en PostgreSQL para validar la factura.'
+    })
+  }
+  const missingCustomerFields = missingInvoiceCustomerFields(customer)
+  const customerBase = {
+    ...base,
+    customer,
+    customerReadyForInvoice: missingCustomerFields.length === 0,
+    missingCustomerFields
+  }
+
+  if (missingCustomerFields.length) {
+    return {
+      ...customerBase,
       documentTypes: [],
       sellers: [],
       paymentTypes: [],
@@ -105,7 +174,7 @@ export default eventHandler(async (event): Promise<OrderSiigoInvoiceContext> => 
   ])
 
   return {
-    ...base,
+    ...customerBase,
     documentTypes: normalizeInvoiceDocumentTypes(documents).filter(item => item.active),
     sellers: normalizeSiigoSellers(users).filter(item => item.active),
     paymentTypes: normalizeInvoicePaymentTypes(paymentTypes).filter(item => item.active),

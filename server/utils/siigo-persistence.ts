@@ -1,5 +1,6 @@
 import type { Prisma } from '../../generated/prisma/client'
 import type { SiigoCustomer, SiigoProduct } from '~/types/siigo'
+import type { CustomerInternalInput } from './customer-validation'
 
 type TransactionClient = Prisma.TransactionClient
 
@@ -21,30 +22,52 @@ function customerDisplayName(customer: SiigoCustomer) {
   return String(customer.name || customer.rfc_id || customer.id)
 }
 
-export async function upsertSiigoCustomer(tx: TransactionClient, customer: SiigoCustomer) {
+export async function upsertSiigoCustomer(
+  tx: TransactionClient,
+  customer: SiigoCustomer,
+  options: {
+    internal?: CustomerInternalInput
+    updatedByEmail?: string
+  } = {}
+) {
+  const syncedAt = new Date()
   const data = {
     name: jsonValue(customer.name || []),
     displayName: customerDisplayName(customer),
+    commercialName: customer.commercial_name || null,
+    branchOffice: customer.branch_office ?? null,
     personType: customer.person_type || null,
     type: customer.type || null,
     identification: customer.identification || null,
     rfcId: customer.rfc_id || null,
     fiscalRegime: customer.fiscal_regime || null,
     active: customer.active ?? null,
+    comments: customer.comments || null,
+    sellerId: customer.seller_id ?? customer.related_users?.seller_id ?? null,
+    collectorId: customer.collector_id ?? customer.related_users?.collector_id ?? null,
     addressStreet: customer.address?.street || null,
     addressInteriorNumber: customer.address?.interior_number || null,
     addressExteriorNumber: customer.address?.exterior_number || null,
     addressColony: customer.address?.colony || null,
     addressLocality: customer.address?.locality || null,
+    addressCountryCode: customer.address?.city?.country_code || null,
+    addressStateCode: customer.address?.city?.state_code || null,
+    addressCityCode: customer.address?.city?.city_code || null,
     addressCityName: customer.address?.city?.city_name || null,
     addressStateName: customer.address?.city?.state_name || null,
     addressPostalCode: customer.address?.postal_code || null,
+    siigoCreatedAt: optionalDate(customer.metadata?.created),
+    siigoUpdatedAt: optionalDate(customer.metadata?.last_updated),
     rawPayload: jsonValue(customer),
-    syncedAt: new Date()
+    syncStatus: 'synced',
+    lastSyncError: null,
+    syncedAt
   }
   const phones = (customer.phones || []).map((phone, index) => ({
     position: index + 1,
+    indicative: phone.indicative || null,
     number: phone.number || null,
+    extension: phone.extension || null,
     rawPayload: jsonValue(phone)
   }))
   const contacts = (customer.contacts || []).map((contact, index) => ({
@@ -53,19 +76,34 @@ export async function upsertSiigoCustomer(tx: TransactionClient, customer: Siigo
     lastName: contact.last_name || null,
     email: contact.email || null,
     phone: contact.phone?.number || null,
+    phoneIndicative: contact.phone?.indicative || null,
+    phoneExtension: contact.phone?.extension || null,
     rawPayload: jsonValue(contact)
   }))
+  const internal = options.internal === undefined
+    ? {}
+    : {
+        internalCode: options.internal.code || null,
+        internalNotes: options.internal.notes || null,
+        internalTags: options.internal.tags
+      }
 
-  await tx.siigoCustomer.upsert({
+  return tx.siigoCustomer.upsert({
     where: { id: customer.id },
     create: {
       id: customer.id,
       ...data,
+      ...internal,
+      createdByEmail: options.updatedByEmail || null,
+      updatedByEmail: options.updatedByEmail || null,
       phones: { create: phones },
       contacts: { create: contacts }
     },
     update: {
       ...data,
+      ...internal,
+      syncVersion: { increment: 1 },
+      ...(options.updatedByEmail ? { updatedByEmail: options.updatedByEmail } : {}),
       // Una escritura anidada conserva la sustitución atómica del snapshot y
       // evita cuatro round trips extra dentro de la transacción del pedido.
       phones: { deleteMany: {}, create: phones },

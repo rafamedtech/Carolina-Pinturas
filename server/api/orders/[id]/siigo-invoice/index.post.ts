@@ -12,16 +12,17 @@ import {
   buildSiigoInvoiceDraftPayload,
   createOrderSiigoInvoiceSchema,
   isUsableFiscalRfc,
+  missingInvoiceCustomerFields,
   normalizeCreatedInvoice,
   normalizeInvoiceCostCenters,
   normalizeInvoiceDocumentTypes,
   normalizeInvoiceProduct,
   normalizeInvoicePaymentTypes,
   normalizeSiigoSellers,
-  normalizeSiigoWarehouses
+  normalizeSiigoWarehouses,
+  siigoInvoiceWritesEnabled
 } from '../../../../utils/siigo-invoices'
 import { siigoJson } from '../../../../utils/siigo-persistence'
-import { siigoFiscalWritesEnabled } from '../../../../utils/siigo-vouchers'
 
 function publicInvoice(invoice: {
   status: string
@@ -138,7 +139,7 @@ export default eventHandler(async (event): Promise<OrderSiigoInvoice> => {
       data: parsed.error.flatten()
     })
   }
-  if (!siigoFiscalWritesEnabled()) {
+  if (!siigoInvoiceWritesEnabled()) {
     throw createError({
       statusCode: 503,
       statusMessage: 'La creación de facturas está deshabilitada hasta validar el contrato fiscal en un tenant seguro.'
@@ -171,10 +172,17 @@ export default eventHandler(async (event): Promise<OrderSiigoInvoice> => {
   ])
   const customer = normalizeSiigoCustomer(customerResponse as SiigoCustomerApiResponse)
   const customerRfc = (customer.rfc_id || customer.identification || '').toUpperCase()
-  if (!isUsableFiscalRfc(customerRfc) || customerRfc !== order.customer.rfc?.toUpperCase() || customer.active === false) {
+  if (!isUsableFiscalRfc(customerRfc) || customer.active === false) {
     throw createError({
       statusCode: 409,
-      statusMessage: 'El RFC o el estado del cliente cambió en Siigo. Actualiza el pedido antes de facturar.'
+      statusMessage: 'El cliente necesita estar activo y tener un RFC fiscal válido en Siigo antes de facturar.'
+    })
+  }
+  const missingCustomerFields = missingInvoiceCustomerFields(customer)
+  if (missingCustomerFields.length) {
+    throw createError({
+      statusCode: 422,
+      statusMessage: `Completa la información del cliente antes de facturar: ${missingCustomerFields.join(', ')}.`
     })
   }
   const normalizedProducts = freshProducts.map(normalizeInvoiceProduct)
@@ -191,6 +199,7 @@ export default eventHandler(async (event): Promise<OrderSiigoInvoice> => {
     input: parsed.data,
     order,
     customerRfc,
+    customerBranchOffice: customer.branch_office,
     products: productsByCode,
     documentType: references.documentType,
     costCenterId: references.costCenterId

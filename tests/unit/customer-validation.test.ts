@@ -82,6 +82,17 @@ describe('createCustomerSchema', () => {
     ]))
   })
 
+  it('acepta colonias de más de 20 caracteres', () => {
+    const colony = 'Fraccionamiento Jardines del Valle Norte'
+    const result = createCustomerSchema.safeParse({
+      ...validMoral,
+      address: { ...validMoral.address, colony }
+    })
+
+    expect(result.success).toBe(true)
+    expect(result.success && result.data.address.colony).toBe(colony)
+  })
+
   it('rechaza código postal, teléfono y correo con formato inválido', () => {
     expect(errorPaths({
       ...validPhysical,

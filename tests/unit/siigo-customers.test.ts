@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import type { CreateCustomerInput } from '../../server/utils/customer-validation'
 import {
   buildSiigoCustomerPayload,
+  buildSiigoCustomerUpdatePayload,
   normalizeSiigoCustomer,
   normalizeSiigoCustomerList
 } from '../../server/utils/siigo-customers'
@@ -47,22 +48,39 @@ function walkValues(value: unknown, visit: (value: unknown) => void) {
 
 describe('buildSiigoCustomerPayload', () => {
   it('arma el payload completo de persona física según el contrato de Siigo México', () => {
-    expect(buildSiigoCustomerPayload(physicalInput())).toEqual({
+    expect(buildSiigoCustomerPayload(physicalInput({
+      commercialName: 'Pinturas María',
+      branchOffice: 2,
+      active: true,
+      sellerId: 21,
+      collectorId: 34,
+      address: {
+        ...physicalInput().address,
+        locality: 'Cuauhtémoc'
+      },
+      internal: { code: 'CLI-001', notes: 'Crédito autorizado', tags: ['mayoreo'] }
+    }))).toEqual({
       person_type: 'Physical',
       rfc_id: 'LOMA850101AB1',
       name: ['María', 'López'],
+      commercial_name: 'Pinturas María',
+      branch_office: 2,
       fiscal_regime: '616',
+      active: true,
       address: {
         address: 'Av. Reforma',
         exterior_number: '123',
         interior_number: '4B',
         colony: 'Centro',
+        locality: 'Cuauhtémoc',
         postal_code: '06000',
-        city: { country_code: 'MX', state_code: '9', city_code: '1' }
+        city: { country_code: 'Mx', state_code: '09', city_code: '001' }
       },
       phones: [{ number: '5512345678' }],
       contacts: [{ first_name: 'María', last_name: 'López', email: 'maria@example.com' }],
-      comments: 'Cliente de mostrador'
+      comments: 'Cliente de mostrador',
+      seller_id: 21,
+      collector_id: 34
     })
   })
 
@@ -83,7 +101,7 @@ describe('buildSiigoCustomerPayload', () => {
       name: 'Pinturas Industriales SA de CV',
       address: {
         address: 'Calle 5',
-        city: { country_code: 'MX', state_code: '9', city_code: '1' }
+        city: { country_code: 'Mx', state_code: '09', city_code: '001' }
       },
       contacts: [{ first_name: 'Pinturas Industriales SA de CV' }]
     })
@@ -101,6 +119,21 @@ describe('buildSiigoCustomerPayload', () => {
     })
   })
 
+  it('siempre envía Mx para una persona física aunque el snapshot tenga otro país', () => {
+    const payload = buildSiigoCustomerPayload(physicalInput({
+      address: {
+        ...physicalInput().address,
+        city: { countryCode: 'US', stateCode: '2', cityCode: '4' }
+      }
+    }))
+
+    expect(payload.address.city).toEqual({
+      country_code: 'Mx',
+      state_code: '02',
+      city_code: '004'
+    })
+  })
+
   it('arma el payload de extranjero con un solo campo de nombre', () => {
     const payload = buildSiigoCustomerPayload({
       personType: 'Foreign',
@@ -114,6 +147,7 @@ describe('buildSiigoCustomerPayload', () => {
 
     expect(payload.person_type).toBe('Foreign')
     expect(payload.name).toBe('Acme Paints LLC')
+    expect(payload.address.city.country_code).toBe('Us')
     expect(payload.contacts).toEqual([{ first_name: 'Acme Paints LLC' }])
   })
 
@@ -138,6 +172,63 @@ describe('buildSiigoCustomerPayload — forma de phones/contacts', () => {
     const withoutPhone = buildSiigoCustomerPayload(physicalInput({ phone: undefined }))
     expect(withoutPhone.phones).toBeUndefined()
     expect(Array.isArray(withoutPhone.contacts)).toBe(true)
+  })
+})
+
+describe('buildSiigoCustomerUpdatePayload', () => {
+  it('usa el Mx canónico y conserva el tipo de persona vigente', () => {
+    const payload = buildSiigoCustomerUpdatePayload(
+      physicalInput({
+        address: {
+          ...physicalInput().address,
+          city: { countryCode: 'MX', stateCode: '2', cityCode: '4' }
+        }
+      }),
+      {
+        id: '6b6ceb28-b2eb-4b98-b3dd-26648a933c81',
+        name: ['María', 'López'],
+        person_type: 'Moral',
+        address: {
+          city: { country_code: 'US', state_code: '5', city_code: '2' }
+        }
+      }
+    )
+
+    expect(payload.address.city).toEqual({
+      country_code: 'Mx',
+      state_code: '02',
+      city_code: '004'
+    })
+    expect(payload.address).toMatchObject({
+      address: 'Av. Reforma',
+      street: 'Av. Reforma'
+    })
+    expect(payload.person_type).toBe('Moral')
+  })
+
+  it('envía la dirección con Mx y conserva Supplier cuando el cliente vigente no tiene país', () => {
+    const payload = buildSiigoCustomerUpdatePayload(physicalInput({ email: undefined }), {
+      id: '9bf22cf2-ba6b-4030-b9a6-3286ea440b61',
+      name: ['Rafael', 'Amed Valenzuela González'],
+      person_type: 'Physical',
+      type: 'Supplier',
+      address: {
+        city: { city_code: '4', city_name: 'Tijuana' }
+      }
+    })
+
+    expect(payload.type).toBe('Supplier')
+    expect(payload.person_type).toBe('Physical')
+    expect(payload.address).toMatchObject({
+      address: 'Av. Reforma',
+      street: 'Av. Reforma',
+      exterior_number: '123',
+      interior_number: '4B',
+      colony: 'Centro',
+      postal_code: '06000',
+      city: { country_code: 'Mx', state_code: '09', city_code: '001' }
+    })
+    expect(payload).not.toHaveProperty('contacts')
   })
 })
 
@@ -172,6 +263,39 @@ describe('normalizeSiigoCustomer', () => {
 
   it('convierte name string a arreglo', () => {
     expect(normalizeSiigoCustomer({ id, name: 'Pinturas SA' }).name).toEqual(['Pinturas SA'])
+  })
+
+  it('normaliza las variantes de respuesta documentadas sin perder datos fiscales', () => {
+    const customer = normalizeSiigoCustomer({
+      id,
+      name: 'Pinturas SA',
+      fiscal_regime: [{ code: '601', name: 'General de Ley' }],
+      address: {
+        address: 'Av. Principal',
+        city: { country_code: 'MX', state_code: '02', city_code: '001' }
+      },
+      phones: { indicative: '52', number: '5512345678', extension: '10' },
+      contacts: {
+        first_name: 'Ana',
+        phone: { indicative: '52', number: '5587654321', extension: '20' }
+      },
+      related_users: { seller_id: 21, collector_id: 34 }
+    })
+
+    expect(customer).toMatchObject({
+      fiscal_regime: '601',
+      address: {
+        street: 'Av. Principal',
+        city: { country_code: 'MX', state_code: '02', city_code: '001' }
+      },
+      phones: [{ indicative: '52', number: '5512345678', extension: '10' }],
+      contacts: [{
+        first_name: 'Ana',
+        phone: { indicative: '52', number: '5587654321', extension: '20' }
+      }],
+      seller_id: 21,
+      collector_id: 34
+    })
   })
 
   it('filtra elementos vacíos y usa rfc_id como respaldo', () => {

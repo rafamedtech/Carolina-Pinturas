@@ -84,9 +84,25 @@ const paymentItems = computed(() => [...props.context.paymentTypes]
     label: item.name,
     value: item.id
   })))
+
+function normalizeCatalogName(value: string) {
+  return value
+    .normalize('NFD')
+    .replace(/\p{Diacritic}/gu, '')
+    .toLocaleLowerCase('es-MX')
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim()
+}
+
 const defaultPaymentTypeId = computed(() =>
-  props.context.paymentTypes.find(item => item.name.trim().toLocaleLowerCase('es-MX') === 'efectivo')?.id
+  props.context.paymentTypes.find(item =>
+    normalizeCatalogName(item.name).split(' ').includes('efectivo')
+  )?.id
   ?? paymentItems.value[0]?.value
+)
+const defaultSellerId = computed(() =>
+  props.context.sellers.find(item => normalizeCatalogName(item.name) === 'alexis cordova')?.id
+  ?? props.context.sellers[0]?.id
 )
 const invoiceDate = computed<DateValue | undefined>({
   get: () => state.date ? parseDate(state.date) : undefined,
@@ -105,7 +121,7 @@ function resetState() {
   const document = props.context.documentTypes[0]
   state.documentTypeId = document?.id
   state.invoiceNumber = document?.automatic_number === false ? document.consecutive : undefined
-  state.sellerId = props.context.sellers[0]?.id
+  state.sellerId = defaultSellerId.value
   state.paymentTypeId = defaultPaymentTypeId.value
   state.costCenterId = document?.cost_center_default ?? undefined
   state.useCfdi = 'G03'
@@ -117,7 +133,7 @@ function resetState() {
 
 watch(open, (value) => {
   if (value) resetState()
-})
+}, { immediate: true })
 
 watch(selectedDocument, (document) => {
   state.invoiceNumber = document?.automatic_number === false ? document.consecutive : undefined

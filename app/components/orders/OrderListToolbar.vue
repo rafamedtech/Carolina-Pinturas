@@ -141,7 +141,7 @@ function clearFilters() {
           icon="i-lucide-sliders-horizontal"
           color="neutral"
           variant="outline"
-          class="flex-1 justify-center sm:flex-none"
+          class="flex-1 justify-start sm:flex-none sm:justify-center"
           @click="moreFiltersOpen = true"
         />
         <UButton

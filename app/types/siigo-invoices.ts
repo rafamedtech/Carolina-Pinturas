@@ -1,4 +1,5 @@
 import type { SiigoCostCenter, SiigoPaymentType } from './siigo-payments'
+import type { SiigoCustomer } from './siigo'
 
 export interface SiigoInvoiceDocumentType {
   id: number
@@ -52,6 +53,9 @@ export interface OrderSiigoInvoiceContext {
   orderTotal: number
   customerName: string
   customerRfc: string | null
+  customer: SiigoCustomer | null
+  customerReadyForInvoice: boolean
+  missingCustomerFields: string[]
   invoice: OrderSiigoInvoice | null
   documentTypes: SiigoInvoiceDocumentType[]
   sellers: SiigoSeller[]
