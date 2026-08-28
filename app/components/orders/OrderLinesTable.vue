@@ -275,7 +275,7 @@ const columns: TableColumn<DraftOrderLine>[] = [{
             <UInputNumber
               v-model="editPrice"
               :min="0.01"
-              :step="1"
+              :step="0.01"
               :step-snapping="false"
               :format-options="{ maximumFractionDigits: 2 }"
               class="w-full"

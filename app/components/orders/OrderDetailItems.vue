@@ -418,8 +418,10 @@ const columns: TableColumn<SalesOrderItem>[] = [{
           <UFormField label="Precio nuevo">
             <UInputNumber
               v-model="editPrice"
-              :min="0.000001"
-              :step="1"
+              :min="0.01"
+              :step="0.01"
+              :step-snapping="false"
+              :format-options="{ maximumFractionDigits: 2 }"
               class="w-full"
             />
           </UFormField>
