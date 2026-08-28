@@ -80,11 +80,34 @@ export interface OrderPaymentContext {
     available: boolean
     writeEnabled: boolean
     unavailableReason: string | null
+    assignedInvoiceId: string | null
+    assignedInvoiceStamped: boolean
     assignedInvoice: SiigoPayableInvoice | null
     documentTypes: SiigoVoucherDocumentType[]
     paymentTypes: SiigoPaymentType[]
     costCenters: SiigoCostCenter[]
   }
+}
+
+export interface HistoricalSiigoReceiptOption {
+  id: string
+  name: string
+  date: string
+  amount: number
+  quote: number
+  stampStatus: string | null
+}
+
+export interface HistoricalSiigoReceiptContext {
+  invoiceName: string
+  paymentAmount: number
+  paymentDate: string
+  receipts: HistoricalSiigoReceiptOption[]
+}
+
+export interface AssignHistoricalSiigoReceiptInput {
+  voucherId: string
+  confirmation: 'ASIGNAR_RECEPCION_HISTORICA'
 }
 
 export interface CreateLocalOrderPaymentInput {

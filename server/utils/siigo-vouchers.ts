@@ -1,8 +1,10 @@
 import * as z from 'zod'
 import type { SiigoInvoice, SiigoInvoiceDetail } from '~/types/siigo'
 import type {
+  AssignHistoricalSiigoReceiptInput,
   CreateOrderSiigoReceiptInput,
   CreateOrderSiigoPaymentInput,
+  HistoricalSiigoReceiptOption,
   SiigoCostCenter,
   SiigoPaymentType,
   SiigoPayableInvoice,
@@ -37,6 +39,11 @@ export const createOrderSiigoReceiptSchema = createOrderSiigoPaymentSchema.omit(
   observations: true
 }).strict() satisfies z.ZodType<CreateOrderSiigoReceiptInput>
 
+export const assignHistoricalSiigoReceiptSchema = z.object({
+  voucherId: z.string().uuid(),
+  confirmation: z.literal('ASIGNAR_RECEPCION_HISTORICA')
+}).strict() satisfies z.ZodType<AssignHistoricalSiigoReceiptInput>
+
 export type CreateOrderSiigoPaymentData = z.output<typeof createOrderSiigoPaymentSchema>
 
 type UnknownRecord = Record<string, unknown>
@@ -64,6 +71,166 @@ function catalogResults(value: unknown): unknown[] {
   if (Array.isArray(value)) return value
   const results = record(value)?.results
   return Array.isArray(results) ? results : []
+}
+
+function positiveInteger(value: unknown) {
+  const parsed = number(value)
+  return parsed && Number.isInteger(parsed) && parsed > 0 ? parsed : null
+}
+
+function amountsMatch(left: number, right: number) {
+  return Math.round(left * 100) === Math.round(right * 100)
+}
+
+function normalizeHistoricalReceipt(value: unknown) {
+  const voucher = record(value)
+  const document = record(voucher?.document)
+  const customer = record(voucher?.customer)
+  const items = Array.isArray(voucher?.items) ? voucher.items : []
+  const item = items.length === 1 ? record(items[0]) : null
+  const due = record(item?.due)
+  const payments = Array.isArray(voucher?.payments)
+    ? voucher.payments
+    : voucher?.payment ? [voucher.payment] : []
+  const payment = payments.length === 1 ? record(payments[0]) : null
+  const conditions = Array.isArray(payment?.conditions) ? payment.conditions : []
+  const condition = conditions.length === 1 ? record(conditions[0]) : null
+  const cfdi = record(payment?.cfdi)
+  const id = string(voucher?.id)
+  const name = string(voucher?.name)
+  const date = string(voucher?.date)
+  const documentTypeId = positiveInteger(document?.id)
+  const paymentTypeId = positiveInteger(condition?.id)
+  const itemAmount = number(item?.value)
+  const conditionAmount = number(condition?.value)
+  const prefix = string(due?.prefix)
+  const consecutive = positiveInteger(due?.consecutive)
+  const quote = positiveInteger(due?.quote)
+  const paymentMethod = string(payment?.method)
+  const cfdiCode = string(cfdi?.code) ?? string(payment?.cfdi)
+  const customerId = string(customer?.id)
+  const customerRfc = string(customer?.rfc_id)
+    ?? string(customer?.['rfc.id'])
+    ?? string(customer?.identification)
+
+  if (
+    !voucher
+    || !id
+    || !z.string().uuid().safeParse(id).success
+    || !name
+    || !date
+    || !dateSchema.safeParse(date).success
+    || !documentTypeId
+    || !paymentTypeId
+    || itemAmount === null
+    || itemAmount <= 0
+    || conditionAmount === null
+    || !amountsMatch(itemAmount, conditionAmount)
+    || !prefix
+    || !consecutive
+    || !quote
+    || (paymentMethod !== 'PUE' && paymentMethod !== 'PPD')
+    || !cfdiCode
+    || (!customerId && !customerRfc)
+  ) return null
+
+  const costCenter = positiveInteger(voucher.cost_center)
+  return {
+    id,
+    name,
+    date,
+    amount: itemAmount,
+    documentTypeId,
+    paymentTypeId,
+    costCenterId: costCenter,
+    cfdiCode,
+    paymentMethod,
+    prefix,
+    consecutive,
+    quote,
+    customerId,
+    customerRfc,
+    stampStatus: string(record(voucher.stamp)?.status),
+    raw: voucher
+  }
+}
+
+type HistoricalReceipt = NonNullable<ReturnType<typeof normalizeHistoricalReceipt>>
+
+function historicalReceiptMatches(receipt: HistoricalReceipt, options: {
+  invoice: SiigoInvoiceDetail
+  customerId: string
+  customerRfc: string | null
+  amount: number
+  date: string
+}) {
+  const customerMatches = receipt.customerId === options.customerId
+    || Boolean(options.customerRfc && receipt.customerRfc?.toUpperCase() === options.customerRfc.toUpperCase())
+
+  return customerMatches
+    && receipt.prefix === invoicePrefix(options.invoice)
+    && receipt.consecutive === options.invoice.number
+    && receipt.date === options.date
+    && amountsMatch(receipt.amount, options.amount)
+}
+
+export function normalizeHistoricalReceiptOptions(value: unknown, options: {
+  invoice: SiigoInvoiceDetail
+  customerId: string
+  customerRfc: string | null
+  amount: number
+  date: string
+}): HistoricalSiigoReceiptOption[] {
+  return catalogResults(value).flatMap((entry) => {
+    const receipt = normalizeHistoricalReceipt(entry)
+    if (!receipt || !historicalReceiptMatches(receipt, options)) return []
+    return [{
+      id: receipt.id,
+      name: receipt.name,
+      date: receipt.date,
+      amount: receipt.amount,
+      quote: receipt.quote,
+      stampStatus: receipt.stampStatus
+    }]
+  }).sort((left, right) => right.date.localeCompare(left.date) || right.name.localeCompare(left.name))
+}
+
+export function normalizeHistoricalReceiptDetail(value: unknown) {
+  const receipt = normalizeHistoricalReceipt(value)
+  if (!receipt) {
+    throw createError({
+      statusCode: 502,
+      statusMessage: 'Siigo devolvió una recepción incompleta para asociarla al pago.'
+    })
+  }
+  return receipt
+}
+
+export function assertHistoricalReceiptMatchesPayment(receipt: HistoricalReceipt, options: {
+  voucherId: string
+  invoice: SiigoInvoiceDetail
+  customerId: string
+  customerRfc: string | null
+  amount: number
+  date: string
+}) {
+  if (receipt.id !== options.voucherId) {
+    throw createError({ statusCode: 422, statusMessage: 'La recepción consultada no coincide con la seleccionada.' })
+  }
+  if (!historicalReceiptMatches(receipt, options)) {
+    const customerMatches = receipt.customerId === options.customerId
+      || Boolean(options.customerRfc && receipt.customerRfc?.toUpperCase() === options.customerRfc.toUpperCase())
+    if (!customerMatches) {
+      throw createError({ statusCode: 422, statusMessage: 'La recepción seleccionada pertenece a otro cliente.' })
+    }
+    if (receipt.prefix !== invoicePrefix(options.invoice) || receipt.consecutive !== options.invoice.number) {
+      throw createError({ statusCode: 422, statusMessage: 'La recepción seleccionada corresponde a otra factura.' })
+    }
+    if (receipt.date !== options.date) {
+      throw createError({ statusCode: 422, statusMessage: 'La fecha de la recepción no coincide con la del pago local.' })
+    }
+    throw createError({ statusCode: 422, statusMessage: 'El importe de la recepción no coincide con el pago local.' })
+  }
 }
 
 export function normalizeVoucherDocumentTypes(value: unknown): SiigoVoucherDocumentType[] {

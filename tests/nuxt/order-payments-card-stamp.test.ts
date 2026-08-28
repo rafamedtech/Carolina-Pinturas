@@ -37,6 +37,8 @@ const context: OrderPaymentContext = {
     available: true,
     writeEnabled: true,
     unavailableReason: null,
+    assignedInvoiceId: '313a93d7-218f-44dd-bbc5-5d3dba22936d',
+    assignedInvoiceStamped: false,
     assignedInvoice: {
       id: '313a93d7-218f-44dd-bbc5-5d3dba22936d',
       name: 'FV-A-253',
@@ -80,5 +82,35 @@ describe('OrderPaymentsCard · timbrado', () => {
     const registerButton = wrapper.findAll('button')
       .find(button => button.text().trim() === 'Registrar en Siigo')
     expect(registerButton?.attributes('disabled')).toBeDefined()
+  })
+
+  it('oculta la asignación de pagos existentes mientras la factura siga en borrador', async () => {
+    wrapper = await mountSuspended(OrderPaymentsCard, {
+      props: { orderId: 'order-stamp' },
+      global: {
+        stubs: {
+          UTooltip: { template: '<div><slot /></div>' }
+        }
+      }
+    })
+
+    await vi.waitFor(() => expect(wrapper?.text()).toContain('Registrar en Siigo'))
+    expect(wrapper?.text()).not.toContain('Asignar pago de Siigo')
+  })
+
+  it('permite al administrador buscar un pago existente cuando la factura está timbrada', async () => {
+    context.siigo.assignedInvoiceStamped = true
+    context.siigo.assignedInvoice!.stampStatus = 'Accepted'
+    context.siigo.assignedInvoice!.stamped = true
+    wrapper = await mountSuspended(OrderPaymentsCard, {
+      props: { orderId: 'order-stamp' },
+      global: {
+        stubs: {
+          UTooltip: { template: '<div><slot /></div>' }
+        }
+      }
+    })
+
+    await vi.waitFor(() => expect(wrapper?.text()).toContain('Asignar pago de Siigo'))
   })
 })

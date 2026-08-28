@@ -7,9 +7,11 @@ import { usePrisma } from '../../../../utils/prisma'
 import { siigoRequest } from '../../../../utils/siigo'
 import {
   normalizeCostCenters,
+  normalizeInvoiceDetail,
   payableInvoicesForCustomer,
   normalizePaymentTypes,
   normalizeVoucherDocumentTypes,
+  isSiigoInvoiceStamped,
   siigoFiscalWritesEnabled
 } from '../../../../utils/siigo-vouchers'
 
@@ -50,6 +52,8 @@ export default eventHandler(async (event): Promise<OrderPaymentContext> => {
     available: false,
     writeEnabled: siigoFiscalWritesEnabled(),
     unavailableReason: null as string | null,
+    assignedInvoiceId: order.siigoReference,
+    assignedInvoiceStamped: false,
     assignedInvoice: null,
     documentTypes: [],
     paymentTypes: [],
@@ -78,6 +82,8 @@ export default eventHandler(async (event): Promise<OrderPaymentContext> => {
         preferredInvoice: associatedInvoice,
         preferredBalance: order.total
       })
+      const invoiceDetail = associatedInvoice ? normalizeInvoiceDetail(associatedInvoice) : null
+      baseSiigo.assignedInvoiceStamped = isSiigoInvoiceStamped(invoiceDetail?.stamp?.status)
       baseSiigo.assignedInvoice = invoices.find(invoice => invoice.id === order.siigoReference) ?? null
       baseSiigo.available = baseSiigo.assignedInvoice !== null
       if (!baseSiigo.assignedInvoice) {

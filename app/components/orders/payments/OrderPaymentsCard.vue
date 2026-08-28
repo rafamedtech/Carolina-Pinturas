@@ -23,6 +23,8 @@ const deletingPayment = shallowRef<OrderPayment | null>(null)
 const siigoOpen = shallowRef(false)
 const syncing = shallowRef(false)
 const syncingPayment = shallowRef<OrderPayment | null>(null)
+const historicalOpen = shallowRef(false)
+const historicalPayment = shallowRef<OrderPayment | null>(null)
 const toast = useToast()
 const { user } = useAuth()
 const {
@@ -61,6 +63,7 @@ function paymentTitle(payment: OrderPayment) {
 }
 
 const mayDeletePayments = computed(() => user.value?.role === 'admin')
+const mayAssignHistoricalReceipts = computed(() => user.value?.role === 'admin')
 
 function paymentCanBeDeleted(payment: OrderPayment) {
   return canDeletePaymentRecord(
@@ -91,6 +94,25 @@ function paymentInvoiceIsStamped(payment: OrderPayment) {
   return paymentInvoice(payment)?.stamped === true
 }
 
+function paymentHasHistoricalSiigoAction(payment: OrderPayment) {
+  return Boolean(
+    mayAssignHistoricalReceipts.value
+    && context.value?.siigo.assignedInvoiceId
+    && context.value.siigo.assignedInvoiceStamped
+    && !payment.siigo?.voucherId
+    && (
+      (payment.provider === 'local' && payment.externalStatus === 'not_applicable')
+      || (payment.provider === 'siigo' && ['failed', 'unknown'].includes(payment.externalStatus))
+    )
+  )
+}
+
+function openHistoricalSiigoPayment(payment: OrderPayment) {
+  if (!paymentHasHistoricalSiigoAction(payment)) return
+  historicalPayment.value = payment
+  historicalOpen.value = true
+}
+
 function openSiigoPayment(payment: OrderPayment) {
   if (!paymentHasSiigoAction(payment) || !paymentInvoiceIsStamped(payment)) return
   syncingPayment.value = payment
@@ -101,6 +123,13 @@ async function onPaymentDeleted(paymentId: string) {
   await refresh()
   deletingPayment.value = null
   emit('deleted', paymentId)
+}
+
+async function onHistoricalPaymentAssigned(payment: OrderPayment) {
+  historicalOpen.value = false
+  historicalPayment.value = null
+  await refresh()
+  emit('created', payment)
 }
 
 async function createPayment(input: CreateOrderPaymentInput) {
@@ -318,6 +347,15 @@ async function registerPaymentInSiigo(input: CreateOrderSiigoReceiptInput) {
                 />
               </span>
             </UTooltip>
+            <UButton
+              v-if="paymentHasHistoricalSiigoAction(payment)"
+              label="Asignar pago de Siigo"
+              icon="i-lucide-link"
+              color="neutral"
+              variant="ghost"
+              size="xs"
+              @click="openHistoricalSiigoPayment(payment)"
+            />
             <UTooltip
               v-if="mayDeletePayments"
               :text="paymentCanBeDeleted(payment)
@@ -364,6 +402,13 @@ async function registerPaymentInSiigo(input: CreateOrderSiigoReceiptInput) {
         :payment="syncingPayment"
         :saving="syncing"
         @submit="registerPaymentInSiigo"
+      />
+      <OrdersPaymentsOrderHistoricalReceiptModal
+        v-if="historicalPayment"
+        v-model:open="historicalOpen"
+        :order-id="orderId"
+        :payment-id="historicalPayment.id"
+        @assigned="onHistoricalPaymentAssigned"
       />
     </template>
   </div>

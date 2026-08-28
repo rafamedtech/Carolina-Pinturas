@@ -16,6 +16,8 @@ const context: OrderPaymentContext = {
     available: true,
     writeEnabled: false,
     unavailableReason: null,
+    assignedInvoiceId: '313a93d7-218f-44dd-bbc5-5d3dba22936d',
+    assignedInvoiceStamped: true,
     assignedInvoice: {
       id: '313a93d7-218f-44dd-bbc5-5d3dba22936d',
       name: 'FV-A-253',

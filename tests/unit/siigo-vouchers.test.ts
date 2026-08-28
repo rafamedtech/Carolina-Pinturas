@@ -1,13 +1,17 @@
 import { describe, expect, it } from 'vitest'
 import type { CreateOrderSiigoPaymentInput } from '../../app/types/siigo-payments'
 import {
+  assertHistoricalReceiptMatchesPayment,
   assertVoucherReferences,
+  assignHistoricalSiigoReceiptSchema,
   buildSiigoVoucherPayload,
   createOrderSiigoReceiptSchema,
   createOrderSiigoPaymentSchema,
   isSiigoInvoiceStamped,
   invoicePrefix,
   normalizeCreatedVoucher,
+  normalizeHistoricalReceiptDetail,
+  normalizeHistoricalReceiptOptions,
   normalizeInvoiceDetail,
   normalizePayableInvoices,
   payableInvoicesForCustomer
@@ -15,6 +19,7 @@ import {
 
 const invoiceId = '63f918c2-ca65-4edc-a7db-66bcdd5159fb'
 const customerId = '6b6ceb28-b2eb-4b98-b3dd-26648a933c81'
+const voucherId = '497f6eca-6276-4993-bfeb-53cbbbba6f08'
 
 function input(overrides: Partial<CreateOrderSiigoPaymentInput> = {}): CreateOrderSiigoPaymentInput {
   return {
@@ -49,6 +54,32 @@ function invoice(overrides: Record<string, unknown> = {}) {
     },
     total: 2546.06,
     balance: 2546.06,
+    ...overrides
+  }
+}
+
+function voucher(overrides: Record<string, unknown> = {}) {
+  return {
+    id: voucherId,
+    document: { id: 7714 },
+    number: 22,
+    name: 'RC-2-22',
+    date: '2026-07-28',
+    customer: {
+      'id': customerId,
+      'rfc.id': 'MELM8305281H0'
+    },
+    cost_center: 235,
+    items: [{
+      due: { prefix: 'FV-1', consecutive: 68, quote: 1 },
+      value: 1273.03
+    }],
+    payments: [{
+      method: 'PUE',
+      cfdi: { code: '03', name: 'Transferencia electrónica' },
+      conditions: [{ id: 5636, name: 'Transferencia', value: 1273.03 }]
+    }],
+    stamp: { status: 'Draft' },
     ...overrides
   }
 }
@@ -261,5 +292,96 @@ describe('recepciones de pago de Siigo México', () => {
       name: 'RC-2-22'
     })).toMatchObject({ id: '497f6eca-6276-4993-bfeb-53cbbbba6f08', name: 'RC-2-22' })
     expect(() => normalizeCreatedVoucher({ name: 'RC-2-22' })).toThrow()
+  })
+
+  it('detecta recepciones existentes de la factura con la fecha e importe del pago local', () => {
+    const invoiceDetail = normalizeInvoiceDetail(invoice())
+    expect(normalizeHistoricalReceiptOptions({
+      results: [
+        voucher(),
+        voucher({ id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', date: '2026-07-29' }),
+        voucher({
+          id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+          items: [{ due: { prefix: 'FV-9', consecutive: 68, quote: 1 }, value: 1273.03 }]
+        })
+      ]
+    }, {
+      invoice: invoiceDetail,
+      customerId,
+      customerRfc: 'MELM8305281H0',
+      amount: 1273.03,
+      date: '2026-07-28'
+    })).toEqual([{
+      id: voucherId,
+      name: 'RC-2-22',
+      date: '2026-07-28',
+      amount: 1273.03,
+      quote: 1,
+      stampStatus: 'Draft'
+    }])
+  })
+
+  it('normaliza payment singular y revalida la recepción antes de asignarla', () => {
+    const source = voucher({
+      payments: undefined,
+      payment: {
+        method: 'PUE',
+        cfdi: '03',
+        conditions: [{ id: 5636, value: 1273.03 }]
+      }
+    })
+    const receipt = normalizeHistoricalReceiptDetail(source)
+    expect(receipt).toMatchObject({
+      id: voucherId,
+      documentTypeId: 7714,
+      paymentTypeId: 5636,
+      cfdiCode: '03',
+      paymentMethod: 'PUE',
+      prefix: 'FV-1',
+      consecutive: 68,
+      quote: 1
+    })
+    expect(() => assertHistoricalReceiptMatchesPayment(receipt, {
+      voucherId,
+      invoice: normalizeInvoiceDetail(invoice()),
+      customerId,
+      customerRfc: 'MELM8305281H0',
+      amount: 1273.03,
+      date: '2026-07-28'
+    })).not.toThrow()
+  })
+
+  it('rechaza recepciones ambiguas, importes distintos y confirmaciones incompletas', () => {
+    expect(() => normalizeHistoricalReceiptDetail(voucher({
+      items: [
+        { due: { prefix: 'FV-1', consecutive: 68, quote: 1 }, value: 1000 },
+        { due: { prefix: 'FV-2', consecutive: 10, quote: 1 }, value: 273.03 }
+      ]
+    }))).toThrow()
+    expect(normalizeHistoricalReceiptOptions({
+      results: [voucher()]
+    }, {
+      invoice: normalizeInvoiceDetail(invoice()),
+      customerId,
+      customerRfc: 'MELM8305281H0',
+      amount: 1273.04,
+      date: '2026-07-28'
+    })).toEqual([])
+    expect(() => normalizeHistoricalReceiptDetail(voucher({
+      payments: [{
+        method: 'PUE',
+        cfdi: { code: '03' },
+        conditions: [{ id: 5636, value: 100 }]
+      }]
+    }))).toThrow()
+    expect(assignHistoricalSiigoReceiptSchema.safeParse({
+      voucherId,
+      confirmation: 'ASIGNAR_RECEPCION_HISTORICA'
+    }).success).toBe(true)
+    expect(assignHistoricalSiigoReceiptSchema.safeParse({
+      voucherId,
+      confirmation: 'ASIGNAR_RECEPCION_HISTORICA',
+      amount: 1
+    }).success).toBe(false)
   })
 })
