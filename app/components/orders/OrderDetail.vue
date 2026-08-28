@@ -22,7 +22,7 @@ const statusNote = shallowRef('')
 const savingStatus = shallowRef(false)
 const selectedRepartidor = shallowRef('')
 const savingRepartidor = shallowRef(false)
-const hiddenSeguimientoStatusKeys = new Set(['borrador', 'ingresado', 'facturado', 'cancelado'])
+const hiddenSeguimientoStatusKeys = new Set(['borrador', 'ingresado', 'cancelado'])
 const toast = useToast()
 const { user } = useAuth()
 const {

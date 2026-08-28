@@ -95,7 +95,8 @@ seleccionado para no confiar en datos enviados por el navegador.
 ### Modelo de pedidos
 
 - Estados iniciales: borrador, ingresado, confirmado, surtido, en espera, en
-  camino, entregado, facturado y cancelado.
+  camino, entregado y cancelado. El estado fiscal (sin facturar / facturado) se
+  deriva de la factura de Siigo asociada, no del estado del pedido.
 - Cada cambio de estado registra fecha, usuario, rol y una nota opcional.
 - `siigo_products` conserva las columnas consultables del producto; sus precios,
   impuestos, almacenes y componentes se normalizan en tablas relacionadas.
