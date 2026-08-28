@@ -415,9 +415,9 @@ async function convertToPedido() {
               <UBadge
                 v-if="!isQuote && order.requiresInvoice"
                 class="hidden lg:inline-flex"
-                color="success"
+                :color="order.invoiceCreated ? 'success' : 'warning'"
                 variant="subtle"
-                label="Requiere factura"
+                :label="order.invoiceCreated ? 'Facturado' : 'Sin facturar'"
               />
             </div>
             <p class="mt-1 text-sm text-muted">
@@ -434,9 +434,9 @@ async function convertToPedido() {
               />
               <UBadge
                 v-if="order.requiresInvoice"
-                color="success"
+                :color="order.invoiceCreated ? 'success' : 'warning'"
                 variant="subtle"
-                label="Requiere factura"
+                :label="order.invoiceCreated ? 'Facturado' : 'Sin facturar'"
               />
             </div>
           </div>
