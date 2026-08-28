@@ -94,7 +94,6 @@ describe('persistencia de snapshots de Siigo', () => {
       create: expect.objectContaining({
         commercialName: 'Pinturas María',
         branchOffice: 2,
-        addressCountryCode: 'MX',
         internalCode: 'CLI-001',
         internalTags: ['mayoreo'],
         requiresInvoice: true,
@@ -127,5 +126,31 @@ describe('persistencia de snapshots de Siigo', () => {
         }
       })
     }))
+  })
+
+  it('excluye el domicilio del snapshot local del cliente', async () => {
+    const upsert = vi.fn().mockResolvedValue(undefined)
+    const tx = { siigoCustomer: { upsert } } as unknown as Parameters<typeof upsertSiigoCustomer>[0]
+    const customer: SiigoCustomer = {
+      id: '6824bfe4-a93d-4eaa-aa88-95fea673b53b',
+      name: ['ILEINN ELISABET', 'LOPEZ SAUCEDA'],
+      address: {
+        street: 'BOULEVARD (BLVD.) MANUEL J. CLOUTHIER',
+        exterior_number: '22216',
+        postal_code: '22214',
+        city: { country_code: 'Mx', state_code: '02', city_code: '004' }
+      }
+    }
+
+    await upsertSiigoCustomer(tx, customer, {
+      rawPayload: customer
+    })
+
+    expect(upsert).toHaveBeenCalledWith(expect.objectContaining({
+      create: expect.objectContaining({ rawPayload: expect.not.objectContaining({ address: expect.anything() }) }),
+      update: expect.objectContaining({ rawPayload: expect.not.objectContaining({ address: expect.anything() }) })
+    }))
+    expect(upsert.mock.calls[0]?.[0].create).not.toHaveProperty('addressStreet')
+    expect(upsert.mock.calls[0]?.[0].update).not.toHaveProperty('addressStreet')
   })
 })

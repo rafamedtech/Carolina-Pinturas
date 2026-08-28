@@ -1,86 +1,62 @@
-import type { Prisma } from '../../generated/prisma/client'
-import type { SiigoCustomer, SiigoListResponse } from '~/types/siigo'
-import { normalizeSiigoCustomer, type SiigoCustomerApiResponse } from './siigo-customers'
+import type { SiigoCustomer } from '~/types/siigo'
 import { usePrisma } from './prisma'
 
-const customerSelect = {
+const customerInternalSelect = {
   id: true,
-  displayName: true,
-  rawPayload: true,
   internalCode: true,
   internalNotes: true,
   internalTags: true,
   requiresInvoice: true,
   syncStatus: true,
   syncVersion: true,
-  siigoCreatedAt: true,
-  siigoUpdatedAt: true,
   syncedAt: true
-} satisfies Prisma.SiigoCustomerSelect
+} as const
 
-type LocalCustomerRow = Prisma.SiigoCustomerGetPayload<{ select: typeof customerSelect }>
+type LocalCustomerInternalRow = {
+  id: string
+  internalCode: string | null
+  internalNotes: string | null
+  internalTags: string[]
+  requiresInvoice: boolean
+  syncStatus: string
+  syncVersion: number
+  syncedAt: Date
+}
 
-export function localCustomerView(row: LocalCustomerRow): SiigoCustomer {
-  const raw = row.rawPayload && typeof row.rawPayload === 'object' && !Array.isArray(row.rawPayload)
-    ? row.rawPayload as SiigoCustomerApiResponse
-    : {}
-  const customer = normalizeSiigoCustomer({
-    ...raw,
-    id: row.id,
-    name: raw.name || [row.displayName]
-  })
-
+export function localCustomerInternal(
+  row: LocalCustomerInternalRow
+): NonNullable<SiigoCustomer['internal']> {
   return {
-    ...customer,
-    metadata: {
-      created: customer.metadata?.created || row.siigoCreatedAt?.toISOString(),
-      last_updated: customer.metadata?.last_updated || row.siigoUpdatedAt?.toISOString() || null
-    },
-    internal: {
-      code: row.internalCode,
-      notes: row.internalNotes,
-      tags: row.internalTags,
-      requires_invoice: row.requiresInvoice,
-      sync_status: row.syncStatus,
-      sync_version: row.syncVersion,
-      synced_at: row.syncedAt.toISOString()
-    }
+    code: row.internalCode,
+    notes: row.internalNotes,
+    tags: row.internalTags,
+    requires_invoice: row.requiresInvoice,
+    sync_status: row.syncStatus,
+    sync_version: row.syncVersion,
+    synced_at: row.syncedAt.toISOString()
   }
 }
 
-export async function listLocalCustomers(options: {
-  all?: boolean
-  page?: number
-  pageSize?: number
-} = {}): Promise<SiigoListResponse<SiigoCustomer>> {
-  const page = Math.max(1, options.page || 1)
-  const pageSize = options.all ? 5000 : Math.min(100, Math.max(1, options.pageSize || 25))
-  const prisma = usePrisma()
-  const [total, rows] = await prisma.$transaction([
-    prisma.siigoCustomer.count(),
-    prisma.siigoCustomer.findMany({
-      select: customerSelect,
-      orderBy: [{ active: 'desc' }, { displayName: 'asc' }],
-      skip: options.all ? 0 : (page - 1) * pageSize,
-      take: pageSize
-    })
-  ])
-
-  return {
-    results: rows.map(localCustomerView),
-    pagination: {
-      page: options.all ? 1 : page,
-      page_size: rows.length,
-      total_results: total
-    }
-  }
-}
-
-export async function getLocalCustomer(customerId: string) {
+export async function getLocalCustomerInternal(customerId: string) {
   const row = await usePrisma().siigoCustomer.findUnique({
     where: { id: customerId },
-    select: customerSelect
+    select: customerInternalSelect
   })
 
-  return row ? localCustomerView(row) : null
+  return row ? localCustomerInternal(row) : undefined
+}
+
+export async function withLocalCustomerInternals(customers: SiigoCustomer[]) {
+  if (!customers.length) return customers
+
+  const rows = await usePrisma().siigoCustomer.findMany({
+    where: { id: { in: customers.map(customer => customer.id) } },
+    select: customerInternalSelect
+  })
+  const internalById = new Map(rows.map(row => [row.id, localCustomerInternal(row)]))
+
+  return customers.map((customer) => {
+    const internal = internalById.get(customer.id)
+    return internal ? { ...customer, internal } : customer
+  })
 }

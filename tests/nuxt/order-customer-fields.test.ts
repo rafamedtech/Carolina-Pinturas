@@ -43,12 +43,17 @@ let wrapper: VueWrapper | null = null
 type DisabledFieldWrapper = VueWrapper<ComponentPublicInstance<{
   disabled?: boolean
 }>>
+type TagFieldWrapper = VueWrapper<ComponentPublicInstance<{
+  disabled?: boolean
+  modelValue?: string[]
+}>>
 
 async function mountFields(options: {
   counterSale?: boolean
   customerId?: string
   lockOrderFields?: boolean
   showPaymentSelectors?: boolean
+  tags?: string[]
 } = {}) {
   wrapper = await mountSuspended(OrderCustomerFields, {
     props: {
@@ -68,7 +73,7 @@ async function mountFields(options: {
       paymentMethod: '',
       paymentDate: '',
       requiresInvoice: false,
-      tags: [],
+      tags: options.tags || [],
       observations: '',
       counterSale: options.counterSale || false,
       showPaymentSelectors: options.showPaymentSelectors ?? true
@@ -126,10 +131,11 @@ describe('OrderCustomerFields', () => {
     expect(text.indexOf('Fecha de entrega')).toBeLessThan(text.indexOf('Repartidor'))
   })
 
-  it('oculta los campos restringidos al editar un pedido', async () => {
+  it('mantiene editables las etiquetas al editar un pedido', async () => {
     const mounted = await mountFields({
       customerId: existingCustomer.id,
-      lockOrderFields: true
+      lockOrderFields: true,
+      tags: ['urgente']
     })
 
     const orderDatePicker = mounted.findAllComponents(OrderDatePicker)[0] as unknown as DisabledFieldWrapper
@@ -140,7 +146,10 @@ describe('OrderCustomerFields', () => {
     expect(mounted.text()).not.toContain('Método de pago')
     expect(mounted.text()).not.toContain('Facturación')
     expect(mounted.text()).not.toContain('Requiere factura')
-    expect(mounted.text()).not.toContain('Etiquetas')
+    expect(mounted.text()).toContain('Etiquetas')
+    const tagSelect = mounted.findAllComponents(USelectMenu)[1] as unknown as TagFieldWrapper
+    expect(tagSelect?.props('disabled')).toBe(false)
+    expect(tagSelect?.props('modelValue')).toEqual(['urgente'])
     expect(mounted.findComponent(OrderCustomerCreateModal).exists()).toBe(false)
     expect(mounted.text()).not.toContain('Usar MOSTRADOR .')
   })

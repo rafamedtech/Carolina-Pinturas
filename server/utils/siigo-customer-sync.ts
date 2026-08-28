@@ -26,7 +26,8 @@ interface CustomerSyncDependencies {
   persist: (
     customer: SiigoCustomer,
     input: CreateCustomerInput,
-    updatedByEmail: string
+    updatedByEmail: string,
+    rawPayload: SiigoCustomerApiResponse
   ) => Promise<unknown>
   invalidate: () => void
 }
@@ -49,10 +50,11 @@ function defaultDependencies(): CustomerSyncDependencies {
       }
     },
     request: (path, options) => siigoRequest<SiigoCustomerApiResponse>(path, options),
-    persist: (customer, input, updatedByEmail) => usePrisma().$transaction(tx => (
+    persist: (customer, input, updatedByEmail, rawPayload) => usePrisma().$transaction(tx => (
       upsertSiigoCustomer(tx, customer, {
         internal: input.internal,
-        updatedByEmail
+        updatedByEmail,
+        rawPayload
       })
     )),
     invalidate: () => invalidateSiigoCatalog('customers')
@@ -98,21 +100,38 @@ async function synchronizeCustomer(
   // Siigo ya cambió en este punto, incluso si la normalización o PostgreSQL
   // fallan. El catálogo debe renovarse y la mutación externa no se reintenta.
   dependencies.invalidate()
-  const customer = normalizeSiigoCustomer(response)
+  let externalResponse = response
+  let externalCustomer = normalizeSiigoCustomer(response)
 
-  if (customerId && customer.id !== customerId) {
+  if (customerId && externalCustomer.id !== customerId) {
     throw createError({
       statusCode: 502,
       statusMessage: 'Siigo devolvió un identificador distinto al cliente actualizado.'
     })
   }
 
+  if (customerId) {
+    externalResponse = await dependencies.request(path, { method: 'GET' })
+    externalCustomer = normalizeSiigoCustomer(externalResponse)
+
+    if (externalCustomer.id !== customerId) {
+      throw createError({
+        statusCode: 502,
+        statusMessage: 'Siigo devolvió un identificador distinto al verificar el cliente actualizado.'
+      })
+    }
+  }
+
+  // El GET posterior es la representación que se muestra al usuario. No se
+  // completan faltantes con PostgreSQL ni con el payload enviado.
+  const customer = externalCustomer
+
   try {
-    await dependencies.persist(customer, input, updatedByEmail)
+    await dependencies.persist(customer, input, updatedByEmail, externalResponse)
   } catch {
     throw createError({
       statusCode: 500,
-      statusMessage: 'Siigo guardó el cliente, pero PostgreSQL no pudo confirmar la sincronización. No repitas la operación; concilia el cliente por su ID de Siigo.',
+      statusMessage: 'Siigo guardó el cliente, pero PostgreSQL no pudo guardar sus preferencias internas. No repitas la operación; concilia el cliente por su ID de Siigo.',
       data: {
         siigoCustomerId: customer.id,
         synchronization: 'pending'

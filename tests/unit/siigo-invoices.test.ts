@@ -60,7 +60,7 @@ describe('Siigo invoice drafts', () => {
     expect(isUsableFiscalRfc('MELM8305281H0')).toBe(true)
   })
 
-  it('detects the customer fields required before invoicing', () => {
+  it('requires only an active customer with a usable RFC before invoicing', () => {
     const completeCustomer = {
       id: '6b6ceb28-b2eb-4b98-b3dd-26648a933c81',
       name: ['Rafael', 'Valenzuela'],
@@ -80,8 +80,14 @@ describe('Siigo invoice drafts', () => {
       ...completeCustomer,
       active: false,
       fiscal_regime: undefined,
-      address: { ...completeCustomer.address, postal_code: undefined }
-    })).toEqual(['cliente activo', 'régimen fiscal', 'código postal'])
+      address: undefined
+    })).toEqual(['cliente activo'])
+    expect(missingInvoiceCustomerFields({
+      ...completeCustomer,
+      rfc_id: 'XAXX010101000',
+      fiscal_regime: undefined,
+      address: undefined
+    })).toEqual(['RFC fiscal válido'])
   })
 
   it('normalizes tenant catalogs without trusting malformed entries', () => {

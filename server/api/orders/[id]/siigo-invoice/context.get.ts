@@ -143,7 +143,7 @@ export default eventHandler(async (event): Promise<OrderSiigoInvoiceContext> => 
   if (!customer) {
     throw createError({
       statusCode: 409,
-      statusMessage: 'El cliente del pedido no está disponible en PostgreSQL para validar la factura.'
+      statusMessage: 'El cliente del pedido no está disponible en Siigo para validar la factura.'
     })
   }
   const missingCustomerFields = missingInvoiceCustomerFields(customer)

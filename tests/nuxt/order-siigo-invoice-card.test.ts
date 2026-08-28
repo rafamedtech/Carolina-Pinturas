@@ -1,19 +1,15 @@
 // @vitest-environment nuxt
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { mountSuspended, registerEndpoint } from '@nuxt/test-utils/runtime'
-import { defineEventHandler, readBody } from 'h3'
 import type { VueWrapper } from '@vue/test-utils'
 import OrderSiigoInvoiceCard from '~/components/orders/siigo/OrderSiigoInvoiceCard.vue'
 import OrderSiigoInvoiceModal from '~/components/orders/siigo/OrderSiigoInvoiceModal.vue'
-import CustomerEditForm from '~/components/customers/CustomerEditForm.vue'
 import type { OrderSiigoInvoiceContext } from '~/types/siigo-invoices'
-import type { SiigoCustomer, SiigoCustomerMutationInput } from '~/types/siigo'
+import type { SiigoCustomer } from '~/types/siigo'
 
 const invoiceId = '63f918c2-ca65-4edc-a7db-66bcdd5159fb'
 let existingChecks = 0
 let missingChecks = 0
-let incompleteCustomerSaved = false
-let receivedCustomerUpdate: unknown
 let wrapper: VueWrapper | null = null
 
 const readyCustomer: SiigoCustomer = {
@@ -101,30 +97,16 @@ registerEndpoint('/api/orders/missing-invoice/siigo-invoice/context', () => {
 })
 
 registerEndpoint('/api/orders/incomplete-customer/siigo-invoice/context', () => {
-  if (incompleteCustomerSaved) return context(null)
-
   return {
     ...context(null),
     customer: {
       ...readyCustomer,
       fiscal_regime: undefined,
-      address: { ...readyCustomer.address, postal_code: undefined }
+      address: undefined
     },
-    customerReadyForInvoice: false,
-    missingCustomerFields: ['régimen fiscal', 'código postal'],
-    documentTypes: [],
-    sellers: [],
-    paymentTypes: []
+    customerReadyForInvoice: true,
+    missingCustomerFields: []
   }
-})
-
-registerEndpoint(`/api/siigo/customers/${readyCustomer.id}`, {
-  method: 'PUT',
-  handler: defineEventHandler(async (event) => {
-    receivedCustomerUpdate = await readBody(event)
-    incompleteCustomerSaved = true
-    return readyCustomer
-  })
 })
 
 afterEach(() => {
@@ -132,8 +114,6 @@ afterEach(() => {
   wrapper = null
   existingChecks = 0
   missingChecks = 0
-  incompleteCustomerSaved = false
-  receivedCustomerUpdate = undefined
   document.body.innerHTML = ''
   clearNuxtData()
 })
@@ -174,35 +154,15 @@ describe('OrderSiigoInvoiceCard', () => {
     expect(selectedCatalogIds).toContain(788)
   })
 
-  it('solicita los datos faltantes, los guarda y después abre la factura', async () => {
+  it('abre la factura con los datos actuales de Siigo sin exigir ni modificar el domicilio', async () => {
     wrapper = await mountSuspended(OrderSiigoInvoiceCard, {
       props: { orderId: 'incomplete-customer', open: false, checking: false }
     })
 
     await wrapper.setProps({ open: true })
     await vi.waitFor(() => {
-      expect(document.body.textContent).toContain('Completar datos para facturar')
-      expect(document.body.textContent).toContain('régimen fiscal, código postal')
-    })
-
-    const customerForm = wrapper.findComponent(CustomerEditForm)
-    const update: SiigoCustomerMutationInput = {
-      personType: 'Moral',
-      name: ['CLIENTE FISCAL'],
-      rfcId: 'PIN900101AB1',
-      fiscalRegime: '601',
-      active: true,
-      address: {
-        street: 'Calle 5',
-        postalCode: '22000',
-        city: { countryCode: 'Mx', stateCode: '2', cityCode: '4' }
-      }
-    }
-    customerForm.vm.$emit('submit', update)
-
-    await vi.waitFor(() => {
-      expect(receivedCustomerUpdate).toEqual(update)
       expect(document.body.textContent).toContain('Crear factura borrador en Siigo')
     })
+    expect(wrapper.findComponent(OrderSiigoInvoiceModal).exists()).toBe(true)
   })
 })

@@ -2,7 +2,6 @@ import * as z from 'zod'
 import { ORDER_ENTRY_ROLES } from '~/utils/roleAccess'
 import { requireRole } from '../../../utils/auth'
 import { createCustomerSchema } from '../../../utils/customer-validation'
-import { getLocalCustomer } from '../../../utils/siigo-customer-repository'
 import { updateSynchronizedSiigoCustomer } from '../../../utils/siigo-customer-sync'
 
 const customerIdSchema = z.string().uuid()
@@ -24,15 +23,5 @@ export default eventHandler(async (event) => {
     })
   }
 
-  await updateSynchronizedSiigoCustomer(id.data, body.data, user.email)
-
-  const customer = await getLocalCustomer(id.data)
-  if (!customer) {
-    throw createError({
-      statusCode: 500,
-      statusMessage: 'El cliente se actualizó, pero PostgreSQL no pudo devolver el registro sincronizado.'
-    })
-  }
-
-  return customer
+  return updateSynchronizedSiigoCustomer(id.data, body.data, user.email)
 })

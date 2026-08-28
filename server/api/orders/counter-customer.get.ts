@@ -1,32 +1,23 @@
 import type { SiigoCustomer } from '~/types/siigo'
 import { ORDER_ENTRY_ROLES } from '~/utils/roleAccess'
 import { requireRole } from '../../utils/auth'
-import { usePrisma } from '../../utils/prisma'
+import { getAllSiigoCustomers } from '../../utils/siigo-customer-catalog'
 
 export default eventHandler(async (event) => {
   await requireRole(event, ORDER_ENTRY_ROLES)
 
-  const customer = await usePrisma().siigoCustomer.findFirst({
-    where: {
-      displayName: {
-        in: ['MOSTRADOR .', 'MOSTRADOR'],
-        mode: 'insensitive'
-      }
-    },
-    select: {
-      id: true
-    }
+  const catalog = await getAllSiigoCustomers()
+  const customer = catalog.results.find((candidate) => {
+    const name = candidate.name.filter(Boolean).join(' ').trim().toLocaleUpperCase('es-MX')
+    return name === 'MOSTRADOR .' || name === 'MOSTRADOR'
   })
 
   if (!customer) {
     throw createError({
       statusCode: 422,
-      statusMessage: 'No se encontró el cliente MOSTRADOR en los datos locales.'
+      statusMessage: 'No se encontró el cliente MOSTRADOR en Siigo.'
     })
   }
 
-  return {
-    id: customer.id,
-    name: ['MOSTRADOR']
-  } satisfies SiigoCustomer
+  return customer satisfies SiigoCustomer
 })

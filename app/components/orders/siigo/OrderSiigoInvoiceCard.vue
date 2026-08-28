@@ -4,7 +4,6 @@ import type {
   OrderSiigoInvoice,
   OrderSiigoInvoiceContext
 } from '~/types/siigo-invoices'
-import type { SiigoCustomer, SiigoCustomerMutationInput } from '~/types/siigo'
 
 const props = defineProps<{
   orderId: string
@@ -18,9 +17,6 @@ const emit = defineEmits<{
 const open = defineModel<boolean>('open', { default: false })
 const checking = defineModel<boolean>('checking', { default: false })
 const saving = shallowRef(false)
-const customerModalOpen = shallowRef(false)
-const savingCustomer = shallowRef(false)
-const customerError = shallowRef('')
 const toast = useToast()
 const {
   data: context,
@@ -83,43 +79,17 @@ watch(open, async (shouldOpen) => {
 
     if (context.value?.customer && !context.value.customerReadyForInvoice) {
       open.value = false
-      customerError.value = ''
-      customerModalOpen.value = true
+      toast.add({
+        title: 'El cliente no está listo para facturar',
+        description: `Actualiza en Siigo: ${context.value.missingCustomerFields.join(', ')}. Después vuelve a intentarlo.`,
+        color: 'warning',
+        icon: 'i-lucide-triangle-alert'
+      })
     }
   } finally {
     checking.value = false
   }
 })
-
-async function saveCustomer(input: SiigoCustomerMutationInput) {
-  const customerId = context.value?.customer?.id
-  if (!customerId || savingCustomer.value) return
-
-  savingCustomer.value = true
-  customerError.value = ''
-
-  try {
-    await $fetch<SiigoCustomer>(`/api/siigo/customers/${encodeURIComponent(customerId)}`, {
-      method: 'PUT',
-      body: input
-    })
-    await refreshNuxtData('customers-catalog-request')
-    customerModalOpen.value = false
-    toast.add({
-      title: 'Datos del cliente actualizados',
-      description: 'Se guardaron en Siigo y PostgreSQL. Continuaremos con la factura.',
-      color: 'success',
-      icon: 'i-lucide-circle-check'
-    })
-    await nextTick()
-    open.value = true
-  } catch (fetchError: unknown) {
-    const response = fetchError as { data?: { statusMessage?: string }, message?: string }
-    customerError.value = response.data?.statusMessage || response.message || 'No fue posible actualizar el cliente.'
-  } finally {
-    savingCustomer.value = false
-  }
-}
 
 async function createInvoice(input: CreateOrderSiigoInvoiceInput) {
   if (saving.value) return
@@ -156,15 +126,6 @@ async function createInvoice(input: CreateOrderSiigoInvoiceInput) {
 </script>
 
 <template>
-  <OrdersSiigoOrderInvoiceCustomerModal
-    v-if="context?.customer"
-    v-model:open="customerModalOpen"
-    :customer="context.customer"
-    :missing-fields="context.missingCustomerFields"
-    :saving="savingCustomer"
-    :error-message="customerError"
-    @submit="saveCustomer"
-  />
   <OrdersSiigoOrderSiigoInvoiceModal
     v-if="context && catalogsReady"
     v-model:open="open"

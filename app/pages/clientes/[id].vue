@@ -78,7 +78,7 @@ async function saveCustomer(
     await refreshNuxtData('customers-catalog-request')
     toast.add({
       title: successTitle,
-      description: 'Los datos quedaron guardados en la base de datos.',
+      description: 'Los datos vigentes quedaron guardados en Siigo.',
       color: 'success',
       icon: 'i-lucide-circle-check'
     })

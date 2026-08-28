@@ -8,6 +8,16 @@ function jsonValue(value: unknown): Prisma.InputJsonValue {
   return JSON.parse(JSON.stringify(value)) as Prisma.InputJsonValue
 }
 
+function customerPayloadWithoutAddress(value: unknown) {
+  const payload = JSON.parse(JSON.stringify(value)) as unknown
+  if (!payload || Array.isArray(payload) || typeof payload !== 'object') {
+    return payload as Prisma.InputJsonValue
+  }
+
+  const { address: _address, ...withoutAddress } = payload as Record<string, unknown>
+  return withoutAddress as Prisma.InputJsonValue
+}
+
 function optionalDate(value: string | null | undefined) {
   if (!value || value === 'null') return null
   const date = new Date(value)
@@ -28,6 +38,7 @@ export async function upsertSiigoCustomer(
   options: {
     internal?: CustomerInternalInput
     updatedByEmail?: string
+    rawPayload?: unknown
   } = {}
 ) {
   const syncedAt = new Date()
@@ -45,20 +56,11 @@ export async function upsertSiigoCustomer(
     comments: customer.comments || null,
     sellerId: customer.seller_id ?? customer.related_users?.seller_id ?? null,
     collectorId: customer.collector_id ?? customer.related_users?.collector_id ?? null,
-    addressStreet: customer.address?.street || null,
-    addressInteriorNumber: customer.address?.interior_number || null,
-    addressExteriorNumber: customer.address?.exterior_number || null,
-    addressColony: customer.address?.colony || null,
-    addressLocality: customer.address?.locality || null,
-    addressCountryCode: customer.address?.city?.country_code || null,
-    addressStateCode: customer.address?.city?.state_code || null,
-    addressCityCode: customer.address?.city?.city_code || null,
-    addressCityName: customer.address?.city?.city_name || null,
-    addressStateName: customer.address?.city?.state_name || null,
-    addressPostalCode: customer.address?.postal_code || null,
     siigoCreatedAt: optionalDate(customer.metadata?.created),
     siigoUpdatedAt: optionalDate(customer.metadata?.last_updated),
-    rawPayload: jsonValue(customer),
+    // El domicilio se consulta directamente en Siigo y no forma parte del
+    // registro local del cliente.
+    rawPayload: customerPayloadWithoutAddress(options.rawPayload ?? customer),
     syncStatus: 'synced',
     lastSyncError: null,
     syncedAt

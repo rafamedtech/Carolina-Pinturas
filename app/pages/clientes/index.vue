@@ -1,21 +1,18 @@
 <script setup lang="ts">
 import type { TableColumn, TableRow } from '@nuxt/ui'
 import type { SiigoCustomer } from '~/types/siigo'
-import { canCreateOrders } from '~/utils/roleAccess'
 
 useSeoMeta({ title: 'Clientes' })
 
 const filter = shallowRef('')
 const router = useRouter()
 const toast = useToast()
-const { user } = useAuth()
 const {
   data,
   status,
   error,
-  syncing,
-  refresh,
-  synchronizeWithSiigo
+  refreshing,
+  refresh
 } = useCustomersCatalog()
 
 const loading = computed(() => status.value === 'pending')
@@ -60,18 +57,18 @@ function openCustomer(_: Event, row: TableRow<SiigoCustomer>) {
   router.push(`/clientes/${encodeURIComponent(row.original.id)}`)
 }
 
-async function synchronizeCustomers() {
+async function reloadCustomers() {
   try {
-    const result = await synchronizeWithSiigo()
+    await refresh()
     toast.add({
-      title: 'Clientes sincronizados',
-      description: `${result.synchronized} clientes quedaron actualizados en PostgreSQL.`,
+      title: 'Clientes actualizados',
+      description: 'La información se volvió a consultar directamente en Siigo.',
       color: 'success'
     })
-  } catch (syncError: unknown) {
+  } catch (refreshError: unknown) {
     toast.add({
-      title: 'No se pudo sincronizar con Siigo',
-      description: (syncError as { data?: { statusMessage?: string } }).data?.statusMessage
+      title: 'No se pudo consultar Siigo',
+      description: (refreshError as { data?: { statusMessage?: string } }).data?.statusMessage
         || 'Intenta nuevamente.',
       color: 'error'
     })
@@ -103,17 +100,8 @@ async function synchronizeCustomers() {
             icon="i-lucide-refresh-cw"
             color="neutral"
             variant="outline"
-            :loading="loading"
-            @click="() => refresh()"
-          />
-          <UButton
-            v-if="user && canCreateOrders(user.role)"
-            label="Sincronizar Siigo"
-            icon="i-lucide-cloud-download"
-            color="neutral"
-            variant="outline"
-            :loading="syncing"
-            @click="synchronizeCustomers"
+            :loading="loading || refreshing"
+            @click="reloadCustomers"
           />
           <UButton
             label="Nuevo cliente"

@@ -339,7 +339,7 @@ function selectCounterCustomer() {
       </UFormField>
 
       <UFormField
-        v-if="!props.counterSale && !props.lockOrderFields"
+        v-if="!props.counterSale"
         name="tags"
         label="Etiquetas"
       >

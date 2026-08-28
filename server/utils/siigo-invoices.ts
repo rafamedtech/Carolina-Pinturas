@@ -192,19 +192,9 @@ export function isUsableFiscalRfc(value: string | null | undefined) {
 
 export function missingInvoiceCustomerFields(customer: SiigoCustomer) {
   const missing: string[] = []
-  const personType = customer.person_type?.trim().toLowerCase()
-  const names = customer.name?.map(part => part.trim()).filter(Boolean) || []
 
   if (customer.active === false) missing.push('cliente activo')
-  if (!names.length) missing.push('nombre o razón social')
-  if (personType === 'physical' && names.length < 2) missing.push('nombres y apellidos')
   if (!isUsableFiscalRfc(customer.rfc_id || customer.identification)) missing.push('RFC fiscal válido')
-  if (!/^\d{3}$/.test(customer.fiscal_regime?.trim() || '')) missing.push('régimen fiscal')
-  if (!customer.address?.street?.trim()) missing.push('calle')
-  if (!/^\d{5}$/.test(customer.address?.postal_code?.trim() || '')) missing.push('código postal')
-  if (!customer.address?.city?.country_code?.trim()) missing.push('país')
-  if (!customer.address?.city?.state_code?.trim()) missing.push('estado')
-  if (!customer.address?.city?.city_code?.trim()) missing.push('ciudad')
 
   return missing
 }

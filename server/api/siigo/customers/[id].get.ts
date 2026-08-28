@@ -10,10 +10,5 @@ export default eventHandler(async (event) => {
     throw createError({ statusCode: 400, statusMessage: 'Falta el identificador del cliente.' })
   }
 
-  const customer = await getSiigoCustomerDetail(id)
-  if (!customer) {
-    throw createError({ statusCode: 404, statusMessage: 'El cliente no existe en PostgreSQL.' })
-  }
-
-  return customer
+  return getSiigoCustomerDetail(id)
 })

@@ -56,7 +56,8 @@ describe('sincronización de clientes Siigo/PostgreSQL', () => {
     expect(deps.persist).toHaveBeenCalledWith(
       expect.objectContaining({ id: customerId, name: ['Pinturas Industriales SA de CV'] }),
       input(),
-      'admin@example.com'
+      'admin@example.com',
+      expect.objectContaining({ id: customerId })
     )
     expect(customer.id).toBe(customerId)
   })
@@ -75,7 +76,20 @@ describe('sincronización de clientes Siigo/PostgreSQL', () => {
       .mockResolvedValueOnce({
         id: customerId,
         name: 'Pinturas Industriales SA de CV',
-        rfc_id: 'PIN900101AB1'
+        rfc_id: 'PIN900101AB1',
+        address: {
+          street: 'Calle 5',
+          city: { country_code: 'Mx', state_code: '02', city_code: '001' }
+        }
+      })
+      .mockResolvedValueOnce({
+        id: customerId,
+        name: 'Pinturas Industriales SA de CV',
+        rfc_id: 'PIN900101AB1',
+        address: {
+          street: 'Calle 5',
+          city: { country_code: 'Mx', state_code: '02', city_code: '001' }
+        }
       })
 
     await updateSynchronizedSiigoCustomer(customerId, input(), 'admin@example.com', deps)
@@ -97,6 +111,9 @@ describe('sincronización de clientes Siigo/PostgreSQL', () => {
         })
       })
     })
+    expect(deps.request).toHaveBeenNthCalledWith(3, `/v1/customers/${customerId}`, {
+      method: 'GET'
+    })
     expect(deps.persist).toHaveBeenCalledOnce()
   })
 
@@ -116,7 +133,21 @@ describe('sincronización de clientes Siigo/PostgreSQL', () => {
         id: customerId,
         name: ['Rafael', 'Amed Valenzuela González'],
         type: 'Supplier',
-        person_type: 'Physical'
+        person_type: 'Physical',
+        address: {
+          street: 'Calle 5',
+          city: { country_code: 'Mx', state_code: '02', city_code: '001' }
+        }
+      })
+      .mockResolvedValueOnce({
+        id: customerId,
+        name: ['Rafael', 'Amed Valenzuela González'],
+        type: 'Supplier',
+        person_type: 'Physical',
+        address: {
+          street: 'Calle 5',
+          city: { country_code: 'Mx', state_code: '02', city_code: '001' }
+        }
       })
 
     const physicalInput = {
@@ -144,6 +175,119 @@ describe('sincronización de clientes Siigo/PostgreSQL', () => {
       }
     })
     expect(putCall?.[1].body).not.toHaveProperty('contacts')
+  })
+
+  it('abrevia una calle larga para el PUT y responde con el valor vigente de Siigo', async () => {
+    const deps = dependencies()
+    const customerWithFullAddress = {
+      ...input(),
+      address: {
+        ...input().address,
+        street: 'BOULEVARD (BLVD.) MANUEL J. CLOUTHIER',
+        exteriorNumber: '22216',
+        colony: 'Ampliación Guaycura',
+        postalCode: '22214'
+      }
+    }
+
+    deps.request
+      .mockResolvedValueOnce({
+        id: customerId,
+        name: 'Pinturas Industriales SA de CV',
+        person_type: 'Moral'
+      })
+      .mockResolvedValueOnce({
+        id: customerId,
+        name: 'Pinturas Industriales SA de CV',
+        address: {
+          street: 'BLVD MAN. CLOUTHIER',
+          exterior_number: '22216',
+          colony: 'Ampliación Guaycura',
+          postal_code: '22214',
+          city: { country_code: 'Mx', state_code: '02', city_code: '001' }
+        }
+      })
+      .mockResolvedValueOnce({
+        id: customerId,
+        name: 'Pinturas Industriales SA de CV',
+        address: {
+          street: 'BLVD MAN. CLOUTHIER',
+          exterior_number: '22216',
+          colony: 'Ampliación Guaycura',
+          postal_code: '22214',
+          city: { country_code: 'Mx', state_code: '02', city_code: '001' }
+        }
+      })
+
+    await expect(updateSynchronizedSiigoCustomer(
+      customerId,
+      customerWithFullAddress,
+      'admin@example.com',
+      deps
+    )).resolves.toMatchObject({
+      address: { street: 'BLVD MAN. CLOUTHIER' }
+    })
+
+    expect(deps.request).toHaveBeenCalledTimes(3)
+    expect(deps.request.mock.calls[1]?.[1].body).toMatchObject({
+      address: {
+        address: 'BOULEVARD (BLVD.) MANUEL J. CLOUTHIER',
+        street: 'BLVD MAN. CLOUTHIER'
+      }
+    })
+    expect(deps.persist).toHaveBeenCalledWith(
+      expect.objectContaining({
+        address: expect.objectContaining({
+          street: 'BLVD MAN. CLOUTHIER'
+        })
+      }),
+      customerWithFullAddress,
+      'admin@example.com',
+      expect.any(Object)
+    )
+  })
+
+  it('usa y persiste la representación devuelta por Siigo sin mezclar el domicilio local', async () => {
+    const deps = dependencies()
+    deps.request
+      .mockResolvedValueOnce({
+        id: customerId,
+        name: 'Pinturas Industriales SA de CV',
+        person_type: 'Moral'
+      })
+      .mockResolvedValueOnce({
+        id: customerId,
+        name: 'Pinturas Industriales SA de CV',
+        address: {
+          street: 'Calle 5',
+          city: { country_code: 'Mx', state_code: '02', city_code: '001' }
+        }
+      })
+      .mockResolvedValueOnce({
+        id: customerId,
+        name: 'Pinturas Industriales SA de CV',
+        address: {
+          street: 'Otra calle',
+          city: { country_code: 'Mx', state_code: '2', city_code: '1' }
+        }
+      })
+
+    await expect(updateSynchronizedSiigoCustomer(
+      customerId,
+      input(),
+      'admin@example.com',
+      deps
+    )).resolves.toMatchObject({
+      address: { street: 'Otra calle' }
+    })
+
+    expect(deps.request).toHaveBeenCalledTimes(3)
+    expect(deps.persist).toHaveBeenCalledWith(
+      expect.objectContaining({ address: expect.objectContaining({ street: 'Otra calle' }) }),
+      input(),
+      'admin@example.com',
+      expect.any(Object)
+    )
   })
 
   it('no toca PostgreSQL cuando Siigo rechaza la mutación', async () => {

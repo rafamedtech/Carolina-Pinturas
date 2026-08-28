@@ -3,8 +3,11 @@ import type { CreateCustomerInput } from '../../server/utils/customer-validation
 import {
   buildSiigoCustomerPayload,
   buildSiigoCustomerUpdatePayload,
+  customerFromSiigoWrite,
   normalizeSiigoCustomer,
-  normalizeSiigoCustomerList
+  normalizeSiigoCustomerList,
+  reconcileSiigoCustomer,
+  siigoStreetForPublicApi
 } from '../../server/utils/siigo-customers'
 
 function physicalInput(overrides: Partial<CreateCustomerInput> = {}): CreateCustomerInput {
@@ -110,7 +113,6 @@ describe('buildSiigoCustomerPayload', () => {
     expect(payload).not.toHaveProperty('comments')
     expect(payload).not.toHaveProperty('type')
     expect(payload).not.toHaveProperty('active')
-    expect(payload.address).not.toHaveProperty('street')
 
     walkValues(payload, (value) => {
       expect(value).not.toBeUndefined()
@@ -199,10 +201,7 @@ describe('buildSiigoCustomerUpdatePayload', () => {
       state_code: '02',
       city_code: '004'
     })
-    expect(payload.address).toMatchObject({
-      address: 'Av. Reforma',
-      street: 'Av. Reforma'
-    })
+    expect(payload.address).toMatchObject({ address: 'Av. Reforma', street: 'Av. Reforma' })
     expect(payload.person_type).toBe('Moral')
   })
 
@@ -228,7 +227,36 @@ describe('buildSiigoCustomerUpdatePayload', () => {
       postal_code: '06000',
       city: { country_code: 'Mx', state_code: '09', city_code: '001' }
     })
+    expect(payload.address.street).toBe('Av. Reforma')
     expect(payload).not.toHaveProperty('contacts')
+  })
+
+  it('conserva la calle completa y abrevia el campo legado del PUT a 20 caracteres', () => {
+    const payload = buildSiigoCustomerUpdatePayload(physicalInput({
+      address: {
+        ...physicalInput().address,
+        street: 'BOULEVARD (BLVD.) MANUEL J. CLOUTHIER'
+      }
+    }), {
+      id: '6824bfe4-a93d-4eaa-aa88-95fea673b53b',
+      name: ['ILEINN ELISABET', 'LOPEZ SAUCEDA'],
+      person_type: 'Physical'
+    })
+
+    expect(payload.address.address).toBe('BOULEVARD (BLVD.) MANUEL J. CLOUTHIER')
+    expect(payload.address.street).toBe('BLVD MAN. CLOUTHIER')
+    expect(payload.address.street.length).toBeLessThanOrEqual(20)
+  })
+})
+
+describe('siigoStreetForPublicApi', () => {
+  it('deja intacta una calle que ya cabe', () => {
+    expect(siigoStreetForPublicApi('Calle 5')).toBe('Calle 5')
+  })
+
+  it('abrevia una dirección larga sin cortar el nombre principal', () => {
+    expect(siigoStreetForPublicApi('BOULEVARD (BLVD.) MANUEL J. CLOUTHIER'))
+      .toBe('BLVD MAN. CLOUTHIER')
   })
 })
 
@@ -321,5 +349,81 @@ describe('normalizeSiigoCustomer', () => {
   it('falla con 502 si no hay ningún nombre utilizable', () => {
     expect(captureError(() => normalizeSiigoCustomer({ id, name: [] })))
       .toMatchObject({ statusCode: 502 })
+  })
+})
+
+describe('reconciliación Siigo/PostgreSQL', () => {
+  const id = '6824bfe4-a93d-4eaa-aa88-95fea673b53b'
+
+  it('completa la respuesta PUT con el formato exacto enviado a Siigo', () => {
+    const payload = buildSiigoCustomerUpdatePayload(physicalInput({
+      name: ['ILEINN ELISABET', 'LOPEZ SAUCEDA'],
+      rfcId: 'LOSI981025CK1',
+      address: {
+        street: 'BOULEVARD (BLVD.) MANUEL J. CLOUTHIER',
+        exteriorNumber: '22216',
+        colony: 'Ampliación Guaycura',
+        postalCode: '22214',
+        city: { countryCode: 'MX', stateCode: '2', cityCode: '4' }
+      }
+    }), {
+      id,
+      name: ['ILEINN ELISABET', 'LOPEZ SAUCEDA'],
+      person_type: 'Physical'
+    })
+    const external = normalizeSiigoCustomer({
+      id,
+      name: ['ILEINN ELISABET', 'LOPEZ SAUCEDA'],
+      address: {
+        exterior_number: '22216',
+        postal_code: '22214',
+        city: { country_code: 'Mx', state_code: '02', city_code: '004' }
+      }
+    })
+
+    expect(customerFromSiigoWrite(external, payload)).toMatchObject({
+      address: {
+        street: 'BOULEVARD (BLVD.) MANUEL J. CLOUTHIER',
+        exterior_number: '22216',
+        colony: 'Ampliación Guaycura',
+        postal_code: '22214',
+        city: { country_code: 'Mx', state_code: '02', city_code: '004' }
+      }
+    })
+  })
+
+  it('Siigo manda en claves presentes y PostgreSQL respalda claves omitidas', () => {
+    const local = normalizeSiigoCustomer({
+      id,
+      name: ['ILEINN ELISABET', 'LOPEZ SAUCEDA'],
+      address: {
+        street: 'BOULEVARD (BLVD.) MANUEL J. CLOUTHIER',
+        exterior_number: '22216',
+        colony: 'Ampliación Guaycura',
+        city: { country_code: 'Mx', state_code: '02', city_code: '004' }
+      },
+      contacts: [{ first_name: 'ILEINN', email: 'ileinn.fg@outlook.com' }]
+    })
+    const raw = {
+      id,
+      name: ['ILEINN ELISABET', 'LOPEZ SAUCEDA'],
+      address: {
+        street: '',
+        exterior_number: '999',
+        colony: '',
+        city: { country_code: 'Mx', state_code: '02', city_code: '004' }
+      },
+      contacts: []
+    }
+    const external = normalizeSiigoCustomer(raw)
+
+    expect(reconcileSiigoCustomer(external, local, raw)).toMatchObject({
+      address: {
+        street: 'BOULEVARD (BLVD.) MANUEL J. CLOUTHIER',
+        exterior_number: '999',
+        colony: 'Ampliación Guaycura'
+      },
+      contacts: []
+    })
   })
 })
