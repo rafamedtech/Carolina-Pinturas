@@ -16,7 +16,7 @@ const context: OrderPaymentContext = {
     available: true,
     writeEnabled: false,
     unavailableReason: null,
-    invoices: [{
+    assignedInvoice: {
       id: '313a93d7-218f-44dd-bbc5-5d3dba22936d',
       name: 'FV-A-253',
       date: '2026-08-18',
@@ -26,7 +26,7 @@ const context: OrderPaymentContext = {
       customerRfc: 'VAGR8902073DA',
       stampStatus: 'Accepted',
       stamped: true
-    }],
+    },
     documentTypes: [],
     paymentTypes: [],
     costCenters: []
@@ -85,8 +85,8 @@ describe('OrderPaymentsModal', () => {
       siigo: {
         voucherId: '497f6eca-6276-4993-bfeb-53cbbbba6f08',
         voucherName: 'RC-1-1',
-        invoiceId: context.siigo.invoices[0]!.id,
-        invoiceName: context.siigo.invoices[0]!.name,
+        invoiceId: context.siigo.assignedInvoice!.id,
+        invoiceName: context.siigo.assignedInvoice!.name,
         documentTypeId: 69452,
         paymentTypeId: 3560,
         costCenterId: null,
@@ -126,9 +126,32 @@ describe('OrderPaymentsModal', () => {
 
     const selectedValues = wrapper.findAllComponents({ name: 'USelect' })
       .map(component => component.props('modelValue'))
-    expect(selectedValues).toContain(context.siigo.invoices[0]!.id)
+    expect(selectedValues).toContain(context.siigo.assignedInvoice!.id)
     expect(selectedValues).toContain('03')
     expect(selectedValues).toContain(3560)
     expect(wrapper.findComponent({ name: 'UInputNumber' }).props('modelValue')).toBe(2)
+  })
+
+  it('muestra la factura asignada al pedido como única opción', async () => {
+    const siigoContext: OrderPaymentContext = {
+      ...context,
+      siigo: {
+        ...context.siigo,
+        documentTypes: [{ id: 69452, code: '1', name: 'Recibo', active: true }],
+        paymentTypes: [{ id: 3560, name: '03 - Transferencia', active: true }]
+      }
+    }
+    wrapper = await mountSuspended(OrderPaymentSiigoModal, {
+      props: { open: false, context: siigoContext, payment, saving: false }
+    })
+    await wrapper.setProps({ open: true })
+
+    const invoiceSelect = wrapper.findAllComponents({ name: 'USelect' })[0]!
+    expect(invoiceSelect.props('modelValue')).toBe(context.siigo.assignedInvoice!.id)
+    expect(invoiceSelect.props('items')).toEqual([expect.objectContaining({
+      label: context.siigo.assignedInvoice!.name,
+      value: context.siigo.assignedInvoice!.id
+    })])
+    expect(invoiceSelect.props('disabled')).toBe(true)
   })
 })

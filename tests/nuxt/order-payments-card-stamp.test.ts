@@ -37,7 +37,7 @@ const context: OrderPaymentContext = {
     available: true,
     writeEnabled: true,
     unavailableReason: null,
-    invoices: [{
+    assignedInvoice: {
       id: '313a93d7-218f-44dd-bbc5-5d3dba22936d',
       name: 'FV-A-253',
       date: '2026-08-18',
@@ -47,7 +47,7 @@ const context: OrderPaymentContext = {
       customerRfc: 'VAGR8902073DA',
       stampStatus: 'Draft',
       stamped: false
-    }],
+    },
     documentTypes: [{ id: 69452, code: '1', name: 'Recibo', active: true }],
     paymentTypes: [{ id: 3560, name: '03 - Transferencia', active: true }],
     costCenters: []

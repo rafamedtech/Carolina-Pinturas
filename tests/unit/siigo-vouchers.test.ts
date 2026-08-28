@@ -184,7 +184,7 @@ describe('recepciones de pago de Siigo México', () => {
     ])
   })
 
-  it('filtra las facturas por cliente y prioriza la asociada al pedido', () => {
+  it('filtra las facturas por cliente y conserva la asociada explícitamente al pedido', () => {
     const preferredInvoiceId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'
     const otherCustomerInvoiceId = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb'
 
@@ -208,6 +208,7 @@ describe('recepciones de pago de Siigo México', () => {
         id: preferredInvoiceId,
         name: 'FV-1-69',
         balance: 0,
+        customer: {},
         stamp: { status: 'Draft' },
         payment: {
           method: 'PPD',

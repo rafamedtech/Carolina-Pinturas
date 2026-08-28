@@ -80,7 +80,7 @@ export interface OrderPaymentContext {
     available: boolean
     writeEnabled: boolean
     unavailableReason: string | null
-    invoices: SiigoPayableInvoice[]
+    assignedInvoice: SiigoPayableInvoice | null
     documentTypes: SiigoVoucherDocumentType[]
     paymentTypes: SiigoPaymentType[]
     costCenters: SiigoCostCenter[]

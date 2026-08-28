@@ -50,7 +50,7 @@ export default eventHandler(async (event): Promise<OrderPaymentContext> => {
     available: false,
     writeEnabled: siigoFiscalWritesEnabled(),
     unavailableReason: null as string | null,
-    invoices: [],
+    assignedInvoice: null,
     documentTypes: [],
     paymentTypes: [],
     costCenters: []
@@ -60,30 +60,29 @@ export default eventHandler(async (event): Promise<OrderPaymentContext> => {
     baseSiigo.unavailableReason = 'Este pedido no requiere factura; el pago se registrará únicamente en PostgreSQL.'
   } else if (!order.customer.rfc) {
     baseSiigo.unavailableReason = 'El cliente necesita RFC para vincular una recepción fiscal en Siigo.'
+  } else if (!order.siigoReference) {
+    baseSiigo.unavailableReason = 'Crea o asigna la factura del pedido antes de registrar el pago en Siigo.'
   } else {
     try {
-      const [invoiceResponse, associatedInvoice, documentResponse, paymentResponse, costCenterResponse] = await Promise.all([
-        siigoRequest<unknown>('/v1/invoices', {
-          query: {
-            customer_identification: order.customer.rfc,
-            page: '1',
-            page_size: '100'
-          }
-        }),
+      const [associatedInvoice, documentResponse, paymentResponse, costCenterResponse] = await Promise.all([
         preferredInvoice(order.siigoReference),
         siigoRequest<unknown>('/v1/document-types', { query: { type: 'RC' } }),
         siigoRequest<unknown>('/v1/payment-types', { query: { document_type: 'FV' } }),
         siigoRequest<unknown>('/v1/cost-centers')
       ])
 
-      baseSiigo.available = true
-      baseSiigo.invoices = payableInvoicesForCustomer(invoiceResponse, {
+      const invoices = payableInvoicesForCustomer({ results: [] }, {
         customerId: order.customer.id,
         customerRfc: order.customer.rfc,
         preferredInvoiceId: order.siigoReference,
         preferredInvoice: associatedInvoice,
         preferredBalance: order.total
       })
+      baseSiigo.assignedInvoice = invoices.find(invoice => invoice.id === order.siigoReference) ?? null
+      baseSiigo.available = baseSiigo.assignedInvoice !== null
+      if (!baseSiigo.assignedInvoice) {
+        baseSiigo.unavailableReason = 'La factura asignada al pedido no está disponible o no tiene saldo pendiente en Siigo.'
+      }
       baseSiigo.documentTypes = normalizeVoucherDocumentTypes(documentResponse).filter(item => item.active)
       baseSiigo.paymentTypes = normalizePaymentTypes(paymentResponse).filter(item => item.active)
       baseSiigo.costCenters = normalizeCostCenters(costCenterResponse).filter(item => item.active !== false)

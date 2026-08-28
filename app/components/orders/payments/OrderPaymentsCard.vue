@@ -77,9 +77,9 @@ function openDeletePayment(payment: OrderPayment) {
 }
 
 function paymentInvoice(payment: OrderPayment) {
-  const invoiceId = payment.siigo?.invoiceId
-  return context.value?.siigo.invoices.find(invoice => invoice.id === invoiceId)
-    ?? context.value?.siigo.invoices[0]
+  const assignedInvoice = context.value?.siigo.assignedInvoice
+  if (payment.siigo?.invoiceId && payment.siigo.invoiceId !== assignedInvoice?.id) return undefined
+  return assignedInvoice
 }
 
 function paymentHasSiigoAction(payment: OrderPayment) {

@@ -41,11 +41,13 @@ const state = reactive<Partial<Schema>>({
   quote: 1,
   confirmed: false
 })
-const invoiceItems = computed(() => props.context.siigo.invoices.map(invoice => ({
-  label: invoice.name,
-  description: `Saldo ${formatCurrency(invoice.balance)} · ${formatDate(invoice.date)}`,
-  value: invoice.id
-})))
+const invoiceItems = computed(() => props.context.siigo.assignedInvoice
+  ? [{
+      label: props.context.siigo.assignedInvoice.name,
+      description: `Saldo ${formatCurrency(props.context.siigo.assignedInvoice.balance)} · ${formatDate(props.context.siigo.assignedInvoice.date)}`,
+      value: props.context.siigo.assignedInvoice.id
+    }]
+  : [])
 const documentItems = computed(() => props.context.siigo.documentTypes.map(document => ({
   label: `${document.code} · ${document.name}`,
   value: document.id
@@ -63,7 +65,9 @@ const selectedDocument = computed(() =>
   props.context.siigo.documentTypes.find(document => document.id === state.documentTypeId)
 )
 const selectedInvoice = computed(() =>
-  props.context.siigo.invoices.find(invoice => invoice.id === state.invoiceId)
+  props.context.siigo.assignedInvoice?.id === state.invoiceId
+    ? props.context.siigo.assignedInvoice
+    : null
 )
 const needsVoucherNumber = computed(() => selectedDocument.value?.automatic_number === false)
 const needsCostCenter = computed(() => selectedDocument.value?.cost_center_mandatory === true)
@@ -113,7 +117,7 @@ function nextQuote(invoiceId: string) {
 
 watch(open, (isOpen) => {
   if (!isOpen) return
-  state.invoiceId = props.payment.siigo?.invoiceId || props.context.siigo.invoices[0]?.id || ''
+  state.invoiceId = props.context.siigo.assignedInvoice?.id || ''
   state.documentTypeId = props.context.siigo.documentTypes[0]?.id
   state.cfdiCode = props.payment.siigo?.cfdiCode || localCfdiCode()
   state.paymentTypeId = props.payment.siigo?.paymentTypeId || defaultPaymentTypeId(state.cfdiCode)
@@ -208,6 +212,7 @@ function onSubmit(event: FormSubmitEvent<Schema>) {
             v-model="state.invoiceId"
             :items="invoiceItems"
             value-key="value"
+            disabled
             class="w-full"
           />
         </UFormField>

@@ -194,7 +194,8 @@ export function payableInvoicesForCustomer(
 
   return [...new Map(invoices.map(invoice => [invoice.id, invoice])).values()]
     .filter(invoice =>
-      invoice.customerId === options.customerId
+      invoice.id === options.preferredInvoiceId
+      || invoice.customerId === options.customerId
       || invoice.customerRfc === options.customerRfc
     )
     .sort((left, right) =>
