@@ -1,6 +1,7 @@
 import * as z from 'zod'
 import type { SiigoInvoice, SiigoInvoiceDetail } from '~/types/siigo'
 import type {
+  CreateOrderSiigoReceiptInput,
   CreateOrderSiigoPaymentInput,
   SiigoCostCenter,
   SiigoPaymentType,
@@ -27,6 +28,14 @@ export const createOrderSiigoPaymentSchema = z.object({
   observations: z.string().trim().max(2500).nullable().optional(),
   confirmation: z.literal('CREAR_RECEPCION_SIIGO')
 })
+
+export const createOrderSiigoReceiptSchema = createOrderSiigoPaymentSchema.omit({
+  destination: true,
+  requestId: true,
+  amount: true,
+  date: true,
+  observations: true
+}).strict() satisfies z.ZodType<CreateOrderSiigoReceiptInput>
 
 export type CreateOrderSiigoPaymentData = z.output<typeof createOrderSiigoPaymentSchema>
 
@@ -111,7 +120,27 @@ export function normalizeCostCenters(value: unknown): SiigoCostCenter[] {
   })
 }
 
-export function normalizePayableInvoices(value: unknown): SiigoPayableInvoice[] {
+function draftPpdOutstandingBalance(invoice: UnknownRecord) {
+  const stamp = record(invoice.stamp)
+  const payment = record(invoice.payment)
+  const conditions = Array.isArray(payment?.conditions) ? payment.conditions : []
+  if (string(stamp?.status)?.toLowerCase() !== 'draft' || string(payment?.method) !== 'PPD') return null
+
+  const outstanding = conditions.reduce((total, condition) => {
+    const value = number(record(condition)?.value)
+    return value && value > 0 ? total + value : total
+  }, 0)
+  return outstanding > 0 ? outstanding : null
+}
+
+export function isSiigoInvoiceStamped(status: string | null | undefined) {
+  return status?.trim().toLowerCase() === 'accepted'
+}
+
+export function normalizePayableInvoices(
+  value: unknown,
+  options: { draftPpdBalanceLimit?: number } = {}
+): SiigoPayableInvoice[] {
   return catalogResults(value).flatMap((entry) => {
     const invoice = record(entry)
     const customer = record(invoice?.customer)
@@ -120,21 +149,64 @@ export function normalizePayableInvoices(value: unknown): SiigoPayableInvoice[] 
     const date = string(invoice?.date)
     const total = number(invoice?.total)
     const balance = number(invoice?.balance)
+    const stampStatus = string(record(invoice?.stamp)?.status)
     if (!invoice || !id || !name || !date || total === null || balance === null) return []
+    const draftBalance = balance <= 0 && options.draftPpdBalanceLimit
+      ? draftPpdOutstandingBalance(invoice)
+      : null
+    const payableBalance = draftBalance
+      ? Math.min(draftBalance, options.draftPpdBalanceLimit!)
+      : balance
 
     return [{
       id,
       name,
       date,
       total,
-      balance,
+      balance: payableBalance,
       customerId: string(customer?.id),
-      customerRfc: string(customer?.rfc_id) ?? string(customer?.['rfc.id'])
+      customerRfc: string(customer?.rfc_id)
+        ?? string(customer?.['rfc.id'])
+        ?? string(customer?.identification),
+      stampStatus,
+      stamped: isSiigoInvoiceStamped(stampStatus)
     }]
   }).filter(invoice => invoice.balance > 0)
 }
 
-export function normalizeInvoiceDetail(value: unknown): SiigoInvoiceDetail {
+export function payableInvoicesForCustomer(
+  value: unknown,
+  options: {
+    customerId: string
+    customerRfc: string
+    preferredInvoiceId?: string | null
+    preferredInvoice?: unknown
+    preferredBalance?: number
+  }
+) {
+  const invoices = [
+    ...normalizePayableInvoices(value),
+    ...normalizePayableInvoices(
+      { results: [options.preferredInvoice] },
+      { draftPpdBalanceLimit: options.preferredBalance }
+    )
+  ]
+
+  return [...new Map(invoices.map(invoice => [invoice.id, invoice])).values()]
+    .filter(invoice =>
+      invoice.customerId === options.customerId
+      || invoice.customerRfc === options.customerRfc
+    )
+    .sort((left, right) =>
+      Number(right.id === options.preferredInvoiceId)
+      - Number(left.id === options.preferredInvoiceId)
+    )
+}
+
+export function normalizeInvoiceDetail(
+  value: unknown,
+  options: { draftPpdBalanceLimit?: number } = {}
+): SiigoInvoiceDetail {
   const invoice = record(value)
   const customer = record(invoice?.customer)
   const document = record(invoice?.document)
@@ -146,6 +218,7 @@ export function normalizeInvoiceDetail(value: unknown): SiigoInvoiceDetail {
   const balance = number(invoice?.balance)
   const customerId = string(customer?.id)
   const customerRfc = string(customer?.rfc_id) ?? string(customer?.identification)
+  const stampStatus = string(record(invoice?.stamp)?.status)
 
   if (
     !invoice
@@ -163,6 +236,9 @@ export function normalizeInvoiceDetail(value: unknown): SiigoInvoiceDetail {
       statusMessage: 'Siigo devolvió una factura incompleta para registrar el pago.'
     })
   }
+  const draftBalance = balance <= 0 && options.draftPpdBalanceLimit
+    ? draftPpdOutstandingBalance(invoice)
+    : null
 
   return {
     id,
@@ -171,7 +247,10 @@ export function normalizeInvoiceDetail(value: unknown): SiigoInvoiceDetail {
     number: consecutive,
     document: { id: number(document?.id) ?? undefined },
     total,
-    balance,
+    balance: draftBalance
+      ? Math.min(draftBalance, options.draftPpdBalanceLimit!)
+      : balance,
+    stamp: stampStatus ? { status: stampStatus } : undefined,
     customer: {
       id: customerId ?? undefined,
       identification: string(customer?.identification) ?? undefined,

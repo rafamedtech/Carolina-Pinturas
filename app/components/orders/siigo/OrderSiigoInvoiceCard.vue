@@ -36,8 +36,8 @@ const catalogsReady = computed(() => Boolean(
   && context.value?.paymentTypes.length
 ))
 
-watch(open, async (shouldOpen) => {
-  if (!shouldOpen || checking.value) return
+async function checkInvoice() {
+  if (checking.value) return
   checking.value = true
 
   try {
@@ -45,49 +45,70 @@ watch(open, async (shouldOpen) => {
     emit('checked')
 
     if (contextError.value) {
-      open.value = false
       toast.add({
         title: 'No se pudo verificar la factura en Siigo',
         description: contextError.value.data?.statusMessage || contextError.value.message,
         color: 'error',
         icon: 'i-lucide-circle-alert'
       })
-      return
-    }
-
-    if (context.value?.invoice?.status === 'created') {
-      open.value = false
-      toast.add({
-        title: 'La factura todavía existe en Siigo',
-        description: context.value.invoice.siigoInvoiceName || context.value.invoice.siigoInvoiceId || undefined,
-        color: 'info',
-        icon: 'i-lucide-file-check-2'
-      })
-      return
-    }
-
-    if (context.value?.invoice && context.value.invoice.status !== 'failed') {
-      open.value = false
-      toast.add({
-        title: 'La factura anterior requiere revisión',
-        description: context.value.invoice.lastError || 'Verifica la factura en Siigo antes de intentar otra creación.',
-        color: 'warning',
-        icon: 'i-lucide-triangle-alert'
-      })
-      return
-    }
-
-    if (context.value?.customer && !context.value.customerReadyForInvoice) {
-      open.value = false
-      toast.add({
-        title: 'El cliente no está listo para facturar',
-        description: `Actualiza en Siigo: ${context.value.missingCustomerFields.join(', ')}. Después vuelve a intentarlo.`,
-        color: 'warning',
-        icon: 'i-lucide-triangle-alert'
-      })
     }
   } finally {
     checking.value = false
+  }
+}
+
+onMounted(checkInvoice)
+
+watch(open, async (shouldOpen) => {
+  if (!shouldOpen || checking.value) return
+
+  // A pedido that was just marked for invoicing needs catalogs, but there was
+  // no existing invoice to reconcile when the page-level check ran.
+  if (context.value?.requiresInvoice === false) {
+    checking.value = true
+    try {
+      await refresh()
+      emit('checked')
+    } finally {
+      checking.value = false
+    }
+  }
+
+  if (contextError.value) {
+    open.value = false
+    toast.add({
+      title: 'No se pudo verificar la factura en Siigo',
+      description: contextError.value.data?.statusMessage || contextError.value.message,
+      color: 'error',
+      icon: 'i-lucide-circle-alert'
+    })
+    return
+  }
+
+  if (context.value?.invoice?.status === 'created') {
+    open.value = false
+    return
+  }
+
+  if (context.value?.invoice && context.value.invoice.status !== 'failed') {
+    open.value = false
+    toast.add({
+      title: 'La factura anterior requiere revisión',
+      description: context.value.invoice.lastError || 'Verifica la factura en Siigo antes de intentar otra creación.',
+      color: 'warning',
+      icon: 'i-lucide-triangle-alert'
+    })
+    return
+  }
+
+  if (context.value?.customer && !context.value.customerReadyForInvoice) {
+    open.value = false
+    toast.add({
+      title: 'El cliente no está listo para facturar',
+      description: `Actualiza en Siigo: ${context.value.missingCustomerFields.join(', ')}. Después vuelve a intentarlo.`,
+      color: 'warning',
+      icon: 'i-lucide-triangle-alert'
+    })
   }
 })
 

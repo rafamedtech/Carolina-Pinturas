@@ -32,6 +32,8 @@ export interface SiigoPayableInvoice {
   balance: number
   customerId: string | null
   customerRfc: string | null
+  stampStatus: string | null
+  stamped: boolean
 }
 
 export type OrderPaymentProvider = 'local' | 'siigo' | (string & {})
@@ -112,4 +114,16 @@ export interface CreateOrderSiigoPaymentInput {
   confirmation: 'CREAR_RECEPCION_SIIGO'
 }
 
-export type CreateOrderPaymentInput = CreateLocalOrderPaymentInput | CreateOrderSiigoPaymentInput
+export interface CreateOrderSiigoReceiptInput {
+  invoiceId: string
+  documentTypeId: number
+  voucherNumber?: number | null
+  paymentTypeId: number
+  costCenterId?: number | null
+  cfdiCode: string
+  paymentMethod: 'PUE' | 'PPD'
+  quote: number
+  confirmation: 'CREAR_RECEPCION_SIIGO'
+}
+
+export type CreateOrderPaymentInput = CreateLocalOrderPaymentInput

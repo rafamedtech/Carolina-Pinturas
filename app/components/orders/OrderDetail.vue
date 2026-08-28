@@ -130,9 +130,6 @@ const mayManagePayment = mayManageLogistics
 const mayEditQuote = computed(() =>
   Boolean(user.value && canCreateOrders(user.value.role))
 )
-const paymentsBlockedByMissingInvoice = computed(() =>
-  !isQuote.value && Boolean(order.value?.requiresInvoice && !order.value.invoiceCreated)
-)
 const invoiceActionBusy = computed(() =>
   markingInvoiceRequired.value || checkingSiigoInvoice.value
 )
@@ -276,6 +273,7 @@ async function saveChanges() {
 
 async function startInvoiceFlow() {
   if (!order.value || invoiceActionBusy.value) return
+  if (order.value.invoiceCreated) return
 
   if (order.value.requiresInvoice) {
     siigoInvoiceOpen.value = true
@@ -441,25 +439,17 @@ async function convertToPedido() {
               color="neutral"
               variant="outline"
               :loading="invoiceActionBusy"
-              :disabled="invoiceActionBusy"
+              :disabled="invoiceActionBusy || order.invoiceCreated"
               @click="startInvoiceFlow"
             />
-            <UTooltip
+            <UButton
               v-if="!isQuote && mayManagePayment"
-              text="Debes crear la factura antes de poder registrar pagos."
-              :disabled="!paymentsBlockedByMissingInvoice"
-            >
-              <span class="inline-flex">
-                <UButton
-                  label="Pagos"
-                  icon="i-lucide-hand-coins"
-                  color="neutral"
-                  variant="outline"
-                  :disabled="paymentsBlockedByMissingInvoice"
-                  @click="paymentsOpen = true"
-                />
-              </span>
-            </UTooltip>
+              label="Pagos"
+              icon="i-lucide-hand-coins"
+              color="neutral"
+              variant="outline"
+              @click="paymentsOpen = true"
+            />
             <UDropdownMenu :items="documentOptions">
               <UButton
                 label="Opciones"

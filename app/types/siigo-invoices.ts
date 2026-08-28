@@ -72,7 +72,7 @@ export interface CreateOrderSiigoInvoiceInput {
   costCenterId?: number | null
   warehouseId?: number | null
   useCfdi: string
-  paymentMethod: 'PUE' | 'PPD'
+  paymentMethod: 'PPD'
   date: string
   dueDate: string
   confirmation: 'CREAR_BORRADOR_SIIGO'

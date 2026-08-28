@@ -61,7 +61,8 @@ function context(invoice: OrderSiigoInvoiceContext['invoice']): OrderSiigoInvoic
       ? []
       : [
           { id: 1000, name: 'Transferencia', active: true },
-          { id: 3558, name: '01-Efectivo', active: true }
+          { id: 3558, name: '01-Efectivo', active: true },
+          { id: 3564, name: 'Crédito Clientes', type: 'Cartera', active: true, due_date: true }
         ],
     costCenters: [],
     warehouses: []
@@ -119,15 +120,15 @@ afterEach(() => {
 })
 
 describe('OrderSiigoInvoiceCard', () => {
-  it('verifica al abrir y cierra sin mostrar el formulario si la factura existe', async () => {
+  it('verifica al montar y no muestra el formulario si la factura existe', async () => {
     wrapper = await mountSuspended(OrderSiigoInvoiceCard, {
       props: { orderId: 'existing-invoice', open: false, checking: false }
     })
 
-    expect(existingChecks).toBe(0)
+    await vi.waitFor(() => expect(wrapper?.emitted('checked')).toHaveLength(1))
+    expect(existingChecks).toBe(1)
     await wrapper.setProps({ open: true })
 
-    await vi.waitFor(() => expect(wrapper?.emitted('checked')).toHaveLength(1))
     expect(existingChecks).toBe(1)
     expect(wrapper.emitted('update:open')?.at(-1)).toEqual([false])
     expect(document.body.textContent).not.toContain('Crear factura borrador en Siigo')
@@ -138,19 +139,28 @@ describe('OrderSiigoInvoiceCard', () => {
       props: { orderId: 'missing-invoice', open: false, checking: false }
     })
 
-    expect(missingChecks).toBe(0)
+    await vi.waitFor(() => expect(wrapper?.emitted('checked')).toHaveLength(1))
+    expect(missingChecks).toBe(1)
     await wrapper.setProps({ open: true })
 
     await vi.waitFor(() => {
-      expect(missingChecks).toBe(1)
       expect(document.body.textContent).toContain('Crear factura borrador en Siigo')
     })
+    expect(document.body.textContent).toContain('Condición de pago')
+    expect(document.body.textContent).toContain('Forma de pago CFDI')
+    expect(document.body.textContent).toContain('Método de pago CFDI')
     expect(wrapper.emitted('checked')).toHaveLength(1)
     const invoiceModal = wrapper.findComponent(OrderSiigoInvoiceModal)
+    const invoiceFields = new Map(invoiceModal.findAllComponents({ name: 'UFormField' }).map(field => [
+      field.props('name'),
+      field.props('label')
+    ]))
+    expect(invoiceFields.get('paymentTypeId')).toBe('Método de pago CFDI')
+    expect(invoiceFields.get('paymentMethod')).toBe('Condición de pago')
     const selectedCatalogIds = invoiceModal
       .findAllComponents({ name: 'USelectMenu' })
       .map(component => component.props('modelValue'))
-    expect(selectedCatalogIds).toContain(3558)
+    expect(selectedCatalogIds).toContain(3564)
     expect(selectedCatalogIds).toContain(788)
   })
 
@@ -159,6 +169,7 @@ describe('OrderSiigoInvoiceCard', () => {
       props: { orderId: 'incomplete-customer', open: false, checking: false }
     })
 
+    await vi.waitFor(() => expect(wrapper?.emitted('checked')).toHaveLength(1))
     await wrapper.setProps({ open: true })
     await vi.waitFor(() => {
       expect(document.body.textContent).toContain('Crear factura borrador en Siigo')

@@ -1,10 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import {
-  assertInitialLocalPaymentAllowed,
   assertOrderPaymentDeletionRole,
   assertPaymentFitsBalance,
   createOrderPaymentSchema,
-  paymentDestinationForOrder,
   paymentMethodFromCfdi,
   paymentStatus
 } from '../../server/utils/order-payments'
@@ -27,11 +25,6 @@ const orderInput = {
 }
 
 describe('pagos unificados de pedidos', () => {
-  it('determina el destino según si el pedido requiere factura', () => {
-    expect(paymentDestinationForOrder(false)).toBe('local')
-    expect(paymentDestinationForOrder(true)).toBe('siigo')
-  })
-
   it('acepta pagos locales sin RFC ni referencias fiscales', () => {
     expect(createOrderPaymentSchema.safeParse({
       destination: 'local',
@@ -42,6 +35,16 @@ describe('pagos unificados de pedidos', () => {
       reference: 'CAJA-123',
       observations: null
     }).success).toBe(true)
+  })
+
+  it('obliga a registrar primero el pago local antes de enviarlo a Siigo', () => {
+    expect(createOrderPaymentSchema.safeParse({
+      destination: 'siigo',
+      requestId,
+      invoiceId: '63f918c2-ca65-4edc-a7db-66bcdd5159fb',
+      amount: 250.50,
+      date: '2026-07-28'
+    }).success).toBe(false)
   })
 
   it('rechaza importes con más de dos decimales y claves idempotentes inválidas', () => {
@@ -94,9 +97,16 @@ describe('pagos unificados de pedidos', () => {
     if (result.success) expect(result.data.initialPayment).not.toHaveProperty('amount')
   })
 
-  it('permite el pago inicial local en pedidos sin factura', () => {
-    expect(() => assertInitialLocalPaymentAllowed(false)).not.toThrow()
-    expect(() => assertInitialLocalPaymentAllowed(true)).toThrow()
+  it('permite el pago inicial local aunque el pedido requiera factura', () => {
+    expect(createOrderSchema.safeParse({
+      ...orderInput,
+      requiresInvoice: true,
+      initialPayment: {
+        requestId,
+        paymentMethod: 'efectivo',
+        date: '2026-07-28'
+      }
+    }).success).toBe(true)
   })
 
   it('reserva la eliminación de pagos para administradores', () => {

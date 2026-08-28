@@ -3,11 +3,14 @@ import type { CreateOrderSiigoPaymentInput } from '../../app/types/siigo-payment
 import {
   assertVoucherReferences,
   buildSiigoVoucherPayload,
+  createOrderSiigoReceiptSchema,
   createOrderSiigoPaymentSchema,
+  isSiigoInvoiceStamped,
   invoicePrefix,
   normalizeCreatedVoucher,
   normalizeInvoiceDetail,
-  normalizePayableInvoices
+  normalizePayableInvoices,
+  payableInvoicesForCustomer
 } from '../../server/utils/siigo-vouchers'
 
 const invoiceId = '63f918c2-ca65-4edc-a7db-66bcdd5159fb'
@@ -72,6 +75,30 @@ function references(overrides: Record<string, unknown> = {}) {
 }
 
 describe('recepciones de pago de Siigo México', () => {
+  it('considera timbrada únicamente una factura aceptada por Siigo', () => {
+    expect(isSiigoInvoiceStamped('Accepted')).toBe(true)
+    expect(isSiigoInvoiceStamped('Draft')).toBe(false)
+    expect(isSiigoInvoiceStamped('Sending')).toBe(false)
+    expect(isSiigoInvoiceStamped('Rejected')).toBe(false)
+    expect(isSiigoInvoiceStamped(null)).toBe(false)
+  })
+
+  it('separa la configuración fiscal de los datos inmutables del pago local', () => {
+    expect(createOrderSiigoReceiptSchema.safeParse({
+      invoiceId,
+      documentTypeId: 7714,
+      paymentTypeId: 5636,
+      cfdiCode: '03',
+      paymentMethod: 'PUE',
+      quote: 1,
+      confirmation: 'CREAR_RECEPCION_SIIGO'
+    }).success).toBe(true)
+    expect(createOrderSiigoReceiptSchema.safeParse({
+      ...input(),
+      amount: 1
+    }).success).toBe(false)
+  })
+
   it('valida importe con máximo dos decimales y confirmación fiscal explícita', () => {
     expect(createOrderSiigoPaymentSchema.safeParse(input()).success).toBe(true)
     expect(createOrderSiigoPaymentSchema.safeParse(input({ amount: 10.001 })).success).toBe(false)
@@ -134,17 +161,64 @@ describe('recepciones de pago de Siigo México', () => {
     }))).toThrow()
   })
 
-  it('normaliza sólo facturas con saldo y tolera rfc.id en respuestas', () => {
+  it('normaliza sólo facturas con saldo y tolera las variantes de RFC en respuestas', () => {
     expect(normalizePayableInvoices({
       results: [
         invoice({ customer: { 'id': customerId, 'rfc.id': 'MELM8305281H0' } }),
-        invoice({ id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', balance: 0 })
+        invoice({
+          id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+          customer: { identification: 'MELM8305281H0' }
+        }),
+        invoice({ id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', balance: 0 })
       ]
-    })).toEqual([expect.objectContaining({
-      id: invoiceId,
-      balance: 2546.06,
-      customerRfc: 'MELM8305281H0'
-    })])
+    })).toEqual([
+      expect.objectContaining({
+        id: invoiceId,
+        balance: 2546.06,
+        customerRfc: 'MELM8305281H0'
+      }),
+      expect.objectContaining({
+        id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+        customerRfc: 'MELM8305281H0'
+      })
+    ])
+  })
+
+  it('filtra las facturas por cliente y prioriza la asociada al pedido', () => {
+    const preferredInvoiceId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'
+    const otherCustomerInvoiceId = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb'
+
+    expect(payableInvoicesForCustomer({
+      results: [
+        invoice(),
+        invoice({
+          id: otherCustomerInvoiceId,
+          name: 'FV-1-70',
+          customer: {
+            id: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
+            rfc_id: 'OTRO010101AA1'
+          }
+        })
+      ]
+    }, {
+      customerId,
+      customerRfc: 'MELM8305281H0',
+      preferredInvoiceId,
+      preferredInvoice: invoice({
+        id: preferredInvoiceId,
+        name: 'FV-1-69',
+        balance: 0,
+        stamp: { status: 'Draft' },
+        payment: {
+          method: 'PPD',
+          conditions: [{ id: 3564, value: 2546.06 }]
+        }
+      }),
+      preferredBalance: 1000
+    }).map(invoice => invoice.id)).toEqual([
+      preferredInvoiceId,
+      invoiceId
+    ])
   })
 
   it('normaliza el detalle de factura y rechaza respuestas incompletas', () => {
@@ -160,6 +234,24 @@ describe('recepciones de pago de Siigo México', () => {
       }
     })
     expect(() => normalizeInvoiceDetail({ id: invoiceId, name: 'FV-1-68' })).toThrow()
+  })
+
+  it('usa la condición pendiente de un borrador PPD asociado cuando Siigo reporta saldo cero', () => {
+    const draft = invoice({
+      balance: 0,
+      stamp: { status: 'Draft' },
+      payment: {
+        method: 'PPD',
+        conditions: [{ id: 3564, value: 110 }]
+      }
+    })
+
+    expect(normalizeInvoiceDetail(draft, { draftPpdBalanceLimit: 80 }).balance).toBe(80)
+    expect(normalizePayableInvoices({ results: [draft] })).toEqual([])
+    expect(normalizePayableInvoices(
+      { results: [draft] },
+      { draftPpdBalanceLimit: 80 }
+    )[0]?.balance).toBe(80)
   })
 
   it('falla si Siigo responde sin un identificador de recepción válido', () => {

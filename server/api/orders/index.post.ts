@@ -7,7 +7,6 @@ import {
 import { requireRole } from '../../utils/auth'
 import { createOrder } from '../../utils/orders'
 import { createOrderSchema } from '../../utils/order-validation'
-import { assertInitialLocalPaymentAllowed } from '../../utils/order-payments'
 import { usePrisma } from '../../utils/prisma'
 import { siigoRequest } from '../../utils/siigo'
 
@@ -53,7 +52,6 @@ export default eventHandler(async (event) => {
         statusMessage: 'No tienes permiso para registrar pagos.'
       })
     }
-    assertInitialLocalPaymentAllowed(parsed.data.requiresInvoice)
   }
 
   return createOrder(parsed.data, user, customer, productsById, repartidor)

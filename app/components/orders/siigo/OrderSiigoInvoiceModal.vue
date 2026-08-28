@@ -53,7 +53,7 @@ const schema = z.object({
   paymentTypeId: z.number().int().positive('Selecciona un método de pago.'),
   costCenterId: z.number().int().positive().optional(),
   useCfdi: z.string().trim().toUpperCase().regex(/^[A-Z0-9]{3,8}$/, 'Captura un uso CFDI válido.'),
-  paymentMethod: z.enum(['PUE', 'PPD']),
+  paymentMethod: z.literal('PPD'),
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Selecciona la fecha de factura.'),
   dueDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Selecciona la fecha de vencimiento.'),
   confirmed: z.boolean().refine(value => value, 'Confirma que deseas crear el borrador en Siigo.')
@@ -67,7 +67,7 @@ const state = reactive<Partial<Schema>>({
   paymentTypeId: undefined,
   costCenterId: undefined,
   useCfdi: 'G03',
-  paymentMethod: 'PUE',
+  paymentMethod: 'PPD',
   date: new Date().toISOString().slice(0, 10),
   dueDate: new Date().toISOString().slice(0, 10),
   confirmed: false
@@ -95,9 +95,7 @@ function normalizeCatalogName(value: string) {
 }
 
 const defaultPaymentTypeId = computed(() =>
-  props.context.paymentTypes.find(item =>
-    normalizeCatalogName(item.name).split(' ').includes('efectivo')
-  )?.id
+  props.context.paymentTypes.find(item => item.due_date || item.type === 'Cartera')?.id
   ?? paymentItems.value[0]?.value
 )
 const defaultSellerId = computed(() =>
@@ -125,7 +123,7 @@ function resetState() {
   state.paymentTypeId = defaultPaymentTypeId.value
   state.costCenterId = document?.cost_center_default ?? undefined
   state.useCfdi = 'G03'
-  state.paymentMethod = 'PUE'
+  state.paymentMethod = 'PPD'
   state.date = new Date().toISOString().slice(0, 10)
   state.dueDate = state.date
   state.confirmed = false
@@ -202,7 +200,7 @@ function onSubmit(event: FormSubmitEvent<Schema>) {
           />
         </UFormField>
 
-        <UFormField name="paymentTypeId" label="Método de pago" required>
+        <UFormField name="paymentTypeId" label="Método de pago CFDI" required>
           <USelectMenu
             v-model="state.paymentTypeId"
             :items="paymentItems"
@@ -211,16 +209,12 @@ function onSubmit(event: FormSubmitEvent<Schema>) {
           />
         </UFormField>
 
-        <UFormField name="paymentMethod" label="Condición de pago" required>
-          <USelect
-            v-model="state.paymentMethod"
-            :items="[
-              { label: 'PUE · Una exhibición', value: 'PUE' },
-              { label: 'PPD · Parcialidades o diferido', value: 'PPD' }
-            ]"
-            value-key="value"
-            class="w-full"
-          />
+        <UFormField label="Forma de pago CFDI">
+          <UInput model-value="99 · Por definir" disabled class="w-full" />
+        </UFormField>
+
+        <UFormField name="paymentMethod" label="Condición de pago">
+          <UInput model-value="PPD · Parcialidades o diferido" disabled class="w-full" />
         </UFormField>
 
         <UFormField name="sellerId" label="Vendedor en Siigo" required>

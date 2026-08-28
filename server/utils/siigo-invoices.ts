@@ -19,7 +19,7 @@ export const createOrderSiigoInvoiceSchema = z.object({
   costCenterId: z.number().int().positive().nullable().optional(),
   warehouseId: z.number().int().positive().nullable().optional(),
   useCfdi: z.string().trim().toUpperCase().regex(/^[A-Z0-9]{3,8}$/, 'Captura un uso CFDI válido.'),
-  paymentMethod: z.enum(['PUE', 'PPD']),
+  paymentMethod: z.literal('PPD'),
   date: dateSchema,
   dueDate: dateSchema,
   confirmation: z.literal('CREAR_BORRADOR_SIIGO')

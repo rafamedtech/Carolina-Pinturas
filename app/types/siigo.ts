@@ -187,6 +187,9 @@ export interface SiigoInvoice {
   total?: number
   balance?: number
   status?: string
+  stamp?: {
+    status?: string
+  }
 }
 
 export interface SiigoInvoiceDetail extends SiigoInvoice {

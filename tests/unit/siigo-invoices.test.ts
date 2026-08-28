@@ -18,7 +18,7 @@ const input: CreateOrderSiigoInvoiceInput = {
   sellerId: 35071,
   paymentTypeId: 5636,
   useCfdi: 'G03',
-  paymentMethod: 'PUE',
+  paymentMethod: 'PPD',
   date: '2026-07-28',
   dueDate: '2026-07-28',
   confirmation: 'CREAR_BORRADOR_SIIGO'
@@ -47,6 +47,10 @@ describe('Siigo invoice drafts', () => {
 
   it('requires explicit confirmation and valid dates', () => {
     expect(createOrderSiigoInvoiceSchema.safeParse(input).success).toBe(true)
+    expect(createOrderSiigoInvoiceSchema.safeParse({
+      ...input,
+      paymentMethod: 'PUE'
+    }).success).toBe(false)
     expect(createOrderSiigoInvoiceSchema.safeParse({
       ...input,
       confirmation: undefined
@@ -171,7 +175,7 @@ describe('Siigo invoice drafts', () => {
         taxes: [{ id: 123 }]
       }],
       payment: {
-        method: 'PUE',
+        method: 'PPD',
         conditions: [{
           id: 5636,
           value: 232,

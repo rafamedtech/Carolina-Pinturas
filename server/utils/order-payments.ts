@@ -3,7 +3,6 @@ import type { Prisma, SalesOrderPayment } from '../../generated/prisma/client'
 import type { AppUser, UserRole } from '~/types/siigo'
 import type { OrderPayment } from '~/types/siigo-payments'
 import { canDeletePaymentRecord, PAYMENT_METHOD_KEYS } from '~/utils/orderPayment'
-import { createOrderSiigoPaymentSchema as siigoPaymentSchema } from './siigo-vouchers'
 
 const PAYMENT_DELETE_TRANSACTION_OPTIONS = {
   isolationLevel: 'Serializable' as const,
@@ -26,23 +25,7 @@ export const createLocalOrderPaymentSchema = z.object({
   observations: z.string().trim().max(2500).nullable().optional()
 })
 
-export const createOrderPaymentSchema = z.discriminatedUnion('destination', [
-  createLocalOrderPaymentSchema,
-  siigoPaymentSchema
-])
-
-export function paymentDestinationForOrder(requiresInvoice: boolean) {
-  return requiresInvoice ? 'siigo' : 'local'
-}
-
-export function assertInitialLocalPaymentAllowed(requiresInvoice: boolean) {
-  if (requiresInvoice) {
-    throw createError({
-      statusCode: 422,
-      statusMessage: 'Un pedido con factura no puede registrar un pago inicial local.'
-    })
-  }
-}
+export const createOrderPaymentSchema = createLocalOrderPaymentSchema
 
 export function paymentMethodFromCfdi(cfdiCode: string) {
   if (cfdiCode === '01') return 'efectivo'

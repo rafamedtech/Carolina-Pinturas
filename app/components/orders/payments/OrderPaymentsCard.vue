@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type {
   CreateOrderPaymentInput,
+  CreateOrderSiigoReceiptInput,
   OrderPayment,
   OrderPaymentContext
 } from '~/types/siigo-payments'
@@ -19,6 +20,9 @@ const open = shallowRef(false)
 const saving = shallowRef(false)
 const deleteOpen = shallowRef(false)
 const deletingPayment = shallowRef<OrderPayment | null>(null)
+const siigoOpen = shallowRef(false)
+const syncing = shallowRef(false)
+const syncingPayment = shallowRef<OrderPayment | null>(null)
 const toast = useToast()
 const { user } = useAuth()
 const {
@@ -70,6 +74,27 @@ function openDeletePayment(payment: OrderPayment) {
   if (!mayDeletePayments.value || !paymentCanBeDeleted(payment)) return
   deletingPayment.value = payment
   deleteOpen.value = true
+}
+
+function paymentInvoice(payment: OrderPayment) {
+  const invoiceId = payment.siigo?.invoiceId
+  return context.value?.siigo.invoices.find(invoice => invoice.id === invoiceId)
+    ?? context.value?.siigo.invoices[0]
+}
+
+function paymentHasSiigoAction(payment: OrderPayment) {
+  return Boolean(paymentInvoice(payment)
+    && (payment.provider === 'local' || payment.externalStatus === 'failed'))
+}
+
+function paymentInvoiceIsStamped(payment: OrderPayment) {
+  return paymentInvoice(payment)?.stamped === true
+}
+
+function openSiigoPayment(payment: OrderPayment) {
+  if (!paymentHasSiigoAction(payment) || !paymentInvoiceIsStamped(payment)) return
+  syncingPayment.value = payment
+  siigoOpen.value = true
 }
 
 async function onPaymentDeleted(paymentId: string) {
@@ -126,6 +151,53 @@ async function createPayment(input: CreateOrderPaymentInput) {
     })
   } finally {
     saving.value = false
+  }
+}
+
+async function registerPaymentInSiigo(input: CreateOrderSiigoReceiptInput) {
+  if (!syncingPayment.value || syncing.value) return
+  syncing.value = true
+
+  try {
+    const payment = await $fetch<OrderPayment>(
+      `/api/orders/${encodeURIComponent(props.orderId)}/payments/${encodeURIComponent(syncingPayment.value.id)}/siigo-receipt`,
+      { method: 'POST', body: input }
+    )
+    siigoOpen.value = false
+    syncingPayment.value = null
+    await refresh()
+    emit('created', payment)
+
+    if (payment.externalStatus !== 'synced') {
+      toast.add({
+        title: payment.externalStatus === 'unknown'
+          ? 'Resultado de Siigo incierto'
+          : 'La recepción no se creó en Siigo',
+        description: payment.externalError || 'Verifica el pago antes de volver a intentarlo.',
+        color: 'warning',
+        icon: 'i-lucide-triangle-alert',
+        duration: 9000
+      })
+      return
+    }
+
+    toast.add({
+      title: 'Pago registrado en Siigo',
+      description: payment.siigo?.voucherName || 'La recepción borrador quedó vinculada.',
+      color: 'success',
+      icon: 'i-lucide-circle-check'
+    })
+  } catch (fetchError: unknown) {
+    const response = fetchError as { data?: { statusMessage?: string }, message?: string }
+    toast.add({
+      title: 'No se pudo registrar el pago en Siigo',
+      description: response.data?.statusMessage || response.message || 'Revisa los datos e intenta nuevamente.',
+      color: 'error',
+      icon: 'i-lucide-circle-alert',
+      duration: 8000
+    })
+  } finally {
+    syncing.value = false
   }
 }
 </script>
@@ -229,6 +301,24 @@ async function createPayment(input: CreateOrderPaymentInput) {
               :label="formatCurrency(payment.amount, payment.currencyCode)"
             />
             <UTooltip
+              v-if="paymentHasSiigoAction(payment)"
+              :text="paymentInvoiceIsStamped(payment)
+                ? 'Crear recepción borrador en Siigo'
+                : 'La factura debe estar timbrada antes de registrar el pago en Siigo.'"
+            >
+              <span class="inline-flex">
+                <UButton
+                  :label="payment.externalStatus === 'failed' ? 'Reintentar en Siigo' : 'Registrar en Siigo'"
+                  icon="i-lucide-cloud-upload"
+                  color="neutral"
+                  variant="ghost"
+                  size="xs"
+                  :disabled="!paymentInvoiceIsStamped(payment)"
+                  @click="openSiigoPayment(payment)"
+                />
+              </span>
+            </UTooltip>
+            <UTooltip
               v-if="mayDeletePayments"
               :text="paymentCanBeDeleted(payment)
                 ? 'Eliminar pago'
@@ -266,6 +356,14 @@ async function createPayment(input: CreateOrderPaymentInput) {
         :order-id="orderId"
         :payment="deletingPayment"
         @deleted="onPaymentDeleted"
+      />
+      <OrdersPaymentsOrderPaymentSiigoModal
+        v-if="syncingPayment"
+        v-model:open="siigoOpen"
+        :context="context"
+        :payment="syncingPayment"
+        :saving="syncing"
+        @submit="registerPaymentInSiigo"
       />
     </template>
   </div>

@@ -130,7 +130,7 @@ afterEach(() => {
 })
 
 describe('OrderDetail · facturación', () => {
-  it('muestra Facturar y marca el pedido antes de validar la factura en Siigo', async () => {
+  it('valida al entrar y marca el pedido sin volver a consultar Siigo al pulsar Facturar', async () => {
     wrapper = await mountSuspended(OrderDetail, {
       props: { orderId: 'order-invoice' },
       global: {
@@ -142,6 +142,7 @@ describe('OrderDetail · facturación', () => {
 
     await vi.waitFor(() => {
       expect(wrapper?.text()).toContain('Facturar')
+      expect(contextChecks).toBe(1)
     })
 
     const invoiceButton = wrapper.findAll('button')
@@ -155,5 +156,46 @@ describe('OrderDetail · facturación', () => {
       expect(wrapper?.text()).toContain('Requiere factura')
       expect(contextChecks).toBe(1)
     })
+  })
+
+  it('deshabilita Facturar cuando la factura validada ya existe', async () => {
+    currentOrder = { ...baseOrder, requiresInvoice: true, invoiceCreated: true }
+    wrapper = await mountSuspended(OrderDetail, {
+      props: { orderId: 'order-invoice' },
+      global: {
+        stubs: {
+          UTooltip: { template: '<div><slot /></div>' }
+        }
+      }
+    })
+
+    await vi.waitFor(() => expect(contextChecks).toBe(1))
+    const invoiceButton = wrapper.findAll('button')
+      .find(button => button.text().trim() === 'Facturar')
+    expect(invoiceButton?.attributes('disabled')).toBeDefined()
+  })
+
+  it('permite abrir los pagos para seleccionar una factura existente', async () => {
+    currentOrder = {
+      ...baseOrder,
+      requiresInvoice: true,
+      invoiceCreated: false
+    }
+    wrapper = await mountSuspended(OrderDetail, {
+      props: { orderId: 'order-invoice' },
+      global: {
+        stubs: {
+          UTooltip: { template: '<div><slot /></div>' }
+        }
+      }
+    })
+
+    await vi.waitFor(() => {
+      expect(wrapper?.text()).toContain('Pagos')
+    })
+
+    const paymentsButton = wrapper.findAll('button')
+      .find(button => button.text().trim() === 'Pagos')
+    expect(paymentsButton?.attributes('disabled')).toBeUndefined()
   })
 })
