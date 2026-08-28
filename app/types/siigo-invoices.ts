@@ -77,3 +77,23 @@ export interface CreateOrderSiigoInvoiceInput {
   dueDate: string
   confirmation: 'CREAR_BORRADOR_SIIGO'
 }
+
+export interface HistoricalSiigoInvoiceOption {
+  id: string
+  name: string
+  date: string
+  total: number
+  stampStatus: string
+}
+
+export interface HistoricalSiigoInvoiceContext {
+  orderNumber: string
+  orderTotal: number
+  customerName: string
+  invoices: HistoricalSiigoInvoiceOption[]
+}
+
+export interface AssignHistoricalSiigoInvoiceInput {
+  invoiceId: string
+  confirmation: 'ASIGNAR_FACTURA_HISTORICA'
+}

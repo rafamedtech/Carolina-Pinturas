@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest'
 import type { CreateOrderSiigoInvoiceInput } from '../../app/types/siigo-invoices'
 import {
   assertInvoiceReferences,
+  assertHistoricalInvoiceMatchesOrder,
+  assignHistoricalSiigoInvoiceSchema,
   buildSiigoInvoiceDraftPayload,
   createOrderSiigoInvoiceSchema,
   isSiigoInvoiceWriteEnabled,
@@ -9,6 +11,8 @@ import {
   missingInvoiceCustomerFields,
   normalizeCreatedInvoice,
   normalizeInvoiceDocumentTypes,
+  normalizeHistoricalInvoiceDetail,
+  normalizeHistoricalInvoiceOptions,
   normalizeInvoiceProduct,
   normalizeSiigoSellers
 } from '../../server/utils/siigo-invoices'
@@ -37,6 +41,82 @@ const documentType = {
 }
 
 describe('Siigo invoice drafts', () => {
+  it('lista únicamente facturas históricas timbradas del mismo cliente y total', () => {
+    const accepted = {
+      id: '63f918c2-ca65-4edc-a7db-66bcdd5159fb',
+      name: 'FV-A-253',
+      date: '2026-08-18',
+      total: 110,
+      customer: { id: '6b6ceb28-b2eb-4b98-b3dd-26648a933c81', rfc_id: 'VAGR8902073DA' },
+      stamp: { status: 'Accepted' }
+    }
+    expect(normalizeHistoricalInvoiceOptions({
+      results: [
+        accepted,
+        { ...accepted, id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', stamp: { status: 'Draft' } },
+        { ...accepted, id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', total: 120 },
+        {
+          ...accepted,
+          id: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
+          customer: { id: 'dddddddd-dddd-4ddd-8ddd-dddddddddddd', rfc_id: 'OTRO010101AA1' }
+        }
+      ]
+    }, {
+      customerId: '6b6ceb28-b2eb-4b98-b3dd-26648a933c81',
+      customerRfc: 'VAGR8902073DA',
+      orderTotal: 110.01
+    })).toEqual([expect.objectContaining({ id: accepted.id, stampStatus: 'Accepted' })])
+  })
+
+  it('revalida el detalle antes de asociar una factura histórica', () => {
+    const raw = {
+      id: '63f918c2-ca65-4edc-a7db-66bcdd5159fb',
+      document: { id: 59625 },
+      number: 253,
+      name: 'FV-A-253',
+      date: '2026-08-18',
+      customer: { id: '6b6ceb28-b2eb-4b98-b3dd-26648a933c81', rfc_id: 'VAGR8902073DA' },
+      cost_center: 25,
+      seller: 788,
+      use: { code: 'G03' },
+      total: 110,
+      stamp: { status: 'Accepted' },
+      items: [{ warehouse: { id: 439 } }],
+      payment: {
+        method: 'PPD',
+        conditions: [{ id: 3564, value: 110, due_date: '2026-08-18' }]
+      }
+    }
+    const invoice = normalizeHistoricalInvoiceDetail(raw)
+    expect(invoice).toMatchObject({
+      id: raw.id,
+      documentTypeId: 59625,
+      sellerId: 788,
+      paymentTypeId: 3564,
+      warehouseId: 439,
+      stampStatus: 'Accepted'
+    })
+    expect(() => assertHistoricalInvoiceMatchesOrder(invoice, {
+      customerId: raw.customer.id,
+      customerRfc: raw.customer.rfc_id,
+      total: 110.01
+    })).not.toThrow()
+    expect(() => assertHistoricalInvoiceMatchesOrder(
+      { ...invoice, stampStatus: 'Draft' },
+      { customerId: raw.customer.id, customerRfc: raw.customer.rfc_id, total: 110 }
+    )).toThrow('Solo puedes asignar una factura timbrada')
+  })
+
+  it('exige confirmación explícita para la asociación histórica', () => {
+    expect(assignHistoricalSiigoInvoiceSchema.safeParse({
+      invoiceId: '63f918c2-ca65-4edc-a7db-66bcdd5159fb',
+      confirmation: 'ASIGNAR_FACTURA_HISTORICA'
+    }).success).toBe(true)
+    expect(assignHistoricalSiigoInvoiceSchema.safeParse({
+      invoiceId: '63f918c2-ca65-4edc-a7db-66bcdd5159fb'
+    }).success).toBe(false)
+  })
+
   it('enables invoice writes only for an explicit true setting', () => {
     expect(isSiigoInvoiceWriteEnabled(true)).toBe(true)
     expect(isSiigoInvoiceWriteEnabled('true')).toBe(true)

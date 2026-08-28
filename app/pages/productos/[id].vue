@@ -95,7 +95,7 @@ function formatDate(value?: string | null) {
                 <dt class="text-sm text-muted">
                   Unidad
                 </dt><dd class="mt-1 font-medium">
-                  {{ product.unit || '—' }}
+                  {{ (typeof product.unit === 'string' ? product.unit : product.unit?.name) || '—' }}
                 </dd>
               </div>
               <div>

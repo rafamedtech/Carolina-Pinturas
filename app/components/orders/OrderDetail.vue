@@ -69,6 +69,7 @@ const { printTicket } = useTicketPrinter()
 const printerSettingsOpen = shallowRef(false)
 const paymentsOpen = shallowRef(false)
 const siigoInvoiceOpen = shallowRef(false)
+const historicalInvoiceOpen = shallowRef(false)
 const checkingSiigoInvoice = shallowRef(false)
 const markingInvoiceRequired = shallowRef(false)
 const cancelOrderOpen = shallowRef(false)
@@ -127,6 +128,9 @@ const documentOptions = computed<DropdownMenuItem[][]>(() => {
 })
 
 const mayManagePayment = mayManageLogistics
+const mayAssignHistoricalInvoice = computed(() =>
+  Boolean(user.value?.role === 'admin' && !isQuote.value && !order.value?.invoiceCreated)
+)
 const mayEditQuote = computed(() =>
   Boolean(user.value && canCreateOrders(user.value.role))
 )
@@ -180,6 +184,11 @@ function onOrderCancelled(updatedOrder: SalesOrderDetail) {
   order.value = updatedOrder
   selectedStatus.value = updatedOrder.status.key
   statusNote.value = ''
+}
+
+function onHistoricalInvoiceAssigned(updatedOrder: SalesOrderDetail) {
+  order.value = updatedOrder
+  selectedStatus.value = updatedOrder.status.key
 }
 
 const repartidorOptions = computed(() => repartidores.value.map(repartidor => ({
@@ -443,6 +452,15 @@ async function convertToPedido() {
               @click="startInvoiceFlow"
             />
             <UButton
+              v-if="mayAssignHistoricalInvoice"
+              label="Asignar factura anterior"
+              icon="i-lucide-link"
+              color="neutral"
+              variant="outline"
+              :disabled="invoiceActionBusy"
+              @click="historicalInvoiceOpen = true"
+            />
+            <UButton
               v-if="!isQuote && mayManagePayment"
               label="Pagos"
               icon="i-lucide-hand-coins"
@@ -492,6 +510,12 @@ async function convertToPedido() {
               :order-id="order.id"
               @created="() => refresh()"
               @checked="() => refresh()"
+            />
+            <OrdersSiigoOrderHistoricalInvoiceModal
+              v-if="user?.role === 'admin' && !isQuote"
+              v-model:open="historicalInvoiceOpen"
+              :order-id="order.id"
+              @assigned="onHistoricalInvoiceAssigned"
             />
             <UButton
               v-if="isQuote && mayEditQuote"
@@ -610,6 +634,21 @@ async function convertToPedido() {
                 </dd>
               </div>
             </dl>
+            <div v-if="order.tags.length" class="mt-4 border-t border-default pt-4">
+              <p class="text-sm text-muted">
+                Etiquetas
+              </p>
+              <div class="mt-2 flex flex-wrap gap-2">
+                <UBadge
+                  v-for="tag in order.tags"
+                  :key="tag"
+                  color="neutral"
+                  variant="subtle"
+                  size="md"
+                  :label="tag"
+                />
+              </div>
+            </div>
             <div v-if="order.observations" class="mt-4 border-t border-default pt-4">
               <p class="text-sm text-muted">
                 Observaciones

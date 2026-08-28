@@ -2,7 +2,9 @@ import Decimal from 'decimal.js'
 import * as z from 'zod'
 import type { SiigoCustomer, SiigoProduct } from '~/types/siigo'
 import type {
+  AssignHistoricalSiigoInvoiceInput,
   CreateOrderSiigoInvoiceInput,
+  HistoricalSiigoInvoiceOption,
   SiigoInvoiceDocumentType,
   SiigoSeller,
   SiigoWarehouse
@@ -24,6 +26,11 @@ export const createOrderSiigoInvoiceSchema = z.object({
   dueDate: dateSchema,
   confirmation: z.literal('CREAR_BORRADOR_SIIGO')
 })
+
+export const assignHistoricalSiigoInvoiceSchema = z.object({
+  invoiceId: z.string().uuid(),
+  confirmation: z.literal('ASIGNAR_FACTURA_HISTORICA')
+}) satisfies z.ZodType<AssignHistoricalSiigoInvoiceInput>
 
 export function isSiigoInvoiceWriteEnabled(value: boolean | string | null | undefined) {
   return value === true || value === 'true'
@@ -51,6 +58,18 @@ function number(value: unknown) {
   if (value === null || value === undefined || value === '') return null
   const parsed = typeof value === 'number' ? value : Number(value)
   return Number.isFinite(parsed) ? parsed : null
+}
+
+function totalsMatch(left: number, right: number) {
+  return Math.abs(Math.round(left * 100) - Math.round(right * 100)) <= 1
+}
+
+function customerMatches(
+  invoice: { id: string | null, rfc: string | null },
+  order: { id: string, rfc: string }
+) {
+  return invoice.id === order.id
+    || invoice.rfc?.toUpperCase() === order.rfc.trim().toUpperCase()
 }
 
 function boolean(value: unknown) {
@@ -197,6 +216,129 @@ export function missingInvoiceCustomerFields(customer: SiigoCustomer) {
   if (!isUsableFiscalRfc(customer.rfc_id || customer.identification)) missing.push('RFC fiscal válido')
 
   return missing
+}
+
+export function normalizeHistoricalInvoiceOptions(
+  value: unknown,
+  options: { customerId: string, customerRfc: string, orderTotal: number }
+): HistoricalSiigoInvoiceOption[] {
+  return catalogResults(value).flatMap((entry) => {
+    const invoice = record(entry)
+    const customer = record(invoice?.customer)
+    const stamp = record(invoice?.stamp)
+    const id = string(invoice?.id)
+    const name = string(invoice?.name)
+    const date = string(invoice?.date)
+    const total = number(invoice?.total)
+    const stampStatus = string(stamp?.status)
+    const customerId = string(customer?.id)
+    const customerRfc = string(customer?.rfc_id)
+      ?? string(customer?.['rfc.id'])
+      ?? string(customer?.identification)
+
+    if (
+      !id
+      || !name
+      || !date
+      || total === null
+      || stampStatus?.toLowerCase() !== 'accepted'
+      || !customerMatches(
+        { id: customerId, rfc: customerRfc },
+        { id: options.customerId, rfc: options.customerRfc }
+      )
+      || !totalsMatch(total, options.orderTotal)
+    ) return []
+
+    return [{ id, name, date, total, stampStatus }]
+  }).sort((left, right) => right.date.localeCompare(left.date))
+}
+
+export function normalizeHistoricalInvoiceDetail(value: unknown) {
+  const invoice = record(value)
+  const customer = record(invoice?.customer)
+  const document = record(invoice?.document)
+  const stamp = record(invoice?.stamp)
+  const use = record(invoice?.use)
+  const payment = record(invoice?.payment)
+  const conditions = Array.isArray(payment?.conditions) ? payment.conditions : []
+  const condition = record(conditions[0])
+  const items = Array.isArray(invoice?.items) ? invoice.items : []
+  const warehouse = record(record(items[0])?.warehouse)
+  const id = string(invoice?.id)
+  const name = string(invoice?.name)
+  const date = string(invoice?.date)
+  const total = number(invoice?.total)
+  const invoiceNumber = number(invoice?.number)
+  const documentTypeId = number(document?.id)
+  const sellerId = number(invoice?.seller)
+  const paymentTypeId = number(condition?.id)
+  const useCfdi = string(use?.code)
+  const paymentMethod = string(payment?.method)
+  const customerId = string(customer?.id)
+  const customerRfc = string(customer?.rfc_id) ?? string(customer?.identification)
+  const stampStatus = string(stamp?.status)
+  const dueDate = string(condition?.due_date) ?? date
+
+  if (
+    !invoice
+    || !id
+    || !name
+    || !date
+    || !dateSchema.safeParse(date).success
+    || !dueDate
+    || !dateSchema.safeParse(dueDate).success
+    || total === null
+    || !documentTypeId
+    || !sellerId
+    || !paymentTypeId
+    || !useCfdi
+    || (paymentMethod !== 'PUE' && paymentMethod !== 'PPD')
+    || (!customerId && !customerRfc)
+    || !stampStatus
+  ) {
+    throw createError({
+      statusCode: 502,
+      statusMessage: 'Siigo devolvió una factura incompleta para asociarla al pedido.'
+    })
+  }
+
+  return {
+    id,
+    name,
+    date,
+    dueDate,
+    total,
+    invoiceNumber: invoiceNumber && Number.isInteger(invoiceNumber) ? invoiceNumber : null,
+    documentTypeId,
+    sellerId,
+    paymentTypeId,
+    costCenterId: number(invoice.cost_center),
+    warehouseId: number(warehouse?.id),
+    useCfdi,
+    paymentMethod,
+    customerId,
+    customerRfc,
+    stampStatus,
+    raw: invoice
+  }
+}
+
+export function assertHistoricalInvoiceMatchesOrder(
+  invoice: ReturnType<typeof normalizeHistoricalInvoiceDetail>,
+  order: { customerId: string, customerRfc: string, total: number }
+) {
+  if (invoice.stampStatus.toLowerCase() !== 'accepted') {
+    throw createError({ statusCode: 422, statusMessage: 'Solo puedes asignar una factura timbrada en Siigo.' })
+  }
+  if (!customerMatches(
+    { id: invoice.customerId, rfc: invoice.customerRfc },
+    { id: order.customerId, rfc: order.customerRfc }
+  )) {
+    throw createError({ statusCode: 422, statusMessage: 'La factura seleccionada pertenece a otro cliente.' })
+  }
+  if (!totalsMatch(invoice.total, order.total)) {
+    throw createError({ statusCode: 422, statusMessage: 'El total de la factura no coincide con el total del pedido.' })
+  }
 }
 
 export function assertInvoiceReferences(options: {

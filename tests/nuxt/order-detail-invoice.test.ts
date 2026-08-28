@@ -130,6 +130,24 @@ afterEach(() => {
 })
 
 describe('OrderDetail · facturación', () => {
+  it('muestra las etiquetas del pedido únicamente cuando existen', async () => {
+    currentOrder = { ...baseOrder, tags: ['urgente', 'mayoreo'] }
+    wrapper = await mountSuspended(OrderDetail, {
+      props: { orderId: 'order-invoice' },
+      global: {
+        stubs: {
+          UTooltip: { template: '<div><slot /></div>' }
+        }
+      }
+    })
+
+    await vi.waitFor(() => {
+      expect(wrapper?.text()).toContain('Etiquetas')
+      expect(wrapper?.text()).toContain('urgente')
+      expect(wrapper?.text()).toContain('mayoreo')
+    })
+  })
+
   it('valida al entrar y marca el pedido sin volver a consultar Siigo al pulsar Facturar', async () => {
     wrapper = await mountSuspended(OrderDetail, {
       props: { orderId: 'order-invoice' },
@@ -142,8 +160,10 @@ describe('OrderDetail · facturación', () => {
 
     await vi.waitFor(() => {
       expect(wrapper?.text()).toContain('Facturar')
+      expect(wrapper?.text()).toContain('Asignar factura anterior')
       expect(contextChecks).toBe(1)
     })
+    expect(wrapper.text()).not.toContain('Etiquetas')
 
     const invoiceButton = wrapper.findAll('button')
       .find(button => button.text().trim() === 'Facturar')
@@ -173,6 +193,7 @@ describe('OrderDetail · facturación', () => {
     const invoiceButton = wrapper.findAll('button')
       .find(button => button.text().trim() === 'Facturar')
     expect(invoiceButton?.attributes('disabled')).toBeDefined()
+    expect(wrapper.text()).not.toContain('Asignar factura anterior')
   })
 
   it('permite abrir los pagos para seleccionar una factura existente', async () => {
