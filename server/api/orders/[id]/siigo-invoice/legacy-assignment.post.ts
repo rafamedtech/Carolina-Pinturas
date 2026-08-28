@@ -2,10 +2,12 @@ import type { SalesOrderDetail } from '~/types/orders'
 import { requireRole } from '../../../../utils/auth'
 import { getOrder } from '../../../../utils/orders'
 import { usePrisma } from '../../../../utils/prisma'
+import { getSiigoCustomerDetail } from '../../../../utils/siigo-customer-detail'
 import { siigoRequest } from '../../../../utils/siigo'
 import {
   assignHistoricalSiigoInvoiceSchema,
   assertHistoricalInvoiceMatchesOrder,
+  isUsableFiscalRfc,
   normalizeHistoricalInvoiceDetail
 } from '../../../../utils/siigo-invoices'
 import { siigoJson } from '../../../../utils/siigo-persistence'
@@ -33,8 +35,11 @@ export default eventHandler(async (event): Promise<SalesOrderDetail> => {
   if (order.siigoReference || order.invoiceCreated) {
     throw createError({ statusCode: 409, statusMessage: 'Este pedido ya tiene una factura asociada.' })
   }
-  if (!order.customer.rfc) {
-    throw createError({ statusCode: 422, statusMessage: 'El cliente del pedido no tiene un RFC fiscal.' })
+
+  const customer = await getSiigoCustomerDetail(order.customer.id)
+  const customerRfc = customer.rfc_id || customer.identification || null
+  if (!customerRfc || !isUsableFiscalRfc(customerRfc)) {
+    throw createError({ statusCode: 422, statusMessage: 'El cliente del pedido no tiene un RFC fiscal válido en Siigo.' })
   }
 
   const invoice = normalizeHistoricalInvoiceDetail(
@@ -42,7 +47,7 @@ export default eventHandler(async (event): Promise<SalesOrderDetail> => {
   )
   assertHistoricalInvoiceMatchesOrder(invoice, {
     customerId: order.customer.id,
-    customerRfc: order.customer.rfc,
+    customerRfc,
     total: order.total
   })
 

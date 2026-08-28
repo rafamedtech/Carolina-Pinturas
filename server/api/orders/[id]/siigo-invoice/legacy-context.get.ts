@@ -2,9 +2,10 @@ import type { HistoricalSiigoInvoiceContext } from '~/types/siigo-invoices'
 import type { SiigoListResponse } from '~/types/siigo'
 import { requireRole } from '../../../../utils/auth'
 import { collectSiigoCatalog } from '../../../../utils/siigo-catalog'
-import { normalizeHistoricalInvoiceOptions } from '../../../../utils/siigo-invoices'
+import { isUsableFiscalRfc, normalizeHistoricalInvoiceOptions } from '../../../../utils/siigo-invoices'
 import { getOrder } from '../../../../utils/orders'
 import { usePrisma } from '../../../../utils/prisma'
+import { getSiigoCustomerDetail } from '../../../../utils/siigo-customer-detail'
 import { siigoRequest } from '../../../../utils/siigo'
 
 export default eventHandler(async (event): Promise<HistoricalSiigoInvoiceContext> => {
@@ -24,14 +25,17 @@ export default eventHandler(async (event): Promise<HistoricalSiigoInvoiceContext
   if (order.siigoReference || (persisted && persisted.status !== 'failed')) {
     throw createError({ statusCode: 409, statusMessage: 'Este pedido ya tiene una factura asociada.' })
   }
-  if (!order.customer.rfc) {
-    throw createError({ statusCode: 422, statusMessage: 'El cliente del pedido no tiene un RFC fiscal.' })
+
+  const customer = await getSiigoCustomerDetail(order.customer.id)
+  const customerRfc = customer.rfc_id || customer.identification || null
+  if (!customerRfc || !isUsableFiscalRfc(customerRfc)) {
+    throw createError({ statusCode: 422, statusMessage: 'El cliente del pedido no tiene un RFC fiscal válido en Siigo.' })
   }
 
   const response = await collectSiigoCatalog<unknown>((page, pageSize) =>
     siigoRequest<SiigoListResponse<unknown>>('/v1/invoices', {
       query: {
-        customer_identification: order.customer.rfc!,
+        customer_identification: customerRfc,
         page: String(page),
         page_size: String(pageSize)
       }
@@ -44,7 +48,7 @@ export default eventHandler(async (event): Promise<HistoricalSiigoInvoiceContext
     customerName: order.customer.name,
     invoices: normalizeHistoricalInvoiceOptions(response, {
       customerId: order.customer.id,
-      customerRfc: order.customer.rfc,
+      customerRfc,
       orderTotal: order.total
     })
   }
