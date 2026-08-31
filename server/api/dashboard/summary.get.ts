@@ -4,6 +4,7 @@ import type {
   DashboardTopProduct,
   SalesDashboardSummary
 } from '~/types/dashboard'
+import { ADMIN_ONLY_EXPENSE_CATEGORIES } from '~/utils/expense'
 import { PAYMENT_STATUSES } from '~/utils/orderPayment'
 import { orderStatusBadgeColor } from '~/utils/orderStatus'
 import { ORDER_LOGISTICS_ROLES } from '~/utils/roleAccess'
@@ -43,7 +44,7 @@ function percentage(amount: number, total: number) {
 }
 
 export default eventHandler(async (event) => {
-  await requireRole(event, ORDER_LOGISTICS_ROLES)
+  const user = await requireRole(event, ORDER_LOGISTICS_ROLES)
   const prisma = usePrisma()
   const query = getQuery(event)
   const selectedMonth = typeof query.month === 'string' ? query.month : undefined
@@ -53,7 +54,9 @@ export default eventHandler(async (event) => {
     orderDate: { gte: start, lt: end }
   } satisfies Prisma.SalesOrderWhereInput
 
-  const [orders, previous] = await Promise.all([
+  const hiddenExpenseCategories = user.role === 'admin' ? [] : [...ADMIN_ONLY_EXPENSE_CATEGORIES]
+
+  const [orders, previous, expenses] = await Promise.all([
     prisma.salesOrder.findMany({
       where: salesWhere,
       select: {
@@ -85,11 +88,22 @@ export default eventHandler(async (event) => {
         orderDate: { gte: previousStart, lt: start }
       },
       _sum: { total: true }
+    }),
+    prisma.expense.findMany({
+      where: {
+        expenseDate: { gte: start, lt: end },
+        ...(hiddenExpenseCategories.length ? { category: { notIn: hiddenExpenseCategories } } : {})
+      },
+      select: { amount: true, exchangeRate: true }
     })
   ] as const)
 
   const sales = orders.reduce((sum, order) => sum + numeric(order.total), 0)
   const previousSales = numeric(previous._sum.total)
+  const expensesAmount = expenses.reduce(
+    (sum, expense) => sum + numeric(expense.amount) * numeric(expense.exchangeRate),
+    0
+  )
   const orderCount = orders.length
   const collectedAmount = orders
     .filter(order => order.paymentStatus === 'pago_recibido')
@@ -190,6 +204,7 @@ export default eventHandler(async (event) => {
         : null,
       projectedSales: elapsedDays > 0 ? (sales / elapsedDays) * daysInMonth : 0,
       orderCount,
+      expensesAmount,
       averageTicket: orderCount > 0 ? sales / orderCount : 0,
       pendingAmount,
       collectedAmount

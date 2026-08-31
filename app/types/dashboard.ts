@@ -15,6 +15,7 @@ export interface DashboardMetrics {
   salesChangePercentage: number | null
   projectedSales: number
   orderCount: number
+  expensesAmount: number
   averageTicket: number
   pendingAmount: number
   collectedAmount: number

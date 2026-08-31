@@ -1,16 +1,16 @@
 <script setup lang="ts">
 import type { DashboardMetrics } from '~/types/dashboard'
-import { dashboardCurrency, dashboardNumber } from '~/utils/dashboardFormatters'
+import { dashboardCurrency } from '~/utils/dashboardFormatters'
 
 const props = defineProps<{
   metrics: DashboardMetrics
 }>()
 
 const stats = computed(() => [{
-  title: 'Pedidos del mes',
-  value: dashboardNumber.format(props.metrics.orderCount),
-  detail: 'Pedidos que ya son venta',
-  icon: 'i-lucide-shopping-bag'
+  title: 'Gastos del mes',
+  value: dashboardCurrency.format(props.metrics.expensesAmount),
+  detail: 'Total gastado en el mes',
+  icon: 'i-lucide-banknote-arrow-down'
 }, {
   title: 'Ticket promedio',
   value: dashboardCurrency.format(props.metrics.averageTicket),
