@@ -1,6 +1,9 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { SiigoCustomer, SiigoListResponse } from '../../app/types/siigo'
-import { synchronizeSiigoCustomers } from '../../server/utils/siigo-customer-import'
+import {
+  synchronizeSiigoCustomers,
+  synchronizeSiigoCustomerSubset
+} from '../../server/utils/siigo-customer-import'
 
 vi.mock('../../server/utils/prisma', () => ({ usePrisma: vi.fn() }))
 
@@ -69,5 +72,23 @@ describe('importación de clientes Siigo → PostgreSQL', () => {
     resolvePage?.({ results: [], pagination: { page: 1, page_size: 100, total_results: 0 } })
     await first
     expect(fetchPage).toHaveBeenCalledOnce()
+  })
+
+  it('sincroniza únicamente proveedores faltantes o con tipo local desactualizado', async () => {
+    const current = { ...customer(1), type: 'Supplier' }
+    const stale = { ...customer(2), type: 'Supplier' }
+    const missing = { ...customer(3), type: 'Supplier' }
+    const findLocalTypes = vi.fn().mockResolvedValue([
+      { id: current.id, type: 'Supplier' },
+      { id: stale.id, type: 'Customer' }
+    ])
+    const persistBatch = vi.fn().mockResolvedValue(undefined)
+
+    await expect(synchronizeSiigoCustomerSubset(
+      [current, stale, missing],
+      { findLocalTypes, persistBatch }
+    )).resolves.toBe(2)
+    expect(persistBatch).toHaveBeenCalledOnce()
+    expect(persistBatch).toHaveBeenCalledWith([stale, missing])
   })
 })

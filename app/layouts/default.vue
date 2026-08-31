@@ -39,6 +39,14 @@ const allLinks: AppNavigationItem[] = [{
     open.value = false
   }
 }, {
+  label: 'Proveedores',
+  icon: 'i-lucide-building-2',
+  to: '/proveedores',
+  roles: managementRoles,
+  onSelect: () => {
+    open.value = false
+  }
+}, {
   label: 'Pedidos',
   icon: 'i-lucide-shopping-cart',
   to: '/ventas',
@@ -50,6 +58,14 @@ const allLinks: AppNavigationItem[] = [{
   label: 'Pagos',
   icon: 'i-lucide-hand-coins',
   to: '/pagos',
+  roles: managementRoles,
+  onSelect: () => {
+    open.value = false
+  }
+}, {
+  label: 'Gastos',
+  icon: 'i-lucide-receipt-text',
+  to: '/gastos',
   roles: managementRoles,
   onSelect: () => {
     open.value = false

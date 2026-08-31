@@ -46,17 +46,26 @@ export async function getLocalCustomerInternal(customerId: string) {
   return row ? localCustomerInternal(row) : undefined
 }
 
-export async function withLocalCustomerInternals(customers: SiigoCustomer[]) {
+export async function withLocalCustomerInternals(
+  customers: SiigoCustomer[],
+  options: { type?: 'Customer' | 'Supplier' | 'Other' } = {}
+) {
   if (!customers.length) return customers
 
   const rows = await usePrisma().siigoCustomer.findMany({
-    where: { id: { in: customers.map(customer => customer.id) } },
+    where: {
+      id: { in: customers.map(customer => customer.id) },
+      ...(options.type
+        ? { type: { equals: options.type, mode: 'insensitive' as const } }
+        : {})
+    },
     select: customerInternalSelect
   })
   const internalById = new Map(rows.map(row => [row.id, localCustomerInternal(row)]))
 
-  return customers.map((customer) => {
+  return customers.flatMap((customer) => {
     const internal = internalById.get(customer.id)
-    return internal ? { ...customer, internal } : customer
+    if (internal) return [{ ...customer, internal }]
+    return options.type ? [] : [customer]
   })
 }

@@ -24,6 +24,7 @@
 - Una venta de mostrador puede crear un pago inicial completo aunque requiera factura. El navegador envía únicamente `requestId`, método y fecha; el servidor calcula el total definitivo y guarda pedido y pago local en la misma transacción. Esta opción se rechaza para repartidores distintos de Mostrador.
 - Volver a consultar cliente y productos en Siigo al guardar un pedido; no confiar en el payload del navegador.
 - Por decisión explícita del usuario del 2026-08-27, el catálogo y el detalle vigente de clientes se consultan desde Siigo. PostgreSQL conserva la referencia necesaria para pedidos y las preferencias internas, pero no el domicilio actual. La caché corta del catálogo evita exceder límites y la acción **Recargar** la invalida explícitamente.
+- Por decisión explícita del usuario del 2026-08-31, los gastos se registran únicamente en PostgreSQL. Cada gasto referencia un tercero cuyo `type` debe ser `Supplier` tanto en Siigo como en `siigo_customers`, conserva snapshots históricos del proveedor y no crea documentos en Siigo.
 - El cliente `MOSTRADOR .` se resuelve desde el catálogo de Siigo compartido y cacheado; al guardar un pedido se conserva la consulta puntual del cliente en Siigo.
 - Conservar snapshots históricos e `raw_payload` para tolerar cambios futuros del contrato externo.
 

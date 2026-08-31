@@ -17,6 +17,7 @@ model AppUser {
   updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   repartidor Repartidor?
+  expenses    Expense[]
 
   @@index([role, active])
   @@map("app_users")
@@ -183,6 +184,7 @@ model SiigoCustomer {
   phones   SiigoCustomerPhone[]
   contacts SiigoCustomerContact[]
   orders   SalesOrder[]
+  expenses Expense[]
 
   @@index([displayName])
   @@index([rfcId])
@@ -279,6 +281,37 @@ model SalesOrder {
   @@index([repartidorId])
   @@index([createdAt])
   @@map("sales_orders")
+}
+
+model Expense {
+  id                   String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  expenseDate          DateTime @map("expense_date") @db.Date
+  category             String   @db.VarChar(64)
+  description          String   @db.VarChar(250)
+  providerId           String   @map("provider_id") @db.Uuid
+  providerNameSnapshot String   @map("provider_name_snapshot")
+  providerRfcSnapshot  String?  @map("provider_rfc_snapshot")
+  providerPayload      Json     @map("provider_payload") @db.JsonB
+  currencyCode         String   @map("currency_code") @db.VarChar(3)
+  exchangeRate         Decimal  @map("exchange_rate") @db.Decimal(20, 6)
+  amount               Decimal  @db.Decimal(20, 2)
+  paymentMethod        String   @map("payment_method") @db.VarChar(32)
+  notes                String?
+  createdByUserId      String?  @map("created_by_user_id") @db.Uuid
+  createdByName        String   @map("created_by_name")
+  createdByEmail       String   @map("created_by_email")
+  createdByRole        String   @map("created_by_role") @db.VarChar(32)
+  createdAt            DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt            DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  provider      SiigoCustomer @relation(fields: [providerId], references: [id], onDelete: Restrict)
+  createdByUser AppUser?      @relation(fields: [createdByUserId], references: [userId], onDelete: SetNull)
+
+  @@index([expenseDate, createdAt])
+  @@index([category, expenseDate])
+  @@index([providerId, expenseDate])
+  @@index([createdByUserId])
+  @@map("expenses")
 }
 
 model SalesOrderSiigoInvoice {

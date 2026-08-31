@@ -6,13 +6,24 @@ import { missingSiigoCustomerFields, siigoCustomerMutationInput } from '~/utils/
 
 const route = useRoute()
 const toast = useToast()
+const isSupplierContext = route.path.startsWith('/proveedores')
+const entityLabel = isSupplierContext ? 'Proveedor' : 'Cliente'
+const entityLabelLower = entityLabel.toLowerCase()
+const entitiesLabelLower = isSupplierContext ? 'proveedores' : 'clientes'
+const collectionPath = isSupplierContext ? '/proveedores' : '/clientes'
+const catalogKey = isSupplierContext
+  ? 'customers-catalog-request-supplier'
+  : 'customers-catalog-request'
 const customerId = computed(() => String(route.params.id))
 const { data: customer, status, error, refresh } = useLazyFetch<SiigoCustomer>(
   () => `/api/siigo/customers/${encodeURIComponent(customerId.value)}`,
   { key: () => `siigo-customer-${customerId.value}` }
 )
 
-const fullName = computed(() => customer.value?.name?.filter(Boolean).join(' ') || 'Cliente')
+const fullName = computed(() => customer.value?.name?.filter(Boolean).join(' ') || entityLabel)
+const isExpectedType = computed(() =>
+  !isSupplierContext || customer.value?.type?.trim().toLowerCase() === 'supplier'
+)
 const contact = computed(() => customer.value?.contacts?.[0])
 const email = computed(() => contact.value?.email || '—')
 const phone = computed(() => siigoCustomerPhone(customer.value) || '—')
@@ -37,7 +48,9 @@ const customerSince = computed(() => {
   const created = customer.value?.metadata?.created
   return created ? formatMexicoDate(created) : '—'
 })
-const message = computed(() => error.value?.data?.statusMessage || 'No fue posible cargar el cliente.')
+const message = computed(() =>
+  error.value?.data?.statusMessage || `No fue posible cargar el ${entityLabelLower}.`
+)
 const editing = shallowRef(false)
 const saving = shallowRef(false)
 const submitError = shallowRef('')
@@ -61,7 +74,7 @@ function cancelEditing() {
 
 async function saveCustomer(
   input: SiigoCustomerMutationInput,
-  successTitle = 'Cliente actualizado'
+  successTitle = `${entityLabel} actualizado`
 ) {
   if (saving.value) return
   saving.value = true
@@ -75,7 +88,7 @@ async function saveCustomer(
     customer.value = updated
     cancelEditing()
     archiveOpen.value = false
-    await refreshNuxtData('customers-catalog-request')
+    await refreshNuxtData(catalogKey)
     toast.add({
       title: successTitle,
       description: 'Los datos vigentes quedaron guardados en Siigo.',
@@ -86,7 +99,7 @@ async function saveCustomer(
     const response = fetchError as { data?: { statusMessage?: string }, message?: string }
     submitError.value = response.data?.statusMessage || response.message || 'Intenta nuevamente.'
     toast.add({
-      title: 'No se pudo actualizar el cliente',
+      title: `No se pudo actualizar el ${entityLabelLower}`,
       description: submitError.value,
       color: 'error',
       icon: 'i-lucide-circle-alert'
@@ -105,12 +118,12 @@ async function setCustomerActive(active: boolean) {
     archiveOpen.value = false
     startEditing({
       active,
-      notice: `Para ${active ? 'activar' : 'archivar'} este cliente, completa: ${missing.join(', ')}.`
+      notice: `Para ${active ? 'activar' : 'archivar'} este ${entityLabelLower}, completa: ${missing.join(', ')}.`
     })
     return
   }
 
-  await saveCustomer(input, active ? 'Cliente activado' : 'Cliente archivado')
+  await saveCustomer(input, active ? `${entityLabel} activado` : `${entityLabel} archivado`)
 }
 
 useSeoMeta({ title: () => fullName.value })
@@ -119,14 +132,14 @@ useSeoMeta({ title: () => fullName.value })
 <template>
   <UDashboardPanel id="customer-detail">
     <template #header>
-      <UDashboardNavbar title="Detalle del cliente">
+      <UDashboardNavbar :title="`Detalle del ${entityLabelLower}`">
         <template #leading>
           <UButton
-            to="/clientes"
+            :to="collectionPath"
             icon="i-lucide-arrow-left"
             color="neutral"
             variant="ghost"
-            aria-label="Volver a clientes"
+            :aria-label="`Volver a ${collectionPath.slice(1)}`"
           />
         </template>
         <template #right>
@@ -148,9 +161,18 @@ useSeoMeta({ title: () => fullName.value })
         v-if="error"
         color="warning"
         variant="subtle"
-        title="Cliente no disponible"
+        :title="`${entityLabel} no disponible`"
         :description="message"
         icon="i-lucide-plug-zap"
+      />
+
+      <UAlert
+        v-else-if="customer && !isExpectedType"
+        color="warning"
+        variant="subtle"
+        title="El registro no es un proveedor"
+        description="Este registro no está marcado como Supplier en Siigo."
+        icon="i-lucide-triangle-alert"
       />
 
       <template v-else-if="customer">
@@ -210,7 +232,7 @@ useSeoMeta({ title: () => fullName.value })
               </div>
               <div>
                 <dt class="text-sm text-muted">
-                  Cliente desde
+                  {{ entityLabel }} desde
                 </dt>
                 <dd class="mt-1 font-medium">
                   {{ customerSince }}
@@ -268,9 +290,9 @@ useSeoMeta({ title: () => fullName.value })
         />
 
         <div v-if="!editing" class="flex flex-wrap gap-2 border-t border-default pt-4">
-          <UButton label="Editar cliente" icon="i-lucide-pencil" @click="startEditing()" />
+          <UButton :label="`Editar ${entityLabelLower}`" icon="i-lucide-pencil" @click="startEditing()" />
           <UButton
-            :label="customer.active === false ? 'Activar cliente' : 'Desactivar cliente'"
+            :label="customer.active === false ? `Activar ${entityLabelLower}` : `Desactivar ${entityLabelLower}`"
             icon="i-lucide-power"
             color="neutral"
             variant="outline"
@@ -279,7 +301,7 @@ useSeoMeta({ title: () => fullName.value })
           />
           <UButton
             v-if="customer.active !== false"
-            label="Archivar cliente"
+            :label="`Archivar ${entityLabelLower}`"
             icon="i-lucide-archive"
             color="error"
             variant="outline"
@@ -290,8 +312,8 @@ useSeoMeta({ title: () => fullName.value })
 
         <UModal
           v-model:open="archiveOpen"
-          title="Archivar cliente"
-          description="Siigo México no permite eliminar clientes; se desactivará este registro en ambos sistemas."
+          :title="`Archivar ${entityLabelLower}`"
+          :description="`Siigo México no permite eliminar ${entitiesLabelLower}; se desactivará este registro en ambos sistemas.`"
           :dismissible="!saving"
           :close="saving ? false : undefined"
           :ui="{ footer: 'justify-end' }"
@@ -300,7 +322,7 @@ useSeoMeta({ title: () => fullName.value })
             <UAlert
               color="warning"
               variant="subtle"
-              title="El cliente dejará de estar activo"
+              :title="`El ${entityLabelLower} dejará de estar activo`"
               description="Se conservarán su historial y sus datos para pedidos y facturación existentes."
               icon="i-lucide-triangle-alert"
             />
@@ -314,7 +336,7 @@ useSeoMeta({ title: () => fullName.value })
               @click="archiveOpen = false"
             />
             <UButton
-              label="Archivar cliente"
+              :label="`Archivar ${entityLabelLower}`"
               color="error"
               icon="i-lucide-archive"
               :loading="saving"
