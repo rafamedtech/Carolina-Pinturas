@@ -6,7 +6,7 @@ const props = withDefaults(defineProps<{
   title: string
   singularLabel: string
   routeBase: '/clientes' | '/proveedores'
-  customerType?: 'Supplier'
+  customerType?: 'Customer' | 'Supplier'
 }>(), {
   customerType: undefined
 })

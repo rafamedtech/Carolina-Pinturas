@@ -80,6 +80,25 @@ describe('catálogos completos de Siigo', () => {
     expect(loader).toHaveBeenCalledTimes(2)
   })
 
+  it('descarta una carga pendiente al solicitar una actualización explícita', async () => {
+    let finishStaleLoad: ((value: SiigoListResponse<CatalogItem>) => void) | undefined
+    const staleLoader = vi.fn(() => new Promise<SiigoListResponse<CatalogItem>>((resolve) => {
+      finishStaleLoad = resolve
+    }))
+    const freshLoader = vi.fn().mockResolvedValue(response([{ id: 2 }]))
+
+    const staleRequest = cachedSiigoCatalog('customers', staleLoader)
+    invalidateSiigoCatalog('customers')
+    await expect(cachedSiigoCatalog('customers', freshLoader))
+      .resolves.toEqual(response([{ id: 2 }]))
+
+    finishStaleLoad?.(response([{ id: 1 }]))
+    await staleRequest
+    await expect(cachedSiigoCatalog('customers', freshLoader))
+      .resolves.toEqual(response([{ id: 2 }]))
+    expect(freshLoader).toHaveBeenCalledOnce()
+  })
+
   it('no oculta errores permanentes con datos anteriores', async () => {
     let now = 1_000
 

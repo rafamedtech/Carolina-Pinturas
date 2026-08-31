@@ -61,6 +61,7 @@ describe('persistencia de snapshots de Siigo', () => {
     const customer: SiigoCustomer = {
       id: '6b6ceb28-b2eb-4b98-b3dd-26648a933c81',
       name: ['María', 'López'],
+      type: 'Supplier',
       rfc_id: 'LOMA850101AB1',
       commercial_name: 'Pinturas María',
       branch_office: 2,
@@ -94,6 +95,8 @@ describe('persistencia de snapshots de Siigo', () => {
       create: expect.objectContaining({
         commercialName: 'Pinturas María',
         branchOffice: 2,
+        isCustomer: false,
+        isSupplier: true,
         internalCode: 'CLI-001',
         internalTags: ['mayoreo'],
         requiresInvoice: true,
@@ -126,6 +129,8 @@ describe('persistencia de snapshots de Siigo', () => {
         }
       })
     }))
+    expect(upsert.mock.calls[0]?.[0].update).not.toHaveProperty('isCustomer')
+    expect(upsert.mock.calls[0]?.[0].update).not.toHaveProperty('isSupplier')
   })
 
   it('excluye el domicilio del snapshot local del cliente', async () => {

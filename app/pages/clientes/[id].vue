@@ -3,9 +3,11 @@ import type { SiigoCustomer, SiigoCustomerMutationInput } from '~/types/siigo'
 import { SAT_FISCAL_REGIMES } from '~/utils/satFiscalRegimes'
 import { siigoCustomerPhone, siigoCustomerAddress } from '~/utils/siigoCustomer'
 import { missingSiigoCustomerFields, siigoCustomerMutationInput } from '~/utils/siigoCustomerMutation'
+import { canManageOrderLogistics } from '~/utils/roleAccess'
 
 const route = useRoute()
 const toast = useToast()
+const { user } = useAuth()
 const isSupplierContext = route.path.startsWith('/proveedores')
 const entityLabel = isSupplierContext ? 'Proveedor' : 'Cliente'
 const entityLabelLower = entityLabel.toLowerCase()
@@ -13,7 +15,7 @@ const entitiesLabelLower = isSupplierContext ? 'proveedores' : 'clientes'
 const collectionPath = isSupplierContext ? '/proveedores' : '/clientes'
 const catalogKey = isSupplierContext
   ? 'customers-catalog-request-supplier'
-  : 'customers-catalog-request'
+  : 'customers-catalog-request-customer'
 const customerId = computed(() => String(route.params.id))
 const { data: customer, status, error, refresh } = useLazyFetch<SiigoCustomer>(
   () => `/api/siigo/customers/${encodeURIComponent(customerId.value)}`,
@@ -22,8 +24,11 @@ const { data: customer, status, error, refresh } = useLazyFetch<SiigoCustomer>(
 
 const fullName = computed(() => customer.value?.name?.filter(Boolean).join(' ') || entityLabel)
 const isExpectedType = computed(() =>
-  !isSupplierContext || customer.value?.type?.trim().toLowerCase() === 'supplier'
+  isSupplierContext
+    ? customer.value?.internal?.roles?.supplier === true
+    : customer.value?.internal?.roles?.customer === true
 )
+const canManageRoles = computed(() => user.value ? canManageOrderLogistics(user.value.role) : false)
 const contact = computed(() => customer.value?.contacts?.[0])
 const email = computed(() => contact.value?.email || '—')
 const phone = computed(() => siigoCustomerPhone(customer.value) || '—')
@@ -57,6 +62,7 @@ const submitError = shallowRef('')
 const editNotice = shallowRef('')
 const activeOverride = shallowRef<boolean | undefined>(undefined)
 const archiveOpen = shallowRef(false)
+const rolesSaving = shallowRef(false)
 
 function startEditing(options: { active?: boolean, notice?: string } = {}) {
   activeOverride.value = options.active
@@ -88,7 +94,10 @@ async function saveCustomer(
     customer.value = updated
     cancelEditing()
     archiveOpen.value = false
-    await refreshNuxtData(catalogKey)
+    await Promise.all([
+      refreshNuxtData(catalogKey),
+      refreshNuxtData('customers-catalog-request')
+    ])
     toast.add({
       title: successTitle,
       description: 'Los datos vigentes quedaron guardados en Siigo.',
@@ -124,6 +133,39 @@ async function setCustomerActive(active: boolean) {
   }
 
   await saveCustomer(input, active ? `${entityLabel} activado` : `${entityLabel} archivado`)
+}
+
+async function saveRoles(roles: { customer: boolean, supplier: boolean }) {
+  if (!customer.value || rolesSaving.value) return
+  rolesSaving.value = true
+
+  try {
+    const internal = await $fetch<NonNullable<SiigoCustomer['internal']>>(
+      `/api/siigo/customers/${encodeURIComponent(customerId.value)}/roles`,
+      { method: 'PATCH', body: roles }
+    )
+    customer.value = { ...customer.value, internal }
+    await Promise.all([
+      refreshNuxtData('customers-catalog-request-customer'),
+      refreshNuxtData('customers-catalog-request-supplier')
+    ])
+    toast.add({
+      title: 'Roles actualizados',
+      description: 'La clasificación local se aplicó a Clientes y Proveedores.',
+      color: 'success',
+      icon: 'i-lucide-circle-check'
+    })
+  } catch (fetchError: unknown) {
+    const response = fetchError as { data?: { statusMessage?: string }, message?: string }
+    toast.add({
+      title: 'No se pudieron actualizar los roles',
+      description: response.data?.statusMessage || response.message || 'Intenta nuevamente.',
+      color: 'error',
+      icon: 'i-lucide-circle-alert'
+    })
+  } finally {
+    rolesSaving.value = false
+  }
 }
 
 useSeoMeta({ title: () => fullName.value })
@@ -166,16 +208,16 @@ useSeoMeta({ title: () => fullName.value })
         icon="i-lucide-plug-zap"
       />
 
-      <UAlert
-        v-else-if="customer && !isExpectedType"
-        color="warning"
-        variant="subtle"
-        title="El registro no es un proveedor"
-        description="Este registro no está marcado como Supplier en Siigo."
-        icon="i-lucide-triangle-alert"
-      />
-
       <template v-else-if="customer">
+        <UAlert
+          v-if="!isExpectedType"
+          color="warning"
+          variant="subtle"
+          :title="`El registro no tiene el rol ${entityLabel}`"
+          description="La clasificación local cambió. Vuelve al catálogo correspondiente o actualiza sus roles."
+          icon="i-lucide-triangle-alert"
+        />
+
         <div class="flex flex-wrap items-start justify-between gap-4">
           <div>
             <h1 class="text-xl font-semibold text-primary">
@@ -282,6 +324,15 @@ useSeoMeta({ title: () => fullName.value })
               </div>
             </dl>
           </UCard>
+
+          <CustomersCustomerRolesCard
+            v-if="customer.internal"
+            :customer="customer.internal.roles?.customer === true"
+            :supplier="customer.internal.roles?.supplier === true"
+            :editable="canManageRoles"
+            :saving="rolesSaving"
+            @save="saveRoles"
+          />
         </div>
 
         <CustomersCustomerOrdersTable

@@ -7,5 +7,6 @@ useSeoMeta({ title: 'Clientes' })
     title="Clientes"
     singular-label="Cliente"
     route-base="/clientes"
+    customer-type="Customer"
   />
 </template>

@@ -25,9 +25,9 @@ export default eventHandler(async (event): Promise<ExpenseRecord> => {
     prisma.siigoCustomer.findFirst({
       where: {
         id: parsed.data.providerId,
-        type: { equals: 'Supplier', mode: 'insensitive' }
+        isSupplier: true
       },
-      select: { id: true, type: true, active: true }
+      select: { id: true, active: true }
     }),
     getSiigoCustomerDetail(parsed.data.providerId)
   ] as const)
@@ -35,7 +35,7 @@ export default eventHandler(async (event): Promise<ExpenseRecord> => {
   if (!provider) {
     throw createError({
       statusCode: 422,
-      statusMessage: 'El proveedor seleccionado no está marcado como Supplier en PostgreSQL.'
+      statusMessage: 'El proveedor seleccionado no tiene el rol Supplier en PostgreSQL.'
     })
   }
   if (provider.active === false) {

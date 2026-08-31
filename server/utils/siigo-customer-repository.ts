@@ -6,6 +6,8 @@ const customerInternalSelect = {
   internalCode: true,
   internalNotes: true,
   internalTags: true,
+  isCustomer: true,
+  isSupplier: true,
   requiresInvoice: true,
   syncStatus: true,
   syncVersion: true,
@@ -17,6 +19,8 @@ type LocalCustomerInternalRow = {
   internalCode: string | null
   internalNotes: string | null
   internalTags: string[]
+  isCustomer: boolean
+  isSupplier: boolean
   requiresInvoice: boolean
   syncStatus: string
   syncVersion: number
@@ -30,6 +34,10 @@ export function localCustomerInternal(
     code: row.internalCode,
     notes: row.internalNotes,
     tags: row.internalTags,
+    roles: {
+      customer: row.isCustomer,
+      supplier: row.isSupplier
+    },
     requires_invoice: row.requiresInvoice,
     sync_status: row.syncStatus,
     sync_version: row.syncVersion,
@@ -48,15 +56,15 @@ export async function getLocalCustomerInternal(customerId: string) {
 
 export async function withLocalCustomerInternals(
   customers: SiigoCustomer[],
-  options: { type?: 'Customer' | 'Supplier' | 'Other' } = {}
+  options: { role?: 'Customer' | 'Supplier' } = {}
 ) {
   if (!customers.length) return customers
 
   const rows = await usePrisma().siigoCustomer.findMany({
     where: {
       id: { in: customers.map(customer => customer.id) },
-      ...(options.type
-        ? { type: { equals: options.type, mode: 'insensitive' as const } }
+      ...(options.role
+        ? { [options.role === 'Customer' ? 'isCustomer' : 'isSupplier']: true }
         : {})
     },
     select: customerInternalSelect
@@ -66,6 +74,22 @@ export async function withLocalCustomerInternals(
   return customers.flatMap((customer) => {
     const internal = internalById.get(customer.id)
     if (internal) return [{ ...customer, internal }]
-    return options.type ? [] : [customer]
+    return options.role ? [] : [customer]
   })
+}
+
+export async function updateLocalCustomerRoles(
+  customerId: string,
+  roles: { customer: boolean, supplier: boolean }
+) {
+  const row = await usePrisma().siigoCustomer.update({
+    where: { id: customerId },
+    data: {
+      isCustomer: roles.customer,
+      isSupplier: roles.supplier
+    },
+    select: customerInternalSelect
+  })
+
+  return localCustomerInternal(row)
 }

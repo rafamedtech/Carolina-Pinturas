@@ -123,6 +123,10 @@ export interface SiigoCustomer {
     code?: string | null
     notes?: string | null
     tags: string[]
+    roles?: {
+      customer: boolean
+      supplier: boolean
+    }
     requires_invoice?: boolean
     sync_status: string
     sync_version: number

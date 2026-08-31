@@ -1,5 +1,7 @@
 import type { SiigoCustomer } from '~/types/siigo'
 
+export type SiigoCustomerCatalogType = 'Customer' | 'Supplier'
+
 export function siigoCustomerName(customer: SiigoCustomer | null | undefined) {
   if (!customer) return null
 

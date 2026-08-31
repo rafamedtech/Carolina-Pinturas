@@ -42,6 +42,7 @@ export async function upsertSiigoCustomer(
   } = {}
 ) {
   const syncedAt = new Date()
+  const externalType = customer.type?.trim().toLowerCase() || 'customer'
   const data = {
     name: jsonValue(customer.name || []),
     displayName: customerDisplayName(customer),
@@ -96,6 +97,8 @@ export async function upsertSiigoCustomer(
     create: {
       id: customer.id,
       ...data,
+      isCustomer: externalType === 'customer',
+      isSupplier: externalType === 'supplier',
       ...internal,
       createdByEmail: options.updatedByEmail || null,
       updatedByEmail: options.updatedByEmail || null,

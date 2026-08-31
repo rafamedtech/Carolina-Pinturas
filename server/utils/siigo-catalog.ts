@@ -12,6 +12,7 @@ interface CatalogCacheEntry<T> {
 
 const catalogCache = new Map<string, CatalogCacheEntry<unknown>>()
 const catalogRequests = new Map<string, Promise<SiigoListResponse<unknown>>>()
+const catalogVersions = new Map<string, number>()
 
 export async function collectSiigoCatalog<T>(
   fetchPage: FetchCatalogPage<T>,
@@ -50,6 +51,7 @@ export async function cachedSiigoCatalog<T>(
 ): Promise<SiigoListResponse<T>> {
   const now = options.now || Date.now
   const ttlMs = options.ttlMs ?? SIIGO_CATALOG_CACHE_TTL_MS
+  const version = catalogVersions.get(key) || 0
   const cached = catalogCache.get(key) as CatalogCacheEntry<T> | undefined
 
   if (cached && cached.expiresAt > now()) return cached.value
@@ -59,7 +61,9 @@ export async function cachedSiigoCatalog<T>(
 
   const request = loader()
     .then((value) => {
-      catalogCache.set(key, { value, expiresAt: now() + ttlMs })
+      if ((catalogVersions.get(key) || 0) === version) {
+        catalogCache.set(key, { value, expiresAt: now() + ttlMs })
+      }
       return value
     })
     .catch((error: unknown) => {
@@ -67,7 +71,7 @@ export async function cachedSiigoCatalog<T>(
       throw error
     })
     .finally(() => {
-      catalogRequests.delete(key)
+      if (catalogRequests.get(key) === request) catalogRequests.delete(key)
     })
 
   catalogRequests.set(key, request as Promise<SiigoListResponse<unknown>>)
@@ -77,8 +81,11 @@ export async function cachedSiigoCatalog<T>(
 export function clearSiigoCatalogCache() {
   catalogCache.clear()
   catalogRequests.clear()
+  catalogVersions.clear()
 }
 
 export function invalidateSiigoCatalog(key: string) {
+  catalogVersions.set(key, (catalogVersions.get(key) || 0) + 1)
   catalogCache.delete(key)
+  catalogRequests.delete(key)
 }
