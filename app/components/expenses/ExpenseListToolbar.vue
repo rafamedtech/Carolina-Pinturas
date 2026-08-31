@@ -1,7 +1,11 @@
 <script setup lang="ts">
 import type { OrderDateRange } from '~/types/orders'
-import { EXPENSE_CATEGORIES } from '~/utils/expense'
+import type { ExpenseCategory } from '~/utils/expense'
 import { PAYMENT_METHODS } from '~/utils/orderPayment'
+
+const props = defineProps<{
+  categories: readonly ExpenseCategory[]
+}>()
 
 const filter = defineModel<string>('filter', { required: true })
 const paymentMethod = defineModel<string>('paymentMethod', { required: true })
@@ -15,13 +19,13 @@ const paymentMethodOptions = [{
   label: item.label,
   value: item.key as string
 }))]
-const categoryOptions = [{
+const categoryOptions = computed(() => [{
   label: 'Todas las categorías',
   value: 'all'
-}, ...EXPENSE_CATEGORIES.map(item => ({
+}, ...props.categories.map(item => ({
   label: item,
   value: item as string
-}))]
+}))])
 </script>
 
 <template>

@@ -1,5 +1,6 @@
 import { Prisma } from '../../../generated/prisma/client'
 import type { ExpenseListResponse } from '~/types/expenses'
+import { ADMIN_ONLY_EXPENSE_CATEGORIES } from '~/utils/expense'
 import { ORDER_LOGISTICS_ROLES } from '~/utils/roleAccess'
 import { requireRole } from '../../utils/auth'
 import { expenseView } from '../../utils/expenses'
@@ -21,7 +22,8 @@ function dateOnly(value: unknown) {
 }
 
 export default eventHandler(async (event): Promise<ExpenseListResponse> => {
-  await requireRole(event, ORDER_LOGISTICS_ROLES)
+  const user = await requireRole(event, ORDER_LOGISTICS_ROLES)
+  const hiddenCategories = user.role === 'admin' ? [] : [...ADMIN_ONLY_EXPENSE_CATEGORIES]
   const query = getQuery(event)
   const page = positiveInteger(query.page, 1, 100_000)
   const pageSize = positiveInteger(query.page_size, 25, 100)
@@ -64,7 +66,8 @@ export default eventHandler(async (event): Promise<ExpenseListResponse> => {
       searchFilter,
       dateFilter,
       ...(paymentMethod ? [{ paymentMethod }] : []),
-      ...(category ? [{ category }] : [])
+      ...(category ? [{ category }] : []),
+      ...(hiddenCategories.length ? [{ category: { notIn: hiddenCategories } }] : [])
     ]
   }
   const searchPattern = `%${search.replace(/[\\%_]/g, character => `\\${character}`)}%`
@@ -84,7 +87,10 @@ export default eventHandler(async (event): Promise<ExpenseListResponse> => {
     ...(dateFrom ? [Prisma.sql`expense_date >= ${dateFrom}::date`] : []),
     ...(dateTo ? [Prisma.sql`expense_date <= ${dateTo}::date`] : []),
     ...(paymentMethod ? [Prisma.sql`payment_method = ${paymentMethod}`] : []),
-    ...(category ? [Prisma.sql`category = ${category}`] : [])
+    ...(category ? [Prisma.sql`category = ${category}`] : []),
+    ...(hiddenCategories.length
+      ? [Prisma.sql`category NOT IN (${Prisma.join(hiddenCategories)})`]
+      : [])
   ]
   const prisma = usePrisma()
   const [expenses, totalResults, totalRows] = await Promise.all([

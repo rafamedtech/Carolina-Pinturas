@@ -1,5 +1,6 @@
 import type { Prisma } from '../../../generated/prisma/client'
 import type { ExpenseRecord } from '~/types/expenses'
+import { canViewExpenseCategory } from '~/utils/expense'
 import { ORDER_LOGISTICS_ROLES } from '~/utils/roleAccess'
 import { siigoCustomerName } from '~/utils/siigoCustomer'
 import { requireRole } from '../../utils/auth'
@@ -17,6 +18,13 @@ export default eventHandler(async (event): Promise<ExpenseRecord> => {
       statusCode: 400,
       statusMessage: 'Revisa los datos del gasto.',
       data: parsed.error.flatten()
+    })
+  }
+
+  if (!canViewExpenseCategory(user.role, parsed.data.category)) {
+    throw createError({
+      statusCode: 403,
+      statusMessage: 'No tienes permiso para registrar gastos de esta categoría.'
     })
   }
 

@@ -13,6 +13,7 @@ import { mexicoToday } from '~/utils/datetime'
 import { siigoCustomerName } from '~/utils/siigoCustomer'
 
 const props = withDefaults(defineProps<{
+  categories: readonly ExpenseCategory[]
   suppliers: SiigoCustomer[]
   suppliersLoading?: boolean
   suppliersError?: string
@@ -31,7 +32,7 @@ const emit = defineEmits<{
 
 const open = defineModel<boolean>('open', { required: true })
 
-const categoryItems = [...EXPENSE_CATEGORIES]
+const categoryItems = computed(() => [...props.categories])
 const currencyItems = EXPENSE_CURRENCIES.map(currency => ({ ...currency }))
 const methodItems = PAYMENT_METHODS.map(method => ({ label: method.label, value: method.key }))
 const supplierItems = computed(() => props.suppliers.map(supplier => ({

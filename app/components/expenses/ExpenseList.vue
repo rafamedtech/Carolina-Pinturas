@@ -2,6 +2,7 @@
 import { parseDate } from '@internationalized/date'
 import type { OrderDateRange } from '~/types/orders'
 import type { CreateExpenseInput, ExpenseListResponse, ExpenseRecord } from '~/types/expenses'
+import { canViewExpenseCategory, visibleExpenseCategories } from '~/utils/expense'
 
 function queryValue(value: unknown) {
   return typeof value === 'string' ? value : ''
@@ -26,9 +27,18 @@ function queryDateRange(from: unknown, to: unknown): OrderDateRange | null {
 
 const route = useRoute()
 const router = useRouter()
+const { user } = useAuth()
+const categories = computed(() => user.value
+  ? visibleExpenseCategories(user.value.role)
+  : [])
 const filter = shallowRef(queryValue(route.query.search))
 const paymentMethod = shallowRef(queryValue(route.query.payment_method) || 'all')
-const category = shallowRef(queryValue(route.query.category) || 'all')
+const initialCategory = queryValue(route.query.category)
+const category = shallowRef(
+  initialCategory && (!user.value || canViewExpenseCategory(user.value.role, initialCategory))
+    ? initialCategory
+    : 'all'
+)
 const dateRange = shallowRef<OrderDateRange | null>(
   queryDateRange(route.query.date_from, route.query.date_to)
 )
@@ -183,6 +193,7 @@ async function addExpense(input: CreateExpenseInput) {
         v-model:payment-method="paymentMethod"
         v-model:category="category"
         v-model:date-range="dateRange"
+        :categories="categories"
       />
 
       <UAlert
@@ -211,6 +222,7 @@ async function addExpense(input: CreateExpenseInput) {
 
       <ExpensesExpenseAddModal
         v-model:open="modalOpen"
+        :categories="categories"
         :suppliers="suppliers"
         :suppliers-loading="suppliersLoading"
         :suppliers-error="suppliersErrorMessage"
