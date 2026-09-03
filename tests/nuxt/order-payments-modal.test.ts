@@ -156,4 +156,32 @@ describe('OrderPaymentsModal', () => {
     })])
     expect(invoiceSelect.props('disabled')).toBe(true)
   })
+
+  it('explica el timbrado y solicita el correo requerido por Siigo', async () => {
+    const siigoContext: OrderPaymentContext = {
+      ...context,
+      siigo: {
+        ...context.siigo,
+        writeEnabled: true,
+        documentTypes: [{ id: 69452, code: '1', name: 'Recibo', active: true }],
+        paymentTypes: [{ id: 3560, name: '03 - Transferencia', active: true }]
+      }
+    }
+    wrapper = await mountSuspended(OrderPaymentSiigoModal, {
+      props: {
+        open: false,
+        context: siigoContext,
+        payment,
+        saving: false,
+        stampAfterCreate: true
+      }
+    })
+    await wrapper.setProps({ open: true })
+
+    await vi.waitFor(() => {
+      expect(document.body.textContent).toContain('Crear y timbrar pago en Siigo')
+      expect(document.body.textContent).toContain('Correo para la recepción timbrada')
+      expect(document.body.textContent).toContain('Confirmo que deseo crear y timbrar')
+    })
+  })
 })

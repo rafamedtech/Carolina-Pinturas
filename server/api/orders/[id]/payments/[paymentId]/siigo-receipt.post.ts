@@ -71,6 +71,12 @@ export default eventHandler(async (event): Promise<OrderPayment> => {
       statusMessage: 'El resultado de este pago en Siigo debe verificarse antes de intentar otra recepción.'
     })
   }
+  if (payment.siigoVoucherId) {
+    throw createError({
+      statusCode: 409,
+      statusMessage: 'Este pago ya tiene una recepción creada en Siigo y no puede generar otra.'
+    })
+  }
   if (payment.provider !== 'local' && payment.externalStatus !== 'failed') {
     throw createError({ statusCode: 409, statusMessage: 'Este pago no se puede registrar nuevamente en Siigo.' })
   }
@@ -84,10 +90,18 @@ export default eventHandler(async (event): Promise<OrderPayment> => {
   const input: CreateOrderSiigoPaymentInput = {
     destination: 'siigo',
     requestId: payment.requestId,
-    ...parsed.data,
+    invoiceId: parsed.data.invoiceId,
+    documentTypeId: parsed.data.documentTypeId,
+    voucherNumber: parsed.data.voucherNumber,
+    paymentTypeId: parsed.data.paymentTypeId,
+    costCenterId: parsed.data.costCenterId,
+    cfdiCode: parsed.data.cfdiCode,
+    paymentMethod: parsed.data.paymentMethod,
+    quote: parsed.data.quote,
     amount: Number(payment.amount.toString()),
     date: payment.paymentDate.toISOString().slice(0, 10),
-    observations: payment.observations
+    observations: payment.observations,
+    confirmation: 'CREAR_RECEPCION_SIIGO'
   }
   const [invoiceResponse, customerResponse, documentResponse, paymentResponse, costCenterResponse] = await Promise.all([
     siigoRequest<unknown>(`/v1/invoices/${encodeURIComponent(input.invoiceId)}`),
@@ -148,17 +162,39 @@ export default eventHandler(async (event): Promise<OrderPayment> => {
   }
 
   try {
-    // Operación fiscal: una sola llamada, sin reintento automático.
+    // Creación fiscal sin reintento automático.
     const created = normalizeCreatedVoucher(await siigoRequest<unknown>('/v1/vouchers', {
       method: 'POST',
       body: payload
     }))
+    await usePrisma().salesOrderPayment.update({
+      where: { id: payment.id },
+      data: {
+        siigoVoucherId: created.id,
+        siigoVoucherName: created.name,
+        externalPayload: siigoJson(created.raw)
+      }
+    })
+
+    if (parsed.data.stamp) {
+      // Siigo México exige un correo al timbrar. No se reintenta si la respuesta es ambigua.
+      const stamped = await siigoRequest<unknown>(`/v1/vouchers/${encodeURIComponent(created.id)}/stamp`, {
+        method: 'PUT',
+        body: { mail_to: parsed.data.stampEmail }
+      })
+      return orderPaymentView(await usePrisma().salesOrderPayment.update({
+        where: { id: payment.id },
+        data: {
+          externalStatus: 'synced',
+          externalPayload: siigoJson({ created: created.raw, stamp: stamped })
+        }
+      }))
+    }
+
     return orderPaymentView(await usePrisma().salesOrderPayment.update({
       where: { id: payment.id },
       data: {
         externalStatus: 'synced',
-        siigoVoucherId: created.id,
-        siigoVoucherName: created.name,
         externalPayload: siigoJson(created.raw)
       }
     }))

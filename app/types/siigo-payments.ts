@@ -146,7 +146,9 @@ export interface CreateOrderSiigoReceiptInput {
   cfdiCode: string
   paymentMethod: 'PUE' | 'PPD'
   quote: number
-  confirmation: 'CREAR_RECEPCION_SIIGO'
+  stamp?: boolean
+  stampEmail?: string
+  confirmation: 'CREAR_RECEPCION_SIIGO' | 'CREAR_Y_TIMBRAR_RECEPCION_SIIGO'
 }
 
 export type CreateOrderPaymentInput = CreateLocalOrderPaymentInput

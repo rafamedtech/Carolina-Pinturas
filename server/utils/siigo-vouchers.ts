@@ -36,8 +36,31 @@ export const createOrderSiigoReceiptSchema = createOrderSiigoPaymentSchema.omit(
   requestId: true,
   amount: true,
   date: true,
-  observations: true
-}).strict() satisfies z.ZodType<CreateOrderSiigoReceiptInput>
+  observations: true,
+  confirmation: true
+}).extend({
+  stamp: z.boolean().optional(),
+  stampEmail: z.string().trim().email('Escribe un correo válido para timbrar la recepción.').max(100).optional(),
+  confirmation: z.enum(['CREAR_RECEPCION_SIIGO', 'CREAR_Y_TIMBRAR_RECEPCION_SIIGO'])
+}).strict().superRefine((input, context) => {
+  if (input.stamp && !input.stampEmail) {
+    context.addIssue({
+      code: 'custom',
+      path: ['stampEmail'],
+      message: 'Escribe el correo al que Siigo enviará la recepción timbrada.'
+    })
+  }
+  const expectedConfirmation = input.stamp
+    ? 'CREAR_Y_TIMBRAR_RECEPCION_SIIGO'
+    : 'CREAR_RECEPCION_SIIGO'
+  if (input.confirmation !== expectedConfirmation) {
+    context.addIssue({
+      code: 'custom',
+      path: ['confirmation'],
+      message: 'Confirma la operación fiscal solicitada.'
+    })
+  }
+}) satisfies z.ZodType<CreateOrderSiigoReceiptInput>
 
 export const assignHistoricalSiigoReceiptSchema = z.object({
   voucherId: z.string().uuid(),

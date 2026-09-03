@@ -10,9 +10,11 @@ import type {
 const props = defineProps<{
   orderId: string
   paymentId: string
+  canCreateAndStamp: boolean
 }>()
 const emit = defineEmits<{
   assigned: [payment: OrderPayment]
+  createAndStamp: []
 }>()
 const open = defineModel<boolean>('open', { required: true })
 const saving = shallowRef(false)
@@ -120,6 +122,15 @@ async function onSubmit(event: FormSubmitEvent<Schema>) {
         description="No hay recepciones de esta factura cuyo cliente, fecha e importe coincidan con el pago local."
       />
 
+      <UAlert
+        v-if="context && !context.receipts.length && !canCreateAndStamp"
+        class="mt-3"
+        color="neutral"
+        variant="subtle"
+        title="Creación fiscal deshabilitada"
+        description="La integración no está autorizada para crear y timbrar recepciones en Siigo."
+      />
+
       <UForm
         v-else-if="context"
         id="historical-receipt-form"
@@ -164,6 +175,14 @@ async function onSubmit(event: FormSubmitEvent<Schema>) {
         @click="close"
       />
       <UButton
+        v-if="context && !context.receipts.length"
+        label="Crear y timbrar en Siigo"
+        icon="i-lucide-badge-check"
+        :disabled="saving || !canCreateAndStamp"
+        @click="emit('createAndStamp')"
+      />
+      <UButton
+        v-else
         type="submit"
         form="historical-receipt-form"
         label="Asignar pago"

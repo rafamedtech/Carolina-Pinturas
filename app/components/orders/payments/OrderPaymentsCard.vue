@@ -23,6 +23,7 @@ const deletingPayment = shallowRef<OrderPayment | null>(null)
 const siigoOpen = shallowRef(false)
 const syncing = shallowRef(false)
 const syncingPayment = shallowRef<OrderPayment | null>(null)
+const stampAfterCreate = shallowRef(false)
 const historicalOpen = shallowRef(false)
 const historicalPayment = shallowRef<OrderPayment | null>(null)
 const toast = useToast()
@@ -87,6 +88,7 @@ function paymentInvoice(payment: OrderPayment) {
 
 function paymentHasSiigoAction(payment: OrderPayment) {
   return Boolean(paymentInvoice(payment)
+    && !payment.siigo?.voucherId
     && (payment.provider === 'local' || payment.externalStatus === 'failed'))
 }
 
@@ -116,6 +118,16 @@ function openHistoricalSiigoPayment(payment: OrderPayment) {
 function openSiigoPayment(payment: OrderPayment) {
   if (!paymentHasSiigoAction(payment) || !paymentInvoiceIsStamped(payment)) return
   syncingPayment.value = payment
+  stampAfterCreate.value = false
+  siigoOpen.value = true
+}
+
+function createAndStampHistoricalPayment() {
+  if (!historicalPayment.value || !context.value?.siigo.writeEnabled) return
+  syncingPayment.value = historicalPayment.value
+  stampAfterCreate.value = true
+  historicalOpen.value = false
+  historicalPayment.value = null
   siigoOpen.value = true
 }
 
@@ -193,7 +205,9 @@ async function registerPaymentInSiigo(input: CreateOrderSiigoReceiptInput) {
       { method: 'POST', body: input }
     )
     siigoOpen.value = false
+    const requestedStamp = input.stamp === true
     syncingPayment.value = null
+    stampAfterCreate.value = false
     await refresh()
     emit('created', payment)
 
@@ -201,7 +215,9 @@ async function registerPaymentInSiigo(input: CreateOrderSiigoReceiptInput) {
       toast.add({
         title: payment.externalStatus === 'unknown'
           ? 'Resultado de Siigo incierto'
-          : 'La recepción no se creó en Siigo',
+          : payment.siigo?.voucherId
+            ? 'Recepción creada; no se pudo timbrar'
+            : 'La recepción no se creó en Siigo',
         description: payment.externalError || 'Verifica el pago antes de volver a intentarlo.',
         color: 'warning',
         icon: 'i-lucide-triangle-alert',
@@ -211,8 +227,10 @@ async function registerPaymentInSiigo(input: CreateOrderSiigoReceiptInput) {
     }
 
     toast.add({
-      title: 'Pago registrado en Siigo',
-      description: payment.siigo?.voucherName || 'La recepción borrador quedó vinculada.',
+      title: requestedStamp ? 'Pago creado y timbrado en Siigo' : 'Pago registrado en Siigo',
+      description: payment.siigo?.voucherName || (requestedStamp
+        ? 'La recepción timbrada quedó vinculada.'
+        : 'La recepción borrador quedó vinculada.'),
       color: 'success',
       icon: 'i-lucide-circle-check'
     })
@@ -401,6 +419,7 @@ async function registerPaymentInSiigo(input: CreateOrderSiigoReceiptInput) {
         :context="context"
         :payment="syncingPayment"
         :saving="syncing"
+        :stamp-after-create="stampAfterCreate"
         @submit="registerPaymentInSiigo"
       />
       <OrdersPaymentsOrderHistoricalReceiptModal
@@ -408,7 +427,9 @@ async function registerPaymentInSiigo(input: CreateOrderSiigoReceiptInput) {
         v-model:open="historicalOpen"
         :order-id="orderId"
         :payment-id="historicalPayment.id"
+        :can-create-and-stamp="context.siigo.writeEnabled && historicalPayment.externalStatus !== 'unknown'"
         @assigned="onHistoricalPaymentAssigned"
+        @create-and-stamp="createAndStampHistoricalPayment"
       />
     </template>
   </div>

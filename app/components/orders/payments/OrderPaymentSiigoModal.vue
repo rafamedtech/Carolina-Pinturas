@@ -11,6 +11,7 @@ const props = defineProps<{
   context: OrderPaymentContext
   payment: OrderPayment
   saving: boolean
+  stampAfterCreate?: boolean
 }>()
 const emit = defineEmits<{
   submit: [input: CreateOrderSiigoReceiptInput]
@@ -26,7 +27,16 @@ const schema = z.object({
   cfdiCode: z.string().min(1, 'Selecciona la forma de pago CFDI.'),
   paymentMethod: z.enum(['PUE', 'PPD']),
   quote: z.number().int().positive(),
+  stampEmail: z.string().trim().email('Escribe un correo válido.').max(100).optional(),
   confirmed: z.boolean().refine(value => value, 'Confirma la creación en Siigo.')
+}).superRefine((input, context) => {
+  if (props.stampAfterCreate && !input.stampEmail) {
+    context.addIssue({
+      code: 'custom',
+      path: ['stampEmail'],
+      message: 'Escribe el correo al que Siigo enviará la recepción timbrada.'
+    })
+  }
 })
 type Schema = z.output<typeof schema>
 
@@ -39,6 +49,7 @@ const state = reactive<Partial<Schema>>({
   cfdiCode: '',
   paymentMethod: 'PUE',
   quote: 1,
+  stampEmail: '',
   confirmed: false
 })
 const invoiceItems = computed(() => props.context.siigo.assignedInvoice
@@ -124,6 +135,7 @@ watch(open, (isOpen) => {
   state.costCenterId = undefined
   state.paymentMethod = 'PUE'
   state.quote = props.payment.siigo?.quote || nextQuote(state.invoiceId)
+  state.stampEmail = ''
   state.confirmed = false
 }, { immediate: true })
 
@@ -145,7 +157,11 @@ function onSubmit(event: FormSubmitEvent<Schema>) {
     cfdiCode: event.data.cfdiCode,
     paymentMethod: event.data.paymentMethod,
     quote: event.data.quote,
-    confirmation: 'CREAR_RECEPCION_SIIGO'
+    stamp: props.stampAfterCreate || undefined,
+    stampEmail: props.stampAfterCreate ? event.data.stampEmail : undefined,
+    confirmation: props.stampAfterCreate
+      ? 'CREAR_Y_TIMBRAR_RECEPCION_SIIGO'
+      : 'CREAR_RECEPCION_SIIGO'
   })
 }
 </script>
@@ -153,8 +169,10 @@ function onSubmit(event: FormSubmitEvent<Schema>) {
 <template>
   <UModal
     v-model:open="open"
-    title="Registrar pago en Siigo"
-    description="Creará una recepción borrador para este pago. No se timbrará ni enviará al SAT."
+    :title="stampAfterCreate ? 'Crear y timbrar pago en Siigo' : 'Registrar pago en Siigo'"
+    :description="stampAfterCreate
+      ? 'Creará una recepción para este pago y la timbrará ante el SAT. Esta operación fiscal no se puede deshacer desde la aplicación.'
+      : 'Creará una recepción borrador para este pago. No se timbrará ni enviará al SAT.'"
     :dismissible="!saving"
     :ui="{ content: 'max-w-2xl', footer: 'justify-end' }"
   >
@@ -272,8 +290,28 @@ function onSubmit(event: FormSubmitEvent<Schema>) {
         <UFormField name="quote" label="Número de parcialidad" required>
           <UInputNumber v-model="state.quote" :min="1" class="w-full" />
         </UFormField>
+        <UFormField
+          v-if="stampAfterCreate"
+          class="sm:col-span-2"
+          name="stampEmail"
+          label="Correo para la recepción timbrada"
+          required
+        >
+          <UInput
+            v-model="state.stampEmail"
+            type="email"
+            autocomplete="email"
+            placeholder="cliente@ejemplo.com"
+            class="w-full"
+          />
+        </UFormField>
         <UFormField class="sm:col-span-2" name="confirmed">
-          <UCheckbox v-model="state.confirmed" label="Confirmo que deseo crear una recepción borrador para este pago en Siigo." />
+          <UCheckbox
+            v-model="state.confirmed"
+            :label="stampAfterCreate
+              ? 'Confirmo que deseo crear y timbrar esta recepción en Siigo.'
+              : 'Confirmo que deseo crear una recepción borrador para este pago en Siigo.'"
+          />
         </UFormField>
       </UForm>
     </template>
@@ -289,8 +327,8 @@ function onSubmit(event: FormSubmitEvent<Schema>) {
       <UButton
         type="submit"
         form="siigo-payment-form"
-        label="Registrar en Siigo"
-        icon="i-lucide-cloud-upload"
+        :label="stampAfterCreate ? 'Crear y timbrar' : 'Registrar en Siigo'"
+        :icon="stampAfterCreate ? 'i-lucide-badge-check' : 'i-lucide-cloud-upload'"
         :loading="saving"
         :disabled="saving || !canUseSiigo || !context.siigo.writeEnabled"
       />

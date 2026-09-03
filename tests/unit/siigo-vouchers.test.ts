@@ -130,6 +130,32 @@ describe('recepciones de pago de Siigo México', () => {
     }).success).toBe(false)
   })
 
+  it('exige correo y confirmación específica para crear y timbrar una recepción', () => {
+    const receipt = {
+      invoiceId,
+      documentTypeId: 7714,
+      paymentTypeId: 5636,
+      cfdiCode: '03',
+      paymentMethod: 'PUE',
+      quote: 1,
+      stamp: true
+    }
+    expect(createOrderSiigoReceiptSchema.safeParse({
+      ...receipt,
+      stampEmail: 'cliente@example.com',
+      confirmation: 'CREAR_Y_TIMBRAR_RECEPCION_SIIGO'
+    }).success).toBe(true)
+    expect(createOrderSiigoReceiptSchema.safeParse({
+      ...receipt,
+      confirmation: 'CREAR_Y_TIMBRAR_RECEPCION_SIIGO'
+    }).success).toBe(false)
+    expect(createOrderSiigoReceiptSchema.safeParse({
+      ...receipt,
+      stampEmail: 'cliente@example.com',
+      confirmation: 'CREAR_RECEPCION_SIIGO'
+    }).success).toBe(false)
+  })
+
   it('valida importe con máximo dos decimales y confirmación fiscal explícita', () => {
     expect(createOrderSiigoPaymentSchema.safeParse(input()).success).toBe(true)
     expect(createOrderSiigoPaymentSchema.safeParse(input({ amount: 10.001 })).success).toBe(false)
