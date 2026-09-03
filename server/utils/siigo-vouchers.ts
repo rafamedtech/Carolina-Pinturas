@@ -311,15 +311,22 @@ export function normalizeCostCenters(value: unknown): SiigoCostCenter[] {
 }
 
 function ppdOutstandingBalance(invoice: UnknownRecord) {
-  const payment = record(invoice.payment)
-  const conditions = Array.isArray(payment?.conditions) ? payment.conditions : []
-  if (string(payment?.method) !== 'PPD') return null
+  const payments = [
+    invoice.payment,
+    ...(Array.isArray(invoice.payments) ? invoice.payments : [])
+  ].map(record).filter((payment): payment is UnknownRecord => payment !== null)
+  const payment = payments.find(item => string(item.method)?.toUpperCase() === 'PPD')
+  if (!payment) return null
 
+  const conditions = Array.isArray(payment?.conditions) ? payment.conditions : []
   const outstanding = conditions.reduce((total, condition) => {
     const value = number(record(condition)?.value)
     return value && value > 0 ? total + value : total
   }, 0)
-  return outstanding > 0 ? outstanding : null
+  if (outstanding > 0) return outstanding
+
+  const invoiceTotal = number(invoice.total)
+  return invoiceTotal && invoiceTotal > 0 ? invoiceTotal : null
 }
 
 export function isSiigoInvoiceStamped(status: string | null | undefined) {

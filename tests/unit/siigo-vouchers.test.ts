@@ -345,6 +345,21 @@ describe('recepciones de pago de Siigo México', () => {
     expect(normalized.balance).toBe(1273.03)
     expect(() => assertVoucherReferences(references({ invoice: normalized }))).not.toThrow()
     expect(normalizeInvoiceDetail(stamped, { ppdBalanceLimit: 500 }).balance).toBe(500)
+
+    const pluralPayment = invoice({
+      balance: 0,
+      payment: undefined,
+      payments: [{ method: 'ppd', conditions: [{ value: 1273.03 }] }],
+      stamp: { status: 'Accepted' }
+    })
+    expect(normalizeInvoiceDetail(pluralPayment, { ppdBalanceLimit: 600 }).balance).toBe(600)
+
+    const withoutConditions = invoice({
+      balance: 0,
+      payment: { method: 'PPD' },
+      stamp: { status: 'Accepted' }
+    })
+    expect(normalizeInvoiceDetail(withoutConditions, { ppdBalanceLimit: 700 }).balance).toBe(700)
   })
 
   it('falla si Siigo responde sin un identificador de recepción válido', () => {
