@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { mockNuxtImport, mountSuspended, registerEndpoint } from '@nuxt/test-utils/runtime'
 import type { VueWrapper } from '@vue/test-utils'
 import OrderPaymentsCard from '~/components/orders/payments/OrderPaymentsCard.vue'
+import OrderPaymentSiigoModal from '~/components/orders/payments/OrderPaymentSiigoModal.vue'
 import type { OrderPaymentContext } from '~/types/siigo-payments'
 
 const { useAuthMock } = vi.hoisted(() => ({
@@ -68,7 +69,7 @@ afterEach(() => {
 })
 
 describe('OrderPaymentsCard · timbrado', () => {
-  it('deshabilita Registrar en Siigo mientras la factura siga en borrador', async () => {
+  it('deshabilita Crear y timbrar en Siigo mientras la factura siga en borrador', async () => {
     wrapper = await mountSuspended(OrderPaymentsCard, {
       props: { orderId: 'order-stamp' },
       global: {
@@ -78,9 +79,9 @@ describe('OrderPaymentsCard · timbrado', () => {
       }
     })
 
-    await vi.waitFor(() => expect(wrapper?.text()).toContain('Registrar en Siigo'))
+    await vi.waitFor(() => expect(wrapper?.text()).toContain('Crear y timbrar en Siigo'))
     const registerButton = wrapper.findAll('button')
-      .find(button => button.text().trim() === 'Registrar en Siigo')
+      .find(button => button.text().trim() === 'Crear y timbrar en Siigo')
     expect(registerButton?.attributes('disabled')).toBeDefined()
   })
 
@@ -94,7 +95,7 @@ describe('OrderPaymentsCard · timbrado', () => {
       }
     })
 
-    await vi.waitFor(() => expect(wrapper?.text()).toContain('Registrar en Siigo'))
+    await vi.waitFor(() => expect(wrapper?.text()).toContain('Crear y timbrar en Siigo'))
     expect(wrapper?.text()).not.toContain('Asignar pago de Siigo')
   })
 
@@ -112,5 +113,26 @@ describe('OrderPaymentsCard · timbrado', () => {
     })
 
     await vi.waitFor(() => expect(wrapper?.text()).toContain('Asignar pago de Siigo'))
+  })
+
+  it('abre el registro directo en modo de creación y timbrado', async () => {
+    context.siigo.assignedInvoiceStamped = true
+    context.siigo.assignedInvoice!.stampStatus = 'Accepted'
+    context.siigo.assignedInvoice!.stamped = true
+    wrapper = await mountSuspended(OrderPaymentsCard, {
+      props: { orderId: 'order-stamp' },
+      global: {
+        stubs: {
+          UTooltip: { template: '<div><slot /></div>' }
+        }
+      }
+    })
+
+    await vi.waitFor(() => expect(wrapper?.text()).toContain('Crear y timbrar en Siigo'))
+    const registerButton = wrapper.findAll('button')
+      .find(button => button.text().trim() === 'Crear y timbrar en Siigo')
+    await registerButton?.trigger('click')
+
+    expect(wrapper.findComponent(OrderPaymentSiigoModal).props('stampAfterCreate')).toBe(true)
   })
 })

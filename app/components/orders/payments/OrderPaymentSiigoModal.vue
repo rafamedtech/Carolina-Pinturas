@@ -27,7 +27,10 @@ const schema = z.object({
   cfdiCode: z.string().min(1, 'Selecciona la forma de pago CFDI.'),
   paymentMethod: z.enum(['PUE', 'PPD']),
   quote: z.number().int().positive(),
-  stampEmail: z.string().trim().email('Escribe un correo válido.').max(100).optional(),
+  stampEmail: z.preprocess(
+    value => value === '' ? undefined : value,
+    z.string().trim().email('Escribe un correo válido.').max(100).optional()
+  ),
   confirmed: z.boolean().refine(value => value, 'Confirma la creación en Siigo.')
 }).superRefine((input, context) => {
   if (props.stampAfterCreate && !input.stampEmail) {

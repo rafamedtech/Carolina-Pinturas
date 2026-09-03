@@ -118,7 +118,7 @@ function openHistoricalSiigoPayment(payment: OrderPayment) {
 function openSiigoPayment(payment: OrderPayment) {
   if (!paymentHasSiigoAction(payment) || !paymentInvoiceIsStamped(payment)) return
   syncingPayment.value = payment
-  stampAfterCreate.value = false
+  stampAfterCreate.value = true
   siigoOpen.value = true
 }
 
@@ -350,13 +350,13 @@ async function registerPaymentInSiigo(input: CreateOrderSiigoReceiptInput) {
             <UTooltip
               v-if="paymentHasSiigoAction(payment)"
               :text="paymentInvoiceIsStamped(payment)
-                ? 'Crear recepción borrador en Siigo'
+                ? 'Crear y timbrar recepción en Siigo'
                 : 'La factura debe estar timbrada antes de registrar el pago en Siigo.'"
             >
               <span class="inline-flex">
                 <UButton
-                  :label="payment.externalStatus === 'failed' ? 'Reintentar en Siigo' : 'Registrar en Siigo'"
-                  icon="i-lucide-cloud-upload"
+                  :label="payment.externalStatus === 'failed' ? 'Reintentar en Siigo' : 'Crear y timbrar en Siigo'"
+                  icon="i-lucide-badge-check"
                   color="neutral"
                   variant="ghost"
                   size="xs"

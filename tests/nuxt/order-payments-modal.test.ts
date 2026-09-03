@@ -183,5 +183,44 @@ describe('OrderPaymentsModal', () => {
       expect(document.body.textContent).toContain('Correo para la recepción timbrada')
       expect(document.body.textContent).toContain('Confirmo que deseo crear y timbrar')
     })
+
+    await wrapper.findComponent({ name: 'UInput' }).setValue('cliente@example.com')
+    await wrapper.findComponent({ name: 'UCheckbox' }).setValue(true)
+    document.querySelector<HTMLFormElement>('#siigo-payment-form')?.requestSubmit()
+
+    await vi.waitFor(() => {
+      expect(wrapper?.emitted('submit')?.[0]).toEqual([expect.objectContaining({
+        stamp: true,
+        stampEmail: 'cliente@example.com',
+        confirmation: 'CREAR_Y_TIMBRAR_RECEPCION_SIIGO'
+      })])
+    })
+  })
+
+  it('no bloquea el envío cuando el correo opcional oculto está vacío', async () => {
+    const siigoContext: OrderPaymentContext = {
+      ...context,
+      siigo: {
+        ...context.siigo,
+        writeEnabled: true,
+        documentTypes: [{ id: 69452, code: '1', name: 'Recibo', active: true }],
+        paymentTypes: [{ id: 3560, name: '03 - Transferencia', active: true }]
+      }
+    }
+    wrapper = await mountSuspended(OrderPaymentSiigoModal, {
+      props: { open: false, context: siigoContext, payment, saving: false }
+    })
+    await wrapper.setProps({ open: true })
+    await wrapper.findComponent({ name: 'UCheckbox' }).setValue(true)
+    document.querySelector<HTMLFormElement>('#siigo-payment-form')?.requestSubmit()
+
+    await vi.waitFor(() => {
+      expect(wrapper?.emitted('submit')?.[0]).toEqual([expect.objectContaining({
+        invoiceId: context.siigo.assignedInvoice!.id,
+        stamp: undefined,
+        stampEmail: undefined,
+        confirmation: 'CREAR_RECEPCION_SIIGO'
+      })])
+    })
   })
 })
