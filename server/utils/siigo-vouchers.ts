@@ -310,11 +310,10 @@ export function normalizeCostCenters(value: unknown): SiigoCostCenter[] {
   })
 }
 
-function draftPpdOutstandingBalance(invoice: UnknownRecord) {
-  const stamp = record(invoice.stamp)
+function ppdOutstandingBalance(invoice: UnknownRecord) {
   const payment = record(invoice.payment)
   const conditions = Array.isArray(payment?.conditions) ? payment.conditions : []
-  if (string(stamp?.status)?.toLowerCase() !== 'draft' || string(payment?.method) !== 'PPD') return null
+  if (string(payment?.method) !== 'PPD') return null
 
   const outstanding = conditions.reduce((total, condition) => {
     const value = number(record(condition)?.value)
@@ -329,7 +328,7 @@ export function isSiigoInvoiceStamped(status: string | null | undefined) {
 
 export function normalizePayableInvoices(
   value: unknown,
-  options: { draftPpdBalanceLimit?: number } = {}
+  options: { ppdBalanceLimit?: number } = {}
 ): SiigoPayableInvoice[] {
   return catalogResults(value).flatMap((entry) => {
     const invoice = record(entry)
@@ -341,11 +340,11 @@ export function normalizePayableInvoices(
     const balance = number(invoice?.balance)
     const stampStatus = string(record(invoice?.stamp)?.status)
     if (!invoice || !id || !name || !date || total === null || balance === null) return []
-    const draftBalance = balance <= 0 && options.draftPpdBalanceLimit
-      ? draftPpdOutstandingBalance(invoice)
+    const ppdBalance = balance <= 0 && options.ppdBalanceLimit
+      ? ppdOutstandingBalance(invoice)
       : null
-    const payableBalance = draftBalance
-      ? Math.min(draftBalance, options.draftPpdBalanceLimit!)
+    const payableBalance = ppdBalance
+      ? Math.min(ppdBalance, options.ppdBalanceLimit!)
       : balance
 
     return [{
@@ -376,11 +375,11 @@ export function payableInvoicesForCustomer(
 ) {
   const preferredInvoices = normalizePayableInvoices(
     { results: [options.preferredInvoice] },
-    { draftPpdBalanceLimit: options.preferredBalance }
+    { ppdBalanceLimit: options.preferredBalance }
   )
   if (options.preferredInvoice && preferredInvoices.length === 0) {
     const invoice = normalizeInvoiceDetail(options.preferredInvoice, {
-      draftPpdBalanceLimit: options.preferredBalance
+      ppdBalanceLimit: options.preferredBalance
     })
     const stampStatus = invoice.stamp?.status ?? null
     preferredInvoices.push({
@@ -415,7 +414,7 @@ export function payableInvoicesForCustomer(
 
 export function normalizeInvoiceDetail(
   value: unknown,
-  options: { draftPpdBalanceLimit?: number } = {}
+  options: { ppdBalanceLimit?: number } = {}
 ): SiigoInvoiceDetail {
   const invoice = record(value)
   const customer = record(invoice?.customer)
@@ -446,8 +445,8 @@ export function normalizeInvoiceDetail(
       statusMessage: 'Siigo devolvió una factura incompleta para registrar el pago.'
     })
   }
-  const draftBalance = balance <= 0 && options.draftPpdBalanceLimit
-    ? draftPpdOutstandingBalance(invoice)
+  const ppdBalance = balance <= 0 && options.ppdBalanceLimit
+    ? ppdOutstandingBalance(invoice)
     : null
 
   return {
@@ -457,8 +456,8 @@ export function normalizeInvoiceDetail(
     number: consecutive,
     document: { id: number(document?.id) ?? undefined },
     total,
-    balance: draftBalance
-      ? Math.min(draftBalance, options.draftPpdBalanceLimit!)
+    balance: ppdBalance
+      ? Math.min(ppdBalance, options.ppdBalanceLimit!)
       : balance,
     stamp: stampStatus ? { status: stampStatus } : undefined,
     customer: {

@@ -103,6 +103,17 @@ export default eventHandler(async (event): Promise<OrderPayment> => {
     observations: payment.observations,
     confirmation: 'CREAR_RECEPCION_SIIGO'
   }
+  const appliedPayments = await usePrisma().salesOrderPayment.aggregate({
+    where: {
+      orderId,
+      id: { not: payment.id },
+      siigoInvoiceId: order.siigoReference,
+      siigoVoucherId: { not: null }
+    },
+    _sum: { amount: true }
+  })
+  const appliedAmount = Number(appliedPayments._sum.amount?.toString() || 0)
+  const ppdBalanceLimit = Math.max(0, order.total - appliedAmount)
   const [invoiceResponse, customerResponse, documentResponse, paymentResponse, costCenterResponse] = await Promise.all([
     siigoRequest<unknown>(`/v1/invoices/${encodeURIComponent(input.invoiceId)}`),
     siigoRequest<unknown>(`/v1/customers/${encodeURIComponent(order.customer.id)}`),
@@ -110,7 +121,7 @@ export default eventHandler(async (event): Promise<OrderPayment> => {
     siigoRequest<unknown>('/v1/payment-types', { query: { document_type: 'FV' } }),
     siigoRequest<unknown>('/v1/cost-centers')
   ])
-  const invoice = normalizeInvoiceDetail(invoiceResponse, { draftPpdBalanceLimit: order.total })
+  const invoice = normalizeInvoiceDetail(invoiceResponse, { ppdBalanceLimit })
   if (!isSiigoInvoiceStamped(invoice.stamp?.status)) {
     throw createError({
       statusCode: 409,

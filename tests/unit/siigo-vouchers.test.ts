@@ -316,7 +316,7 @@ describe('recepciones de pago de Siigo México', () => {
     expect(() => normalizeInvoiceDetail({ id: invoiceId, name: 'FV-1-68' })).toThrow()
   })
 
-  it('usa la condición pendiente de un borrador PPD asociado cuando Siigo reporta saldo cero', () => {
+  it('usa la condición pendiente de una factura PPD cuando Siigo reporta saldo cero', () => {
     const draft = invoice({
       balance: 0,
       stamp: { status: 'Draft' },
@@ -326,12 +326,25 @@ describe('recepciones de pago de Siigo México', () => {
       }
     })
 
-    expect(normalizeInvoiceDetail(draft, { draftPpdBalanceLimit: 80 }).balance).toBe(80)
+    expect(normalizeInvoiceDetail(draft, { ppdBalanceLimit: 80 }).balance).toBe(80)
     expect(normalizePayableInvoices({ results: [draft] })).toEqual([])
     expect(normalizePayableInvoices(
       { results: [draft] },
-      { draftPpdBalanceLimit: 80 }
+      { ppdBalanceLimit: 80 }
     )[0]?.balance).toBe(80)
+
+    const stamped = invoice({
+      balance: 0,
+      stamp: { status: 'Accepted' },
+      payment: {
+        method: 'PPD',
+        conditions: [{ id: 3564, value: 1273.03 }]
+      }
+    })
+    const normalized = normalizeInvoiceDetail(stamped, { ppdBalanceLimit: 1273.03 })
+    expect(normalized.balance).toBe(1273.03)
+    expect(() => assertVoucherReferences(references({ invoice: normalized }))).not.toThrow()
+    expect(normalizeInvoiceDetail(stamped, { ppdBalanceLimit: 500 }).balance).toBe(500)
   })
 
   it('falla si Siigo responde sin un identificador de recepción válido', () => {
