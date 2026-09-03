@@ -279,6 +279,28 @@ describe('recepciones de pago de Siigo México', () => {
     ])
   })
 
+  it('conserva la factura asignada en el selector aunque Siigo reporte saldo cero', () => {
+    const assigned = invoice({
+      balance: 0,
+      stamp: { status: 'Accepted' }
+    })
+
+    expect(payableInvoicesForCustomer({ results: [] }, {
+      customerId,
+      customerRfc: 'MELM8305281H0',
+      preferredInvoiceId: invoiceId,
+      preferredInvoice: assigned,
+      preferredBalance: 1273.03
+    })).toEqual([
+      expect.objectContaining({
+        id: invoiceId,
+        name: 'FV-1-68',
+        balance: 0,
+        stamped: true
+      })
+    ])
+  })
+
   it('normaliza el detalle de factura y rechaza respuestas incompletas', () => {
     expect(normalizeInvoiceDetail(invoice())).toMatchObject({
       id: invoiceId,

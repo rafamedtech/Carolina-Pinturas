@@ -374,12 +374,31 @@ export function payableInvoicesForCustomer(
     preferredBalance?: number
   }
 ) {
+  const preferredInvoices = normalizePayableInvoices(
+    { results: [options.preferredInvoice] },
+    { draftPpdBalanceLimit: options.preferredBalance }
+  )
+  if (options.preferredInvoice && preferredInvoices.length === 0) {
+    const invoice = normalizeInvoiceDetail(options.preferredInvoice, {
+      draftPpdBalanceLimit: options.preferredBalance
+    })
+    const stampStatus = invoice.stamp?.status ?? null
+    preferredInvoices.push({
+      id: invoice.id,
+      name: invoice.name,
+      date: invoice.date,
+      total: invoice.total!,
+      balance: invoice.balance!,
+      customerId: invoice.customer?.id ?? null,
+      customerRfc: invoice.customer?.rfc_id ?? invoice.customer?.identification ?? null,
+      stampStatus,
+      stamped: isSiigoInvoiceStamped(stampStatus)
+    })
+  }
+
   const invoices = [
     ...normalizePayableInvoices(value),
-    ...normalizePayableInvoices(
-      { results: [options.preferredInvoice] },
-      { draftPpdBalanceLimit: options.preferredBalance }
-    )
+    ...preferredInvoices
   ]
 
   return [...new Map(invoices.map(invoice => [invoice.id, invoice])).values()]
