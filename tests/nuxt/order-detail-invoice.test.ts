@@ -129,6 +129,10 @@ afterEach(() => {
   clearNuxtData()
 })
 
+function findInvoiceButton() {
+  return wrapper?.findAll('button').find(button => button.text().trim() === 'Facturar')
+}
+
 describe('OrderDetail · facturación', () => {
   it('muestra las etiquetas del pedido únicamente cuando existen', async () => {
     currentOrder = { ...baseOrder, tags: ['urgente', 'mayoreo'] }
@@ -158,22 +162,24 @@ describe('OrderDetail · facturación', () => {
       }
     })
 
+    // El botón queda en estado `loading` mientras se valida el contexto de
+    // Siigo, así que hay que esperar a que se habilite antes de pulsarlo.
     await vi.waitFor(() => {
-      expect(wrapper?.text()).toContain('Facturar')
       expect(wrapper?.text()).toContain('Asignar factura anterior')
       expect(contextChecks).toBe(1)
+      expect(findInvoiceButton()?.attributes('disabled')).toBeUndefined()
     })
     expect(wrapper.text()).not.toContain('Etiquetas')
+    expect(wrapper.text()).not.toContain('Sin facturar')
 
-    const invoiceButton = wrapper.findAll('button')
-      .find(button => button.text().trim() === 'Facturar')
+    const invoiceButton = findInvoiceButton()
     if (!invoiceButton) throw new Error('No se encontró el botón Facturar.')
 
     await invoiceButton.trigger('click')
 
     await vi.waitFor(() => {
       expect(receivedBody).toEqual({ version: 1 })
-      expect(wrapper?.text()).toContain('Requiere factura')
+      expect(wrapper?.text()).toContain('Sin facturar')
       expect(contextChecks).toBe(1)
     })
   })
