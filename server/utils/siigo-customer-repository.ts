@@ -8,6 +8,7 @@ const customerInternalSelect = {
   internalTags: true,
   isCustomer: true,
   isSupplier: true,
+  isInternalOrderCustomer: true,
   requiresInvoice: true,
   syncStatus: true,
   syncVersion: true,
@@ -21,6 +22,7 @@ type LocalCustomerInternalRow = {
   internalTags: string[]
   isCustomer: boolean
   isSupplier: boolean
+  isInternalOrderCustomer: boolean
   requiresInvoice: boolean
   syncStatus: string
   syncVersion: number
@@ -38,6 +40,7 @@ export function localCustomerInternal(
       customer: row.isCustomer,
       supplier: row.isSupplier
     },
+    internal_orders: row.isInternalOrderCustomer,
     requires_invoice: row.requiresInvoice,
     sync_status: row.syncStatus,
     sync_version: row.syncVersion,
@@ -92,4 +95,37 @@ export async function updateLocalCustomerRoles(
   })
 
   return localCustomerInternal(row)
+}
+
+export async function replaceInternalOrderCustomers(customerIds: string[]) {
+  const prisma = usePrisma()
+  const uniqueIds = [...new Set(customerIds)]
+  const eligibleCustomers = await prisma.siigoCustomer.findMany({
+    where: {
+      id: { in: uniqueIds },
+      isCustomer: true,
+      OR: [{ active: true }, { active: null }]
+    },
+    select: { id: true }
+  })
+
+  if (eligibleCustomers.length !== uniqueIds.length) {
+    throw createError({
+      statusCode: 400,
+      statusMessage: 'Uno o más clientes seleccionados no están disponibles.'
+    })
+  }
+
+  await prisma.$transaction([
+    prisma.siigoCustomer.updateMany({
+      where: { isInternalOrderCustomer: true },
+      data: { isInternalOrderCustomer: false }
+    }),
+    prisma.siigoCustomer.updateMany({
+      where: { id: { in: uniqueIds } },
+      data: { isInternalOrderCustomer: true }
+    })
+  ])
+
+  return uniqueIds
 }

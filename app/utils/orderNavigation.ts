@@ -1,4 +1,4 @@
-const ORDER_LIST_PATHS = ['/ventas', '/igualaciones'] as const
+const ORDER_LIST_PATHS = ['/ventas', '/igualaciones', '/pedidos-internos'] as const
 
 export function orderListReturnPath(value: unknown, fallback = '/ventas') {
   if (typeof value !== 'string') return fallback

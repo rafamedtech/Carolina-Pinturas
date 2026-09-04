@@ -14,6 +14,12 @@ describe('orderListReturnPath', () => {
     expect(orderListReturnPath(returnTo)).toBe(returnTo)
   })
 
+  it('supports returning to the internal orders view', () => {
+    const returnTo = '/pedidos-internos?search=Cliente&page=2'
+
+    expect(orderListReturnPath(returnTo)).toBe(returnTo)
+  })
+
   it('rejects external and unrelated return paths', () => {
     expect(orderListReturnPath('https://example.com')).toBe('/ventas')
     expect(orderListReturnPath('/configuracion')).toBe('/ventas')

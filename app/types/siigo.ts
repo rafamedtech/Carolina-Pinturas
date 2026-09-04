@@ -127,6 +127,7 @@ export interface SiigoCustomer {
       customer: boolean
       supplier: boolean
     }
+    internal_orders: boolean
     requires_invoice?: boolean
     sync_status: string
     sync_version: number

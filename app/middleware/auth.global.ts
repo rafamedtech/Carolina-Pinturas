@@ -26,6 +26,8 @@ export default defineNuxtRouteMiddleware(async (to) => {
     || path.startsWith('/configuracion/')
     || path === '/reportes'
     || path.startsWith('/reportes/')
+    || path === '/pedidos-internos'
+    || path.startsWith('/pedidos-internos/')
 
   if (adminOnlyPath && user.role !== 'admin') {
     return navigateTo('/')

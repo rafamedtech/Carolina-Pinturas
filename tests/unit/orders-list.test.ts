@@ -51,6 +51,18 @@ describe('listado de pedidos', () => {
     }))
   })
 
+  it('filtra pedidos por los clientes marcados para la vista interna', async () => {
+    await listOrders({ page: 1, pageSize: 25, internalCustomers: true }, admin)
+
+    expect(mocks.findMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({
+        AND: expect.arrayContaining([{
+          customer: { isInternalOrderCustomer: true }
+        }])
+      })
+    }))
+  })
+
   it.each([
     ['cotizacion', { statusKey: 'borrador' }],
     ['pendiente_pago', { paymentStatus: { in: ['pendiente_pago', 'abonado'] } }],

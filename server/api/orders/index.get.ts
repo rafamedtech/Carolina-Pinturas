@@ -31,6 +31,7 @@ function dateOnly(value: unknown) {
 export default eventHandler(async (event) => {
   const user = await requireUser(event)
   const query = getQuery(event)
+  const internalCustomers = query.internal_customers === 'true' || query.internal_customers === '1'
   const customerId = optionalCustomerId.safeParse(
     typeof query.customer_id === 'string' && query.customer_id.trim()
       ? query.customer_id.trim()
@@ -46,6 +47,10 @@ export default eventHandler(async (event) => {
     throw createError({ statusCode: 400, statusMessage: 'Los filtros del listado no son válidos.' })
   }
 
+  if (internalCustomers && user.role !== 'admin') {
+    throw createError({ statusCode: 403, statusMessage: 'No tienes permiso para consultar pedidos internos.' })
+  }
+
   return listOrders({
     page: positiveInteger(query.page, 1, 100_000),
     pageSize: positiveInteger(query.page_size, 25, 100),
@@ -59,6 +64,7 @@ export default eventHandler(async (event) => {
     dateTo: dateOnly(query.date_to),
     customerId: customerId.data,
     view: view.data,
-    igualacion: query.igualacion === 'true' || query.igualacion === '1'
+    igualacion: query.igualacion === 'true' || query.igualacion === '1',
+    internalCustomers
   }, user)
 })

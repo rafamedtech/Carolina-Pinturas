@@ -160,6 +160,7 @@ model SiigoCustomer {
   type                  String?   @db.VarChar(32)
   isCustomer            Boolean   @default(false) @map("is_customer")
   isSupplier            Boolean   @default(false) @map("is_supplier")
+  isInternalOrderCustomer Boolean @default(false) @map("is_internal_order_customer")
   identification        String?
   rfcId                 String?   @map("rfc_id")
   fiscalRegime          String?   @map("fiscal_regime")
@@ -193,6 +194,7 @@ model SiigoCustomer {
   @@index([rfcId, branchOffice], map: "siigo_customers_rfc_branch_office_idx")
   @@index([isCustomer, active], map: "siigo_customers_is_customer_active_idx")
   @@index([isSupplier, active], map: "siigo_customers_is_supplier_active_idx")
+  @@index([isInternalOrderCustomer, active], map: "siigo_customers_internal_order_customer_idx")
   @@index([syncStatus, syncedAt], map: "siigo_customers_sync_status_idx")
   @@map("siigo_customers")
 }

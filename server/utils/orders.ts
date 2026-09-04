@@ -845,6 +845,7 @@ export async function listOrders(options: {
   dateTo?: string
   customerId?: string
   igualacion?: boolean
+  internalCustomers?: boolean
   view?: 'cotizacion' | 'mostrador' | 'vendedor' | 'pendiente_pago' | 'entregado' | 'facturacion' | 'cancelado'
 }, user: AppUser) {
   const prisma = usePrisma()
@@ -885,6 +886,9 @@ export async function listOrders(options: {
     : {}
   const customerFilter: Prisma.SalesOrderWhereInput = options.customerId
     ? { customerId: options.customerId }
+    : {}
+  const internalCustomerFilter: Prisma.SalesOrderWhereInput = options.internalCustomers
+    ? { customer: { isInternalOrderCustomer: true } }
     : {}
   const counterCustomerFilter: Prisma.SalesOrderWhereInput = {
     OR: [
@@ -939,6 +943,7 @@ export async function listOrders(options: {
       paymentMethodFilter,
       dateFilter,
       customerFilter,
+      internalCustomerFilter,
       viewFilter,
       orderVisibilityFilter(user),
       ...(isIgualacionesView ? [igualacionFilter] : []),

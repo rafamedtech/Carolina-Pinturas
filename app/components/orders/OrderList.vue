@@ -6,9 +6,11 @@ import { canCreateOrders } from '~/utils/roleAccess'
 const props = withDefaults(defineProps<{
   title?: string
   igualacion?: boolean
+  internalCustomers?: boolean
 }>(), {
   title: 'Pedidos',
-  igualacion: false
+  igualacion: false,
+  internalCustomers: false
 })
 
 function queryValue(value: unknown) {
@@ -69,6 +71,7 @@ const debouncedFilter = refDebounced(filter, 300)
 const { user } = useAuth()
 const canCreate = computed(() => Boolean(user.value && canCreateOrders(user.value.role)))
 const isHydrated = shallowRef(false)
+const customerManagerOpen = shallowRef(false)
 
 onMounted(() => {
   isHydrated.value = true
@@ -130,7 +133,8 @@ const {
     hide_quotes: computed(() => hideQuotes.value ? 'true' : undefined),
     date_from: dateFrom,
     date_to: dateTo,
-    igualacion: props.igualacion ? 'true' : undefined
+    igualacion: props.igualacion ? 'true' : undefined,
+    internal_customers: props.internalCustomers ? 'true' : undefined
   },
   default: () => ({
     results: [],
@@ -187,6 +191,15 @@ const statusTabItems = computed(() => {
           <UDashboardSidebarCollapse />
         </template>
         <template #right>
+          <UButton
+            v-if="internalCustomers"
+            label="Gestionar clientes"
+            icon="i-lucide-users-round"
+            color="neutral"
+            variant="outline"
+            :ui="{ label: 'hidden sm:inline' }"
+            @click="customerManagerOpen = true"
+          />
           <UButton
             label="Actualizar"
             icon="i-lucide-refresh-cw"
@@ -246,6 +259,12 @@ const statusTabItems = computed(() => {
         :filtered-total="igualacion ? undefined : orders.filteredTotal"
         :page-size="orders.pagination.pageSize"
         :loading="loading"
+      />
+
+      <OrdersInternalOrderCustomersModal
+        v-if="internalCustomers"
+        v-model:open="customerManagerOpen"
+        @saved="refresh()"
       />
     </template>
   </UDashboardPanel>

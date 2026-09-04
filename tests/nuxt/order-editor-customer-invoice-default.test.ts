@@ -33,6 +33,7 @@ const invoiceCustomer: SiigoCustomer = {
     code: null,
     notes: null,
     tags: [],
+    internal_orders: false,
     requires_invoice: true,
     sync_status: 'synced',
     sync_version: 1,

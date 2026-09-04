@@ -26,6 +26,7 @@ const customer: SiigoCustomer = {
     code: 'CLI-001',
     notes: 'Cuenta de mayoreo',
     tags: ['mayoreo', 'crédito'],
+    internal_orders: false,
     requires_invoice: true,
     sync_status: 'synced',
     sync_version: 1,
