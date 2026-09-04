@@ -397,6 +397,36 @@ describe('recepciones de pago de Siigo México', () => {
     }])
   })
 
+  it('detecta el importe aplicado a la factura dentro de una recepción con varias facturas', () => {
+    const invoiceDetail = normalizeInvoiceDetail(invoice())
+    expect(normalizeHistoricalReceiptOptions({
+      results: [voucher({
+        items: [
+          { due: { prefix: 'FV-9', consecutive: 10, quote: 1 }, value: 250 },
+          { due: { prefix: 'FV-1', consecutive: 68, quote: 2 }, value: 1273.03 }
+        ],
+        payments: [{
+          method: 'PUE',
+          cfdi: { code: '03' },
+          conditions: [{ id: 5636, value: 1523.03 }]
+        }]
+      })]
+    }, {
+      invoice: invoiceDetail,
+      customerId,
+      customerRfc: 'MELM8305281H0',
+      amount: 1273.03,
+      date: '2026-07-28'
+    })).toEqual([{
+      id: voucherId,
+      name: 'RC-2-22',
+      date: '2026-07-28',
+      amount: 1273.03,
+      quote: 2,
+      stampStatus: 'Draft'
+    }])
+  })
+
   it('normaliza payment singular y revalida la recepción antes de asignarla', () => {
     const source = voucher({
       payments: undefined,
@@ -413,9 +443,7 @@ describe('recepciones de pago de Siigo México', () => {
       paymentTypeId: 5636,
       cfdiCode: '03',
       paymentMethod: 'PUE',
-      prefix: 'FV-1',
-      consecutive: 68,
-      quote: 1
+      applications: [{ amount: 1273.03, prefix: 'FV-1', consecutive: 68, quote: 1 }]
     })
     expect(() => assertHistoricalReceiptMatchesPayment(receipt, {
       voucherId,
@@ -432,7 +460,12 @@ describe('recepciones de pago de Siigo México', () => {
       items: [
         { due: { prefix: 'FV-1', consecutive: 68, quote: 1 }, value: 1000 },
         { due: { prefix: 'FV-2', consecutive: 10, quote: 1 }, value: 273.03 }
-      ]
+      ],
+      payments: [{
+        method: 'PUE',
+        cfdi: { code: '03' },
+        conditions: [{ id: 5636, value: 1273.04 }]
+      }]
     }))).toThrow()
     expect(normalizeHistoricalReceiptOptions({
       results: [voucher()]

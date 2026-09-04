@@ -39,6 +39,7 @@ const receiptItems = computed(() => (context.value?.receipts || []).map(receipt 
   description: `${formatDate(receipt.date)} · ${formatCurrency(receipt.amount)} · Parcialidad ${receipt.quote}`,
   value: receipt.id
 })))
+const selectedReceiptItem = computed(() => receiptItems.value.find(item => item.value === state.voucherId))
 
 watch(open, async (isOpen) => {
   if (!isOpen) return
@@ -153,8 +154,23 @@ async function onSubmit(event: FormSubmitEvent<Schema>) {
             v-model="state.voucherId"
             :items="receiptItems"
             value-key="value"
+            label-key="label"
+            description-key="description"
+            placeholder="Selecciona un pago aplicado a la factura"
             class="w-full"
-          />
+          >
+            <template #default="{ modelValue }">
+              <div v-if="modelValue" class="min-w-0 text-left">
+                <p class="truncate font-medium">
+                  {{ selectedReceiptItem?.label }}
+                </p>
+                <p class="truncate text-xs text-muted">
+                  {{ selectedReceiptItem?.description }}
+                </p>
+              </div>
+              <span v-else class="text-dimmed">Selecciona un pago aplicado a la factura</span>
+            </template>
+          </USelectMenu>
         </UFormField>
 
         <UFormField name="confirmed">

@@ -110,8 +110,17 @@ function normalizeHistoricalReceipt(value: unknown) {
   const document = record(voucher?.document)
   const customer = record(voucher?.customer)
   const items = Array.isArray(voucher?.items) ? voucher.items : []
-  const item = items.length === 1 ? record(items[0]) : null
-  const due = record(item?.due)
+  const applications = items.flatMap((entry) => {
+    const item = record(entry)
+    const due = record(item?.due)
+    const amount = number(item?.value)
+    const prefix = string(due?.prefix)
+    const consecutive = positiveInteger(due?.consecutive)
+    const quote = positiveInteger(due?.quote)
+
+    if (!item || amount === null || amount <= 0 || !prefix || !consecutive || !quote) return []
+    return [{ amount, prefix, consecutive, quote }]
+  })
   const payments = Array.isArray(voucher?.payments)
     ? voucher.payments
     : voucher?.payment ? [voucher.payment] : []
@@ -124,11 +133,7 @@ function normalizeHistoricalReceipt(value: unknown) {
   const date = string(voucher?.date)
   const documentTypeId = positiveInteger(document?.id)
   const paymentTypeId = positiveInteger(condition?.id)
-  const itemAmount = number(item?.value)
   const conditionAmount = number(condition?.value)
-  const prefix = string(due?.prefix)
-  const consecutive = positiveInteger(due?.consecutive)
-  const quote = positiveInteger(due?.quote)
   const paymentMethod = string(payment?.method)
   const cfdiCode = string(cfdi?.code) ?? string(payment?.cfdi)
   const customerId = string(customer?.id)
@@ -145,13 +150,10 @@ function normalizeHistoricalReceipt(value: unknown) {
     || !dateSchema.safeParse(date).success
     || !documentTypeId
     || !paymentTypeId
-    || itemAmount === null
-    || itemAmount <= 0
+    || applications.length !== items.length
+    || !applications.length
     || conditionAmount === null
-    || !amountsMatch(itemAmount, conditionAmount)
-    || !prefix
-    || !consecutive
-    || !quote
+    || !amountsMatch(applications.reduce((total, item) => total + item.amount, 0), conditionAmount)
     || (paymentMethod !== 'PUE' && paymentMethod !== 'PPD')
     || !cfdiCode
     || (!customerId && !customerRfc)
@@ -162,15 +164,13 @@ function normalizeHistoricalReceipt(value: unknown) {
     id,
     name,
     date,
-    amount: itemAmount,
+    amount: conditionAmount,
     documentTypeId,
     paymentTypeId,
     costCenterId: costCenter,
     cfdiCode,
     paymentMethod,
-    prefix,
-    consecutive,
-    quote,
+    applications,
     customerId,
     customerRfc,
     stampStatus: string(record(voucher.stamp)?.status),
@@ -179,6 +179,13 @@ function normalizeHistoricalReceipt(value: unknown) {
 }
 
 type HistoricalReceipt = NonNullable<ReturnType<typeof normalizeHistoricalReceipt>>
+
+function receiptApplicationForInvoice(receipt: HistoricalReceipt, invoice: SiigoInvoiceDetail) {
+  const prefix = invoicePrefix(invoice)
+  return receipt.applications.find(application =>
+    application.prefix === prefix && application.consecutive === invoice.number
+  )
+}
 
 function historicalReceiptMatches(receipt: HistoricalReceipt, options: {
   invoice: SiigoInvoiceDetail
@@ -189,12 +196,12 @@ function historicalReceiptMatches(receipt: HistoricalReceipt, options: {
 }) {
   const customerMatches = receipt.customerId === options.customerId
     || Boolean(options.customerRfc && receipt.customerRfc?.toUpperCase() === options.customerRfc.toUpperCase())
+  const application = receiptApplicationForInvoice(receipt, options.invoice)
 
   return customerMatches
-    && receipt.prefix === invoicePrefix(options.invoice)
-    && receipt.consecutive === options.invoice.number
+    && application
     && receipt.date === options.date
-    && amountsMatch(receipt.amount, options.amount)
+    && amountsMatch(application.amount, options.amount)
 }
 
 export function normalizeHistoricalReceiptOptions(value: unknown, options: {
@@ -207,12 +214,13 @@ export function normalizeHistoricalReceiptOptions(value: unknown, options: {
   return catalogResults(value).flatMap((entry) => {
     const receipt = normalizeHistoricalReceipt(entry)
     if (!receipt || !historicalReceiptMatches(receipt, options)) return []
+    const application = receiptApplicationForInvoice(receipt, options.invoice)!
     return [{
       id: receipt.id,
       name: receipt.name,
       date: receipt.date,
-      amount: receipt.amount,
-      quote: receipt.quote,
+      amount: application.amount,
+      quote: application.quote,
       stampStatus: receipt.stampStatus
     }]
   }).sort((left, right) => right.date.localeCompare(left.date) || right.name.localeCompare(left.name))
@@ -240,13 +248,14 @@ export function assertHistoricalReceiptMatchesPayment(receipt: HistoricalReceipt
   if (receipt.id !== options.voucherId) {
     throw createError({ statusCode: 422, statusMessage: 'La recepción consultada no coincide con la seleccionada.' })
   }
+  const application = receiptApplicationForInvoice(receipt, options.invoice)
   if (!historicalReceiptMatches(receipt, options)) {
     const customerMatches = receipt.customerId === options.customerId
       || Boolean(options.customerRfc && receipt.customerRfc?.toUpperCase() === options.customerRfc.toUpperCase())
     if (!customerMatches) {
       throw createError({ statusCode: 422, statusMessage: 'La recepción seleccionada pertenece a otro cliente.' })
     }
-    if (receipt.prefix !== invoicePrefix(options.invoice) || receipt.consecutive !== options.invoice.number) {
+    if (!application) {
       throw createError({ statusCode: 422, statusMessage: 'La recepción seleccionada corresponde a otra factura.' })
     }
     if (receipt.date !== options.date) {
@@ -254,6 +263,7 @@ export function assertHistoricalReceiptMatchesPayment(receipt: HistoricalReceipt
     }
     throw createError({ statusCode: 422, statusMessage: 'El importe de la recepción no coincide con el pago local.' })
   }
+  return application!
 }
 
 export function normalizeVoucherDocumentTypes(value: unknown): SiigoVoucherDocumentType[] {

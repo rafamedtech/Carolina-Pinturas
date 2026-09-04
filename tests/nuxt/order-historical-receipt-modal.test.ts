@@ -11,6 +11,20 @@ registerEndpoint('/api/orders/order-1/payments/payment-1/siigo-receipt/legacy-co
   receipts: []
 }))
 
+registerEndpoint('/api/orders/order-1/payments/payment-2/siigo-receipt/legacy-context', () => ({
+  invoiceName: 'FV-1-10',
+  paymentAmount: 500,
+  paymentDate: '2026-09-03',
+  receipts: [{
+    id: '497f6eca-6276-4993-bfeb-53cbbbba6f08',
+    name: 'RC-2-22',
+    date: '2026-09-03',
+    amount: 500,
+    quote: 2,
+    stampStatus: 'Accepted'
+  }]
+}))
+
 let wrapper: VueWrapper | null = null
 
 afterEach(() => {
@@ -41,5 +55,23 @@ describe('OrderHistoricalReceiptModal', () => {
       .find(button => button.props('label') === 'Crear y timbrar en Siigo')
     await action?.trigger('click')
     expect(wrapper.emitted('createAndStamp')).toHaveLength(1)
+  })
+
+  it('muestra el pago aplicado a la factura en el selector', async () => {
+    wrapper = await mountSuspended(OrderHistoricalReceiptModal, {
+      props: {
+        open: false,
+        orderId: 'order-1',
+        paymentId: 'payment-2',
+        canCreateAndStamp: true
+      }
+    })
+    await wrapper.setProps({ open: true })
+
+    await vi.waitFor(() => {
+      expect(document.body.textContent).toContain('RC-2-22')
+      expect(document.body.textContent).toContain('$500.00')
+      expect(document.body.textContent).toContain('Parcialidad 2')
+    })
   })
 })

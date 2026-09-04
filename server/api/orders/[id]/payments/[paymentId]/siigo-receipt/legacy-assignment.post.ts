@@ -60,7 +60,7 @@ export default eventHandler(async (event): Promise<OrderPayment> => {
     throw createError({ statusCode: 409, statusMessage: 'La factura asignada debe estar timbrada en Siigo.' })
   }
   const receipt = normalizeHistoricalReceiptDetail(receiptResponse)
-  assertHistoricalReceiptMatchesPayment(receipt, {
+  const application = assertHistoricalReceiptMatchesPayment(receipt, {
     voucherId: parsed.data.voucherId,
     invoice,
     customerId: order.customer.id,
@@ -93,7 +93,7 @@ export default eventHandler(async (event): Promise<OrderPayment> => {
         siigoCostCenterId: receipt.costCenterId,
         siigoCfdiCode: receipt.cfdiCode,
         siigoPaymentMethod: receipt.paymentMethod,
-        siigoQuote: receipt.quote,
+        siigoQuote: application.quote,
         externalPayload: siigoJson(receipt.raw)
       }
     })
