@@ -12,7 +12,7 @@ const initialized = shallowRef(false)
 const saving = shallowRef(false)
 const submitError = shallowRef('')
 const toast = useToast()
-const { data, status, error } = useCustomersCatalog({ customerType: 'Customer' })
+const { data, status, error, refreshing, refresh } = useCustomersCatalog()
 
 const customers = computed(() => (data.value?.results ?? [])
   .filter(customer => customer.active !== false)
@@ -56,6 +56,17 @@ function toggleCustomer(customerId: string, selected: boolean) {
   selectedIds.value = selected
     ? [...new Set([...selectedIds.value, customerId])]
     : selectedIds.value.filter(id => id !== customerId)
+}
+
+async function refreshFromSiigo() {
+  submitError.value = ''
+
+  try {
+    await refresh()
+  } catch (refreshError: unknown) {
+    submitError.value = (refreshError as { data?: { statusMessage?: string } }).data?.statusMessage
+      || 'No fue posible recargar los clientes desde Siigo.'
+  }
 }
 
 async function save() {
@@ -121,6 +132,16 @@ async function save() {
             icon="i-lucide-search"
             placeholder="Buscar por nombre o RFC"
             class="min-w-0 flex-1 sm:min-w-80"
+          />
+          <UButton
+            label="Recargar Siigo"
+            icon="i-lucide-refresh-cw"
+            color="neutral"
+            variant="outline"
+            :loading="refreshing"
+            :disabled="saving || refreshing"
+            :ui="{ label: 'hidden sm:inline' }"
+            @click="refreshFromSiigo"
           />
           <UBadge
             :label="`${selectedIds.length} seleccionados`"

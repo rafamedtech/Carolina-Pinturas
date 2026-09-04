@@ -23,7 +23,10 @@ export async function getCompleteSiigoCustomerCatalog(options: {
   const catalog = await getAllSiigoCustomers()
   const customerType = options.customerType
 
-  if (customerType) await synchronizeSiigoCustomerSubset(catalog.results)
+  // Siigo can expose a Customer + Supplier third party only as Supplier. Persist
+  // every catalog entry before applying local role filters so dual-role and new
+  // customers keep their application-specific preferences.
+  await synchronizeSiigoCustomerSubset(catalog.results)
   const results = await withLocalCustomerInternals(
     catalog.results,
     customerType ? { role: customerType } : undefined

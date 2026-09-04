@@ -35,9 +35,16 @@ describe('clientes de pedidos internos', () => {
       where: { id: { in: [firstId, secondId] } },
       data: { isInternalOrderCustomer: true }
     })
+    expect(findMany).toHaveBeenCalledWith({
+      where: {
+        id: { in: [firstId, secondId] },
+        OR: [{ active: true }, { active: null }]
+      },
+      select: { id: true }
+    })
   })
 
-  it('rechaza clientes que no están activos o no tienen rol de cliente', async () => {
+  it('rechaza clientes que no existen o no están activos', async () => {
     findMany.mockResolvedValue([{ id: firstId }])
 
     await expect(replaceInternalOrderCustomers([firstId, secondId]))

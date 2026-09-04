@@ -103,7 +103,6 @@ export async function replaceInternalOrderCustomers(customerIds: string[]) {
   const eligibleCustomers = await prisma.siigoCustomer.findMany({
     where: {
       id: { in: uniqueIds },
-      isCustomer: true,
       OR: [{ active: true }, { active: null }]
     },
     select: { id: true }
