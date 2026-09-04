@@ -845,6 +845,7 @@ export async function listOrders(options: {
   dateTo?: string
   customerId?: string
   igualacion?: boolean
+  view?: 'cotizacion' | 'mostrador' | 'vendedor' | 'pendiente_pago' | 'entregado' | 'facturacion' | 'cancelado'
 }, user: AppUser) {
   const prisma = usePrisma()
   const isIgualacionesView = options.igualacion || user.role === 'igualaciones'
@@ -885,6 +886,32 @@ export async function listOrders(options: {
   const customerFilter: Prisma.SalesOrderWhereInput = options.customerId
     ? { customerId: options.customerId }
     : {}
+  const counterCustomerFilter: Prisma.SalesOrderWhereInput = {
+    OR: [
+      { customerNameSnapshot: { equals: 'MOSTRADOR .', mode: 'insensitive' } },
+      { customerNameSnapshot: { equals: 'MOSTRADOR', mode: 'insensitive' } }
+    ]
+  }
+  const viewFilter: Prisma.SalesOrderWhereInput = (() => {
+    switch (options.view) {
+      case 'cotizacion':
+        return { statusKey: 'borrador' }
+      case 'mostrador':
+        return counterCustomerFilter
+      case 'vendedor':
+        return { NOT: counterCustomerFilter }
+      case 'pendiente_pago':
+        return { paymentStatus: { in: ['pendiente_pago', 'abonado'] } }
+      case 'entregado':
+        return { statusKey: 'entregado' }
+      case 'facturacion':
+        return { requiresInvoice: true }
+      case 'cancelado':
+        return { statusKey: 'cancelado' }
+      default:
+        return {}
+    }
+  })()
   const searchFilter: Prisma.SalesOrderWhereInput = options.search
     ? {
         OR: [{
@@ -912,6 +939,7 @@ export async function listOrders(options: {
       paymentMethodFilter,
       dateFilter,
       customerFilter,
+      viewFilter,
       orderVisibilityFilter(user),
       ...(isIgualacionesView ? [igualacionFilter] : []),
       searchFilter

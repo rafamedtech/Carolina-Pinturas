@@ -39,8 +39,23 @@ function queryDateRange(from: unknown, to: unknown): OrderDateRange | null {
 
 const route = useRoute()
 const router = useRouter()
+const ORDER_VIEW_KEYS = [
+  'all',
+  'cotizacion',
+  'mostrador',
+  'vendedor',
+  'pendiente_pago',
+  'entregado',
+  'facturacion',
+  'cancelado'
+] as const
+const initialSelection = props.igualacion
+  ? queryValue(route.query.status) || 'all'
+  : ORDER_VIEW_KEYS.includes(queryValue(route.query.view) as typeof ORDER_VIEW_KEYS[number])
+    ? queryValue(route.query.view)
+    : 'all'
 const filter = shallowRef(queryValue(route.query.search))
-const statusKey = shallowRef(queryValue(route.query.status) || 'all')
+const selectedTab = shallowRef(initialSelection)
 const paymentStatusKey = shallowRef(queryValue(route.query.payment_status) || 'all')
 const paymentMethodKey = shallowRef(queryValue(route.query.payment_method) || 'all')
 const hideCancelled = shallowRef(queryBoolean(route.query.hide_cancelled))
@@ -59,7 +74,7 @@ onMounted(() => {
   isHydrated.value = true
 })
 
-watch([filter, statusKey, paymentStatusKey, paymentMethodKey, hideCancelled, hideQuotes, dateRange], () => {
+watch([filter, selectedTab, paymentStatusKey, paymentMethodKey, hideCancelled, hideQuotes, dateRange], () => {
   page.value = 1
 })
 
@@ -71,7 +86,11 @@ const dateTo = computed(() => dateRange.value?.start && dateRange.value?.end
   : undefined)
 const listQuery = computed(() => ({
   ...(filter.value ? { search: filter.value } : {}),
-  ...(statusKey.value !== 'all' ? { status: statusKey.value } : {}),
+  ...(selectedTab.value !== 'all'
+    ? props.igualacion
+      ? { status: selectedTab.value }
+      : { view: selectedTab.value }
+    : {}),
   ...(paymentStatusKey.value !== 'all' ? { payment_status: paymentStatusKey.value } : {}),
   ...(paymentMethodKey.value !== 'all' ? { payment_method: paymentMethodKey.value } : {}),
   ...(hideCancelled.value ? { hide_cancelled: 'true' } : {}),
@@ -86,7 +105,7 @@ const returnTo = computed(() => router.resolve({
 }).fullPath)
 
 watch(
-  [debouncedFilter, statusKey, paymentStatusKey, paymentMethodKey, hideCancelled, hideQuotes, dateFrom, dateTo, page],
+  [debouncedFilter, selectedTab, paymentStatusKey, paymentMethodKey, hideCancelled, hideQuotes, dateFrom, dateTo, page],
   () => {
     void router.replace({ query: listQuery.value })
   }
@@ -103,7 +122,8 @@ const {
     page,
     page_size: pageSize,
     search: debouncedFilter,
-    status: computed(() => statusKey.value === 'all' ? undefined : statusKey.value),
+    status: computed(() => props.igualacion && selectedTab.value !== 'all' ? selectedTab.value : undefined),
+    view: computed(() => !props.igualacion && selectedTab.value !== 'all' ? selectedTab.value : undefined),
     payment_status: computed(() => paymentStatusKey.value === 'all' ? undefined : paymentStatusKey.value),
     payment_method: computed(() => paymentMethodKey.value === 'all' ? undefined : paymentMethodKey.value),
     hide_cancelled: computed(() => hideCancelled.value ? 'true' : undefined),
@@ -135,9 +155,20 @@ const loading = computed(() => isHydrated.value && status.value === 'pending')
 
 const IGUALACION_STATUS_KEYS = ['confirmado', 'surtido', 'en_espera']
 const statusTabItems = computed(() => {
-  const list = props.igualacion
-    ? statuses.value.filter(item => IGUALACION_STATUS_KEYS.includes(item.key))
-    : statuses.value
+  if (!props.igualacion) {
+    return [
+      { label: 'Todos', value: 'all' },
+      { label: 'Cotización', value: 'cotizacion' },
+      { label: 'Mostrador', value: 'mostrador' },
+      { label: 'Vendedor', value: 'vendedor' },
+      { label: 'Pendiente de pago', value: 'pendiente_pago' },
+      { label: 'Entregado', value: 'entregado' },
+      { label: 'Facturación', value: 'facturacion' },
+      { label: 'Cancelado', value: 'cancelado' }
+    ]
+  }
+
+  const list = statuses.value.filter(item => IGUALACION_STATUS_KEYS.includes(item.key))
   return [{
     label: 'Todos',
     value: 'all'
@@ -173,20 +204,20 @@ const statusTabItems = computed(() => {
     <template #body>
       <OrdersOrderListToolbar
         v-model:filter="filter"
-        v-model:status="statusKey"
+        v-model:status="selectedTab"
         v-model:payment-status="paymentStatusKey"
         v-model:payment-method="paymentMethodKey"
         v-model:hide-cancelled="hideCancelled"
         v-model:hide-quotes="hideQuotes"
         v-model:date-range="dateRange"
-        :statuses="statuses"
+        :items="statusTabItems"
         :igualacion="igualacion"
         :can-create="canCreate"
         :return-to="returnTo"
       />
 
       <UTabs
-        v-model="statusKey"
+        v-model="selectedTab"
         :items="statusTabItems"
         class="hidden w-full sm:block"
       />

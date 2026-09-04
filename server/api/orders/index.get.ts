@@ -3,6 +3,15 @@ import { listOrders } from '../../utils/orders'
 import * as z from 'zod'
 
 const optionalCustomerId = z.string().uuid().optional()
+const orderView = z.enum([
+  'cotizacion',
+  'mostrador',
+  'vendedor',
+  'pendiente_pago',
+  'entregado',
+  'facturacion',
+  'cancelado'
+]).optional()
 
 function positiveInteger(value: unknown, fallback: number, maximum: number) {
   const parsed = Number(value)
@@ -27,9 +36,14 @@ export default eventHandler(async (event) => {
       ? query.customer_id.trim()
       : undefined
   )
+  const view = orderView.safeParse(
+    typeof query.view === 'string' && query.view.trim()
+      ? query.view.trim()
+      : undefined
+  )
 
-  if (!customerId.success) {
-    throw createError({ statusCode: 400, statusMessage: 'El identificador del cliente no es válido.' })
+  if (!customerId.success || !view.success) {
+    throw createError({ statusCode: 400, statusMessage: 'Los filtros del listado no son válidos.' })
   }
 
   return listOrders({
@@ -44,6 +58,7 @@ export default eventHandler(async (event) => {
     dateFrom: dateOnly(query.date_from),
     dateTo: dateOnly(query.date_to),
     customerId: customerId.data,
+    view: view.data,
     igualacion: query.igualacion === 'true' || query.igualacion === '1'
   }, user)
 })

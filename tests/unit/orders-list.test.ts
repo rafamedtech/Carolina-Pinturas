@@ -50,4 +50,44 @@ describe('listado de pedidos', () => {
       })
     }))
   })
+
+  it.each([
+    ['cotizacion', { statusKey: 'borrador' }],
+    ['pendiente_pago', { paymentStatus: { in: ['pendiente_pago', 'abonado'] } }],
+    ['entregado', { statusKey: 'entregado' }],
+    ['facturacion', { requiresInvoice: true }],
+    ['cancelado', { statusKey: 'cancelado' }]
+  ] as const)('aplica el filtro de la vista %s', async (view, expectedFilter) => {
+    await listOrders({ page: 1, pageSize: 25, view }, admin)
+
+    expect(mocks.findMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({
+        AND: expect.arrayContaining([expectedFilter])
+      })
+    }))
+  })
+
+  it('separa los pedidos de mostrador de los de vendedor', async () => {
+    await listOrders({ page: 1, pageSize: 25, view: 'mostrador' }, admin)
+
+    const counterFilter = {
+      OR: [
+        { customerNameSnapshot: { equals: 'MOSTRADOR .', mode: 'insensitive' } },
+        { customerNameSnapshot: { equals: 'MOSTRADOR', mode: 'insensitive' } }
+      ]
+    }
+    expect(mocks.findMany).toHaveBeenLastCalledWith(expect.objectContaining({
+      where: expect.objectContaining({
+        AND: expect.arrayContaining([counterFilter])
+      })
+    }))
+
+    await listOrders({ page: 1, pageSize: 25, view: 'vendedor' }, admin)
+
+    expect(mocks.findMany).toHaveBeenLastCalledWith(expect.objectContaining({
+      where: expect.objectContaining({
+        AND: expect.arrayContaining([{ NOT: counterFilter }])
+      })
+    }))
+  })
 })

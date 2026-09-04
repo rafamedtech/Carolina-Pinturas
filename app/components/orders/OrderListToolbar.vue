@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import type { DropdownMenuItem } from '@nuxt/ui'
-import type { OrderDateRange, OrderStatus } from '~/types/orders'
+import type { OrderDateRange } from '~/types/orders'
 import { PAYMENT_METHODS, PAYMENT_STATUSES } from '~/utils/orderPayment'
 
 const props = withDefaults(defineProps<{
-  statuses: OrderStatus[]
+  items: Array<{ label: string, value: string }>
   returnTo: string
   igualacion?: boolean
   canCreate?: boolean
@@ -21,21 +21,6 @@ const hideCancelled = defineModel<boolean>('hideCancelled', { required: true })
 const hideQuotes = defineModel<boolean>('hideQuotes', { required: true })
 const dateRange = defineModel<OrderDateRange | null>('dateRange', { required: true })
 const moreFiltersOpen = shallowRef(false)
-
-const IGUALACION_STATUS_KEYS = ['confirmado', 'surtido', 'en_espera']
-
-const statusOptions = computed(() => {
-  const statuses = props.igualacion
-    ? props.statuses.filter(item => IGUALACION_STATUS_KEYS.includes(item.key))
-    : props.statuses
-  return [{
-    label: 'Todos los estados',
-    value: 'all'
-  }, ...statuses.map(item => ({
-    label: item.label,
-    value: item.key
-  }))]
-})
 
 const paymentStatusOptions = [{
   label: 'Todos los pagos',
@@ -130,7 +115,7 @@ function clearFilters() {
       />
       <USelect
         v-model="status"
-        :items="statusOptions"
+        :items="items"
         value-key="value"
         class="w-full sm:hidden"
       />
