@@ -22,7 +22,12 @@ export default defineNuxtRouteMiddleware(async (to) => {
     return navigateTo(homePathForRole(user.role))
   }
 
-  if (to.path.startsWith('/configuracion') && user.role !== 'admin') {
+  const adminOnlyPath = path === '/configuracion'
+    || path.startsWith('/configuracion/')
+    || path === '/reportes'
+    || path.startsWith('/reportes/')
+
+  if (adminOnlyPath && user.role !== 'admin') {
     return navigateTo('/')
   }
 })

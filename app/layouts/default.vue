@@ -12,6 +12,7 @@ interface AppNavigationItem {
 
 const open = shallowRef(false)
 const { user } = useAuth()
+const adminRoles = ['admin'] as const satisfies readonly UserRole[]
 const managementRoles = ['admin', 'mostrador', 'vendedor'] as const satisfies readonly UserRole[]
 const orderEntryRoles = [...managementRoles, 'repartidor'] as const satisfies readonly UserRole[]
 const allLinks: AppNavigationItem[] = [{
@@ -19,6 +20,14 @@ const allLinks: AppNavigationItem[] = [{
   icon: 'i-lucide-house',
   to: '/',
   roles: managementRoles,
+  onSelect: () => {
+    open.value = false
+  }
+}, {
+  label: 'Reportes',
+  icon: 'i-lucide-chart-column-big',
+  to: '/reportes',
+  roles: adminRoles,
   onSelect: () => {
     open.value = false
   }
