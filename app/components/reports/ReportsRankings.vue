@@ -28,7 +28,7 @@ const rankings = computed(() => [{
 }, {
   key: 'debtors',
   title: 'Clientes con mayor adeudo',
-  description: 'Saldo vigente de pedidos del mes, descontando los pagos recibidos.',
+  description: 'Saldo vigente de pedidos del mes.',
   icon: 'i-lucide-wallet',
   empty: 'Sin clientes con adeudo en este mes',
   items: props.debtors,

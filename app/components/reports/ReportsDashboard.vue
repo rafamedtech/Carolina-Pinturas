@@ -59,18 +59,6 @@ const errorMessage = computed(() =>
         :products="data.topProducts"
         :debtors="data.topDebtors"
       />
-
-      <div class="flex gap-3 rounded-lg border border-default bg-elevated/40 p-4">
-        <UIcon name="i-lucide-info" class="mt-0.5 size-4 shrink-0 text-dimmed" />
-        <div>
-          <p class="text-sm font-medium text-default">
-            Cómo leer este reporte
-          </p>
-          <p class="mt-1 text-sm text-balance text-muted">
-            Todos los importes se presentan en MXN. Se excluyen borradores y pedidos cancelados. Mostrador corresponde a los clientes “MOSTRADOR” y “MOSTRADOR .”; todos los demás se agrupan como clientes del vendedor. Las ventas corresponden a la fecha del pedido; los cobros, a la fecha en que se recibió el pago, incluso si pertenecen a ventas de otro mes. El saldo por cobrar refleja el saldo vigente de los pedidos del periodo. El flujo neto es cobros menos gastos y no representa utilidad, porque el sistema no registra el costo de venta.
-          </p>
-        </div>
-      </div>
     </template>
   </div>
 </template>
