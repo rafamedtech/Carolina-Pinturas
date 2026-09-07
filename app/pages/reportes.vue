@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { CalendarDate } from '@internationalized/date'
 
-useSeoMeta({ title: 'Reportes' })
+useSeoMeta({ title: 'Reporte mensual' })
 
 const now = new Date()
 const selectedMonth = shallowRef(new CalendarDate(now.getFullYear(), now.getMonth() + 1, 1))
@@ -11,7 +11,7 @@ const month = computed(() => `${selectedMonth.value.year}-${String(selectedMonth
 <template>
   <UDashboardPanel id="reports">
     <template #header>
-      <UDashboardNavbar title="Reportes">
+      <UDashboardNavbar title="Reporte mensual">
         <template #leading>
           <UDashboardSidebarCollapse />
         </template>

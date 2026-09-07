@@ -31,7 +31,45 @@ export function reportMonthBounds(selectedMonth: string | undefined, now = new D
   const previousStart = new Date(Date.UTC(year, month - 1, 1))
   const totalDays = new Date(Date.UTC(year, month + 1, 0)).getUTCDate()
   const isCurrentMonth = year === now.getUTCFullYear() && month === now.getUTCMonth()
-  const elapsedDays = isCurrentMonth ? Math.min(now.getUTCDate(), totalDays) : totalDays
+  const elapsedDays = start > now ? 0 : isCurrentMonth ? Math.min(now.getUTCDate(), totalDays) : totalDays
 
   return { start, end, previousStart, totalDays, elapsedDays, dayInMs: DAY_IN_MS }
+}
+
+// Match the customer-based classification used by the order list.
+export function reportIsCounterSale(customerName: string) {
+  return ['MOSTRADOR', 'MOSTRADOR .'].includes(customerName.toUpperCase())
+}
+
+export function reportTopDebtors(orders: readonly {
+  customerId: string
+  customerNameSnapshot: string
+  total: { toString(): string } | number
+  payments: readonly { amount: { toString(): string } | number }[]
+}[]) {
+  const customers = new Map<string, { id: string, label: string, detail: string, amount: number, count: number }>()
+  let totalOutstanding = 0
+
+  for (const order of orders) {
+    const paid = order.payments.reduce((sum, payment) => sum + reportNumeric(payment.amount), 0)
+    const outstanding = Math.max(reportNumeric(order.total) - paid, 0)
+    if (outstanding <= 0) continue
+
+    const customer = customers.get(order.customerId) ?? {
+      id: order.customerId,
+      label: order.customerNameSnapshot,
+      detail: 'Saldo pendiente',
+      amount: 0,
+      count: 0
+    }
+    customer.amount += outstanding
+    customer.count++
+    totalOutstanding += outstanding
+    customers.set(order.customerId, customer)
+  }
+
+  return [...customers.values()]
+    .sort((a, b) => b.amount - a.amount || a.label.localeCompare(b.label))
+    .slice(0, 5)
+    .map(customer => ({ ...customer, percentage: reportPercentage(customer.amount, totalOutstanding) }))
 }

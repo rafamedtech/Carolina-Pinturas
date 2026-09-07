@@ -9,6 +9,8 @@ import { requireRole } from '../../utils/auth'
 import { usePrisma } from '../../utils/prisma'
 import {
   reportDateOnly,
+  reportTopDebtors,
+  reportIsCounterSale,
   reportMonthBounds,
   reportNumeric,
   reportPercentage,
@@ -24,9 +26,10 @@ export default eventHandler(async (event) => {
   const query = getQuery(event)
   const selectedMonth = typeof query.month === 'string' ? query.month : undefined
   const { start, end, previousStart, totalDays, elapsedDays, dayInMs } = reportMonthBounds(selectedMonth)
+  const cutoff = new Date(start.getTime() + elapsedDays * dayInMs)
   const salesWhere = {
     statusKey: { notIn: EXCLUDED_SALES_STATUSES },
-    orderDate: { gte: start, lt: end }
+    orderDate: { gte: start, lt: cutoff }
   } satisfies Prisma.SalesOrderWhereInput
 
   const [orders, previousSalesResult, collections, previousCollectionsResult, expenses, previousExpenses] = await Promise.all([
@@ -53,15 +56,15 @@ export default eventHandler(async (event) => {
         }
       }
     }),
-    prisma.salesOrder.aggregate({
+    prisma.salesOrder.findMany({
       where: {
         statusKey: { notIn: EXCLUDED_SALES_STATUSES },
         orderDate: { gte: previousStart, lt: start }
       },
-      _sum: { total: true }
+      select: { total: true, customerNameSnapshot: true }
     }),
     prisma.salesOrderPayment.findMany({
-      where: { paymentDate: { gte: start, lt: end } },
+      where: { paymentDate: { gte: start, lt: cutoff } },
       select: { paymentDate: true, paymentMethod: true, amount: true }
     }),
     prisma.salesOrderPayment.aggregate({
@@ -69,8 +72,13 @@ export default eventHandler(async (event) => {
       _sum: { amount: true }
     }),
     prisma.expense.findMany({
-      where: { expenseDate: { gte: start, lt: end } },
-      select: { expenseDate: true, category: true, amount: true, exchangeRate: true }
+      where: { expenseDate: { gte: start, lt: cutoff } },
+      orderBy: [{ expenseDate: 'desc' }, { id: 'desc' }],
+      select: {
+        id: true, expenseDate: true, category: true, description: true,
+        providerNameSnapshot: true, paymentMethod: true, currencyCode: true,
+        amount: true, exchangeRate: true, notes: true
+      }
     }),
     prisma.expense.findMany({
       where: { expenseDate: { gte: previousStart, lt: start } },
@@ -79,7 +87,7 @@ export default eventHandler(async (event) => {
   ] as const)
 
   const sales = orders.reduce((sum, order) => sum + reportNumeric(order.total), 0)
-  const previousSales = reportNumeric(previousSalesResult._sum.total)
+  const previousSales = previousSalesResult.reduce((sum, order) => sum + reportNumeric(order.total), 0)
   const collectionsAmount = collections.reduce((sum, payment) => sum + reportNumeric(payment.amount), 0)
   const previousCollections = reportNumeric(previousCollectionsResult._sum.amount)
   const expensesAmount = expenses.reduce(
@@ -98,12 +106,18 @@ export default eventHandler(async (event) => {
     return sum + Math.max(reportNumeric(order.total) - paid, 0)
   }, 0)
 
+  const dailyCounts = new Map<string, number>()
+  const dailyCounterSales = new Map<string, number>()
   const dailySales = new Map<string, number>()
   const dailyCollections = new Map<string, number>()
   const dailyExpenses = new Map<string, number>()
 
   for (const order of orders) {
     const key = reportDateOnly(order.orderDate)
+    dailyCounts.set(key, (dailyCounts.get(key) ?? 0) + 1)
+    if (reportIsCounterSale(order.customerNameSnapshot)) {
+      dailyCounterSales.set(key, (dailyCounterSales.get(key) ?? 0) + reportNumeric(order.total))
+    }
     dailySales.set(key, (dailySales.get(key) ?? 0) + reportNumeric(order.total))
   }
 
@@ -128,6 +142,9 @@ export default eventHandler(async (event) => {
       date: key,
       label: new Intl.DateTimeFormat('es-MX', { day: 'numeric', month: 'short', timeZone: 'UTC' }).format(date),
       sales: dailySales.get(key) ?? 0,
+      orderCount: dailyCounts.get(key) ?? 0,
+      counterSales: dailyCounterSales.get(key) ?? 0,
+      sellerSales: (dailySales.get(key) ?? 0) - (dailyCounterSales.get(key) ?? 0),
       collections: dayCollections,
       expenses: dayExpenses,
       netCashFlow: dayCollections - dayExpenses
@@ -230,6 +247,10 @@ export default eventHandler(async (event) => {
     },
     metrics: {
       sales,
+      previousOrderCount: previousSalesResult.length,
+      previousCounterSales: previousSalesResult.filter(order => reportIsCounterSale(order.customerNameSnapshot)).reduce((sum, order) => sum + reportNumeric(order.total), 0),
+      previousSellerSales: previousSalesResult.filter(order => !reportIsCounterSale(order.customerNameSnapshot)).reduce((sum, order) => sum + reportNumeric(order.total), 0),
+      previousDays: Math.round((start.getTime() - previousStart.getTime()) / dayInMs),
       previousSales,
       salesChangePercentage: reportPercentageChange(sales, previousSales),
       collections: collectionsAmount,
@@ -247,6 +268,24 @@ export default eventHandler(async (event) => {
       outstandingBalance,
       collectionCoveragePercentage: reportPercentage(sales - outstandingBalance, sales)
     },
+    salesChannels: ['counter', 'seller'].map((key) => {
+      const channelOrders = orders.filter(order => reportIsCounterSale(order.customerNameSnapshot) === (key === 'counter'))
+      const amount = channelOrders.reduce((sum, order) => sum + reportNumeric(order.total), 0)
+      return { key, label: key === 'counter' ? 'Mostrador' : 'Clientes del vendedor', amount, count: channelOrders.length, percentage: reportPercentage(amount, sales) }
+    }),
+    expenseDetails: expenses.map(expense => ({
+      id: expense.id,
+      date: reportDateOnly(expense.expenseDate),
+      category: expense.category,
+      description: expense.description,
+      provider: expense.providerNameSnapshot,
+      paymentMethod: paymentMethodLabel(expense.paymentMethod),
+      currencyCode: expense.currencyCode,
+      originalAmount: reportNumeric(expense.amount),
+      exchangeRate: reportNumeric(expense.exchangeRate),
+      amount: reportNumeric(expense.amount) * reportNumeric(expense.exchangeRate),
+      notes: expense.notes
+    })),
     dailyMovements,
     paymentMethods,
     expenseCategories: breakdown(
@@ -255,6 +294,7 @@ export default eventHandler(async (event) => {
       expense => reportNumeric(expense.amount) * reportNumeric(expense.exchangeRate),
       expensesAmount
     ),
+    topDebtors: reportTopDebtors(orders),
     topCustomers: ranking(customers, sales),
     topProducts: ranking(products, sales),
     topSellers: ranking(sellers, sales)

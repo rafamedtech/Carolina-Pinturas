@@ -11,29 +11,6 @@ const errorMessage = computed(() =>
 
 <template>
   <div class="flex w-full flex-col gap-6">
-    <div class="flex flex-wrap items-end justify-between gap-x-6 gap-y-3 border-b border-default pb-5">
-      <div class="max-w-2xl">
-        <p class="text-[11px] font-semibold tracking-[0.18em] text-primary uppercase">
-          Lectura ejecutiva
-        </p>
-        <h1 class="mt-1.5 text-2xl font-semibold tracking-tight text-highlighted sm:text-3xl">
-          Pulso del negocio
-        </h1>
-        <p class="mt-2 text-sm text-muted">
-          Ventas, liquidez y concentración comercial para tomar decisiones con datos reales.
-        </p>
-      </div>
-      <UBadge
-        v-if="data"
-        :label="data.period.label"
-        icon="i-lucide-calendar-range"
-        color="neutral"
-        variant="subtle"
-        size="lg"
-        class="capitalize"
-      />
-    </div>
-
     <UAlert
       v-if="error"
       color="warning"
@@ -54,7 +31,7 @@ const errorMessage = computed(() =>
       </template>
     </UAlert>
 
-    <template v-if="status === 'pending' && !data">
+    <template v-if="status === 'pending'">
       <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <USkeleton v-for="index in 4" :key="index" class="h-36 rounded-lg" />
       </div>
@@ -68,17 +45,20 @@ const errorMessage = computed(() =>
       </div>
     </template>
 
-    <template v-else-if="data">
+    <template v-else-if="data && !error">
       <ReportsSummaryCards :metrics="data.metrics" />
+      <ReportsPeriodAnalysis :report="data" />
+      <ReportsSalesChannels :channels="data.salesChannels" />
       <ReportsCashFlowChart :data="data.dailyMovements" />
       <ReportsBreakdowns
         :payment-methods="data.paymentMethods"
         :expense-categories="data.expenseCategories"
       />
+      <ReportsExpenseDetails :expenses="data.expenseDetails" />
       <ReportsRankings
         :customers="data.topCustomers"
         :products="data.topProducts"
-        :sellers="data.topSellers"
+        :debtors="data.topDebtors"
       />
 
       <div class="flex gap-3 rounded-lg border border-default bg-elevated/40 p-4">
@@ -88,7 +68,7 @@ const errorMessage = computed(() =>
             Cómo leer este reporte
           </p>
           <p class="mt-1 text-sm text-balance text-muted">
-            Las ventas corresponden a la fecha del pedido; los cobros, a la fecha en que se recibió el pago, incluso si pertenecen a ventas de otro mes. El saldo por cobrar refleja el saldo vigente de los pedidos del periodo. El flujo neto es cobros menos gastos y no representa utilidad, porque el sistema no registra el costo de venta.
+            Todos los importes se presentan en MXN. Se excluyen borradores y pedidos cancelados. Mostrador corresponde a los clientes “MOSTRADOR” y “MOSTRADOR .”; todos los demás se agrupan como clientes del vendedor. Las ventas corresponden a la fecha del pedido; los cobros, a la fecha en que se recibió el pago, incluso si pertenecen a ventas de otro mes. El saldo por cobrar refleja el saldo vigente de los pedidos del periodo. El flujo neto es cobros menos gastos y no representa utilidad, porque el sistema no registra el costo de venta.
           </p>
         </div>
       </div>

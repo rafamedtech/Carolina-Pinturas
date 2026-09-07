@@ -8,6 +8,10 @@ export interface ReportPeriod {
 
 export interface ReportMetrics {
   sales: number
+  previousOrderCount: number
+  previousCounterSales: number
+  previousSellerSales: number
+  previousDays: number
   previousSales: number
   salesChangePercentage: number | null
   collections: number
@@ -30,6 +34,9 @@ export interface ReportDailyMovement {
   date: string
   label: string
   sales: number
+  orderCount: number
+  counterSales: number
+  sellerSales: number
   collections: number
   expenses: number
   netCashFlow: number
@@ -56,9 +63,26 @@ export interface BusinessReportSummary {
   period: ReportPeriod
   metrics: ReportMetrics
   dailyMovements: ReportDailyMovement[]
+  salesChannels: ReportBreakdownItem[]
+  expenseDetails: ReportExpenseDetail[]
   paymentMethods: ReportBreakdownItem[]
   expenseCategories: ReportBreakdownItem[]
+  topDebtors: ReportRankingItem[]
   topCustomers: ReportRankingItem[]
   topProducts: ReportRankingItem[]
   topSellers: ReportRankingItem[]
+}
+
+export interface ReportExpenseDetail {
+  id: string
+  date: string
+  category: string
+  description: string
+  provider: string
+  paymentMethod: string
+  currencyCode: string
+  originalAmount: number
+  exchangeRate: number
+  amount: number
+  notes: string | null
 }

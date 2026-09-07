@@ -1,11 +1,12 @@
 <script setup lang="ts">
+import { reportCurrency } from '~/utils/reportPeriods'
 import type { ReportRankingItem } from '~/types/reports'
 import { dashboardCompactCurrency, dashboardNumber } from '~/utils/dashboardFormatters'
 
 const props = defineProps<{
   customers: ReportRankingItem[]
   products: ReportRankingItem[]
-  sellers: ReportRankingItem[]
+  debtors: ReportRankingItem[]
 }>()
 
 const rankings = computed(() => [{
@@ -25,13 +26,13 @@ const rankings = computed(() => [{
   items: props.products,
   countLabel: (count: number) => `${dashboardNumber.format(count)} uds.`
 }, {
-  key: 'sellers',
-  title: 'Desempeño comercial',
-  description: 'Ventas registradas por vendedor.',
-  icon: 'i-lucide-medal',
-  empty: 'Sin actividad comercial',
-  items: props.sellers,
-  countLabel: (count: number) => `${count} ${count === 1 ? 'pedido' : 'pedidos'}`
+  key: 'debtors',
+  title: 'Clientes con mayor adeudo',
+  description: 'Saldo vigente de pedidos del mes, descontando los pagos recibidos.',
+  icon: 'i-lucide-wallet',
+  empty: 'Sin clientes con adeudo en este mes',
+  items: props.debtors,
+  countLabel: (count: number) => `${count} ${count === 1 ? 'pedido con saldo' : 'pedidos con saldo'}`
 }])
 </script>
 
@@ -68,7 +69,7 @@ const rankings = computed(() => [{
                 {{ item.label }}
               </p>
               <p class="shrink-0 text-sm font-semibold tabular-nums text-highlighted">
-                {{ dashboardCompactCurrency(item.amount) }}
+                {{ ranking.key === 'debtors' ? reportCurrency.format(item.amount) : dashboardCompactCurrency(item.amount) }}
               </p>
             </div>
             <UProgress

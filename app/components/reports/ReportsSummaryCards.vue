@@ -1,6 +1,7 @@
 <script setup lang="ts">
+import { reportCurrency } from '~/utils/reportPeriods'
 import type { ReportMetrics } from '~/types/reports'
-import { dashboardCurrency, dashboardNumber } from '~/utils/dashboardFormatters'
+import { dashboardNumber } from '~/utils/dashboardFormatters'
 
 const props = defineProps<{
   metrics: ReportMetrics
@@ -17,29 +18,29 @@ function comparison(value: number | null, inverse = false) {
 }
 
 const primaryMetrics = computed(() => [{
-  title: 'Ventas registradas',
-  value: dashboardCurrency.format(props.metrics.sales),
+  title: 'Total vendido',
+  value: reportCurrency.format(props.metrics.sales),
   description: `${props.metrics.orderCount} ${props.metrics.orderCount === 1 ? 'pedido activo' : 'pedidos activos'}`,
   icon: 'i-lucide-chart-no-axes-combined',
   accent: 'text-primary bg-primary/10',
   comparison: comparison(props.metrics.salesChangePercentage)
 }, {
-  title: 'Cobros recibidos',
-  value: dashboardCurrency.format(props.metrics.collections),
-  description: 'Entradas reales del periodo',
+  title: 'Cantidad de ventas',
+  value: dashboardNumber.format(props.metrics.orderCount),
+  description: 'Pedidos sin borradores ni cancelados',
   icon: 'i-lucide-banknote-arrow-up',
   accent: 'text-success bg-success/10',
-  comparison: comparison(props.metrics.collectionsChangePercentage)
+  comparison: comparison(props.metrics.previousOrderCount ? (props.metrics.orderCount - props.metrics.previousOrderCount) / props.metrics.previousOrderCount * 100 : null)
 }, {
   title: 'Gastos pagados',
-  value: dashboardCurrency.format(props.metrics.expenses),
+  value: reportCurrency.format(props.metrics.expenses),
   description: 'Egresos convertidos a MXN',
   icon: 'i-lucide-banknote-arrow-down',
   accent: 'text-warning bg-warning/10',
   comparison: comparison(props.metrics.expensesChangePercentage, true)
 }, {
   title: 'Flujo neto',
-  value: dashboardCurrency.format(props.metrics.netCashFlow),
+  value: reportCurrency.format(props.metrics.netCashFlow),
   description: 'Cobros menos gastos',
   icon: 'i-lucide-scale',
   accent: 'text-info bg-info/10',
@@ -47,20 +48,20 @@ const primaryMetrics = computed(() => [{
 }])
 
 const operatingMetrics = computed(() => [{
+  title: 'Cobros recibidos',
+  value: reportCurrency.format(props.metrics.collections),
+  detail: 'Entradas reales del mes',
+  icon: 'i-lucide-banknote-arrow-up'
+}, {
   title: 'Saldo por cobrar',
-  value: dashboardCurrency.format(props.metrics.outstandingBalance),
+  value: reportCurrency.format(props.metrics.outstandingBalance),
   detail: `${dashboardNumber.format(props.metrics.collectionCoveragePercentage)}% cubierto en pedidos del mes`,
   icon: 'i-lucide-hourglass'
 }, {
   title: 'Ticket promedio',
-  value: dashboardCurrency.format(props.metrics.averageTicket),
+  value: reportCurrency.format(props.metrics.averageTicket),
   detail: 'Venta promedio por pedido',
   icon: 'i-lucide-receipt-text'
-}, {
-  title: 'Descuentos otorgados',
-  value: dashboardCurrency.format(props.metrics.discounts),
-  detail: 'Descuento total en pedidos',
-  icon: 'i-lucide-badge-percent'
 }])
 </script>
 
@@ -87,6 +88,7 @@ const operatingMetrics = computed(() => [{
 
         <div class="mt-4 flex flex-wrap items-center gap-x-2 gap-y-1 border-t border-default pt-3">
           <UBadge v-bind="metric.comparison" variant="soft" size="sm" />
+          <span class="text-xs text-muted">vs. mes anterior completo</span>
           <span class="text-xs text-muted">{{ metric.description }}</span>
         </div>
       </UCard>

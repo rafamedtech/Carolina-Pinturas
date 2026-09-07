@@ -104,6 +104,9 @@ function dayLabel(day: ReportDailyMovement) {
               class="group flex w-7 flex-col rounded-md px-0.5 pt-1 transition-colors hover:bg-elevated/60"
               :aria-label="dayLabel(day)"
               role="img"
+              tabindex="0"
+              @focus="hoveredDate = day.date"
+              @blur="hoveredDate = null"
               @mouseenter="hoveredDate = day.date"
             >
               <div class="flex h-64 items-end justify-center gap-0.5">
