@@ -54,7 +54,6 @@ const errorMessage = computed(() =>
         :payment-methods="data.paymentMethods"
         :expense-categories="data.expenseCategories"
       />
-      <ReportsExpenseDetails :expenses="data.expenseDetails" />
       <ReportsRankings
         :customers="data.topCustomers"
         :products="data.topProducts"
