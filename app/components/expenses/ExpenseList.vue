@@ -48,6 +48,8 @@ const debouncedFilter = refDebounced(filter, 300)
 const isHydrated = shallowRef(false)
 const modalOpen = shallowRef(false)
 const saving = shallowRef(false)
+const deleting = shallowRef(false)
+const selectedExpense = shallowRef<ExpenseRecord | null>(null)
 const submitError = shallowRef('')
 const toast = useToast()
 
@@ -131,18 +133,45 @@ watch(modalOpen, (isOpen) => {
   if (isOpen) submitError.value = ''
 })
 
-async function addExpense(input: CreateExpenseInput) {
+function openExpense(expense: ExpenseRecord | null = null) {
+  selectedExpense.value = expense
+  submitError.value = ''
+  modalOpen.value = true
+}
+
+async function deleteExpense() {
+  if (!selectedExpense.value || saving.value || deleting.value) return
+  deleting.value = true
+  submitError.value = ''
+  try {
+    await $fetch(`/api/expenses/${selectedExpense.value.id}`, { method: 'DELETE' })
+    modalOpen.value = false
+    toast.add({ title: 'Gasto eliminado', color: 'success', icon: 'i-lucide-circle-check' })
+    if (expenseCatalog.value.results.length === 1 && page.value > 1) page.value -= 1
+    else await refreshExpenses()
+  } catch (error: unknown) {
+    const fetchError = error as { data?: { statusMessage?: string }, message?: string }
+    submitError.value = fetchError.data?.statusMessage || fetchError.message || 'Intenta nuevamente.'
+  } finally {
+    deleting.value = false
+  }
+}
+
+async function saveExpense(input: CreateExpenseInput) {
+  if (saving.value || deleting.value) return
   saving.value = true
   submitError.value = ''
 
   try {
-    const expense = await $fetch<ExpenseRecord>('/api/expenses', {
-      method: 'POST',
-      body: input
-    })
+    const editing = Boolean(selectedExpense.value)
+    const expense = await $fetch<ExpenseRecord>(
+      selectedExpense.value ? `/api/expenses/${selectedExpense.value.id}` : '/api/expenses', {
+        method: editing ? 'PUT' : 'POST',
+        body: input
+      })
     modalOpen.value = false
     toast.add({
-      title: 'Gasto agregado',
+      title: editing ? 'Gasto actualizado' : 'Gasto agregado',
       description: `${expense.description} por ${formatCurrency(expense.amount, expense.currencyCode)}.`,
       color: 'success',
       icon: 'i-lucide-circle-check'
@@ -181,7 +210,7 @@ async function addExpense(input: CreateExpenseInput) {
             label="Agregar gasto"
             icon="i-lucide-plus"
             :ui="{ label: 'hidden sm:inline' }"
-            @click="modalOpen = true"
+            @click="openExpense()"
           />
         </template>
       </UDashboardNavbar>
@@ -209,6 +238,7 @@ async function addExpense(input: CreateExpenseInput) {
         v-else
         :expenses="expenseCatalog.results"
         :loading="loading"
+        @select="openExpense"
       />
 
       <ExpensesExpenseListPagination
@@ -227,8 +257,11 @@ async function addExpense(input: CreateExpenseInput) {
         :suppliers-loading="suppliersLoading"
         :suppliers-error="suppliersErrorMessage"
         :saving="saving"
+        :deleting="deleting"
+        :expense="selectedExpense"
         :submit-error="submitError"
-        @submit="addExpense"
+        @submit="saveExpense"
+        @delete="deleteExpense"
       />
     </template>
   </UDashboardPanel>

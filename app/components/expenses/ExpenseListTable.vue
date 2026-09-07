@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { h, resolveComponent } from 'vue'
 import type { TableColumn } from '@nuxt/ui'
-import type { Column, SortingState } from '@tanstack/table-core'
+import type { Column, Row, SortingState } from '@tanstack/table-core'
 import type { ExpenseRecord } from '~/types/expenses'
 import { paymentMethodLabel } from '~/utils/orderPayment'
 
@@ -9,6 +9,14 @@ const props = defineProps<{
   expenses: readonly ExpenseRecord[]
   loading: boolean
 }>()
+
+const emit = defineEmits<{
+  select: [expense: ExpenseRecord]
+}>()
+
+function selectRow(_event: Event, row: Row<ExpenseRecord>) {
+  emit('select', row.original)
+}
 
 const UButton = resolveComponent('UButton')
 const tableExpenses = computed(() => [...props.expenses])
@@ -108,7 +116,14 @@ const columns: TableColumn<ExpenseRecord>[] = [{
       <UCard
         v-for="expense in expenses"
         :key="expense.id"
+        role="button"
+        tabindex="0"
+        :aria-label="`Editar gasto: ${expense.description}`"
+        class="cursor-pointer focus-visible:outline-2 focus-visible:outline-primary"
         :ui="{ body: 'flex flex-col gap-4 p-4 sm:p-4' }"
+        @click="emit('select', expense)"
+        @keydown.enter.prevent="emit('select', expense)"
+        @keydown.space.prevent="emit('select', expense)"
       >
         <div class="flex items-start justify-between gap-3">
           <div class="min-w-0">
@@ -185,7 +200,9 @@ const columns: TableColumn<ExpenseRecord>[] = [{
       tbody: '[&>tr]:last:[&>td]:border-b-0',
       th: 'py-2 first:rounded-l-lg last:rounded-r-lg border-y border-default first:border-l last:border-r',
       td: 'border-b border-default',
+      tr: 'data-[selectable=true]:cursor-pointer',
       separator: 'h-0'
     }"
+    @select="selectRow"
   />
 </template>

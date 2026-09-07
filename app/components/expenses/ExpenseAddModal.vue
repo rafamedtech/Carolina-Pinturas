@@ -3,7 +3,7 @@ import { parseDate } from '@internationalized/date'
 import type { DateValue } from '@internationalized/date'
 import * as z from 'zod'
 import type { FormSubmitEvent } from '@nuxt/ui'
-import type { CreateExpenseInput } from '~/types/expenses'
+import type { CreateExpenseInput, ExpenseRecord } from '~/types/expenses'
 import type { SiigoCustomer } from '~/types/siigo'
 import type { ExpenseCategory, ExpenseCurrencyCode } from '~/utils/expense'
 import { EXPENSE_CATEGORIES, EXPENSE_CURRENCIES } from '~/utils/expense'
@@ -13,6 +13,8 @@ import { mexicoToday } from '~/utils/datetime'
 import { siigoCustomerName } from '~/utils/siigoCustomer'
 
 const props = withDefaults(defineProps<{
+  expense?: ExpenseRecord | null
+  deleting?: boolean
   categories: readonly ExpenseCategory[]
   suppliers: SiigoCustomer[]
   suppliersLoading?: boolean
@@ -20,6 +22,8 @@ const props = withDefaults(defineProps<{
   saving?: boolean
   submitError?: string
 }>(), {
+  expense: null,
+  deleting: false,
   suppliersLoading: false,
   suppliersError: '',
   saving: false,
@@ -28,6 +32,7 @@ const props = withDefaults(defineProps<{
 
 const emit = defineEmits<{
   submit: [expense: CreateExpenseInput]
+  delete: []
 }>()
 
 const open = defineModel<boolean>('open', { required: true })
@@ -35,11 +40,21 @@ const open = defineModel<boolean>('open', { required: true })
 const categoryItems = computed(() => [...props.categories])
 const currencyItems = EXPENSE_CURRENCIES.map(currency => ({ ...currency }))
 const methodItems = PAYMENT_METHODS.map(method => ({ label: method.label, value: method.key }))
-const supplierItems = computed(() => props.suppliers.map(supplier => ({
-  label: siigoCustomerName(supplier) || 'Proveedor sin nombre',
-  description: supplier.rfc_id || supplier.identification,
-  value: supplier.id
-})))
+const supplierItems = computed(() => {
+  const items = props.suppliers.map(supplier => ({
+    label: siigoCustomerName(supplier) || 'Proveedor sin nombre',
+    description: supplier.rfc_id || supplier.identification,
+    value: supplier.id
+  }))
+  if (props.expense && !items.some(item => item.value === props.expense?.providerId)) {
+    items.unshift({
+      label: props.expense.provider,
+      description: props.expense.providerRfc || '',
+      value: props.expense.providerId
+    })
+  }
+  return items
+})
 
 const schema = z.object({
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Selecciona una fecha válida.'),
@@ -57,6 +72,20 @@ const schema = z.object({
 type Schema = z.output<typeof schema>
 
 function initialState(): Schema {
+  if (props.expense) {
+    const expense = props.expense
+    return {
+      date: expense.date,
+      category: expense.category,
+      description: expense.description,
+      providerId: expense.providerId,
+      currencyCode: expense.currencyCode,
+      exchangeRate: expense.exchangeRate,
+      amount: expense.amount,
+      paymentMethod: expense.paymentMethod,
+      notes: expense.notes || ''
+    }
+  }
   return {
     date: mexicoToday(),
     category: 'Compra de materiales',
@@ -93,8 +122,10 @@ function onSubmit(event: FormSubmitEvent<Schema>) {
 <template>
   <UModal
     v-model:open="open"
-    title="Agregar gasto"
-    description="Registra la información del gasto para incluirlo en el control del negocio."
+    :title="props.expense ? 'Editar gasto' : 'Agregar gasto'"
+    :description="props.expense ? 'Modifica la información del gasto seleccionado.' : 'Registra la información del gasto para incluirlo en el control del negocio.'"
+    :dismissible="!props.saving && !props.deleting"
+    :close="!props.saving && !props.deleting"
     :ui="{ content: 'max-w-3xl', footer: 'justify-end' }"
   >
     <template #body>
@@ -102,6 +133,7 @@ function onSubmit(event: FormSubmitEvent<Schema>) {
         id="expense-form"
         :schema="schema"
         :state="state"
+        :disabled="props.saving || props.deleting"
         class="grid gap-4 sm:grid-cols-2"
         @submit="onSubmit"
       >
@@ -109,7 +141,7 @@ function onSubmit(event: FormSubmitEvent<Schema>) {
           v-if="props.submitError"
           color="error"
           variant="subtle"
-          title="No se pudo guardar el gasto"
+          title="No se pudo completar la operación"
           :description="props.submitError"
           icon="i-lucide-circle-alert"
           class="sm:col-span-2"
@@ -235,19 +267,30 @@ function onSubmit(event: FormSubmitEvent<Schema>) {
 
     <template #footer="{ close }">
       <UButton
+        v-if="props.expense"
+        label="Eliminar gasto"
+        icon="i-lucide-trash-2"
+        color="error"
+        variant="subtle"
+        class="mr-auto"
+        :loading="props.deleting"
+        :disabled="props.saving || props.deleting"
+        @click="emit('delete')"
+      />
+      <UButton
         label="Cancelar"
         color="neutral"
         variant="outline"
-        :disabled="props.saving"
+        :disabled="props.saving || props.deleting"
         @click="close"
       />
       <UButton
         type="submit"
         form="expense-form"
-        label="Guardar gasto"
+        :label="props.expense ? 'Guardar cambios' : 'Guardar gasto'"
         icon="i-lucide-save"
         :loading="props.saving"
-        :disabled="props.saving"
+        :disabled="props.saving || props.deleting"
       />
     </template>
   </UModal>
