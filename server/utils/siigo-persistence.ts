@@ -107,6 +107,10 @@ export async function upsertSiigoCustomer(
     },
     update: {
       ...data,
+      // Siigo México puede representar ambos roles únicamente como Supplier.
+      // Incorporar el rol confirmado sin borrar la otra membresía local.
+      ...(externalType === 'supplier' ? { isSupplier: true } : {}),
+      ...(customer.type?.trim().toLowerCase() === 'customer' ? { isCustomer: true } : {}),
       ...internal,
       syncVersion: { increment: 1 },
       ...(options.updatedByEmail ? { updatedByEmail: options.updatedByEmail } : {}),

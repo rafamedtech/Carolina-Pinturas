@@ -130,7 +130,7 @@ describe('persistencia de snapshots de Siigo', () => {
       })
     }))
     expect(upsert.mock.calls[0]?.[0].update).not.toHaveProperty('isCustomer')
-    expect(upsert.mock.calls[0]?.[0].update).not.toHaveProperty('isSupplier')
+    expect(upsert.mock.calls[0]?.[0].update).toHaveProperty('isSupplier', true)
   })
 
   it('excluye el domicilio del snapshot local del cliente', async () => {

@@ -79,8 +79,8 @@ describe('importación de clientes Siigo → PostgreSQL', () => {
     const stale = { ...customer(2), type: 'Supplier' }
     const missing = { ...customer(3), type: 'Supplier' }
     const findLocalTypes = vi.fn().mockResolvedValue([
-      { id: current.id, type: 'Supplier' },
-      { id: stale.id, type: 'Customer' }
+      { id: current.id, type: 'Supplier', isCustomer: false, isSupplier: true },
+      { id: stale.id, type: 'Customer', isCustomer: true, isSupplier: false }
     ])
     const persistBatch = vi.fn().mockResolvedValue(undefined)
 
@@ -90,5 +90,36 @@ describe('importación de clientes Siigo → PostgreSQL', () => {
     )).resolves.toBe(2)
     expect(persistBatch).toHaveBeenCalledOnce()
     expect(persistBatch).toHaveBeenCalledWith([stale, missing])
+  })
+
+  it('repara el rol de UNIVERSAL PAINT aunque su tipo local ya sea Supplier', async () => {
+    const supplier = {
+      ...customer(1),
+      name: ['UNIVERSAL PAINT DEL NOROESTE, S. DE R.L. DE C.V.'],
+      type: 'Supplier'
+    }
+    const findLocalTypes = vi.fn().mockResolvedValue([{
+      id: supplier.id, type: 'Supplier', isCustomer: true, isSupplier: false
+    }])
+    const persistBatch = vi.fn().mockResolvedValue(undefined)
+
+    await expect(synchronizeSiigoCustomerSubset([supplier], {
+      findLocalTypes, persistBatch
+    })).resolves.toBe(1)
+    expect(persistBatch).toHaveBeenCalledWith([supplier])
+  })
+
+  it('importa terceros nuevos sin tipo y repara Customer sin desactivar Supplier', async () => {
+    const existing = { ...customer(1), type: 'Customer' }
+    const missing = customer(2)
+    const findLocalTypes = vi.fn().mockResolvedValue([{
+      id: existing.id, type: 'Customer', isCustomer: false, isSupplier: true
+    }])
+    const persistBatch = vi.fn().mockResolvedValue(undefined)
+
+    await expect(synchronizeSiigoCustomerSubset([existing, missing], {
+      findLocalTypes, persistBatch
+    })).resolves.toBe(2)
+    expect(persistBatch).toHaveBeenCalledWith([existing, missing])
   })
 })

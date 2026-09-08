@@ -15,7 +15,12 @@ interface CustomerImportDependencies {
 }
 
 interface CustomerSubsetSyncDependencies {
-  findLocalTypes: (ids: string[]) => Promise<Array<{ id: string, type: string | null }>>
+  findLocalTypes: (ids: string[]) => Promise<Array<{
+    id: string
+    type: string | null
+    isCustomer: boolean
+    isSupplier: boolean
+  }>>
   persistBatch: (customers: SiigoCustomer[]) => Promise<void>
 }
 
@@ -45,7 +50,7 @@ function defaultSubsetDependencies(): CustomerSubsetSyncDependencies {
     async findLocalTypes(ids) {
       return usePrisma().siigoCustomer.findMany({
         where: { id: { in: ids } },
-        select: { id: true, type: true }
+        select: { id: true, type: true, isCustomer: true, isSupplier: true }
       })
     },
     async persistBatch(customers) {
@@ -97,10 +102,15 @@ export async function synchronizeSiigoCustomerSubset(
   if (!customers.length) return 0
 
   const localCustomers = await dependencies.findLocalTypes(customers.map(customer => customer.id))
-  const localTypeById = new Map(localCustomers.map(customer => [customer.id, customer.type?.trim().toLowerCase()]))
+  const localById = new Map(localCustomers.map(customer => [customer.id, customer]))
   const staleCustomers = customers.filter((customer) => {
+    const local = localById.get(customer.id)
+    if (!local) return true
     const externalType = customer.type?.trim().toLowerCase()
-    return externalType && localTypeById.get(customer.id) !== externalType
+    // Reparar también snapshots que ya guardaron Supplier sin activar su rol.
+    return (externalType && local.type?.trim().toLowerCase() !== externalType)
+      || (externalType === 'supplier' && !local.isSupplier)
+      || (externalType === 'customer' && !local.isCustomer)
   })
 
   for (let index = 0; index < staleCustomers.length; index += CUSTOMER_IMPORT_BATCH_SIZE) {
