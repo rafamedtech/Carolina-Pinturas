@@ -58,10 +58,10 @@ const orderDetailInclude = {
 type OrderDetailRecord = Prisma.SalesOrderGetPayload<{ include: typeof orderDetailInclude }>
 
 // Prisma cancela las transacciones interactivas después de 5 s por defecto.
-// La app sincroniza snapshots de Siigo antes de escribir el pedido y la
-// latencia del pooler de producción puede superar ese umbral aun con queries
-// pequeñas. Mantener un límite explícito y acotado después de reducir los
-// round trips de persistencia.
+// Los snapshots de Siigo se sincronizan antes y fuera de la transacción, de
+// modo que la escritura del pedido conserva un límite explícito y acotado:
+// la latencia del pooler de producción puede superar el umbral predeterminado
+// aun con queries pequeñas, y con varias partidas lo agotaba.
 const ORDER_WRITE_TRANSACTION_OPTIONS = {
   maxWait: 5_000,
   timeout: 15_000
@@ -577,19 +577,23 @@ export async function createOrder(
     ? new Date(`${input.paymentDate}T00:00:00.000Z`)
     : initialPaymentDate
 
+  const status = await prisma.orderStatus.findFirst({
+    where: { key: statusKey, isActive: true }
+  })
+  if (!status) {
+    throw createError({ statusCode: 422, statusMessage: 'El estado seleccionado no está disponible.' })
+  }
+
+  // Los snapshots de Siigo se sincronizan antes y fuera de la transacción:
+  // son upserts idempotentes e independientes del pedido. Mantenerlos dentro
+  // multiplicaba los round trips y agotaba el timeout interactivo en
+  // producción cuando el pedido trae varios productos.
+  await upsertSiigoCustomer(prisma, customer)
+  for (const product of products.values()) {
+    await upsertSiigoProduct(prisma, product)
+  }
+
   const createdOrderId = await prisma.$transaction(async (tx) => {
-    const status = await tx.orderStatus.findFirst({
-      where: { key: statusKey, isActive: true }
-    })
-    if (!status) {
-      throw createError({ statusCode: 422, statusMessage: 'El estado seleccionado no está disponible.' })
-    }
-
-    await upsertSiigoCustomer(tx, customer)
-    for (const product of products.values()) {
-      await upsertSiigoProduct(tx, product)
-    }
-
     const order = await tx.salesOrder.create({
       data: {
         statusKey: status.key,
@@ -746,12 +750,16 @@ export async function updateOrder(
   const totals = orderTotals(lines, input.discountType, input.discountValue)
   const displayName = siigoCustomerDisplayName(customer)
 
-  await prisma.$transaction(async (tx) => {
-    await upsertSiigoCustomer(tx, customer)
-    for (const product of products.values()) {
-      await upsertSiigoProduct(tx, product)
-    }
+  // Los snapshots de Siigo se sincronizan antes y fuera de la transacción:
+  // son upserts idempotentes e independientes del pedido. Mantenerlos dentro
+  // multiplicaba los round trips y agotaba el timeout interactivo en
+  // producción cuando el pedido trae varios productos.
+  await upsertSiigoCustomer(prisma, customer)
+  for (const product of products.values()) {
+    await upsertSiigoProduct(prisma, product)
+  }
 
+  await prisma.$transaction(async (tx) => {
     const result = await tx.salesOrder.updateMany({
       where: { id, version: input.version, statusKey: { not: 'entregado' } },
       data: {

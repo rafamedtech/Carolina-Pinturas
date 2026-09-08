@@ -1,8 +1,8 @@
-import type { Prisma } from '../../generated/prisma/client'
+import type { Prisma, PrismaClient } from '../../generated/prisma/client'
 import type { SiigoCustomer, SiigoProduct } from '~/types/siigo'
 import type { CustomerInternalInput } from './customer-validation'
 
-type TransactionClient = Prisma.TransactionClient
+type SnapshotClient = Prisma.TransactionClient | PrismaClient
 
 function jsonValue(value: unknown): Prisma.InputJsonValue {
   return JSON.parse(JSON.stringify(value)) as Prisma.InputJsonValue
@@ -33,7 +33,7 @@ function customerDisplayName(customer: SiigoCustomer) {
 }
 
 export async function upsertSiigoCustomer(
-  tx: TransactionClient,
+  tx: SnapshotClient,
   customer: SiigoCustomer,
   options: {
     internal?: CustomerInternalInput
@@ -118,7 +118,7 @@ export async function upsertSiigoCustomer(
   })
 }
 
-export async function upsertSiigoProduct(tx: TransactionClient, product: SiigoProduct) {
+export async function upsertSiigoProduct(tx: SnapshotClient, product: SiigoProduct) {
   const unit = product.unit && typeof product.unit === 'object' ? product.unit : undefined
   const data = {
     code: product.code,
