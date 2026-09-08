@@ -1,12 +1,8 @@
 import type { SiigoCustomer, SiigoCustomerSyncResult, SiigoListResponse } from '~/types/siigo'
 import { collectSiigoCatalog, SIIGO_FULL_CATALOG_PAGE_SIZE } from './siigo-catalog'
-import {
-  normalizeSiigoCustomerList,
-  type SiigoCustomerApiResponse
-} from './siigo-customers'
+import { fetchSiigoCustomerPage } from './siigo-customer-catalog'
 import { upsertSiigoCustomer } from './siigo-persistence'
 import { usePrisma } from './prisma'
-import { siigoRequest } from './siigo'
 
 interface CustomerImportDependencies {
   fetchPage: (page: number, pageSize: number) => Promise<SiigoListResponse<SiigoCustomer>>
@@ -30,10 +26,7 @@ let customerImportRequest: Promise<SiigoCustomerSyncResult> | null = null
 function defaultDependencies(): CustomerImportDependencies {
   return {
     async fetchPage(page, pageSize) {
-      const response = await siigoRequest<SiigoListResponse<SiigoCustomerApiResponse>>('/v1/customers', {
-        query: { page: String(page), page_size: String(pageSize) }
-      })
-      return normalizeSiigoCustomerList(response)
+      return fetchSiigoCustomerPage({ page: String(page), page_size: String(pageSize) })
     },
     async persistBatch(customers) {
       await usePrisma().$transaction(
