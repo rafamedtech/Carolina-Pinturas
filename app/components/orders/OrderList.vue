@@ -51,13 +51,26 @@ const ORDER_VIEW_KEYS = [
   'facturacion',
   'cancelado'
 ] as const
+const IGUALACION_VIEW_KEYS = ['mostrador', 'vendedor']
 const initialSelection = props.igualacion
-  ? queryValue(route.query.status) || 'all'
+  ? IGUALACION_VIEW_KEYS.includes(queryValue(route.query.view))
+    ? queryValue(route.query.view)
+    : queryValue(route.query.status) || 'all'
   : ORDER_VIEW_KEYS.includes(queryValue(route.query.view) as typeof ORDER_VIEW_KEYS[number])
     ? queryValue(route.query.view)
     : 'all'
 const filter = shallowRef(queryValue(route.query.search))
 const selectedTab = shallowRef(initialSelection)
+const selectedStatus = computed(() =>
+  props.igualacion && selectedTab.value !== 'all' && !IGUALACION_VIEW_KEYS.includes(selectedTab.value)
+    ? selectedTab.value
+    : undefined
+)
+const selectedView = computed(() =>
+  selectedTab.value !== 'all' && (!props.igualacion || IGUALACION_VIEW_KEYS.includes(selectedTab.value))
+    ? selectedTab.value
+    : undefined
+)
 const paymentStatusKey = shallowRef(queryValue(route.query.payment_status) || 'all')
 const paymentMethodKey = shallowRef(queryValue(route.query.payment_method) || 'all')
 const hideCancelled = shallowRef(queryBoolean(route.query.hide_cancelled))
@@ -89,11 +102,8 @@ const dateTo = computed(() => dateRange.value?.start && dateRange.value?.end
   : undefined)
 const listQuery = computed(() => ({
   ...(filter.value ? { search: filter.value } : {}),
-  ...(selectedTab.value !== 'all'
-    ? props.igualacion
-      ? { status: selectedTab.value }
-      : { view: selectedTab.value }
-    : {}),
+  ...(selectedStatus.value ? { status: selectedStatus.value } : {}),
+  ...(selectedView.value ? { view: selectedView.value } : {}),
   ...(paymentStatusKey.value !== 'all' ? { payment_status: paymentStatusKey.value } : {}),
   ...(paymentMethodKey.value !== 'all' ? { payment_method: paymentMethodKey.value } : {}),
   ...(hideCancelled.value ? { hide_cancelled: 'true' } : {}),
@@ -125,8 +135,8 @@ const {
     page,
     page_size: pageSize,
     search: debouncedFilter,
-    status: computed(() => props.igualacion && selectedTab.value !== 'all' ? selectedTab.value : undefined),
-    view: computed(() => !props.igualacion && selectedTab.value !== 'all' ? selectedTab.value : undefined),
+    status: selectedStatus,
+    view: selectedView,
     payment_status: computed(() => paymentStatusKey.value === 'all' ? undefined : paymentStatusKey.value),
     payment_method: computed(() => paymentMethodKey.value === 'all' ? undefined : paymentMethodKey.value),
     hide_cancelled: computed(() => hideCancelled.value ? 'true' : undefined),
@@ -176,6 +186,12 @@ const statusTabItems = computed(() => {
   return [{
     label: 'Todos',
     value: 'all'
+  }, {
+    label: 'Mostrador',
+    value: 'mostrador'
+  }, {
+    label: 'Vendedor',
+    value: 'vendedor'
   }, ...list.map(item => ({
     label: item.label,
     value: item.key
