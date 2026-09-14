@@ -860,15 +860,13 @@ export async function listOrders(options: {
   const isIgualacionesView = options.igualacion || user.role === 'igualaciones'
   const folioMatch = options.search?.toUpperCase().match(/^(?:PED-?)?0*(\d+)$/)
   const folio = folioMatch?.[1] ? Number(folioMatch[1]) : null
-  const statusFilter: Prisma.SalesOrderWhereInput = isIgualacionesView
+  const statusFilter: Prisma.SalesOrderWhereInput = options.statusKey
     ? {
-        statusKey: options.statusKey
+        statusKey: isIgualacionesView
           ? { in: IGUALACION_STATUS_KEYS.filter(key => key === options.statusKey) }
-          : { in: IGUALACION_STATUS_KEYS }
+          : options.statusKey
       }
-    : options.statusKey
-      ? { statusKey: options.statusKey }
-      : {}
+    : {}
   const paymentStatusFilter: Prisma.SalesOrderWhereInput = options.paymentStatus
     ? { paymentStatus: options.paymentStatus }
     : {}
