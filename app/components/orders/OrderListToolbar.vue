@@ -120,7 +120,7 @@ function clearFilters() {
         class="w-full sm:hidden"
       />
       <OrdersOrderDateRangePicker v-model="dateRange" />
-      <div v-if="!igualacion" class="flex w-full gap-2 sm:w-auto">
+      <div class="flex w-full gap-2 sm:w-auto">
         <UButton
           label="Más filtros"
           icon="i-lucide-sliders-horizontal"
@@ -156,7 +156,6 @@ function clearFilters() {
     </UDropdownMenu>
 
     <OrdersOrderListMoreFiltersModal
-      v-if="!igualacion"
       v-model:open="moreFiltersOpen"
       :payment-status="paymentStatus"
       :payment-method="paymentMethod"

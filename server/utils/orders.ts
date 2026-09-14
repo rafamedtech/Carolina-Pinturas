@@ -877,7 +877,7 @@ export async function listOrders(options: {
     ...(options.hideCancelled ? ['cancelado'] : []),
     ...(options.hideQuotes ? ['borrador'] : [])
   ]
-  const visibilityStatusFilter: Prisma.SalesOrderWhereInput = !isIgualacionesView && !options.statusKey && excludedStatusKeys.length
+  const visibilityStatusFilter: Prisma.SalesOrderWhereInput = !options.statusKey && excludedStatusKeys.length
     ? { statusKey: { notIn: excludedStatusKeys } }
     : {}
   const dateFilter: Prisma.SalesOrderWhereInput = options.dateFrom || options.dateTo
