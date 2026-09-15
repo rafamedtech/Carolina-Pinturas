@@ -12,3 +12,4 @@ export interface SatSearchResponse {
   retrievedAt: string
   source: string
 }
+export interface ProductImage { url: string, updatedAt: string }

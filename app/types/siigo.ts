@@ -1,3 +1,5 @@
+import type { ProductImage } from './siigo-products'
+
 export type UserRole = 'admin' | 'mostrador' | 'vendedor' | 'repartidor' | 'igualaciones'
 
 export interface AppUser {
@@ -68,6 +70,10 @@ export interface SiigoProduct {
       value?: number | string
     }>
   }>
+  // App-owned data that Siigo does not provide.
+  internal?: {
+    image: ProductImage | null
+  }
 }
 
 export interface SiigoCustomer {

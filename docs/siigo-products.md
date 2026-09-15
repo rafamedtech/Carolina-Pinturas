@@ -30,3 +30,13 @@ Para reproducir desde descargas previas, pasar `--source-dir` con `siigo-claves.
 ## Verificación
 
 Pruebas unitarias y de rutas cubren validación, permisos, filtros, SAT, normalización, preservación de payload, caché y errores ambiguos. Pruebas Nuxt cubren formulario, monedas, errores, calendarios y doble envío. Se verificaron consultas de catálogo y buscadores en Chrome con sesión existente. Las escrituras se prueban con mocks; no se crean datos de prueba en el tenant real.
+
+## Imágenes de producto
+
+Siigo México no expone imagen de producto (verificado contra listado y detalle reales el 2026-09-15). La imagen es dato propio de la app:
+
+- Archivo en el bucket público `product-images` de Supabase Storage, ruta `{productId}/{uuid}.{ext}`. Cada subida usa ruta nueva, así la URL pública es inmutable y cacheable; la anterior se borra tras guardar.
+- Registro en `public.product_images` (Prisma `ProductImage`), llave = ID de Siigo. El detalle (`GET /api/siigo/products/:id`) la agrega en `internal.image`.
+- Solo `PRODUCT_MANAGEMENT_ROLES` sube (`PUT /api/siigo/products/:id/image`, multipart campo `image`) o quita (`DELETE`). El servidor valida la firma del archivo (JPG, PNG, WebP), máximo 2 MB, y que el producto exista en Siigo.
+- Storage no tiene políticas para `anon`/`authenticated`: escribe solo el servidor con `NUXT_SUPABASE_SECRET_KEY` (llave `sb_secret_`, nunca `NUXT_PUBLIC_*`) después de `requireRole`.
+- Se sube desde la edición del producto; en el detalle solo se muestra si existe. Un producto nuevo recibe imagen después de crearse.

@@ -223,6 +223,20 @@ function formatDateTime(value?: string | null) {
           </div>
 
           <div class="flex flex-col gap-4">
+            <UCard v-if="product.internal?.image" :ui="{ body: 'p-0 sm:p-0' }">
+              <div class="flex aspect-square items-center justify-center overflow-hidden rounded-lg bg-elevated">
+                <img
+                  :src="product.internal.image.url"
+                  :alt="product.name"
+                  width="480"
+                  height="480"
+                  loading="lazy"
+                  decoding="async"
+                  class="size-full object-contain"
+                >
+              </div>
+            </UCard>
+
             <UCard>
               <template #header>
                 <h2 class="font-semibold text-highlighted">

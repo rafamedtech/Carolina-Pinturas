@@ -27,6 +27,8 @@ export default defineNuxtConfig({
   },
 
   runtimeConfig: {
+    // Server-only sb_secret_ key, used exclusively to write product images to Storage.
+    supabaseSecretKey: '',
     siigo: {
       apiUrl: 'https://api.siigo.mx',
       username: '',

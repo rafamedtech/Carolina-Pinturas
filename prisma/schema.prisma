@@ -16,8 +16,9 @@ model AppUser {
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  repartidor Repartidor?
-  expenses    Expense[]
+  repartidor    Repartidor?
+  expenses      Expense[]
+  productImages ProductImage[]
 
   @@index([role, active])
   @@map("app_users")
@@ -461,4 +462,19 @@ model SalesOrderStatusHistory {
 
   @@index([orderId, changedAt])
   @@map("sales_order_status_history")
+}
+
+model ProductImage {
+  productId        String   @id @map("product_id") @db.Uuid
+  storagePath      String   @unique @map("storage_path")
+  contentType      String   @map("content_type") @db.VarChar(32)
+  sizeBytes        Int      @map("size_bytes")
+  uploadedByUserId String?  @map("uploaded_by_user_id") @db.Uuid
+  createdAt        DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt        DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  uploadedByUser AppUser? @relation(fields: [uploadedByUserId], references: [userId], onDelete: SetNull)
+
+  @@index([uploadedByUserId])
+  @@map("product_images")
 }

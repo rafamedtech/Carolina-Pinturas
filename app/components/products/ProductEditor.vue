@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { SiigoProduct } from '~/types/siigo'
-import type { ProductContext, ProductInput } from '~/types/siigo-products'
+import type { ProductContext, ProductImage, ProductInput } from '~/types/siigo-products'
 import { canManageProducts } from '~/utils/roleAccess'
 
 const props = defineProps<{ productId?: string }>()
@@ -12,9 +12,11 @@ const { data: context, error: contextError } = await useFetch<ProductContext>('/
 const product = ref<SiigoProduct>()
 const loading = shallowRef(Boolean(props.productId))
 const loadError = shallowRef('')
+const productImage = ref<ProductImage | null>(null)
 if (props.productId && allowed.value) {
   try {
     product.value = await $fetch<SiigoProduct>(`/api/siigo/products/${encodeURIComponent(props.productId)}`, { headers: useRequestHeaders(['cookie']), query: { refresh: 'true' } })
+    productImage.value = product.value.internal?.image ?? null
     if (!['Product', 'Service', 'ConsumerGood'].includes(product.value.type || 'Product')) loadError.value = 'Este tipo de producto se administra directamente en Siigo.'
   } catch {
     loadError.value = 'No se pudo cargar el producto. Actualiza la página para reintentar.'
@@ -63,6 +65,12 @@ useSeoMeta({ title })
             Revisa el producto antes de iniciar otro guardado; Siigo pudo procesar la solicitud.
           </p>
         </div>
+        <ProductsProductImageField
+          v-if="productId && product"
+          v-model:image="productImage"
+          :product-id="productId"
+          :product-name="product.name"
+        />
         <ProductsProductForm
           :product="product"
           :context="context"
