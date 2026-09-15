@@ -150,7 +150,7 @@ function productPrice(product: SiigoProduct) {
   ) ?? product.prices?.find(item => item.price_list?.some(entry => entry.position === 1))
   ?? product.prices?.[0]
   const entry = price?.price_list?.find(item => item.position === 1) ?? price?.price_list?.[0]
-  const value = Number(entry?.value ?? product.price ?? 0)
+  const value = Number(entry?.value ?? 0)
 
   return {
     currencyCode: price?.currency_code || 'MXN',
@@ -548,7 +548,7 @@ export async function createOrder(
   const prisma = usePrisma()
   const lines = input.lines.map((line, index) => {
     const product = products.get(line.productId)
-    if (!product) {
+    if (!product || product.active === false) {
       throw createError({
         statusCode: 422,
         statusMessage: `El producto ${line.productId} ya no está disponible en Siigo.`
@@ -695,7 +695,8 @@ export async function updateOrder(
       statusKey: true,
       customerId: true,
       orderDate: true,
-      paymentStatus: true
+      paymentStatus: true,
+      items: { select: { productId: true } }
     }
   })
 
@@ -730,7 +731,7 @@ export async function updateOrder(
 
   const lines = input.lines.map((line, index) => {
     const product = products.get(line.productId)
-    if (!product) {
+    if (!product || (product.active === false && !existing.items.some(item => item.productId === product.id))) {
       throw createError({
         statusCode: 422,
         statusMessage: `El producto ${line.productId} ya no está disponible en Siigo.`

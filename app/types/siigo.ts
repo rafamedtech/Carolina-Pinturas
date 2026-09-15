@@ -26,6 +26,8 @@ export interface SiigoProduct {
     code?: string
     name?: string
   }
+  tax_classification?: string
+  tax_consumption_value?: number
   tax_included?: boolean
   account_group?: {
     id?: string | number
@@ -34,6 +36,8 @@ export interface SiigoProduct {
   additional_fields?: {
     barcode?: string
     brand?: string
+    tariff?: string
+    model?: string
   }
   taxes?: Array<{
     id?: string | number
@@ -53,9 +57,9 @@ export interface SiigoProduct {
   }>
   metadata?: {
     created?: string
+    stock_updated?: string
     last_updated?: string | null
   }
-  price?: number | string
   prices?: Array<{
     currency_code?: string
     price_list?: Array<{

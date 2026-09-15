@@ -1,13 +1,11 @@
-import type { SiigoListResponse, SiigoProduct } from '~/types/siigo'
+import type { SiigoProduct } from '~/types/siigo'
 import type { CatalogPrice } from '~/types/catalog'
-import { cachedSiigoCatalog, collectSiigoCatalog } from '../../utils/siigo-catalog'
-import { siigoRequest } from '../../utils/siigo'
+import { getActiveProducts } from '../../utils/siigo-products'
 
 function productPrice(product: SiigoProduct) {
   const price = product.prices?.find(entry => entry.price_list?.some(item => item.position === 1)) ?? product.prices?.[0]
   const value = price?.price_list?.find(item => item.position === 1)?.value
     ?? price?.price_list?.[0]?.value
-    ?? product.price
   const amount = typeof value === 'string' ? Number(value) : value
 
   return {
@@ -17,11 +15,7 @@ function productPrice(product: SiigoProduct) {
 }
 
 async function getProducts() {
-  const catalog = await cachedSiigoCatalog('active-products', () => collectSiigoCatalog((page, pageSize) => (
-    siigoRequest<SiigoListResponse<SiigoProduct>>('/v1/products', {
-      query: { active: 'true', page: String(page), page_size: String(pageSize) }
-    })
-  )))
+  const catalog = await getActiveProducts()
 
   return catalog.results
 }

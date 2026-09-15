@@ -77,3 +77,9 @@ export function canAccessAppPath(role: UserRole, path: string) {
 
   return true
 }
+
+export const PRODUCT_MANAGEMENT_ROLES = ['admin'] as const satisfies readonly UserRole[]
+
+export function canManageProducts(role: UserRole | undefined) {
+  return role === 'admin'
+}

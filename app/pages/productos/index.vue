@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { TableColumn, TableRow } from '@nuxt/ui'
 import type { SiigoProduct } from '~/types/siigo'
+import { canManageProducts } from '~/utils/roleAccess'
 
 useSeoMeta({ title: 'Productos' })
 
@@ -13,7 +14,13 @@ watch(filter, () => {
   page.value = 1
 })
 
-const { data, status, error, refresh } = useProductsCatalog()
+const { user } = useAuth()
+const filters = ref<Record<string, string>>({ active: 'true' })
+const { data, status, error, refresh } = useProductManagementCatalog(filters)
+function applyFilters(value: Record<string, string>) {
+  filters.value = value
+  page.value = 1
+}
 
 const isHydrated = shallowRef(false)
 onMounted(() => {
@@ -38,20 +45,30 @@ const products = computed(() => {
 // El listado masivo de Siigo no trae el nombre de la unidad (`unit: {}`);
 // solo el detalle por producto lo incluye. Se resuelve por página visible.
 const unitsById = reactive(new Map<string, string>())
-watch(products, async (rows) => {
+watch(products, async (rows, _, onCleanup) => {
+  let cancelled = false
+  onCleanup(() => {
+    cancelled = true
+  })
   const pending = rows.filter(row => !unitsById.has(row.id))
-  await Promise.all(pending.map(async (row) => {
-    const detail = await $fetch<SiigoProduct>(`/api/siigo/products/${encodeURIComponent(row.id)}`)
-      .catch(() => null)
-    unitsById.set(row.id, (detail && siigoProductUnit(detail)) || '—')
+  // Four workers maximum; server deduplicates concurrent detail requests.
+  await Promise.all(Array.from({ length: Math.min(4, pending.length) }, async () => {
+    while (pending.length && !cancelled) {
+      const row = pending.shift()!
+      const detail = await $fetch<SiigoProduct>(`/api/siigo/products/${encodeURIComponent(row.id)}`).catch(() => null)
+      if (!cancelled && detail) unitsById.set(row.id, siigoProductUnit(detail) || '—')
+    }
   }))
 }, { immediate: true })
+async function reload() {
+  unitsById.clear()
+  await refresh()
+}
 
 function formatProductPrice(product: SiigoProduct) {
   const priceList = product.prices?.find(price => price.price_list?.some(item => item.position === 1)) ?? product.prices?.[0]
   const value = priceList?.price_list?.find(item => item.position === 1)?.value
     ?? priceList?.price_list?.[0]?.value
-    ?? product.price
 
   if (value === undefined || value === null) return '—'
 
@@ -127,16 +144,18 @@ function openProduct(_: Event, row: TableRow<SiigoProduct>) {
             color="neutral"
             variant="outline"
             :loading="loading"
-            @click="() => refresh()"
+            @click="reload"
           />
           <UButton
+            v-if="canManageProducts(user?.role)"
+            to="/productos/nuevo"
             label="Nuevo producto"
             icon="i-lucide-plus"
-            disabled
-            title="Se habilita tras validar la API de Siigo México."
           />
         </div>
       </div>
+
+      <ProductsProductFilters @change="applyFilters" />
 
       <UAlert
         v-if="error"

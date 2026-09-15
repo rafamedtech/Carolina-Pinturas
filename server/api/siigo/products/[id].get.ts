@@ -1,15 +1,11 @@
-import type { SiigoProduct } from '~/types/siigo'
+import * as z from 'zod'
 import { ORDER_ENTRY_ROLES } from '~/utils/roleAccess'
 import { requireRole } from '../../../utils/auth'
-import { siigoRequest } from '../../../utils/siigo'
+import { getProductDetail } from '../../../utils/siigo-products'
 
 export default eventHandler(async (event) => {
   await requireRole(event, ORDER_ENTRY_ROLES)
-
-  const id = getRouterParam(event, 'id')
-  if (!id) {
-    throw createError({ statusCode: 400, statusMessage: 'Falta el identificador del producto.' })
-  }
-
-  return siigoRequest<SiigoProduct>(`/v1/products/${encodeURIComponent(id)}`)
+  const id = z.uuid().safeParse(getRouterParam(event, 'id'))
+  if (!id.success) throw createError({ statusCode: 400, statusMessage: 'Identificador de producto inválido.' })
+  return getProductDetail(id.data, getQuery(event).refresh === 'true')
 })

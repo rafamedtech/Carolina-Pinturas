@@ -1,4 +1,4 @@
-import type { SiigoCustomer, SiigoProduct } from '~/types/siigo'
+import type { SiigoCustomer } from '~/types/siigo'
 import {
   canCreateOrderWithStatus,
   canManageOrderLogistics,
@@ -9,6 +9,7 @@ import { createOrder } from '../../utils/orders'
 import { createOrderSchema } from '../../utils/order-validation'
 import { usePrisma } from '../../utils/prisma'
 import { siigoRequest } from '../../utils/siigo'
+import { normalizeSiigoProduct } from '../../utils/siigo-products'
 
 export default eventHandler(async (event) => {
   const user = await requireRole(event, ORDER_ENTRY_ROLES)
@@ -37,7 +38,7 @@ export default eventHandler(async (event) => {
       ? usePrisma().repartidor.findUnique({ where: { id: repartidorId } })
       : Promise.resolve(null),
     ...productIds.map(id =>
-      siigoRequest<SiigoProduct>(`/v1/products/${encodeURIComponent(id)}`)
+      siigoRequest<unknown>(`/v1/products/${encodeURIComponent(id)}`).then(normalizeSiigoProduct)
     )
   ])
   const productsById = new Map(products.map(product => [product.id, product]))

@@ -21,6 +21,7 @@ export function useProductsCatalog() {
   useTrackSiigoLoading(status)
 
   async function refreshCatalog() {
+    await $fetch('/api/siigo/products', { query: { all: 'true', refresh: 'true' } })
     await refresh()
 
     if (data.value) {

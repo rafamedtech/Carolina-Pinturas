@@ -123,7 +123,6 @@ function productPrice(product: SiigoProduct) {
   ?? product.prices?.[0]
   const value = price?.price_list?.find(item => item.position === 1)?.value
     ?? price?.price_list?.[0]?.value
-    ?? product.price
   const amount = Number(value)
 
   return Number.isFinite(amount) ? amount : 0
