@@ -63,6 +63,7 @@ export default eventHandler(async (event): Promise<ExpenseListResponse> => {
     : {}
   const where: Prisma.ExpenseWhereInput = {
     AND: [
+      ...(user.role !== 'admin' ? [{ purchasePaymentId: null }] : []),
       searchFilter,
       dateFilter,
       ...(paymentMethod ? [{ paymentMethod }] : []),
@@ -73,6 +74,7 @@ export default eventHandler(async (event): Promise<ExpenseListResponse> => {
   const searchPattern = `%${search.replace(/[\\%_]/g, character => `\\${character}`)}%`
   const totalConditions = [
     Prisma.sql`TRUE`,
+    ...(user.role !== 'admin' ? [Prisma.sql`purchase_payment_id IS NULL`] : []),
     ...(search
       ? [Prisma.sql`(
         description ILIKE ${searchPattern}

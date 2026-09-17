@@ -12,6 +12,9 @@ export default eventHandler(async (event) => {
   if (!expense) {
     throw createError({ statusCode: 404, statusMessage: 'El gasto no existe.' })
   }
+  if (expense.purchasePaymentId) {
+    throw createError({ statusCode: user.role === 'admin' ? 409 : 404, statusMessage: user.role === 'admin' ? 'Gestiona este gasto desde Compras.' : 'El gasto no existe.' })
+  }
   if (!canViewExpenseCategory(user.role, expense.category)) {
     throw createError({ statusCode: 403, statusMessage: 'No tienes permiso para eliminar este gasto.' })
   }

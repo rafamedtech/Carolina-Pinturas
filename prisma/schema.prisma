@@ -89,6 +89,7 @@ model SiigoProduct {
   warehouses SiigoProductWarehouse[]
   components SiigoProductComponent[]
   orderItems SalesOrderItem[]
+  purchaseItems PurchaseItem[]
 
   @@index([code])
   @@index([name])
@@ -189,6 +190,7 @@ model SiigoCustomer {
   contacts SiigoCustomerContact[]
   orders   SalesOrder[]
   expenses Expense[]
+  purchases PurchaseOrder[]
 
   @@index([displayName])
   @@index([rfcId])
@@ -310,6 +312,9 @@ model Expense {
   createdByRole        String   @map("created_by_role") @db.VarChar(32)
   createdAt            DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt            DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  purchasePaymentId String? @unique @map("purchase_payment_id") @db.Uuid
+  purchasePayment PurchasePayment? @relation(fields: [purchasePaymentId], references: [id], onDelete: Restrict)
 
   provider      SiigoCustomer @relation(fields: [providerId], references: [id], onDelete: Restrict)
   createdByUser AppUser?      @relation(fields: [createdByUserId], references: [userId], onDelete: SetNull)
@@ -477,4 +482,124 @@ model ProductImage {
 
   @@index([uploadedByUserId])
   @@map("product_images")
+}
+
+
+model PurchaseOrder {
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  folio Int @unique @default(autoincrement())
+  status String @default("borrador") @db.VarChar(20)
+  version Int @default(1)
+  providerId String @map("provider_id") @db.Uuid
+  providerName String @map("provider_name")
+  providerRfc String? @map("provider_rfc")
+  providerPayload Json @map("provider_payload") @db.JsonB
+  date DateTime @db.Date
+  currencyCode String @map("currency_code") @db.VarChar(3)
+  total Decimal @db.Decimal(20, 2)
+  notes String
+  createdBy String @map("created_by")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+  provider SiigoCustomer @relation(fields: [providerId], references: [id], onDelete: Restrict)
+  items PurchaseItem[]
+  receipts PurchaseReceipt[]
+  invoices PurchaseInvoice[]
+  events PurchaseEvent[]
+  @@index([providerId, date])
+  @@index([status, date])
+  @@map("purchase_orders")
+}
+
+model PurchaseItem {
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  orderId String @map("order_id") @db.Uuid
+  productId String @map("product_id") @db.Uuid
+  position Int
+  code String
+  name String
+  productPayload Json @map("product_payload") @db.JsonB
+  quantity Decimal @db.Decimal(20, 6)
+  unitCost Decimal @map("unit_cost") @db.Decimal(20, 6)
+  total Decimal @db.Decimal(20, 2)
+  order PurchaseOrder @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  product SiigoProduct @relation(fields: [productId], references: [id], onDelete: Restrict)
+  receipts PurchaseReceiptItem[]
+  @@unique([orderId, position])
+  @@index([productId])
+  @@map("purchase_items")
+}
+
+model PurchaseReceipt {
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  orderId String @map("order_id") @db.Uuid
+  date DateTime @db.Date
+  createdBy String @map("created_by")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  voidedAt DateTime? @map("voided_at") @db.Timestamptz(6)
+  voidReason String? @map("void_reason")
+  order PurchaseOrder @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  items PurchaseReceiptItem[]
+  @@index([orderId])
+  @@map("purchase_receipts")
+}
+
+model PurchaseReceiptItem {
+  receiptId String @map("receipt_id") @db.Uuid
+  itemId String @map("item_id") @db.Uuid
+  quantity Decimal @db.Decimal(20, 6)
+  receipt PurchaseReceipt @relation(fields: [receiptId], references: [id], onDelete: Restrict)
+  item PurchaseItem @relation(fields: [itemId], references: [id], onDelete: Restrict)
+  @@id([receiptId, itemId])
+  @@index([itemId])
+  @@map("purchase_receipt_items")
+}
+
+model PurchaseInvoice {
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  orderId String @map("order_id") @db.Uuid
+  folio String @db.VarChar(100)
+  date DateTime @db.Date
+  dueDate DateTime @map("due_date") @db.Date
+  amount Decimal @db.Decimal(20, 2)
+  createdBy String @map("created_by")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  voidedAt DateTime? @map("voided_at") @db.Timestamptz(6)
+  voidReason String? @map("void_reason")
+  order PurchaseOrder @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  payments PurchasePayment[]
+  @@index([orderId])
+  @@index([dueDate])
+  @@map("purchase_invoices")
+}
+
+model PurchasePayment {
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  invoiceId String @map("invoice_id") @db.Uuid
+  date DateTime @db.Date
+  amount Decimal @db.Decimal(20, 2)
+  exchangeRate Decimal @map("exchange_rate") @db.Decimal(20, 6)
+  method String @db.VarChar(32)
+  createdBy String @map("created_by")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  voidedAt DateTime? @map("voided_at") @db.Timestamptz(6)
+  voidReason String? @map("void_reason")
+  invoice PurchaseInvoice @relation(fields: [invoiceId], references: [id], onDelete: Restrict)
+  expense Expense?
+  @@index([invoiceId])
+  @@map("purchase_payments")
+}
+
+model PurchaseEvent {
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  requestId String @unique @map("request_id") @db.Uuid
+  requestHash String @map("request_hash")
+  orderId String @map("order_id") @db.Uuid
+  action String @db.VarChar(32)
+  detail Json @db.JsonB
+  createdBy String @map("created_by")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  order PurchaseOrder @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  @@index([orderId, createdAt])
+  @@map("purchase_events")
 }

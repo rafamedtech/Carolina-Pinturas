@@ -80,6 +80,12 @@ const allLinks: AppNavigationItem[] = [{
     open.value = false
   }
 }, {
+  label: 'Compras',
+  icon: 'i-lucide-package-plus',
+  to: '/compras',
+  roles: adminRoles,
+  onSelect: () => { open.value = false }
+}, {
   label: 'Gastos',
   icon: 'i-lucide-receipt-text',
   to: '/gastos',

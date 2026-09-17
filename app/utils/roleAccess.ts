@@ -66,6 +66,7 @@ export function homePathForRole(role: UserRole) {
 }
 
 export function canAccessAppPath(role: UserRole, path: string) {
+  if (path === '/compras' || path.startsWith('/compras/')) return role === 'admin'
   if (role === 'igualaciones') {
     const isOrderDetail = /^\/ventas\/[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(path)
     return path === '/igualaciones' || isOrderDetail

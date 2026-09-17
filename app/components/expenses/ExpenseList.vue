@@ -134,6 +134,10 @@ watch(modalOpen, (isOpen) => {
 })
 
 function openExpense(expense: ExpenseRecord | null = null) {
+  if (expense?.purchasePaymentId) {
+    toast.add({ title: 'Gasto vinculado a compras', description: 'Consulta o anula el abono desde Compras.', color: 'info' })
+    return
+  }
   selectedExpense.value = expense
   submitError.value = ''
   modalOpen.value = true

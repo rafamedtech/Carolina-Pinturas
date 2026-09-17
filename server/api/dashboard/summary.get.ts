@@ -92,6 +92,7 @@ export default eventHandler(async (event) => {
     prisma.expense.findMany({
       where: {
         expenseDate: { gte: start, lt: end },
+        ...(user.role !== 'admin' ? { purchasePaymentId: null } : {}),
         ...(hiddenExpenseCategories.length ? { category: { notIn: hiddenExpenseCategories } } : {})
       },
       select: { amount: true, exchangeRate: true }

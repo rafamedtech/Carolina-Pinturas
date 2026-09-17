@@ -51,6 +51,7 @@ function decimal(value: { toString(): string }) {
 export function expenseView(expense: Expense): ExpenseRecord {
   return {
     id: expense.id,
+    purchasePaymentId: expense.purchasePaymentId,
     date: expense.expenseDate.toISOString().slice(0, 10),
     category: expense.category as ExpenseCategory,
     description: expense.description,

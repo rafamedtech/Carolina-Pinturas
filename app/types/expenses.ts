@@ -15,6 +15,7 @@ export interface CreateExpenseInput {
 
 export interface ExpenseRecord extends Omit<CreateExpenseInput, 'notes'> {
   id: string
+  purchasePaymentId?: string | null
   provider: string
   providerRfc: string | null
   notes: string | null
