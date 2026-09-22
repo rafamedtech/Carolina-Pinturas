@@ -28,13 +28,24 @@ async function save(draft: PurchaseDraft) {
     <template #header>
       <UDashboardNavbar title="Nueva compra">
         <template #leading>
-          <UDashboardSidebarCollapse />
-        </template><template #right>
-          <UButton to="/compras" label="Volver" variant="ghost" />
+          <UButton
+            to="/compras"
+            icon="i-lucide-arrow-left"
+            color="neutral"
+            variant="ghost"
+            aria-label="Volver a compras"
+          />
         </template>
       </UDashboardNavbar>
     </template><template #body>
-      <UAlert v-if="error" :title="error" color="error" /><UCard><PurchasesPurchaseDraftForm :busy="busy" @save="save" /></UCard>
+      <UAlert
+        v-if="error"
+        :title="error"
+        color="error"
+        variant="subtle"
+        icon="i-lucide-circle-alert"
+      />
+      <PurchasesPurchaseDraftForm :busy="busy" cancel-to="/compras" @save="save" />
     </template>
   </UDashboardPanel>
 </template>

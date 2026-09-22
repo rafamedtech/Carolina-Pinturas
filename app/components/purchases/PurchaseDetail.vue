@@ -77,14 +77,13 @@ function eventReason(detail: unknown) {
         </section>
         <div class="purchase-screen space-y-6">
           <UAlert v-if="error" :title="error" color="error" />
-          <UCard v-if="order.status === 'borrador'">
-            <PurchasesPurchaseDraftForm
-              :key="order.version"
-              :order="order"
-              :busy="busy"
-              @save="run({ action: 'edit', draft: $event })"
-            />
-          </UCard>
+          <PurchasesPurchaseDraftForm
+            v-if="order.status === 'borrador'"
+            :key="order.version"
+            :order="order"
+            :busy="busy"
+            @save="run({ action: 'edit', draft: $event })"
+          />
           <UButton
             v-if="order.status === 'borrador'"
             label="Confirmar orden"
