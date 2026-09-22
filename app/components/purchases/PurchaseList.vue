@@ -1,11 +1,22 @@
 <script setup lang="ts">
+import type { OrderDateRange } from '~/types/orders'
 import type { PurchaseView } from '~/types/purchases'
 
 const search = shallowRef('')
 const status = shallowRef('all')
-const dateFrom = shallowRef('')
-const dateTo = shallowRef('')
-const query = computed(() => ({ search: search.value || undefined, status: status.value === 'all' ? undefined : status.value, dateFrom: dateFrom.value || undefined, dateTo: dateTo.value || undefined }))
+const dateRange = shallowRef<OrderDateRange | null>(null)
+const statusItems = [
+  { label: 'Todas', value: 'all' },
+  { label: 'Borrador', value: 'borrador' },
+  { label: 'Confirmada', value: 'confirmada' },
+  { label: 'Cancelada', value: 'cancelada' }
+]
+const query = computed(() => ({
+  search: search.value || undefined,
+  status: status.value === 'all' ? undefined : status.value,
+  dateFrom: dateRange.value?.start && dateRange.value?.end ? dateRange.value.start.toString() : undefined,
+  dateTo: dateRange.value?.start && dateRange.value?.end ? dateRange.value.end.toString() : undefined
+}))
 const { data, error, status: loading, refresh } = await useFetch<{ results: PurchaseView[] }>('/api/purchases', { query })
 </script>
 
@@ -16,25 +27,47 @@ const { data, error, status: loading, refresh } = await useFetch<{ results: Purc
         <template #leading>
           <UDashboardSidebarCollapse />
         </template><template #right>
-          <UButton to="/compras/cuentas-por-pagar" label="Cuentas por pagar" variant="outline" /><UButton to="/compras/nueva" label="Nueva compra" icon="i-lucide-plus" />
+          <UButton
+            to="/compras/cuentas-por-pagar"
+            label="Cuentas por pagar"
+            icon="i-lucide-wallet"
+            aria-label="Cuentas por pagar"
+            color="neutral"
+            variant="outline"
+            :ui="{ label: 'hidden sm:inline' }"
+          />
+          <UButton
+            label="Actualizar"
+            icon="i-lucide-refresh-cw"
+            color="neutral"
+            variant="outline"
+            aria-label="Actualizar"
+            :ui="{ label: 'hidden sm:inline' }"
+            :loading="loading === 'pending'"
+            @click="refresh()"
+          />
+          <UButton
+            to="/compras/nueva"
+            label="Nueva compra"
+            icon="i-lucide-plus"
+            aria-label="Nueva compra"
+            :ui="{ label: 'hidden sm:inline' }"
+          />
         </template>
       </UDashboardNavbar>
     </template>
     <template #body>
-      <div class="grid gap-3 md:grid-cols-4">
-        <UFormField label="Proveedor">
-          <UInput v-model="search" placeholder="Buscar proveedor" class="w-full" />
-        </UFormField><UFormField label="Estado">
-          <USelect v-model="status" :items="[{ label: 'Todos', value: 'all' }, { label: 'Borrador', value: 'borrador' }, { label: 'Confirmada', value: 'confirmada' }, { label: 'Cancelada', value: 'cancelada' }]" class="w-full" />
-        </UFormField><UFormField label="Desde">
-          <PurchasesPurchaseDate v-model="dateFrom" />
-        </UFormField><UFormField label="Hasta">
-          <PurchasesPurchaseDate v-model="dateTo" />
-        </UFormField>
-      </div>
-      <div class="flex gap-2">
-        <UButton label="Limpiar filtros" variant="ghost" @click="search = ''; status = 'all'; dateFrom = ''; dateTo = ''" /><UButton label="Recargar" variant="ghost" @click="refresh()" />
-      </div>
+      <PurchasesPurchaseListToolbar
+        v-model:search="search"
+        v-model:status="status"
+        v-model:date-range="dateRange"
+        :status-items="statusItems"
+      />
+      <UTabs
+        v-model="status"
+        :items="statusItems"
+        class="hidden w-full sm:block"
+      />
       <UAlert v-if="error" title="No se pudieron cargar las compras." color="error" />
       <p v-else-if="loading === 'pending'">
         Cargando compras…

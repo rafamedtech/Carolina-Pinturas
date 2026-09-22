@@ -4,6 +4,8 @@ import { DateFormatter, today } from '@internationalized/date'
 import type { OrderDateRange } from '~/types/orders'
 import { MEXICO_TIME_ZONE } from '~/utils/datetime'
 
+withDefaults(defineProps<{ subject?: string }>(), { subject: 'pedidos' })
+
 interface PresetRange {
   label: string
   days?: number
@@ -94,7 +96,7 @@ function clearRange() {
       color="neutral"
       variant="outline"
       class="w-full justify-start sm:w-auto"
-      :aria-label="selectedRange ? `Rango de fechas: ${label}` : 'Filtrar pedidos por rango de fechas'"
+      :aria-label="selectedRange ? `Rango de fechas: ${label}` : `Filtrar ${subject} por rango de fechas`"
     />
 
     <template #content>
