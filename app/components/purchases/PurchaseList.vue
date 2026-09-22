@@ -1,6 +1,13 @@
 <script setup lang="ts">
+import { h, resolveComponent } from 'vue'
+import type { TableColumn } from '@nuxt/ui'
+import type { Column, SortingState } from '@tanstack/table-core'
 import type { OrderDateRange } from '~/types/orders'
 import type { PurchaseView } from '~/types/purchases'
+
+const UButton = resolveComponent('UButton')
+const NuxtLink = resolveComponent('NuxtLink')
+const sorting = ref<SortingState>([])
 
 const search = shallowRef('')
 const status = shallowRef('all')
@@ -18,6 +25,68 @@ const query = computed(() => ({
   dateTo: dateRange.value?.start && dateRange.value?.end ? dateRange.value.end.toString() : undefined
 }))
 const { data, error, status: loading, refresh } = await useFetch<{ results: PurchaseView[] }>('/api/purchases', { query })
+const purchases = computed(() => [...(data.value?.results ?? [])])
+
+function sortableHeader(label: string, align: 'left' | 'right' = 'left') {
+  return ({ column }: { column: Column<PurchaseView, unknown> }) => {
+    const direction = column.getIsSorted()
+    const nextDirection = column.getNextSortingOrder()
+    const nextDirectionLabel = nextDirection === 'asc'
+      ? 'ascendente'
+      : nextDirection === 'desc'
+        ? 'descendente'
+        : 'quitar el orden'
+
+    return h(UButton, {
+      'label': label,
+      'color': 'neutral',
+      'variant': 'ghost',
+      'size': 'sm',
+      'class': align === 'right' ? 'w-full justify-end' : undefined,
+      'trailingIcon': direction === 'asc'
+        ? 'i-lucide-arrow-up'
+        : direction === 'desc'
+          ? 'i-lucide-arrow-down'
+          : 'i-lucide-arrow-up-down',
+      'aria-label': `Ordenar ${label} ${nextDirectionLabel}`,
+      'onClick': () => column.toggleSorting()
+    })
+  }
+}
+
+function formatAmount(amount: number, currencyCode: string) {
+  return h('div', { class: 'text-right' }, `${amount.toFixed(2)} ${currencyCode}`)
+}
+
+const columns: TableColumn<PurchaseView>[] = [{
+  accessorKey: 'folio',
+  header: sortableHeader('Orden'),
+  cell: ({ row }) => h(
+    NuxtLink,
+    { to: `/compras/${row.original.id}`, class: 'font-semibold text-primary underline' },
+    () => `OC-${row.original.folio}`
+  )
+}, {
+  accessorKey: 'providerName',
+  header: sortableHeader('Proveedor')
+}, {
+  accessorKey: 'date',
+  header: sortableHeader('Fecha')
+}, {
+  accessorKey: 'status',
+  header: sortableHeader('Estado')
+}, {
+  accessorKey: 'receiptStatus',
+  header: sortableHeader('Recepción')
+}, {
+  accessorKey: 'total',
+  header: sortableHeader('Total', 'right'),
+  cell: ({ row }) => formatAmount(row.original.total, row.original.currencyCode)
+}, {
+  accessorKey: 'balance',
+  header: sortableHeader('Saldo facturado', 'right'),
+  cell: ({ row }) => formatAmount(row.original.balance, row.original.currencyCode)
+}]
 </script>
 
 <template>
@@ -75,47 +144,21 @@ const { data, error, status: loading, refresh } = await useFetch<{ results: Purc
       <p v-else-if="!data?.results.length" class="py-10 text-center text-muted">
         Sin compras para estos filtros.
       </p>
-      <div v-else class="overflow-x-auto">
-        <table class="w-full text-left text-sm">
-          <thead>
-            <tr class="border-b border-default">
-              <th class="p-3">
-                Orden
-              </th><th class="p-3">
-                Proveedor
-              </th><th class="p-3">
-                Fecha
-              </th><th class="p-3">
-                Estado
-              </th><th class="p-3">
-                Recepción
-              </th><th class="p-3">
-                Total
-              </th><th class="p-3">
-                Saldo facturado
-              </th>
-            </tr>
-          </thead><tbody>
-            <tr v-for="order in data.results" :key="order.id" class="border-b border-default">
-              <td class="p-3">
-                <NuxtLink :to="`/compras/${order.id}`" class="font-semibold text-primary underline">OC-{{ order.folio }}</NuxtLink>
-              </td><td class="p-3">
-                {{ order.providerName }}
-              </td><td class="p-3">
-                {{ order.date }}
-              </td><td class="p-3">
-                {{ order.status }}
-              </td><td class="p-3">
-                {{ order.receiptStatus }}
-              </td><td class="p-3">
-                {{ order.total.toFixed(2) }} {{ order.currencyCode }}
-              </td><td class="p-3">
-                {{ order.balance.toFixed(2) }} {{ order.currencyCode }}
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
+      <UTable
+        v-else
+        v-model:sorting="sorting"
+        :data="purchases"
+        :columns="columns"
+        class="shrink-0"
+        :ui="{
+          base: 'min-w-full border-separate border-spacing-0',
+          thead: '[&>tr]:bg-elevated/50 [&>tr]:after:content-none',
+          tbody: '[&>tr]:last:[&>td]:border-b-0',
+          th: 'py-2 first:rounded-l-lg last:rounded-r-lg border-y border-default first:border-l last:border-r',
+          td: 'border-b border-default',
+          separator: 'h-0'
+        }"
+      />
     </template>
   </UDashboardPanel>
 </template>
