@@ -1,68 +1,192 @@
 <script setup lang="ts">
 import { mexicoToday } from '~/utils/datetime'
 import type { PurchaseView } from '~/types/purchases'
+import { purchaseDateLabel, purchaseQuantity, receiptStatus } from '~/utils/purchaseFormat'
 
 const props = defineProps<{ order: PurchaseView }>()
 const emit = defineEmits<{ saved: [order: PurchaseView] }>()
 const { busy, error, run } = usePurchaseAction(() => props.order, value => emit('saved', value))
 const date = shallowRef(mexicoToday())
 const quantities = reactive<Record<string, number>>({})
-const reason = shallowRef('')
+const formOpen = shallowRef(false)
+const voiding = shallowRef<string>()
+
+const status = computed(() => receiptStatus(props.order.receiptStatus))
+const pendingItems = computed(() => props.order.items
+  .map(item => ({ ...item, pending: Number((item.quantity - item.received).toFixed(6)) }))
+  .filter(item => item.pending > 0))
+const canReceive = computed(() => props.order.status === 'confirmada' && props.order.receiptStatus !== 'completa')
+const hasQuantities = computed(() => Object.values(quantities).some(q => q > 0))
+const itemName = (id: string) => props.order.items.find(i => i.id === id)?.name ?? 'Producto'
+
+function receiveAll() {
+  for (const item of pendingItems.value) quantities[item.id] = item.pending
+}
 async function receive() {
   const items = Object.entries(quantities).filter(([, quantity]) => quantity > 0).map(([itemId, quantity]) => ({ itemId, quantity }))
-  if (await run({ action: 'receive', date: date.value, items })) Object.keys(quantities).forEach(k => quantities[k] = 0)
+  if (await run({ action: 'receive', date: date.value, items })) {
+    Object.keys(quantities).forEach(k => quantities[k] = 0)
+    formOpen.value = false
+  }
+}
+async function voidReceipt(reason: string) {
+  if (voiding.value && await run({ action: 'voidReceipt', id: voiding.value, reason })) voiding.value = undefined
 }
 </script>
 
 <template>
   <UCard>
     <template #header>
-      <h2 class="font-semibold">
-        Recepciones · {{ order.receiptStatus }}
-      </h2>
-    </template>
-    <div class="space-y-4">
-      <UAlert title="Actualizar inventario manualmente en Siigo" description="Esta recepción guarda cantidades recibidas; no modifica existencias." color="info" />
-      <UAlert v-if="error" :title="error" color="error" />
-      <form v-if="order.status === 'confirmada' && order.receiptStatus !== 'completa'" class="space-y-3" @submit.prevent="receive">
-        <UFormField label="Fecha de recepción">
-          <PurchasesPurchaseDate v-model="date" />
-        </UFormField>
-        <div v-for="item in order.items.filter(i => i.received < i.quantity)" :key="item.id" class="flex items-center justify-between gap-3">
-          <label :for="`receive-${item.id}`">{{ item.name }} · Pendiente: {{ Number((item.quantity - item.received).toFixed(6)) }}</label>
-          <UInput
-            :id="`receive-${item.id}`"
-            v-model.number="quantities[item.id]"
-            type="number"
-            :min="0"
-            :max="Number((item.quantity - item.received).toFixed(6))"
-            step="0.000001"
-            class="w-32"
+      <div class="flex flex-wrap items-center justify-between gap-3">
+        <div class="flex items-center gap-2">
+          <h2 class="font-semibold text-primary">
+            Recepciones
+          </h2>
+          <UBadge
+            :label="status.label"
+            :color="status.color"
+            variant="subtle"
+            size="sm"
           />
         </div>
-        <UButton label="Registrar recepción" type="submit" :loading="busy" />
-      </form>
-      <UFormField v-if="order.receipts.some(r => !r.voidedAt)" label="Motivo para anular recepción">
-        <UInput v-model="reason" class="w-full" />
-      </UFormField>
-      <div v-for="receipt in order.receipts" :key="receipt.id" class="rounded border border-default p-3">
-        <div class="flex items-center justify-between">
-          <span>{{ receipt.date }} · {{ receipt.voidedAt ? 'Anulada' : 'Vigente' }}</span><UButton
-            v-if="!receipt.voidedAt"
-            label="Anular recepción"
-            color="error"
-            variant="ghost"
-            :disabled="reason.trim().length < 3 || busy"
-            @click="run({ action: 'voidReceipt', id: receipt.id, reason })"
-          />
-        </div>
-        <p v-for="item in receipt.items" :key="item.itemId" class="text-sm text-muted">
-          {{ order.items.find(i => i.id === item.itemId)?.name }}: {{ item.quantity }}
-        </p>
-        <p v-if="receipt.voidReason" class="text-sm">
-          {{ receipt.voidReason }}
-        </p>
+        <UButton
+          v-if="canReceive && !formOpen"
+          label="Registrar recepción"
+          icon="i-lucide-package-plus"
+          size="sm"
+          @click="formOpen = true"
+        />
       </div>
+    </template>
+
+    <div class="flex flex-col gap-4">
+      <UAlert
+        v-if="error"
+        :title="error"
+        color="error"
+        variant="subtle"
+        icon="i-lucide-circle-alert"
+      />
+
+      <form v-if="canReceive && formOpen" class="flex flex-col gap-4 rounded-lg border border-default p-4" @submit.prevent="receive">
+        <div class="flex flex-wrap items-end justify-between gap-3">
+          <UFormField label="Fecha de recepción">
+            <PurchasesPurchaseDate v-model="date" />
+          </UFormField>
+          <UButton
+            label="Recibir todo lo pendiente"
+            icon="i-lucide-list-checks"
+            color="neutral"
+            variant="subtle"
+            size="sm"
+            @click="receiveAll"
+          />
+        </div>
+        <ul class="divide-y divide-default rounded-lg border border-default">
+          <li
+            v-for="item in pendingItems"
+            :key="item.id"
+            class="flex flex-col gap-2 px-3 py-2 sm:flex-row sm:items-center sm:justify-between"
+          >
+            <label :for="`receive-${item.id}`" class="min-w-0 text-sm">
+              <span class="block truncate font-medium">{{ item.name }}</span>
+              <span class="text-muted">Pendiente: {{ purchaseQuantity(item.pending) }} de {{ purchaseQuantity(item.quantity) }}</span>
+            </label>
+            <UInputNumber
+              :id="`receive-${item.id}`"
+              v-model="quantities[item.id]"
+              :min="0"
+              :max="item.pending"
+              :step="1"
+              :step-snapping="false"
+              :format-options="{ maximumFractionDigits: 6 }"
+              size="sm"
+              placeholder="0"
+              class="w-full sm:w-36"
+            />
+          </li>
+        </ul>
+        <div class="flex flex-col-reverse gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <p class="flex items-center gap-1.5 text-xs text-muted">
+            <UIcon name="i-lucide-info" class="size-4 shrink-0" />
+            No modifica existencias: actualiza el inventario manualmente en Siigo.
+          </p>
+          <div class="flex gap-2">
+            <UButton
+              label="Cancelar"
+              color="neutral"
+              variant="outline"
+              class="flex-1 justify-center sm:flex-none"
+              :disabled="busy"
+              @click="formOpen = false"
+            />
+            <UButton
+              type="submit"
+              label="Guardar recepción"
+              icon="i-lucide-package-check"
+              class="flex-1 justify-center sm:flex-none"
+              :loading="busy"
+              :disabled="!hasQuantities"
+            />
+          </div>
+        </div>
+      </form>
+
+      <p v-if="!order.receipts.length && !formOpen" class="py-4 text-center text-sm text-muted">
+        Aún no se registran recepciones.
+      </p>
+
+      <ul v-if="order.receipts.length" class="flex flex-col gap-3">
+        <li
+          v-for="receipt in order.receipts"
+          :key="receipt.id"
+          class="rounded-lg border border-default p-3"
+          :class="receipt.voidedAt ? 'opacity-60' : ''"
+        >
+          <div class="flex items-center justify-between gap-2">
+            <div class="flex items-center gap-2">
+              <UIcon :name="receipt.voidedAt ? 'i-lucide-package-x' : 'i-lucide-package-check'" class="size-4 text-muted" />
+              <span class="font-medium">{{ purchaseDateLabel(receipt.date) }}</span>
+              <UBadge
+                v-if="receipt.voidedAt"
+                label="Anulada"
+                color="neutral"
+                variant="subtle"
+                size="sm"
+              />
+            </div>
+            <UButton
+              v-if="!receipt.voidedAt"
+              label="Anular"
+              icon="i-lucide-undo-2"
+              color="error"
+              variant="ghost"
+              size="sm"
+              :disabled="busy"
+              @click="voiding = receipt.id"
+            />
+          </div>
+          <ul class="mt-2 space-y-1 text-sm">
+            <li v-for="item in receipt.items" :key="item.itemId" class="flex justify-between gap-3">
+              <span class="truncate text-muted">{{ itemName(item.itemId) }}</span>
+              <span class="shrink-0 tabular-nums">{{ purchaseQuantity(item.quantity) }}</span>
+            </li>
+          </ul>
+          <p v-if="receipt.voidReason" class="mt-2 text-sm text-muted italic">
+            “{{ receipt.voidReason }}”
+          </p>
+        </li>
+      </ul>
     </div>
+
+    <PurchasesPurchaseReasonModal
+      :open="Boolean(voiding)"
+      title="Anular recepción"
+      description="Las cantidades volverán a quedar pendientes de recibir."
+      confirm-label="Anular recepción"
+      :busy="busy"
+      @update:open="!$event && (voiding = undefined)"
+      @confirm="voidReceipt"
+    />
   </UCard>
 </template>
