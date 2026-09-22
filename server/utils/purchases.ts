@@ -75,14 +75,21 @@ async function replay(requestId: string, requestHash: string) {
   purchaseAssert(event.requestHash === requestHash, 'Identificador de solicitud reutilizado con otros datos.')
   return purchaseView(await getPurchase(event.orderId))
 }
+async function persistProductSnapshots(products: SiigoProduct[]) {
+  const prisma = usePrisma()
+  // These catalog snapshots are idempotent and independent from the purchase.
+  // Keeping their nested relation writes inside the interactive transaction can
+  // exhaust its timeout before the order items are replaced.
+  for (const product of products) await upsertSiigoProduct(prisma, product)
+}
 export async function createPurchase(input: { requestId: string, draft: PurchaseDraft }, user: AppUser) {
   const requestHash = hash({ actor: user.id, ...input })
   const prior = await replay(input.requestId, requestHash)
   if (prior) return prior
   const prepared = await prepareDraft(input.draft)
+  await persistProductSnapshots(prepared.products)
   try {
     const id = await usePrisma().$transaction(async (tx) => {
-      for (const product of prepared.products) await upsertSiigoProduct(tx, product)
       const row = await tx.purchaseOrder.create({ data: { ...prepared.data, createdBy: user.email, items: { create: prepared.items }, events: { create: { requestId: input.requestId, requestHash, action: 'create', detail: json(input.draft), createdBy: user.email } } } })
       return row.id
     }, { timeout: 15000 })
@@ -102,6 +109,7 @@ export async function mutatePurchase(id: string, input: PurchaseCommand, user: A
   const c = input.command
   const before = await getPurchase(id)
   const prepared = c.action === 'edit' ? await prepareDraft(c.draft) : c.action === 'confirm' ? await prepareDraft({ providerId: before.providerId, date: day(before.date), currencyCode: before.currencyCode as 'MXN' | 'USD', notes: before.notes, items: before.items.map(i => ({ productId: i.productId, quantity: Number(i.quantity), unitCost: Number(i.unitCost) })) }) : null
+  if (prepared) await persistProductSnapshots(prepared.products)
   try {
     await usePrisma().$transaction(async (tx) => {
       // This conditional UPDATE locks the order until commit. Every child write uses the same lock.
@@ -111,7 +119,6 @@ export async function mutatePurchase(id: string, input: PurchaseCommand, user: A
       if (c.action === 'edit' || c.action === 'confirm') {
         purchaseAssert(row.status === 'borrador', 'Solo puedes modificar o confirmar borradores.')
         purchaseAssert(prepared, 'Faltan datos de la orden.')
-        for (const product of prepared.products) await upsertSiigoProduct(tx, product)
         await tx.purchaseItem.deleteMany({ where: { orderId: id } })
         await tx.purchaseOrder.update({ where: { id }, data: { ...prepared.data, status: c.action === 'confirm' ? 'confirmada' : 'borrador', items: { create: prepared.items } } })
       } else if (c.action === 'cancel') {
