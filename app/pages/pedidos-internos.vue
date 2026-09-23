@@ -1,7 +1,15 @@
 <script setup lang="ts">
-useSeoMeta({ title: 'Pedidos internos' })
+const route = useRoute()
+
+await navigateTo({
+  path: '/ventas',
+  query: {
+    ...route.query,
+    view: 'internos'
+  }
+}, { replace: true })
 </script>
 
 <template>
-  <OrdersOrderList title="Pedidos internos" internal-customers />
+  <div />
 </template>

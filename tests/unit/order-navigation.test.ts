@@ -14,10 +14,11 @@ describe('orderListReturnPath', () => {
     expect(orderListReturnPath(returnTo)).toBe(returnTo)
   })
 
-  it('supports returning to the internal orders view', () => {
+  it('migrates the former internal-orders page to the orders tab', () => {
     const returnTo = '/pedidos-internos?search=Cliente&page=2'
 
-    expect(orderListReturnPath(returnTo)).toBe(returnTo)
+    expect(orderListReturnPath(returnTo)).toBe('/ventas?view=internos&search=Cliente&page=2')
+    expect(orderListReturnPath('/pedidos-internos')).toBe('/ventas?view=internos')
   })
 
   it('rejects external and unrelated return paths', () => {

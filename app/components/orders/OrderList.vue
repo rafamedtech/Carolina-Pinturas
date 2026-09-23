@@ -6,11 +6,9 @@ import { canCreateOrders } from '~/utils/roleAccess'
 const props = withDefaults(defineProps<{
   title?: string
   igualacion?: boolean
-  internalCustomers?: boolean
 }>(), {
   title: 'Pedidos',
-  igualacion: false,
-  internalCustomers: false
+  igualacion: false
 })
 
 function queryValue(value: unknown) {
@@ -41,6 +39,7 @@ function queryDateRange(from: unknown, to: unknown): OrderDateRange | null {
 
 const route = useRoute()
 const router = useRouter()
+const { user } = useAuth()
 const ORDER_VIEW_KEYS = [
   'all',
   'cotizacion',
@@ -49,28 +48,35 @@ const ORDER_VIEW_KEYS = [
   'pendiente_pago',
   'entregado',
   'facturacion',
-  'cancelado'
+  'cancelado',
+  'internos'
 ] as const
 const IGUALACION_VIEW_KEYS = ['mostrador', 'vendedor']
+const canViewInternal = computed(() => user.value?.role === 'admin')
 const initialSelection = props.igualacion
   ? IGUALACION_VIEW_KEYS.includes(queryValue(route.query.view))
     ? queryValue(route.query.view)
     : queryValue(route.query.status) || 'all'
   : ORDER_VIEW_KEYS.includes(queryValue(route.query.view) as typeof ORDER_VIEW_KEYS[number])
+    && (queryValue(route.query.view) !== 'internos' || canViewInternal.value)
     ? queryValue(route.query.view)
     : 'all'
 const filter = shallowRef(queryValue(route.query.search))
 const selectedTab = shallowRef(initialSelection)
+const isInternalCustomersView = computed(() => !props.igualacion && selectedTab.value === 'internos')
 const selectedStatus = computed(() =>
   props.igualacion && selectedTab.value !== 'all' && !IGUALACION_VIEW_KEYS.includes(selectedTab.value)
     ? selectedTab.value
     : undefined
 )
 const selectedView = computed(() =>
-  selectedTab.value !== 'all' && (!props.igualacion || IGUALACION_VIEW_KEYS.includes(selectedTab.value))
+  selectedTab.value !== 'all'
+  && !isInternalCustomersView.value
+  && (!props.igualacion || IGUALACION_VIEW_KEYS.includes(selectedTab.value))
     ? selectedTab.value
     : undefined
 )
+const selectedQueryView = computed(() => isInternalCustomersView.value ? 'internos' : selectedView.value)
 const paymentStatusKey = shallowRef(queryValue(route.query.payment_status) || 'all')
 const paymentMethodKey = shallowRef(queryValue(route.query.payment_method) || 'all')
 const hideCancelled = shallowRef(queryBoolean(route.query.hide_cancelled))
@@ -81,7 +87,6 @@ const dateRange = shallowRef<OrderDateRange | null>(
 const page = shallowRef(queryPage(route.query.page))
 const pageSize = 25
 const debouncedFilter = refDebounced(filter, 300)
-const { user } = useAuth()
 const canCreate = computed(() => Boolean(user.value && canCreateOrders(user.value.role)))
 const isHydrated = shallowRef(false)
 const customerManagerOpen = shallowRef(false)
@@ -94,6 +99,10 @@ watch([filter, selectedTab, paymentStatusKey, paymentMethodKey, hideCancelled, h
   page.value = 1
 })
 
+watch(canViewInternal, (canView) => {
+  if (!canView && selectedTab.value === 'internos') selectedTab.value = 'all'
+})
+
 const dateFrom = computed(() => dateRange.value?.start && dateRange.value?.end
   ? dateRange.value.start.toString()
   : undefined)
@@ -103,7 +112,7 @@ const dateTo = computed(() => dateRange.value?.start && dateRange.value?.end
 const listQuery = computed(() => ({
   ...(filter.value ? { search: filter.value } : {}),
   ...(selectedStatus.value ? { status: selectedStatus.value } : {}),
-  ...(selectedView.value ? { view: selectedView.value } : {}),
+  ...(selectedQueryView.value ? { view: selectedQueryView.value } : {}),
   ...(paymentStatusKey.value !== 'all' ? { payment_status: paymentStatusKey.value } : {}),
   ...(paymentMethodKey.value !== 'all' ? { payment_method: paymentMethodKey.value } : {}),
   ...(hideCancelled.value ? { hide_cancelled: 'true' } : {}),
@@ -144,7 +153,7 @@ const {
     date_from: dateFrom,
     date_to: dateTo,
     igualacion: props.igualacion ? 'true' : undefined,
-    internal_customers: props.internalCustomers ? 'true' : undefined
+    internal_customers: computed(() => isInternalCustomersView.value ? 'true' : undefined)
   },
   default: () => ({
     results: [],
@@ -170,7 +179,7 @@ const loading = computed(() => isHydrated.value && status.value === 'pending')
 const IGUALACION_STATUS_KEYS = ['confirmado', 'surtido', 'en_espera']
 const statusTabItems = computed(() => {
   if (!props.igualacion) {
-    return [
+    const items = [
       { label: 'Todos', value: 'all' },
       { label: 'Cotización', value: 'cotizacion' },
       { label: 'Mostrador', value: 'mostrador' },
@@ -180,6 +189,9 @@ const statusTabItems = computed(() => {
       { label: 'Facturación', value: 'facturacion' },
       { label: 'Cancelado', value: 'cancelado' }
     ]
+
+    if (canViewInternal.value) items.push({ label: 'Internos', value: 'internos' })
+    return items
   }
 
   const list = statuses.value.filter(item => IGUALACION_STATUS_KEYS.includes(item.key))
@@ -208,7 +220,7 @@ const statusTabItems = computed(() => {
         </template>
         <template #right>
           <UButton
-            v-if="internalCustomers"
+            v-if="isInternalCustomersView"
             label="Gestionar clientes"
             icon="i-lucide-users-round"
             color="neutral"
@@ -278,7 +290,7 @@ const statusTabItems = computed(() => {
       />
 
       <OrdersInternalOrderCustomersModal
-        v-if="internalCustomers"
+        v-if="canViewInternal"
         v-model:open="customerManagerOpen"
         @saved="refresh()"
       />

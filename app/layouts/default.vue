@@ -64,14 +64,6 @@ const allLinks: AppNavigationItem[] = [{
     open.value = false
   }
 }, {
-  label: 'Pedidos internos',
-  icon: 'i-lucide-clipboard-list',
-  to: '/pedidos-internos',
-  roles: adminRoles,
-  onSelect: () => {
-    open.value = false
-  }
-}, {
   label: 'Pagos',
   icon: 'i-lucide-hand-coins',
   to: '/pagos',
