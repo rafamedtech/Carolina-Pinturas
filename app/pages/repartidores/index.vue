@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { TableColumn, TableRow } from '@nuxt/ui'
 import type { Repartidor } from '~/types/orders'
+import type { CsvColumn } from '~/utils/csv'
 
 useSeoMeta({ title: 'Repartidores' })
 
@@ -22,6 +23,13 @@ const repartidores = computed(() => {
     `${repartidor.nombre} ${repartidor.telefono || ''}`.toLowerCase().includes(value)
   )
 })
+
+const csvColumns: CsvColumn<Repartidor>[] = [
+  { key: 'nombre', label: 'Nombre' },
+  { key: 'telefono', label: 'Teléfono', value: row => row.telefono || '' },
+  { key: 'deliveredCount', label: 'Pedidos entregados', value: row => row.deliveredCount },
+  { key: 'activo', label: 'Estado', value: row => row.activo === false ? 'Inactivo' : 'Activo' }
+]
 
 const columns: TableColumn<Repartidor>[] = [{
   accessorKey: 'nombre',
@@ -66,6 +74,12 @@ function openRepartidor(_: Event, row: TableRow<Repartidor>) {
           class="w-full sm:max-w-sm"
         />
         <div class="flex gap-2">
+          <AppCsvExportButton
+            filename="repartidores"
+            :columns="csvColumns"
+            :rows="repartidores"
+            :disabled="loading"
+          />
           <UButton
             label="Actualizar"
             icon="i-lucide-refresh-cw"

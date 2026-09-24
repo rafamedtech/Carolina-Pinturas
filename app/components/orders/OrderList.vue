@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { parseDate } from '@internationalized/date'
-import type { OrderDateRange, OrderStatus, SalesOrderListResponse } from '~/types/orders'
+import type { OrderDateRange, OrderStatus, SalesOrderListItem, SalesOrderListResponse } from '~/types/orders'
+import type { CsvColumn } from '~/utils/csv'
+import { paymentStatusLabel } from '~/utils/orderPayment'
 import { canCreateOrders } from '~/utils/roleAccess'
 
 const props = withDefaults(defineProps<{
@@ -176,6 +178,57 @@ const errorMessage = computed(() =>
 )
 const loading = computed(() => isHydrated.value && status.value === 'pending')
 
+const csvColumns = computed<CsvColumn<SalesOrderListItem>[]>(() => {
+  const columns: CsvColumn<SalesOrderListItem>[] = [
+    { key: 'number', label: 'Pedido' },
+    { key: 'orderDate', label: 'Fecha' },
+    { key: 'promisedDate', label: 'Fecha prometida', value: row => row.promisedDate ?? '' },
+    { key: 'customer', label: 'Cliente', value: row => row.customer.name },
+    { key: 'rfc', label: 'RFC', value: row => row.customer.rfc ?? '' },
+    { key: 'itemCount', label: 'Partidas', value: row => row.itemCount }
+  ]
+
+  if (props.igualacion) {
+    columns.push({
+      key: 'igualaciones',
+      label: 'Igualaciones',
+      value: row => (row.partidas ?? [])
+        .filter(item => item.isIgualacion)
+        .map(item => `${item.quantity} x ${item.code}`)
+        .join(' | ')
+    })
+  } else {
+    columns.push(
+      { key: 'paymentStatus', label: 'Estado de pago', value: row => paymentStatusLabel(row.paymentStatus) },
+      { key: 'total', label: 'Total', value: row => row.total }
+    )
+  }
+
+  columns.push(
+    { key: 'status', label: 'Estado', value: row => row.status.label },
+    { key: 'createdAt', label: 'Creado', value: row => row.createdAt },
+    { key: 'updatedAt', label: 'Última actualización', value: row => row.updatedAt }
+  )
+
+  return columns
+})
+
+function fetchAllOrders() {
+  return fetchAllPages<SalesOrderListItem>('/api/orders', {
+    search: debouncedFilter.value || undefined,
+    status: selectedStatus.value,
+    view: selectedView.value,
+    payment_status: paymentStatusKey.value === 'all' ? undefined : paymentStatusKey.value,
+    payment_method: paymentMethodKey.value === 'all' ? undefined : paymentMethodKey.value,
+    hide_cancelled: hideCancelled.value ? 'true' : undefined,
+    hide_quotes: hideQuotes.value ? 'true' : undefined,
+    date_from: dateFrom.value,
+    date_to: dateTo.value,
+    igualacion: props.igualacion ? 'true' : undefined,
+    internal_customers: isInternalCustomersView.value ? 'true' : undefined
+  })
+}
+
 const IGUALACION_STATUS_KEYS = ['confirmado', 'surtido', 'en_espera']
 const statusTabItems = computed(() => {
   if (!props.igualacion) {
@@ -227,6 +280,12 @@ const statusTabItems = computed(() => {
             variant="outline"
             :ui="{ label: 'hidden sm:inline' }"
             @click="customerManagerOpen = true"
+          />
+          <AppCsvExportButton
+            :filename="igualacion ? 'igualaciones' : 'pedidos'"
+            :columns="csvColumns"
+            :fetch-all="fetchAllOrders"
+            :disabled="loading"
           />
           <UButton
             label="Actualizar"

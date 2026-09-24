@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import { parseDate } from '@internationalized/date'
 import type { OrderDateRange } from '~/types/orders'
-import type { PaymentListResponse } from '~/types/payments'
+import type { PaymentListItem, PaymentListResponse } from '~/types/payments'
+import type { CsvColumn } from '~/utils/csv'
+import { paymentMethodLabel } from '~/utils/orderPayment'
 
 function queryValue(value: unknown) {
   return typeof value === 'string' ? value : ''
@@ -97,6 +99,26 @@ const errorMessage = computed(() =>
   error.value?.data?.statusMessage || 'No fue posible cargar los pagos.'
 )
 const loading = computed(() => isHydrated.value && status.value === 'pending')
+
+const csvColumns: CsvColumn<PaymentListItem>[] = [
+  { key: 'order', label: 'Pedido', value: row => row.order.number },
+  { key: 'paymentDate', label: 'Fecha' },
+  { key: 'customer', label: 'Cliente', value: row => row.order.customerName },
+  { key: 'paymentMethod', label: 'Método', value: row => paymentMethodLabel(row.paymentMethod) },
+  { key: 'reference', label: 'Referencia', value: row => row.reference || row.siigoVoucherName || '' },
+  { key: 'createdBy', label: 'Registró', value: row => row.createdBy.name },
+  { key: 'amount', label: 'Monto', value: row => row.amount },
+  { key: 'currencyCode', label: 'Moneda', value: row => row.currencyCode }
+]
+
+function fetchAllPayments() {
+  return fetchAllPages<PaymentListItem>('/api/payments', {
+    search: debouncedFilter.value || undefined,
+    payment_method: paymentMethod.value === 'all' ? undefined : paymentMethod.value,
+    date_from: dateFrom.value,
+    date_to: dateTo.value
+  })
+}
 </script>
 
 <template>
@@ -107,6 +129,12 @@ const loading = computed(() => isHydrated.value && status.value === 'pending')
           <UDashboardSidebarCollapse />
         </template>
         <template #right>
+          <AppCsvExportButton
+            filename="pagos"
+            :columns="csvColumns"
+            :fetch-all="fetchAllPayments"
+            :disabled="loading"
+          />
           <UButton
             label="Actualizar"
             icon="i-lucide-refresh-cw"

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { TableColumn, TableRow } from '@nuxt/ui'
 import type { SiigoCustomer } from '~/types/siigo'
+import type { CsvColumn } from '~/utils/csv'
 
 const props = withDefaults(defineProps<{
   title: string
@@ -36,6 +37,14 @@ const records = computed(() => {
     return `${customer.rfc_id || ''} ${name} ${email}`.toLowerCase().includes(value)
   })
 })
+
+const csvColumns: CsvColumn<SiigoCustomer>[] = [
+  { key: 'rfc_id', label: 'RFC', value: row => row.rfc_id || '' },
+  { key: 'name', label: props.singularLabel, value: row => row.name?.filter(Boolean).join(' ') || '' },
+  { key: 'email', label: 'Correo', value: row => row.contacts?.[0]?.email || '' },
+  { key: 'phone', label: 'Teléfono', value: row => row.phones?.map(phone => phone.number).filter(Boolean).join(', ') || '' },
+  { key: 'active', label: 'Estado', value: row => row.active === false ? 'Inactivo' : 'Activo' }
+]
 
 const columns = computed<TableColumn<SiigoCustomer>[]>(() => [{
   accessorKey: 'rfc_id',
@@ -105,6 +114,12 @@ async function reloadRecords() {
           class="w-full sm:max-w-sm"
         />
         <div class="flex gap-2">
+          <AppCsvExportButton
+            :filename="routeBase === '/proveedores' ? 'proveedores' : 'clientes'"
+            :columns="csvColumns"
+            :rows="records"
+            :disabled="loading"
+          />
           <UButton
             label="Recargar"
             icon="i-lucide-refresh-cw"

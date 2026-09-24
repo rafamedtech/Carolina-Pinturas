@@ -2,7 +2,9 @@
 import { parseDate } from '@internationalized/date'
 import type { OrderDateRange } from '~/types/orders'
 import type { CreateExpenseInput, ExpenseListResponse, ExpenseRecord } from '~/types/expenses'
+import type { CsvColumn } from '~/utils/csv'
 import { canViewExpenseCategory, visibleExpenseCategories } from '~/utils/expense'
+import { paymentMethodLabel } from '~/utils/orderPayment'
 
 function queryValue(value: unknown) {
   return typeof value === 'string' ? value : ''
@@ -122,6 +124,28 @@ const expenseErrorMessage = computed(() =>
 )
 const loading = computed(() => isHydrated.value && expenseStatus.value === 'pending')
 
+const csvColumns: CsvColumn<ExpenseRecord>[] = [
+  { key: 'date', label: 'Fecha' },
+  { key: 'category', label: 'Categoría' },
+  { key: 'description', label: 'Descripción' },
+  { key: 'provider', label: 'Proveedor', value: row => row.provider },
+  { key: 'providerRfc', label: 'RFC proveedor', value: row => row.providerRfc ?? '' },
+  { key: 'paymentMethod', label: 'Método', value: row => paymentMethodLabel(row.paymentMethod) },
+  { key: 'createdBy', label: 'Registró', value: row => row.createdBy.name },
+  { key: 'amount', label: 'Importe', value: row => row.amount },
+  { key: 'currencyCode', label: 'Moneda', value: row => row.currencyCode }
+]
+
+function fetchAllExpenses() {
+  return fetchAllPages<ExpenseRecord>('/api/expenses', {
+    search: debouncedFilter.value || undefined,
+    payment_method: paymentMethod.value === 'all' ? undefined : paymentMethod.value,
+    category: category.value === 'all' ? undefined : category.value,
+    date_from: dateFrom.value,
+    date_to: dateTo.value
+  })
+}
+
 function formatCurrency(amount: number, currencyCode: string) {
   return new Intl.NumberFormat('es-MX', {
     style: 'currency',
@@ -200,6 +224,12 @@ async function saveExpense(input: CreateExpenseInput) {
           <UDashboardSidebarCollapse />
         </template>
         <template #right>
+          <AppCsvExportButton
+            filename="gastos"
+            :columns="csvColumns"
+            :fetch-all="fetchAllExpenses"
+            :disabled="loading"
+          />
           <UButton
             label="Actualizar"
             icon="i-lucide-refresh-cw"

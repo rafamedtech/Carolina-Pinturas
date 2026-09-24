@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { TableColumn, TableRow } from '@nuxt/ui'
 import type { SiigoProduct } from '~/types/siigo'
+import type { CsvColumn } from '~/utils/csv'
 import { canManageProducts } from '~/utils/roleAccess'
 
 useSeoMeta({ title: 'Productos' })
@@ -81,6 +82,16 @@ function formatProductPrice(product: SiigoProduct) {
   }).format(amount)
 }
 
+const csvColumns: CsvColumn<SiigoProduct>[] = [
+  { key: 'code', label: 'Código' },
+  { key: 'name', label: 'Producto' },
+  { key: 'unit', label: 'Unidad', value: row => unitsById.get(row.id) ?? '' },
+  { key: 'brand', label: 'Marca', value: row => row.additional_fields?.brand || '' },
+  { key: 'type', label: 'Tipo', value: row => row.type || 'Producto' },
+  { key: 'available_quantity', label: 'Existencia', value: row => row.available_quantity ?? '' },
+  { key: 'price', label: 'Precio', value: row => formatProductPrice(row) }
+]
+
 const columns: TableColumn<SiigoProduct>[] = [{
   accessorKey: 'code',
   header: 'Código'
@@ -138,6 +149,12 @@ function openProduct(_: Event, row: TableRow<SiigoProduct>) {
           class="w-full sm:max-w-sm"
         />
         <div class="flex gap-2">
+          <AppCsvExportButton
+            filename="productos"
+            :columns="csvColumns"
+            :rows="filteredProducts"
+            :disabled="loading"
+          />
           <UButton
             label="Actualizar"
             icon="i-lucide-refresh-cw"

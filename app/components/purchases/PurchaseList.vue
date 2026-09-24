@@ -4,6 +4,7 @@ import type { TableColumn } from '@nuxt/ui'
 import type { Column, SortingState } from '@tanstack/table-core'
 import type { OrderDateRange } from '~/types/orders'
 import type { PurchaseView } from '~/types/purchases'
+import type { CsvColumn } from '~/utils/csv'
 
 const UButton = resolveComponent('UButton')
 const NuxtLink = resolveComponent('NuxtLink')
@@ -26,6 +27,17 @@ const query = computed(() => ({
 }))
 const { data, error, status: loading, refresh } = await useFetch<{ results: PurchaseView[] }>('/api/purchases', { query })
 const purchases = computed(() => [...(data.value?.results ?? [])])
+
+const csvColumns: CsvColumn<PurchaseView>[] = [
+  { key: 'folio', label: 'Orden', value: row => `OC-${row.folio}` },
+  { key: 'providerName', label: 'Proveedor' },
+  { key: 'date', label: 'Fecha' },
+  { key: 'status', label: 'Estado' },
+  { key: 'receiptStatus', label: 'Recepción' },
+  { key: 'total', label: 'Total', value: row => row.total },
+  { key: 'balance', label: 'Saldo facturado', value: row => row.balance },
+  { key: 'currencyCode', label: 'Moneda' }
+]
 
 function sortableHeader(label: string, align: 'left' | 'right' = 'left') {
   return ({ column }: { column: Column<PurchaseView, unknown> }) => {
@@ -96,6 +108,12 @@ const columns: TableColumn<PurchaseView>[] = [{
         <template #leading>
           <UDashboardSidebarCollapse />
         </template><template #right>
+          <AppCsvExportButton
+            filename="compras"
+            :columns="csvColumns"
+            :rows="purchases"
+            :disabled="loading === 'pending'"
+          />
           <UButton
             to="/compras/cuentas-por-pagar"
             label="Cuentas por pagar"
