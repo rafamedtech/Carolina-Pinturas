@@ -15,6 +15,7 @@ const { data, status, error, refresh } = useFetch<SatSearchResponse>('/api/siigo
   query: computed(() => ({ kind: props.kind, q: debouncedSearch.value, page: page.value })),
   immediate: false, server: false
 })
+const isLoading = computed(() => status.value === 'pending' || (open.value && !data.value && !error.value))
 watch(open, (value) => {
   if (value) refresh()
 })
@@ -32,7 +33,7 @@ const label = computed(() => model.value ? `${model.value}${selectedName.value |
       icon="i-lucide-search"
     />
     <template #body>
-      <div class="space-y-4">
+      <div class="flex h-96 flex-col gap-4 sm:h-[28rem]">
         <UInput
           v-model="search"
           :placeholder="`Buscar ${props.label.toLowerCase()}`"
@@ -41,33 +42,44 @@ const label = computed(() => model.value ? `${model.value}${selectedName.value |
           class="w-full"
           icon="i-lucide-search"
         />
-        <UAlert v-if="error" color="error" title="No se pudo consultar el catálogo SAT." />
-        <div v-if="status === 'pending'" role="status">
-          Buscando…
+        <div class="min-h-0 flex-1">
+          <div
+            v-if="isLoading"
+            class="flex h-full items-center justify-center gap-2 text-sm text-muted"
+            role="status"
+          >
+            <UIcon name="i-lucide-loader-circle" class="size-5 animate-spin" />
+            <span>Buscando…</span>
+          </div>
+          <UAlert v-else-if="error" color="error" title="No se pudo consultar el catálogo SAT." />
+          <ul v-else class="h-full space-y-1 overflow-y-auto">
+            <li v-for="entry in data?.results" :key="entry.code">
+              <UButton
+                :label="`${entry.code} · ${entry.name}`"
+                color="neutral"
+                variant="ghost"
+                class="w-full justify-start text-left whitespace-normal"
+                @click="model = entry.code; selectedName = entry.name; open = false"
+              />
+            </li>
+            <li v-if="data && !data.results.length" class="p-3 text-muted">
+              Sin coincidencias.
+            </li>
+          </ul>
         </div>
-        <ul v-else class="max-h-80 space-y-1 overflow-y-auto">
-          <li v-for="entry in data?.results" :key="entry.code">
-            <UButton
-              :label="`${entry.code} · ${entry.name}`"
-              color="neutral"
-              variant="ghost"
-              class="w-full justify-start text-left whitespace-normal"
-              @click="model = entry.code; selectedName = entry.name; open = false"
-            />
-          </li>
-          <li v-if="data && !data.results.length" class="p-3 text-muted">
-            Sin coincidencias.
-          </li>
-        </ul>
-        <UPagination
-          v-if="data"
-          v-model:page="page"
-          :total="data.pagination.total_results"
-          :items-per-page="25"
-          :disabled="status === 'pending'"
-        />
-        <p v-if="data" class="text-xs text-muted">
-          Catálogo Siigo México · consultado {{ data.retrievedAt }}
+        <div class="flex min-h-8 items-center">
+          <UPagination
+            v-if="data"
+            v-model:page="page"
+            :total="data.pagination.total_results"
+            :items-per-page="25"
+            :disabled="isLoading"
+          />
+        </div>
+        <p class="min-h-4 text-xs text-muted">
+          <template v-if="data">
+            Catálogo Siigo México · consultado {{ data.retrievedAt }}
+          </template>
         </p>
       </div>
     </template>

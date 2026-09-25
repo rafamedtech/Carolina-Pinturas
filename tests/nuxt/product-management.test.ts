@@ -5,6 +5,7 @@ import { defineComponent, h } from 'vue'
 import { flushPromises, type VueWrapper } from '@vue/test-utils'
 import ProductForm from '~/components/products/ProductForm.vue'
 import ProductFilters from '~/components/products/ProductFilters.vue'
+import SatPicker from '~/components/products/SatPicker.vue'
 import OrderDatePicker from '~/components/orders/OrderDatePicker.vue'
 import { useProductMutation } from '~/composables/useProductMutation'
 import type { SiigoProduct } from '~/types/siigo'
@@ -22,7 +23,10 @@ const context = {
   priceLists: [{ id: 1, name: 'Público', active: true }, { id: 2, name: 'Mayoreo', active: true }]
 }
 let wrapper: VueWrapper | undefined
-registerEndpoint('/api/siigo/products/sat', () => ({ results: [{ code: 'H87', name: 'Pieza' }], pagination: { page: 1, page_size: 25, total_results: 1 }, retrievedAt: '2026-09-15', source: 'https://example.com' }))
+registerEndpoint('/api/siigo/products/sat', async () => {
+  await new Promise(resolve => setTimeout(resolve, 10))
+  return { results: [{ code: 'H87', name: 'Pieza' }], pagination: { page: 1, page_size: 25, total_results: 1 }, retrievedAt: '2026-09-15', source: 'https://example.com' }
+})
 afterEach(() => {
   wrapper?.unmount()
 })
@@ -55,6 +59,20 @@ describe('formulario de productos', () => {
     const apply = wrapper.findAll('button').find(button => button.text() === 'Aplicar filtros')!
     await apply.trigger('click')
     expect(wrapper.emitted('change')?.[0]?.[0]).toEqual({ active: 'true' })
+  })
+  it('mantiene la altura del selector SAT mientras carga los resultados', async () => {
+    wrapper = await mountSuspended(SatPicker, {
+      attachTo: document.body,
+      props: { modelValue: '', kind: 'unit', label: 'Unidad SAT' }
+    })
+    await wrapper.get('button').trigger('click')
+
+    const loading = document.querySelector('[role="status"]')
+    expect(loading?.textContent).toContain('Buscando…')
+    expect(document.querySelector('.h-96')).not.toBeNull()
+
+    await vi.waitFor(() => expect(document.body.textContent).toContain('H87 · Pieza'))
+    expect(document.querySelector('.h-96')).not.toBeNull()
   })
 })
 
