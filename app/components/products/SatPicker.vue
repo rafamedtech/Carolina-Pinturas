@@ -37,6 +37,7 @@ const label = computed(() => model.value ? `${model.value}${selectedName.value |
           v-model="search"
           :placeholder="`Buscar ${props.label.toLowerCase()}`"
           aria-label="Buscar en catálogo SAT"
+          autofocus
           class="w-full"
           icon="i-lucide-search"
         />
