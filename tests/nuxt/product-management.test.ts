@@ -68,7 +68,7 @@ describe('formulario de productos', () => {
     await wrapper.get('button').trigger('click')
 
     const loading = document.querySelector('[role="status"]')
-    expect(loading?.textContent).toContain('Buscando…')
+    expect(loading?.textContent).toContain('Cargando…')
     expect(document.querySelector('.h-96')).not.toBeNull()
 
     await vi.waitFor(() => expect(document.body.textContent).toContain('H87 · Pieza'))

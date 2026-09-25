@@ -45,11 +45,11 @@ const label = computed(() => model.value ? `${model.value}${selectedName.value |
         <div class="min-h-0 flex-1">
           <div
             v-if="isLoading"
-            class="flex h-full items-center justify-center gap-2 text-sm text-muted"
+            class="flex h-full flex-col items-center justify-center gap-3 text-sm text-muted"
             role="status"
           >
-            <UIcon name="i-lucide-loader-circle" class="size-5 animate-spin" />
-            <span>Buscando…</span>
+            <UIcon name="i-lucide-loader-circle" class="size-10 animate-spin text-primary" />
+            <span>Cargando…</span>
           </div>
           <UAlert v-else-if="error" color="error" title="No se pudo consultar el catálogo SAT." />
           <ul v-else class="h-full space-y-1 overflow-y-auto">
