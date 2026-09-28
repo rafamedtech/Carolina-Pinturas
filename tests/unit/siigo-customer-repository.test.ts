@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { usePrisma } from '../../server/utils/prisma'
 import {
   localCustomerInternal,
+  updateLocalCustomerInvoiceRequirement,
   withLocalCustomerInternals
 } from '../../server/utils/siigo-customer-repository'
 
@@ -40,6 +41,37 @@ describe('preferencias locales de clientes', () => {
     })
     expect(internal).not.toHaveProperty('address')
     expect(internal).not.toHaveProperty('rfc_id')
+  })
+
+  it('actualiza únicamente la preferencia de facturación local', async () => {
+    const customerId = '6b6ceb28-b2eb-4b98-b3dd-26648a933c81'
+    const row = {
+      id: customerId,
+      internalCode: 'CLI-001',
+      internalNotes: 'Cuenta de mayoreo',
+      internalTags: ['mayoreo'],
+      isCustomer: true,
+      isSupplier: false,
+      isInternalOrderCustomer: false,
+      requiresInvoice: false,
+      syncStatus: 'synced',
+      syncVersion: 1,
+      syncedAt: new Date('2026-08-18T17:00:00.000Z')
+    }
+    const update = vi.fn().mockResolvedValue(row)
+    vi.mocked(usePrisma).mockReturnValue({
+      siigoCustomer: { update }
+    } as unknown as ReturnType<typeof usePrisma>)
+
+    const internal = await updateLocalCustomerInvoiceRequirement(customerId, false)
+
+    expect(update).toHaveBeenCalledWith({
+      where: { id: customerId },
+      data: { requiresInvoice: false },
+      select: expect.objectContaining({ requiresInvoice: true })
+    })
+    expect(internal.requires_invoice).toBe(false)
+    expect(internal.code).toBe('CLI-001')
   })
 
   it('conserva únicamente terceros con el rol local Supplier', async () => {

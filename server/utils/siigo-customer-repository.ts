@@ -97,6 +97,19 @@ export async function updateLocalCustomerRoles(
   return localCustomerInternal(row)
 }
 
+export async function updateLocalCustomerInvoiceRequirement(
+  customerId: string,
+  requiresInvoice: boolean
+) {
+  const row = await usePrisma().siigoCustomer.update({
+    where: { id: customerId },
+    data: { requiresInvoice },
+    select: customerInternalSelect
+  })
+
+  return localCustomerInternal(row)
+}
+
 export async function replaceInternalOrderCustomers(customerIds: string[]) {
   const prisma = usePrisma()
   const uniqueIds = [...new Set(customerIds)]

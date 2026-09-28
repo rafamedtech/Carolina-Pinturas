@@ -63,6 +63,7 @@ const editNotice = shallowRef('')
 const activeOverride = shallowRef<boolean | undefined>(undefined)
 const archiveOpen = shallowRef(false)
 const rolesSaving = shallowRef(false)
+const invoiceSaving = shallowRef(false)
 
 function startEditing(options: { active?: boolean, notice?: string } = {}) {
   activeOverride.value = options.active
@@ -165,6 +166,39 @@ async function saveRoles(roles: { customer: boolean, supplier: boolean }) {
     })
   } finally {
     rolesSaving.value = false
+  }
+}
+
+async function saveInvoiceRequirement(requiresInvoice: boolean) {
+  if (!customer.value?.internal || invoiceSaving.value) return
+  invoiceSaving.value = true
+
+  try {
+    const internal = await $fetch<NonNullable<SiigoCustomer['internal']>>(
+      `/api/siigo/customers/${encodeURIComponent(customerId.value)}/invoice-requirement`,
+      { method: 'PATCH', body: { requiresInvoice } }
+    )
+    customer.value = { ...customer.value, internal }
+    await Promise.all([
+      refreshNuxtData(catalogKey),
+      refreshNuxtData('customers-catalog-request')
+    ])
+    toast.add({
+      title: 'Facturación predeterminada actualizada',
+      description: 'La preferencia se aplicará a los próximos pedidos de este cliente.',
+      color: 'success',
+      icon: 'i-lucide-circle-check'
+    })
+  } catch (fetchError: unknown) {
+    const response = fetchError as { data?: { statusMessage?: string }, message?: string }
+    toast.add({
+      title: 'No se pudo actualizar la facturación',
+      description: response.data?.statusMessage || response.message || 'Intenta nuevamente.',
+      color: 'error',
+      icon: 'i-lucide-circle-alert'
+    })
+  } finally {
+    invoiceSaving.value = false
   }
 }
 
@@ -284,8 +318,14 @@ useSeoMeta({ title: () => fullName.value })
                 <dt class="text-sm text-muted">
                   Facturación predeterminada
                 </dt>
-                <dd class="mt-1 font-medium">
-                  {{ customer.internal?.requires_invoice ? 'Requiere factura' : 'No requiere factura' }}
+                <dd class="mt-1">
+                  <CustomersCustomerInvoiceRequirement
+                    v-if="customer.internal"
+                    :requires-invoice="customer.internal.requires_invoice ?? false"
+                    :saving="invoiceSaving"
+                    @save="saveInvoiceRequirement"
+                  />
+                  <span v-else class="font-medium">—</span>
                 </dd>
               </div>
             </dl>
