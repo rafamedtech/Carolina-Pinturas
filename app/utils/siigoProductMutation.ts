@@ -8,7 +8,9 @@ export function productMutationInput(product?: SiigoProduct): ProductInput {
     type: (product?.type ?? 'Product') as ProductInput['type'],
     active: product?.active ?? true, stock_control: product?.stock_control ?? false,
     tax_included: product?.tax_included ?? false,
-    unit: typeof product?.unit === 'string' ? product.unit : product?.unit?.code ?? '',
+    unit: product
+      ? (typeof product.unit === 'string' ? product.unit : product.unit?.code ?? '')
+      : 'H87',
     key: product?.key?.code ?? '',
     reference: product?.reference ?? '', description: product?.description ?? '',
     additional_fields: { barcode: product?.additional_fields?.barcode ?? '', brand: product?.additional_fields?.brand ?? '' },
