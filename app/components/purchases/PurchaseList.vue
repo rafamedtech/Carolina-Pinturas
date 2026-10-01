@@ -107,14 +107,14 @@ const columns: TableColumn<PurchaseView>[] = [{
   header: sortableHeader('Estado'),
   cell: ({ row }) => {
     const status = purchaseStatus(row.original.status)
-    return h(UBadge, { color: status.color, icon: status.icon, variant: 'soft' }, () => status.label)
+    return h(UBadge, { color: status.color, icon: status.icon, variant: 'soft', ui: { leadingIcon: 'size-4' } }, () => status.label)
   }
 }, {
   accessorKey: 'receiptStatus',
   header: sortableHeader('Recepción'),
   cell: ({ row }) => {
     const status = receiptStatus(row.original.receiptStatus)
-    return h(UBadge, { color: status.color, variant: 'soft' }, () => status.label)
+    return h(UBadge, { color: status.color, icon: status.icon, variant: 'soft', ui: { leadingIcon: 'size-4' } }, () => status.label)
   }
 }, {
   accessorKey: 'total',

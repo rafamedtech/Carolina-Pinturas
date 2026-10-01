@@ -5,10 +5,10 @@ const PURCHASE_STATUS: Record<string, { label: string, color: BadgeColor, icon: 
   confirmada: { label: 'Confirmada', color: 'primary', icon: 'i-lucide-circle-check' },
   cancelada: { label: 'Cancelada', color: 'error', icon: 'i-lucide-circle-x' }
 }
-const RECEIPT_STATUS: Record<string, { label: string, color: BadgeColor }> = {
-  pendiente: { label: 'Sin recibir', color: 'neutral' },
-  parcial: { label: 'Recepción parcial', color: 'warning' },
-  completa: { label: 'Recibida', color: 'success' }
+const RECEIPT_STATUS: Record<string, { label: string, color: BadgeColor, icon: string }> = {
+  pendiente: { label: 'Sin recibir', color: 'neutral', icon: 'i-lucide-package' },
+  parcial: { label: 'Recepción parcial', color: 'warning', icon: 'i-lucide-package-open' },
+  completa: { label: 'Recibida', color: 'success', icon: 'i-lucide-package-check' }
 }
 const INVOICE_STATUS: Record<string, { label: string, color: BadgeColor }> = {
   pendiente: { label: 'Pendiente', color: 'warning' },
@@ -18,7 +18,7 @@ const INVOICE_STATUS: Record<string, { label: string, color: BadgeColor }> = {
 }
 
 export const purchaseStatus = (key: string) => PURCHASE_STATUS[key] ?? { label: key, color: 'neutral' as const, icon: 'i-lucide-circle' }
-export const receiptStatus = (key: string) => RECEIPT_STATUS[key] ?? { label: key, color: 'neutral' as const }
+export const receiptStatus = (key: string) => RECEIPT_STATUS[key] ?? { label: key, color: 'neutral' as const, icon: 'i-lucide-package' }
 export const invoiceStatus = (key: string) => INVOICE_STATUS[key] ?? { label: key, color: 'neutral' as const }
 
 export function purchaseMoney(value: number, currency: string) {
