@@ -6,6 +6,7 @@ import type { OrderDateRange } from '~/types/orders'
 import type { PurchaseView } from '~/types/purchases'
 import type { CsvColumn } from '~/utils/csv'
 import { purchaseStatus, receiptStatus } from '~/utils/purchaseFormat'
+import { mexicoToday } from '~/utils/datetime'
 
 const UButton = resolveComponent('UButton')
 const UBadge = resolveComponent('UBadge')
@@ -35,9 +36,11 @@ const tableMeta: TableMeta<PurchaseView> = {
     tr: (row) => {
       const invoices = row.original.invoices.filter(invoice => !invoice.voidedAt && invoice.status !== 'anulada')
       if (!invoices.length) return ''
-      if (invoices.some(invoice => invoice.status === 'vencida')) return 'bg-error/10'
-      if (invoices.some(invoice => invoice.status === 'pendiente')) return 'bg-warning/10'
-      if (invoices.every(invoice => invoice.status === 'liquidada')) return 'bg-success/10'
+      const pendingInvoices = invoices.filter(invoice => invoice.balance > 0)
+      const today = mexicoToday()
+      if (pendingInvoices.some(invoice => invoice.dueDate < today)) return 'bg-error/10'
+      if (pendingInvoices.some(invoice => invoice.dueDate >= today)) return 'bg-warning/10'
+      if (invoices.every(invoice => invoice.balance === 0)) return 'bg-success/10'
       return ''
     }
   },
