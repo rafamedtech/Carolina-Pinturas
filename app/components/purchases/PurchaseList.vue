@@ -1,12 +1,14 @@
 <script setup lang="ts">
 import { h, resolveComponent } from 'vue'
 import type { TableColumn } from '@nuxt/ui'
-import type { Column, SortingState } from '@tanstack/table-core'
+import type { Column, SortingState, TableMeta } from '@tanstack/table-core'
 import type { OrderDateRange } from '~/types/orders'
 import type { PurchaseView } from '~/types/purchases'
 import type { CsvColumn } from '~/utils/csv'
+import { purchaseStatus, receiptStatus } from '~/utils/purchaseFormat'
 
 const UButton = resolveComponent('UButton')
+const UBadge = resolveComponent('UBadge')
 const NuxtLink = resolveComponent('NuxtLink')
 const sorting = ref<SortingState>([])
 
@@ -27,6 +29,22 @@ const query = computed(() => ({
 }))
 const { data, error, status: loading, refresh } = await useFetch<{ results: PurchaseView[] }>('/api/purchases', { query })
 const purchases = computed(() => [...(data.value?.results ?? [])])
+
+const tableMeta: TableMeta<PurchaseView> = {
+  class: {
+    tr: (row) => {
+      const invoices = row.original.invoices.filter(invoice => !invoice.voidedAt && invoice.status !== 'anulada')
+      if (!invoices.length) return ''
+      if (invoices.some(invoice => invoice.status === 'vencida')) return 'bg-error/10'
+      if (invoices.some(invoice => invoice.status === 'pendiente')) return 'bg-warning/10'
+      if (invoices.every(invoice => invoice.status === 'liquidada')) return 'bg-success/10'
+      return ''
+    }
+  },
+  style: {
+    tr: { '--ui-warning': 'var(--color-orange-500)' }
+  }
+}
 
 const csvColumns: CsvColumn<PurchaseView>[] = [
   { key: 'folio', label: 'Orden', value: row => `OC-${row.folio}` },
@@ -86,10 +104,18 @@ const columns: TableColumn<PurchaseView>[] = [{
   header: sortableHeader('Fecha')
 }, {
   accessorKey: 'status',
-  header: sortableHeader('Estado')
+  header: sortableHeader('Estado'),
+  cell: ({ row }) => {
+    const status = purchaseStatus(row.original.status)
+    return h(UBadge, { color: status.color, icon: status.icon, variant: 'soft' }, () => status.label)
+  }
 }, {
   accessorKey: 'receiptStatus',
-  header: sortableHeader('Recepción')
+  header: sortableHeader('Recepción'),
+  cell: ({ row }) => {
+    const status = receiptStatus(row.original.receiptStatus)
+    return h(UBadge, { color: status.color, variant: 'soft' }, () => status.label)
+  }
 }, {
   accessorKey: 'total',
   header: sortableHeader('Total', 'right'),
@@ -167,6 +193,7 @@ const columns: TableColumn<PurchaseView>[] = [{
         v-model:sorting="sorting"
         :data="purchases"
         :columns="columns"
+        :meta="tableMeta"
         class="shrink-0"
         :ui="{
           base: 'min-w-full border-separate border-spacing-0',
