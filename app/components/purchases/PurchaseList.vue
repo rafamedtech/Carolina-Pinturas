@@ -45,7 +45,7 @@ const tableMeta: TableMeta<PurchaseView> = {
     }
   },
   style: {
-    tr: { '--ui-warning': 'var(--color-orange-500)' }
+    tr: { '--ui-warning': 'var(--color-yellow-500)' }
   }
 }
 
