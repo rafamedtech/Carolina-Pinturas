@@ -649,11 +649,11 @@ async function convertToPedido() {
                 />
               </div>
             </div>
-            <div v-if="!isQuote && order.observations" class="mt-4 border-t border-default pt-4">
+            <div v-if="order.observations" class="mt-4 border-t border-default pt-4">
               <p class="text-sm text-muted">
                 Observaciones
               </p>
-              <p class="mt-1 whitespace-pre-wrap">
+              <p class="mt-1 whitespace-pre-wrap break-words">
                 {{ order.observations }}
               </p>
             </div>
@@ -682,16 +682,6 @@ async function convertToPedido() {
           />
 
           <div class="[grid-area:totales] grid items-start gap-4 lg:grid-cols-2">
-            <UCard v-if="isQuote && order.observations" class="min-w-0">
-              <template #header>
-                <h2 class="font-semibold text-primary">
-                  Observaciones
-                </h2>
-              </template>
-              <p class="whitespace-pre-wrap break-words">
-                {{ order.observations }}
-              </p>
-            </UCard>
             <UCard class="lg:col-start-2">
               <template #header>
                 <h2 class="font-semibold text-primary">
