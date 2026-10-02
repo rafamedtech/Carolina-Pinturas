@@ -6,5 +6,5 @@ export {
   formatDate as formatMexicoDate,
   formatDateTime as formatMexicoDateTime,
   mexicoToday
-} from '../../shared/utils/datetime'
-export type { DateInput } from '../../shared/utils/datetime'
+} from '#shared/utils/datetime'
+export type { DateInput } from '#shared/utils/datetime'
