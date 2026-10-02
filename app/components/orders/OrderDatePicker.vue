@@ -1,7 +1,6 @@
 <script setup lang="ts">
-import { DateFormatter } from '@internationalized/date'
 import type { DateValue } from '@internationalized/date'
-import { MEXICO_TIME_ZONE } from '~/utils/datetime'
+import { formatDate } from '~/utils/datetime'
 
 const props = withDefaults(defineProps<{
   disabled?: boolean
@@ -13,15 +12,9 @@ const props = withDefaults(defineProps<{
 
 const selectedDate = defineModel<DateValue | undefined>({ required: true })
 
-const formatter = new DateFormatter('es-MX', {
-  day: '2-digit',
-  month: '2-digit',
-  year: 'numeric',
-  timeZone: MEXICO_TIME_ZONE
-})
 const label = computed(() =>
   selectedDate.value
-    ? formatter.format(selectedDate.value.toDate(MEXICO_TIME_ZONE))
+    ? formatDate(selectedDate.value.toString())
     : props.placeholder
 )
 </script>

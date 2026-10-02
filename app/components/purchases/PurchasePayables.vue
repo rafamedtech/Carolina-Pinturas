@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import Decimal from 'decimal.js'
 import type { PurchaseView } from '~/types/purchases'
+import { formatDate } from '~/utils/datetime'
 
 const { data, error, refresh } = await useFetch<{ results: PurchaseView[] }>('/api/purchases')
 const status = shallowRef('all')
@@ -77,7 +78,7 @@ const groups = computed(() => {
               </td><td class="p-3">
                 {{ row.providerName }}
               </td><td class="p-3">
-                {{ row.dueDate }}
+                {{ formatDate(row.dueDate) }}
               </td><td class="p-3">
                 {{ row.status }}
               </td><td class="p-3">

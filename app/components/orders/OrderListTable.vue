@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { formatDate, formatDateTime } from '~/utils/datetime'
 import { h, resolveComponent } from 'vue'
 import type { TableColumn } from '@nuxt/ui'
 import type { Column, SortingState, VisibilityState } from '@tanstack/table-core'
@@ -20,10 +21,6 @@ const NuxtLink = resolveComponent('NuxtLink')
 const UButton = resolveComponent('UButton')
 const UBadge = resolveComponent('UBadge')
 const currency = new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' })
-const dateTime = new Intl.DateTimeFormat('es-MX', {
-  dateStyle: 'short',
-  timeStyle: 'short'
-})
 const tableOrders = computed(() => [...props.orders])
 const sorting = ref<SortingState>([])
 const columnVisibility = ref<VisibilityState>({
@@ -40,15 +37,6 @@ const detailOpen = shallowRef(false)
 function openOrder(order: SalesOrderListItem) {
   selectedOrder.value = order
   detailOpen.value = true
-}
-
-function formatDate(value: string | null) {
-  if (!value) return '—'
-  return value.split('-').reverse().join('/')
-}
-
-function formatDateTime(value: string) {
-  return dateTime.format(new Date(value))
 }
 
 function sortableHeader(label: string, align: 'left' | 'right' = 'left') {

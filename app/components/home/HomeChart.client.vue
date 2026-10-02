@@ -38,7 +38,7 @@ function progress(item: DashboardDailySale) {
       <div
         v-for="item in recentDays"
         :key="item.date"
-        class="grid gap-2 sm:grid-cols-[5rem_minmax(0,1fr)_7rem] sm:items-center"
+        class="grid gap-2 sm:grid-cols-[6rem_minmax(0,1fr)_7rem] sm:items-center"
       >
         <p class="text-sm text-muted">
           {{ item.label }}

@@ -78,7 +78,7 @@ const label = computed(() => model.value ? `${model.value}${selectedName.value |
         </div>
         <p class="min-h-4 text-xs text-muted">
           <template v-if="data">
-            Catálogo Siigo México · consultado {{ data.retrievedAt }}
+            Catálogo Siigo México · consultado {{ formatDate(data.retrievedAt) }}
           </template>
         </p>
       </div>

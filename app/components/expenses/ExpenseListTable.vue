@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { formatDate } from '~/utils/datetime'
 import { h, resolveComponent } from 'vue'
 import type { TableColumn } from '@nuxt/ui'
 import type { Column, Row, SortingState } from '@tanstack/table-core'
@@ -21,10 +22,6 @@ function selectRow(_event: Event, row: Row<ExpenseRecord>) {
 const UButton = resolveComponent('UButton')
 const tableExpenses = computed(() => [...props.expenses])
 const sorting = ref<SortingState>([])
-
-function formatDate(value: string) {
-  return value.split('-').reverse().join('/')
-}
 
 function formatCurrency(amount: number, currencyCode: string) {
   return new Intl.NumberFormat('es-MX', {

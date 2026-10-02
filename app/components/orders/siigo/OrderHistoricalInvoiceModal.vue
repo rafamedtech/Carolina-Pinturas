@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { formatDate } from '~/utils/datetime'
 import * as z from 'zod'
 import type { FormSubmitEvent } from '@nuxt/ui'
 import type { SalesOrderDetail } from '~/types/orders'
@@ -47,10 +48,6 @@ watch(open, async (isOpen) => {
 
 function formatCurrency(value: number) {
   return new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(value)
-}
-
-function formatDate(value: string) {
-  return value.split('-').reverse().join('/')
 }
 
 async function onSubmit(event: FormSubmitEvent<Schema>) {

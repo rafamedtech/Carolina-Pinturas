@@ -32,6 +32,11 @@ describe('toCsv', () => {
 
     expect(csv).toBe('Nombre,Importe,Nota\r\nThinner,,')
   })
+
+  it('exports Date values with the shared date and time format', () => {
+    expect(toCsv([{ key: 'date', label: 'Fecha' }], [{ date: new Date('2026-10-02T18:05:00Z') }]))
+      .toBe('Fecha\r\n"02/10/2026, 12:05"')
+  })
 })
 
 describe('csvFilename', () => {

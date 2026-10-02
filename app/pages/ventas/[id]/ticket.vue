@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { formatDate } from '~/utils/datetime'
 import type { SalesOrderDetail } from '~/types/orders'
 import { BUSINESS_INFO } from '#shared/utils/businessInfo'
 import type { TicketPaperWidth } from '#shared/types/ticket'
@@ -27,11 +28,6 @@ const currency = computed(() => new Intl.NumberFormat('es-MX', {
 
 function formatCurrency(value: number | undefined) {
   return currency.value.format(value || 0)
-}
-
-function formatDate(value: string | null | undefined) {
-  if (!value) return '—'
-  return value.split('-').reverse().join('/')
 }
 
 function formatTaxLabel(tax: SalesOrderDetail['taxBreakdown'][number]) {

@@ -125,7 +125,7 @@ const expenseErrorMessage = computed(() =>
 const loading = computed(() => isHydrated.value && expenseStatus.value === 'pending')
 
 const csvColumns: CsvColumn<ExpenseRecord>[] = [
-  { key: 'date', label: 'Fecha' },
+  { key: 'date', label: 'Fecha', value: row => formatDate(row.date) },
   { key: 'category', label: 'Categoría' },
   { key: 'description', label: 'Descripción' },
   { key: 'provider', label: 'Proveedor', value: row => row.provider },

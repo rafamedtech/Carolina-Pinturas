@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { formatDate } from '~/utils/datetime'
 import type {
   CreateOrderPaymentInput,
   CreateOrderSiigoReceiptInput,
@@ -50,10 +51,6 @@ function formatCurrency(value: number, currency = 'MXN') {
     style: 'currency',
     currency
   }).format(value)
-}
-
-function formatDate(value: string) {
-  return value.split('T')[0]!.split('-').reverse().join('/')
 }
 
 function paymentTitle(payment: OrderPayment) {

@@ -10,6 +10,7 @@ import { orderStatusBadgeColor } from '~/utils/orderStatus'
 import { ORDER_LOGISTICS_ROLES } from '~/utils/roleAccess'
 import { requireRole } from '../../utils/auth'
 import { usePrisma } from '../../utils/prisma'
+import { formatDate, formatDateRange } from '../../../shared/utils/datetime'
 
 const EXCLUDED_SALES_STATUSES = ['borrador', 'cancelado']
 
@@ -128,7 +129,7 @@ export default eventHandler(async (event) => {
 
     return {
       date: key,
-      label: new Intl.DateTimeFormat('es-MX', { day: 'numeric', month: 'short', timeZone: 'UTC' }).format(date),
+      label: formatDate(key),
       ...value
     }
   })
@@ -191,7 +192,7 @@ export default eventHandler(async (event) => {
 
   const result: SalesDashboardSummary = {
     period: {
-      label: new Intl.DateTimeFormat('es-MX', { month: 'long', year: 'numeric', timeZone: 'UTC' }).format(start),
+      label: formatDateRange(dateOnly(start), dateOnly(new Date(end.getTime() - 86_400_000))),
       start: dateOnly(start),
       end: dateOnly(new Date(end.getTime() - 86_400_000)),
       elapsedDays,

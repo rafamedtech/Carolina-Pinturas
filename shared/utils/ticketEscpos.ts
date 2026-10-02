@@ -1,6 +1,7 @@
 import ReceiptPrinterEncoder from '@point-of-sale/receipt-printer-encoder'
 import type { TicketOrder, TicketPrintOptions } from '../types/ticket'
 import { BUSINESS_INFO } from './businessInfo'
+import { formatDate } from './datetime'
 
 // Local copies of the payment labels (app/utils/orderPayment.ts): shared code
 // cannot import from app/, and the builder also runs server-side.
@@ -13,10 +14,6 @@ const PAYMENT_METHOD_LABELS: Record<string, string> = {
   efectivo: 'Efectivo',
   transferencia: 'Transferencia',
   tarjeta: 'Tarjeta'
-}
-
-function formatTicketDate(value: string) {
-  return value.split('-').reverse().join('/')
 }
 
 function formatTaxLabel(tax: TicketOrder['taxBreakdown'][number]) {
@@ -64,7 +61,7 @@ export function buildTicketBytes(order: TicketOrder, options: TicketPrintOptions
     .line(isQuote ? 'COTIZACIÓN' : 'NOTA DE VENTA')
     .align('left')
     .line(`Folio: ${order.number}`)
-    .line(`Fecha: ${formatTicketDate(order.orderDate)}`)
+    .line(`Fecha: ${formatDate(order.orderDate)}`)
     .line(`Cliente: ${order.customer.name}`)
 
   if (order.customer.rfc) {

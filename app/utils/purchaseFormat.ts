@@ -29,7 +29,4 @@ export function purchaseQuantity(value: number) {
   return value.toLocaleString('es-MX', { maximumFractionDigits: 6 })
 }
 
-// Fechas de negocio (YYYY-MM-DD) sin zona horaria: formatear en UTC evita corrimientos de día.
-export function purchaseDateLabel(value: string) {
-  return new Intl.DateTimeFormat('es-MX', { dateStyle: 'medium', timeZone: 'UTC' }).format(new Date(`${value}T00:00:00Z`))
-}
+export { formatDate as purchaseDateLabel } from './datetime'

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { formatDate } from '~/utils/datetime'
 import { h, resolveComponent } from 'vue'
 import type { TableColumn } from '@nuxt/ui'
 import type { Column, SortingState } from '@tanstack/table-core'
@@ -16,10 +17,6 @@ const UButton = resolveComponent('UButton')
 const currency = new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' })
 const tablePayments = computed(() => [...props.payments])
 const sorting = ref<SortingState>([])
-
-function formatDate(value: string) {
-  return value.split('-').reverse().join('/')
-}
 
 function sortableHeader(label: string, align: 'left' | 'right' = 'left') {
   return ({ column }: { column: Column<PaymentListItem, unknown> }) => {

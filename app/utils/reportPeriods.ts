@@ -26,9 +26,7 @@ export function reportDailyAverage(total: number, days: number) {
   return days > 0 ? total / days : 0
 }
 
-export function reportShortDate(date: string) {
-  return new Intl.DateTimeFormat('es-MX', { day: 'numeric', month: 'short', timeZone: 'UTC' }).format(new Date(`${date}T00:00:00Z`))
-}
+export { formatDate as reportShortDate } from './datetime'
 
 function createReportCurrency() {
   return new Intl.NumberFormat('es-MX', {

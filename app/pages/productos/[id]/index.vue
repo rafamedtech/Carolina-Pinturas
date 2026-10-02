@@ -31,8 +31,8 @@ const generalFields = computed(() => {
   const item = product.value
   if (!item) return []
   return [
-    { label: 'Creado', value: formatDateTime(item.metadata?.created) },
-    { label: 'Última actualización', value: formatDateTime(item.metadata?.last_updated) },
+    { label: 'Creado', value: formatMexicoDateTime(item.metadata?.created) },
+    { label: 'Última actualización', value: formatMexicoDateTime(item.metadata?.last_updated) },
     { label: 'Descripción', value: item.description, multiline: true },
     { label: 'Marca', value: item.additional_fields?.brand },
     { label: 'Grupo', value: item.account_group?.name },
@@ -66,11 +66,6 @@ function formatCurrency(value?: number | string, currencyCode = 'MXN') {
 function formatQuantity(value?: number) {
   if (value === undefined || !Number.isFinite(value)) return '—'
   return new Intl.NumberFormat('es-MX', { maximumFractionDigits: 4 }).format(value)
-}
-
-function formatDateTime(value?: string | null) {
-  if (!value || formatMexicoDate(value) === '—') return '—'
-  return formatMexicoDateTime(value)
 }
 </script>
 

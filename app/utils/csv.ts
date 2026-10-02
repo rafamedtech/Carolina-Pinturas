@@ -1,3 +1,5 @@
+import { formatDateTime } from './datetime'
+
 export interface CsvColumn<T = unknown> {
   key: string
   label: string
@@ -6,7 +8,7 @@ export interface CsvColumn<T = unknown> {
 
 function serializeCsvValue(value: unknown): string {
   if (value === null || value === undefined) return ''
-  if (value instanceof Date) return value.toISOString()
+  if (value instanceof Date) return formatDateTime(value)
   if (typeof value === 'object') return JSON.stringify(value)
   return String(value)
 }

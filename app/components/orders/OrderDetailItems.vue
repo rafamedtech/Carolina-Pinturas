@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { formatDateTime } from '~/utils/datetime'
 import { h, resolveComponent } from 'vue'
 import type { TableColumn } from '@nuxt/ui'
 import type { SalesOrderDetail, SalesOrderItem } from '~/types/orders'
@@ -179,13 +180,6 @@ const historyItem = shallowRef<SalesOrderItem | null>(null)
 function openHistory(item: SalesOrderItem) {
   historyItem.value = item
   historyOpen.value = true
-}
-
-function formatDateTime(value: string) {
-  return new Date(value).toLocaleString('es-MX', {
-    dateStyle: 'short',
-    timeStyle: 'short'
-  })
 }
 
 const tableItems = computed(() => [...props.items])

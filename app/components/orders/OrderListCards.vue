@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { formatDate } from '~/utils/datetime'
 import { resolveComponent } from 'vue'
 import type { SalesOrderListItem } from '~/types/orders'
 
@@ -20,11 +21,6 @@ const currency = new Intl.NumberFormat('es-MX', {
   style: 'currency',
   currency: 'MXN'
 })
-
-function formatDate(value: string | null) {
-  if (!value) return '—'
-  return value.split('-').reverse().join('/')
-}
 
 function igualacionItems(order: SalesOrderListItem) {
   return (order.partidas ?? []).filter(item => item.isIgualacion)

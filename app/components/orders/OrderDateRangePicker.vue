@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { breakpointsTailwind, useBreakpoints } from '@vueuse/core'
-import { DateFormatter, today } from '@internationalized/date'
+import { today } from '@internationalized/date'
 import type { OrderDateRange } from '~/types/orders'
-import { MEXICO_TIME_ZONE } from '~/utils/datetime'
+import { formatDateRange, MEXICO_TIME_ZONE } from '~/utils/datetime'
 
 withDefaults(defineProps<{ subject?: string }>(), { subject: 'pedidos' })
 
@@ -19,12 +19,6 @@ const open = shallowRef(false)
 const draftRange = shallowRef<OrderDateRange | null>(selectedRange.value)
 const breakpoints = useBreakpoints(breakpointsTailwind)
 const isDesktop = breakpoints.greaterOrEqual('sm')
-const formatter = new DateFormatter('es-MX', {
-  day: '2-digit',
-  month: 'short',
-  year: 'numeric',
-  timeZone: MEXICO_TIME_ZONE
-})
 const presetRanges: PresetRange[] = [
   { label: 'Últimos 7 días', days: 7 },
   { label: 'Últimos 14 días', days: 14 },
@@ -40,10 +34,7 @@ const label = computed(() => {
 
   if (!start || !end) return 'Filtrar por fecha'
 
-  const formattedStart = formatter.format(start.toDate(MEXICO_TIME_ZONE))
-  if (start.compare(end) === 0) return formattedStart
-
-  return `${formattedStart} – ${formatter.format(end.toDate(MEXICO_TIME_ZONE))}`
+  return formatDateRange(start.toString(), end.toString())
 })
 
 watch(selectedRange, (value) => {

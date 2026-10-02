@@ -7,6 +7,7 @@ import type {
 import { PAYMENT_METHODS, paymentMethodLabel } from '~/utils/orderPayment'
 import { requireRole } from '../../utils/auth'
 import { usePrisma } from '../../utils/prisma'
+import { formatDate, formatDateRange } from '../../../shared/utils/datetime'
 import {
   reportDateOnly,
   reportTopDebtors,
@@ -140,7 +141,7 @@ export default eventHandler(async (event) => {
 
     return {
       date: key,
-      label: new Intl.DateTimeFormat('es-MX', { day: 'numeric', month: 'short', timeZone: 'UTC' }).format(date),
+      label: formatDate(key),
       sales: dailySales.get(key) ?? 0,
       orderCount: dailyCounts.get(key) ?? 0,
       counterSales: dailyCounterSales.get(key) ?? 0,
@@ -239,7 +240,7 @@ export default eventHandler(async (event) => {
 
   const result: BusinessReportSummary = {
     period: {
-      label: new Intl.DateTimeFormat('es-MX', { month: 'long', year: 'numeric', timeZone: 'UTC' }).format(start),
+      label: formatDateRange(reportDateOnly(start), reportDateOnly(new Date(end.getTime() - dayInMs))),
       start: reportDateOnly(start),
       end: reportDateOnly(new Date(end.getTime() - dayInMs)),
       elapsedDays,

@@ -101,7 +101,7 @@ function dayLabel(day: ReportDailyMovement) {
             <div
               v-for="day in data"
               :key="day.date"
-              class="group flex w-7 flex-col rounded-md px-0.5 pt-1 transition-colors hover:bg-elevated/60"
+              class="group flex w-20 flex-col rounded-md px-0.5 pt-1 transition-colors hover:bg-elevated/60"
               :aria-label="dayLabel(day)"
               role="img"
               tabindex="0"
@@ -121,7 +121,7 @@ function dayLabel(day: ReportDailyMovement) {
               <span
                 class="mt-2 text-center text-[10px] tabular-nums transition-colors"
                 :class="hoveredDate === day.date ? 'font-medium text-highlighted' : 'text-dimmed'"
-              >{{ day.label.split(' ')[0] }}</span>
+              >{{ day.label }}</span>
             </div>
           </div>
         </div>

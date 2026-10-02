@@ -23,10 +23,4 @@ export function dashboardCompactCurrency(value: number) {
   return `${sign}$${dashboardNumber.format(absoluteValue / divisor)} ${suffix}`
 }
 
-export function dashboardDate(value: string) {
-  return new Intl.DateTimeFormat('es-MX', {
-    day: 'numeric',
-    month: 'short',
-    timeZone: 'UTC'
-  }).format(new Date(`${value}T00:00:00.000Z`))
-}
+export { formatDate as dashboardDate } from './datetime'

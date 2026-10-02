@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { formatDate } from '~/utils/datetime'
 import type { TableColumn, TableRow } from '@nuxt/ui'
 import type { RepartidorDelivery, RepartidorDetail } from '~/types/orders'
 
@@ -14,10 +15,6 @@ const currency = new Intl.NumberFormat('es-MX', { style: 'currency', currency: '
 const message = computed(() => error.value?.data?.statusMessage || 'No fue posible cargar el repartidor.')
 
 useSeoMeta({ title: () => repartidor.value?.nombre || 'Detalle del repartidor' })
-
-function formatDate(value: string) {
-  return value.split('-').reverse().join('/')
-}
 
 const columns: TableColumn<RepartidorDelivery>[] = [{
   accessorKey: 'number',

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { formatDateTime } from '~/utils/datetime'
 import type { SalesOrderStatusHistoryItem } from '~/types/orders'
 
 const props = defineProps<{
@@ -9,10 +10,6 @@ const props = defineProps<{
 const sortedEntries = computed(() =>
   props.entries.map((entry, index) => ({ entry, index })).reverse()
 )
-
-function formatDateTime(value: string) {
-  return formatMexicoDateTime(value)
-}
 
 function minutesSince(index: number) {
   if (index === 0) return null

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { formatDate } from '~/utils/datetime'
 import * as z from 'zod'
 import type { FormSubmitEvent } from '@nuxt/ui'
 import type { OrderSaleType, OrderStatus, SalesOrderDetail } from '~/types/orders'
@@ -445,11 +446,6 @@ watch(() => state.customerId, (customerId) => {
   const customer = availableCustomers.value.find(candidate => candidate.id === customerId)
   state.requiresInvoice = customer?.internal?.requires_invoice ?? false
 })
-
-function formatDate(value: string) {
-  if (!value) return '—'
-  return value.split('-').reverse().join('/')
-}
 
 function documentMessage(message: string) {
   if (!isQuoteMode.value) return message

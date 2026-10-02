@@ -6,7 +6,7 @@ import type { OrderDateRange } from '~/types/orders'
 import type { PurchaseView } from '~/types/purchases'
 import type { CsvColumn } from '~/utils/csv'
 import { purchaseStatus, receiptStatus } from '~/utils/purchaseFormat'
-import { mexicoToday } from '~/utils/datetime'
+import { formatDate, mexicoToday } from '~/utils/datetime'
 
 const UButton = resolveComponent('UButton')
 const UBadge = resolveComponent('UBadge')
@@ -52,7 +52,7 @@ const tableMeta: TableMeta<PurchaseView> = {
 const csvColumns: CsvColumn<PurchaseView>[] = [
   { key: 'folio', label: 'Orden', value: row => `OC-${row.folio}` },
   { key: 'providerName', label: 'Proveedor' },
-  { key: 'date', label: 'Fecha' },
+  { key: 'date', label: 'Fecha', value: row => formatDate(row.date) },
   { key: 'status', label: 'Estado' },
   { key: 'receiptStatus', label: 'Recepción' },
   { key: 'total', label: 'Total', value: row => row.total },
@@ -104,7 +104,8 @@ const columns: TableColumn<PurchaseView>[] = [{
   header: sortableHeader('Proveedor')
 }, {
   accessorKey: 'date',
-  header: sortableHeader('Fecha')
+  header: sortableHeader('Fecha'),
+  cell: ({ row }) => formatDate(row.original.date)
 }, {
   accessorKey: 'status',
   header: sortableHeader('Estado'),

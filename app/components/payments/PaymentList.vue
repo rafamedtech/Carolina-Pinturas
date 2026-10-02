@@ -102,7 +102,7 @@ const loading = computed(() => isHydrated.value && status.value === 'pending')
 
 const csvColumns: CsvColumn<PaymentListItem>[] = [
   { key: 'order', label: 'Pedido', value: row => row.order.number },
-  { key: 'paymentDate', label: 'Fecha' },
+  { key: 'paymentDate', label: 'Fecha', value: row => formatDate(row.paymentDate) },
   { key: 'customer', label: 'Cliente', value: row => row.order.customerName },
   { key: 'paymentMethod', label: 'Método', value: row => paymentMethodLabel(row.paymentMethod) },
   { key: 'reference', label: 'Referencia', value: row => row.reference || row.siigoVoucherName || '' },

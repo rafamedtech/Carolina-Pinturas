@@ -9,3 +9,5 @@
 ## Campos de fecha
 
 - Cada vez que implementes un campo de fecha, usa el componente de calendario de Nuxt UI mediante el selector de fecha reutilizable del proyecto.
+- Para mostrar fechas, usa `formatDate`, `formatDateTime` o `formatDateRange` de `app/utils/datetime.ts` (en código compartido o servidor, de `shared/utils/datetime.ts`). El formato visible es `DD/MM/AAAA`; agrega `HH:mm` cuando se necesite la hora. No crees formateadores locales en los componentes.
+- Conserva `YYYY-MM-DD` e ISO en los valores de calendarios, filtros, API y base de datos. Las fechas sin hora deben conservar su día; los timestamps se muestran en la zona de México.

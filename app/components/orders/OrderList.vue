@@ -181,8 +181,8 @@ const loading = computed(() => isHydrated.value && status.value === 'pending')
 const csvColumns = computed<CsvColumn<SalesOrderListItem>[]>(() => {
   const columns: CsvColumn<SalesOrderListItem>[] = [
     { key: 'number', label: 'Pedido' },
-    { key: 'orderDate', label: 'Fecha' },
-    { key: 'promisedDate', label: 'Fecha prometida', value: row => row.promisedDate ?? '' },
+    { key: 'orderDate', label: 'Fecha', value: row => formatDate(row.orderDate) },
+    { key: 'promisedDate', label: 'Fecha prometida', value: row => row.promisedDate ? formatDate(row.promisedDate) : '' },
     { key: 'customer', label: 'Cliente', value: row => row.customer.name },
     { key: 'rfc', label: 'RFC', value: row => row.customer.rfc ?? '' },
     { key: 'itemCount', label: 'Partidas', value: row => row.itemCount }
@@ -206,8 +206,8 @@ const csvColumns = computed<CsvColumn<SalesOrderListItem>[]>(() => {
 
   columns.push(
     { key: 'status', label: 'Estado', value: row => row.status.label },
-    { key: 'createdAt', label: 'Creado', value: row => row.createdAt },
-    { key: 'updatedAt', label: 'Última actualización', value: row => row.updatedAt }
+    { key: 'createdAt', label: 'Creado', value: row => formatDateTime(row.createdAt) },
+    { key: 'updatedAt', label: 'Última actualización', value: row => formatDateTime(row.updatedAt) }
   )
 
   return columns
