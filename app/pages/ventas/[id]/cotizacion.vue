@@ -168,6 +168,7 @@ async function downloadPdf() {
       y += 7
     }
 
+    const summaryStartY = y
     const totalsLabelX = right - 55
     pdf.setFontSize(9)
     pdf.setTextColor(107, 114, 128)
@@ -199,6 +200,35 @@ async function downloadPdf() {
     pdf.setFontSize(12)
     pdf.text('Total', totalsLabelX, y)
     pdf.text(formatCurrency(order.value.total), right, y, { align: 'right' })
+
+    const totalsEndY = y
+    if (order.value.observations) {
+      pdf.setFont('helvetica', 'normal')
+      pdf.setFontSize(9)
+      const notesLines = pdf.splitTextToSize(order.value.observations, totalsLabelX - left - 10) as string[]
+      let notesY = summaryStartY
+      let continued = false
+      const drawNotesHeading = () => {
+        pdf.setTextColor(107, 114, 128)
+        pdf.setFont('helvetica', 'bold')
+        pdf.text('OBSERVACIONES', left, notesY)
+        pdf.setFont('helvetica', 'normal')
+        pdf.setTextColor(17, 24, 39)
+        notesY += 6
+      }
+      drawNotesHeading()
+      for (const line of notesLines) {
+        if (notesY > pageHeight - 25) {
+          pdf.addPage()
+          notesY = 20
+          continued = true
+          drawNotesHeading()
+        }
+        pdf.text(line, left, notesY)
+        notesY += 4.5
+      }
+      y = continued ? notesY : Math.max(totalsEndY, notesY)
+    }
 
     y += 18
     if (y > pageHeight - 28) {
@@ -356,6 +386,14 @@ watch([status, order], () => {
       </table>
 
       <div class="totals-wrap">
+        <section v-if="order.observations" class="doc-notes">
+          <p class="notes-label">
+            Observaciones
+          </p>
+          <p class="notes-body">
+            {{ order.observations }}
+          </p>
+        </section>
         <table class="totals">
           <tbody>
             <tr>
@@ -396,15 +434,6 @@ watch([status, order], () => {
           </tbody>
         </table>
       </div>
-
-      <section v-if="order.observations" class="doc-notes">
-        <p class="notes-label">
-          Observaciones
-        </p>
-        <p class="notes-body">
-          {{ order.observations }}
-        </p>
-      </section>
 
       <footer class="doc-foot">
         <p v-if="isQuote" class="foot-terms">
@@ -540,13 +569,18 @@ watch([status, order], () => {
 
 .totals-wrap {
   display: flex;
-  justify-content: flex-end;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 24px;
   margin-top: 16px;
 }
 
 .totals {
   width: 260px;
+  flex-shrink: 0;
+  margin-left: auto;
   border-collapse: collapse;
+  break-inside: avoid;
 }
 
 .totals td {
@@ -573,9 +607,9 @@ watch([status, order], () => {
 }
 
 .doc-notes {
-  margin-top: 24px;
-  border-top: 1px solid #e5e7eb;
-  padding-top: 16px;
+  flex: 1;
+  min-width: 0;
+  padding-top: 6px;
 }
 
 .notes-label {
@@ -588,6 +622,7 @@ watch([status, order], () => {
 .notes-body {
   margin-top: 4px;
   white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 
 .doc-foot {
@@ -604,6 +639,16 @@ watch([status, order], () => {
 
 .foot-thanks {
   margin-top: 8px;
+}
+
+@media screen and (max-width: 600px) {
+  .totals-wrap {
+    flex-direction: column;
+  }
+
+  .doc-notes {
+    width: 100%;
+  }
 }
 
 @media print {
