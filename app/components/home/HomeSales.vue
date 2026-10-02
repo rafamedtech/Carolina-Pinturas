@@ -65,7 +65,7 @@ const columns: TableColumn<DashboardRecentOrder>[] = [{
       <div class="flex items-center justify-between gap-3">
         <div>
           <h2 class="text-lg font-semibold text-highlighted">
-            Últimos pedidos del mes
+            Últimos pedidos de la semana
           </h2>
         </div>
         <UButton
@@ -99,7 +99,7 @@ const columns: TableColumn<DashboardRecentOrder>[] = [{
     <UEmpty
       v-else
       icon="i-lucide-receipt"
-      title="Aún no hay pedidos este mes"
+      title="Aún no hay pedidos esta semana"
       description="Crea el primer pedido para comenzar el resumen."
       :actions="[{ label: 'Nuevo pedido', icon: 'i-lucide-plus', to: '/ventas/nuevo-pedido' }]"
       class="py-12"

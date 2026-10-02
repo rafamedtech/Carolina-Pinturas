@@ -63,7 +63,7 @@ defineProps<{
       <UEmpty
         v-else
         icon="i-lucide-wallet-cards"
-        title="Sin cobros este mes"
+        title="Sin cobros esta semana"
         class="py-10"
       />
     </UCard>
@@ -95,7 +95,7 @@ defineProps<{
           :to="`/ventas?status=${item.key}`"
           :aria-label="`Ver pedidos en etapa ${item.label}`"
           :title="`${item.count} ${item.count === 1 ? 'pedido' : 'pedidos'}`"
-          :description="`${item.percentage}% del mes · ${dashboardCompactCurrency(item.amount)}`"
+          :description="`${item.percentage}% de la semana · ${dashboardCompactCurrency(item.amount)}`"
           variant="subtle"
           :ui="{ container: 'gap-y-2 p-4 sm:p-4' }"
         >
@@ -108,7 +108,7 @@ defineProps<{
       <UEmpty
         v-else
         icon="i-lucide-package-search"
-        title="Sin pedidos este mes"
+        title="Sin pedidos esta semana"
         class="py-10"
       />
     </UCard>

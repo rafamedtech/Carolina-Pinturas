@@ -1,14 +1,10 @@
 <script setup lang="ts">
 import { dashboardCurrency } from '~/utils/dashboardFormatters'
 
-const props = defineProps<{
-  month: string
-}>()
-
-const { data, status, error, refresh } = useSalesDashboard(toRef(props, 'month'))
+const { data, status, error, refresh } = useSalesDashboard()
 
 const errorMessage = computed(() =>
-  error.value?.data?.statusMessage || 'No fue posible cargar el resumen mensual.'
+  error.value?.data?.statusMessage || 'No fue posible cargar el resumen semanal.'
 )
 
 const change = computed(() => data.value?.metrics.salesChangePercentage)
@@ -58,7 +54,7 @@ const periodProgress = computed(() => {
     <template v-else-if="data">
       <UPageGrid class="gap-4 lg:grid-cols-3">
         <UPageCard
-          title="Ventas del mes"
+          title="Ventas de la semana"
           description="Pedidos activos y completados; no incluye cotizaciones ni cancelaciones."
           icon="i-lucide-chart-no-axes-combined"
           :badge="{ label: data.period.label, color: 'neutral', variant: 'subtle', class: 'capitalize' }"
@@ -72,7 +68,7 @@ const periodProgress = computed(() => {
             </p>
             <UBadge
               v-if="change !== null"
-              :label="`${isPositiveChange ? '+' : ''}${change}% vs. mes anterior`"
+              :label="`${isPositiveChange ? '+' : ''}${change}% vs. semana anterior`"
               :icon="isPositiveChange ? 'i-lucide-trending-up' : 'i-lucide-trending-down'"
               :color="isPositiveChange ? 'success' : 'error'"
               variant="soft"
@@ -88,7 +84,7 @@ const periodProgress = computed(() => {
         </UPageCard>
 
         <UPageCard
-          title="Proyección al cierre"
+          title="Proyección al cierre semanal"
           :description="`Día ${data.period.elapsedDays} de ${data.period.totalDays}`"
           icon="i-lucide-gauge"
           variant="subtle"

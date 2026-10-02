@@ -1,10 +1,8 @@
 import type { SalesDashboardSummary } from '~/types/dashboard'
-import type { MaybeRefOrGetter } from 'vue'
 
-export function useSalesDashboard(month: MaybeRefOrGetter<string>) {
+export function useSalesDashboard() {
   return useFetch<SalesDashboardSummary>('/api/dashboard/summary', {
-    key: 'sales-dashboard-summary',
-    query: { month },
+    key: 'sales-dashboard-week-summary',
     lazy: true
   })
 }

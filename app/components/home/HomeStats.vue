@@ -7,9 +7,9 @@ const props = defineProps<{
 }>()
 
 const stats = computed(() => [{
-  title: 'Gastos del mes',
+  title: 'Gastos de la semana',
   value: dashboardCurrency.format(props.metrics.expensesAmount),
-  detail: 'Total gastado en el mes',
+  detail: 'Total gastado en la semana',
   icon: 'i-lucide-banknote-arrow-down'
 }, {
   title: 'Ticket promedio',
@@ -19,7 +19,7 @@ const stats = computed(() => [{
 }, {
   title: 'Venta cobrada',
   value: dashboardCurrency.format(props.metrics.collectedAmount),
-  detail: `${props.metrics.sales > 0 ? Math.round((props.metrics.collectedAmount / props.metrics.sales) * 100) : 0}% de la venta mensual`,
+  detail: `${props.metrics.sales > 0 ? Math.round((props.metrics.collectedAmount / props.metrics.sales) * 100) : 0}% de la venta semanal`,
   icon: 'i-lucide-circle-check-big'
 }, {
   title: 'Por cobrar',

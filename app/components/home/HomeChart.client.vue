@@ -8,8 +8,7 @@ const props = defineProps<{
 
 const total = computed(() => props.data.reduce((sum, item) => sum + item.total, 0))
 const hasSales = computed(() => props.data.some(item => item.total > 0))
-const recentDays = computed(() => props.data.slice(-7))
-const maximum = computed(() => Math.max(...recentDays.value.map(item => item.total), 0))
+const maximum = computed(() => Math.max(...props.data.map(item => item.total), 0))
 
 function progress(item: DashboardDailySale) {
   return maximum.value > 0 ? (item.total / maximum.value) * 100 : 0
@@ -22,7 +21,7 @@ function progress(item: DashboardDailySale) {
       <div class="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h2 class="text-lg font-semibold text-highlighted">
-            Ventas de los últimos 7 días
+            Ventas diarias de la semana
           </h2>
         </div>
         <UBadge
@@ -36,7 +35,7 @@ function progress(item: DashboardDailySale) {
 
     <div v-if="hasSales" class="space-y-5">
       <div
-        v-for="item in recentDays"
+        v-for="item in data"
         :key="item.date"
         class="grid gap-2 sm:grid-cols-[6rem_minmax(0,1fr)_7rem] sm:items-center"
       >
@@ -62,7 +61,7 @@ function progress(item: DashboardDailySale) {
     <UEmpty
       v-else
       icon="i-lucide-chart-spline"
-      title="Aún no hay ventas este mes"
+      title="Aún no hay ventas esta semana"
       description="La tendencia aparecerá aquí cuando se registren pedidos."
       class="h-80"
     />

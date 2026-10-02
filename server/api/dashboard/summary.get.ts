@@ -10,6 +10,7 @@ import { orderStatusBadgeColor } from '~/utils/orderStatus'
 import { ORDER_LOGISTICS_ROLES } from '~/utils/roleAccess'
 import { requireRole } from '../../utils/auth'
 import { usePrisma } from '../../utils/prisma'
+import { currentWeekBounds } from '../../utils/dashboard-period'
 import { formatDate, formatDateRange } from '../../../shared/utils/datetime'
 
 const EXCLUDED_SALES_STATUSES = ['borrador', 'cancelado']
@@ -22,24 +23,6 @@ function dateOnly(value: Date) {
   return value.toISOString().slice(0, 10)
 }
 
-function monthBounds(selectedMonth: string | undefined, now = new Date()) {
-  if (selectedMonth && !/^\d{4}-(0[1-9]|1[0-2])$/.test(selectedMonth)) {
-    throw createError({ statusCode: 400, statusMessage: 'El mes seleccionado no es válido.' })
-  }
-
-  const [selectedYear, selectedMonthNumber] = selectedMonth?.split('-').map(Number) ?? []
-  const year = selectedYear ?? now.getUTCFullYear()
-  const month = selectedMonthNumber ? selectedMonthNumber - 1 : now.getUTCMonth()
-  const start = new Date(Date.UTC(year, month, 1))
-  const end = new Date(Date.UTC(year, month + 1, 1))
-  const previousStart = new Date(Date.UTC(year, month - 1, 1))
-  const totalDays = new Date(Date.UTC(year, month + 1, 0)).getUTCDate()
-  const isCurrentMonth = year === now.getUTCFullYear() && month === now.getUTCMonth()
-  const elapsedDays = isCurrentMonth ? Math.min(now.getUTCDate(), totalDays) : totalDays
-
-  return { start, end, previousStart, elapsedDays }
-}
-
 function percentage(amount: number, total: number) {
   return total > 0 ? Math.round((amount / total) * 1000) / 10 : 0
 }
@@ -47,9 +30,7 @@ function percentage(amount: number, total: number) {
 export default eventHandler(async (event) => {
   const user = await requireRole(event, ORDER_LOGISTICS_ROLES)
   const prisma = usePrisma()
-  const query = getQuery(event)
-  const selectedMonth = typeof query.month === 'string' ? query.month : undefined
-  const { start, end, previousStart, elapsedDays } = monthBounds(selectedMonth)
+  const { start, end, previousStart, elapsedDays, totalDays } = currentWeekBounds()
   const salesWhere = {
     statusKey: { notIn: EXCLUDED_SALES_STATUSES },
     orderDate: { gte: start, lt: end }
@@ -111,7 +92,6 @@ export default eventHandler(async (event) => {
     .filter(order => order.paymentStatus === 'pago_recibido')
     .reduce((sum, order) => sum + numeric(order.total), 0)
   const pendingAmount = sales - collectedAmount
-  const daysInMonth = Math.round((end.getTime() - start.getTime()) / 86_400_000)
   const dailyTotals = new Map<string, { total: number, orders: number }>()
 
   for (const order of orders) {
@@ -122,7 +102,7 @@ export default eventHandler(async (event) => {
     dailyTotals.set(key, current)
   }
 
-  const dailySales = Array.from({ length: elapsedDays }, (_, index) => {
+  const dailySales = Array.from({ length: totalDays }, (_, index) => {
     const date = new Date(start.getTime() + index * 86_400_000)
     const key = dateOnly(date)
     const value = dailyTotals.get(key) || { total: 0, orders: 0 }
@@ -196,7 +176,7 @@ export default eventHandler(async (event) => {
       start: dateOnly(start),
       end: dateOnly(new Date(end.getTime() - 86_400_000)),
       elapsedDays,
-      totalDays: daysInMonth
+      totalDays
     },
     metrics: {
       sales,
@@ -204,7 +184,7 @@ export default eventHandler(async (event) => {
       salesChangePercentage: previousSales > 0
         ? Math.round(((sales - previousSales) / previousSales) * 1000) / 10
         : null,
-      projectedSales: elapsedDays > 0 ? (sales / elapsedDays) * daysInMonth : 0,
+      projectedSales: elapsedDays > 0 ? (sales / elapsedDays) * totalDays : 0,
       orderCount,
       expensesAmount,
       averageTicket: orderCount > 0 ? sales / orderCount : 0,
