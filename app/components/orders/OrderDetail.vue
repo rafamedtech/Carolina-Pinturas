@@ -442,7 +442,7 @@ async function convertToPedido() {
           </div>
           <div class="[grid-area:acciones] flex flex-wrap items-center gap-4 lg:justify-end">
             <UButton
-              v-if="!isQuote && mayManagePayment"
+              v-if="!isQuote && mayManagePayment && order.requiresInvoice"
               label="Facturar"
               icon="i-lucide-file-plus-2"
               color="neutral"
