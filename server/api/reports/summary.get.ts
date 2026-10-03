@@ -12,6 +12,7 @@ import {
   reportDateOnly,
   reportTopDebtors,
   reportSalesChannel,
+  reportSalesBeforeTax,
   reportMonthBounds,
   reportNumeric,
   reportPercentage,
@@ -54,6 +55,7 @@ export default eventHandler(async (event) => {
             productCodeSnapshot: true,
             productNameSnapshot: true,
             quantity: true,
+            taxAmount: true,
             total: true
           }
         }
@@ -97,10 +99,9 @@ export default eventHandler(async (event) => {
     })
   ] as const)
 
-  const sales = orders.reduce((sum, order) => sum + reportNumeric(order.total), 0)
-  const previousSales = previousSalesResult.reduce((sum, order) => sum + reportNumeric(order.total), 0)
-  const salesBeforeTax = orders.reduce((sum, order) => sum + reportNumeric(order.total) - reportNumeric(order.taxTotal), 0)
-  const previousSalesBeforeTax = previousSalesResult.reduce((sum, order) => sum + reportNumeric(order.total) - reportNumeric(order.taxTotal), 0)
+  const grossSales = orders.reduce((sum, order) => sum + reportNumeric(order.total), 0)
+  const sales = orders.reduce((sum, order) => sum + reportSalesBeforeTax(order), 0)
+  const previousSales = previousSalesResult.reduce((sum, order) => sum + reportSalesBeforeTax(order), 0)
   const operatingExpenses = expenses.filter(expense => expense.category !== 'Compra de materiales' && !expense.purchasePaymentId)
     .reduce((sum, expense) => sum + reportNumeric(expense.amount) * reportNumeric(expense.exchangeRate), 0)
   const previousOperatingExpenses = previousExpenses.filter(expense => expense.category !== 'Compra de materiales' && !expense.purchasePaymentId)
@@ -140,15 +141,16 @@ export default eventHandler(async (event) => {
 
   for (const order of orders) {
     const key = reportDateOnly(order.orderDate)
+    const amount = reportSalesBeforeTax(order)
     dailyCounts.set(key, (dailyCounts.get(key) ?? 0) + 1)
     const channel = reportSalesChannel(order)
     if (channel === 'counter') {
-      dailyCounterSales.set(key, (dailyCounterSales.get(key) ?? 0) + reportNumeric(order.total))
+      dailyCounterSales.set(key, (dailyCounterSales.get(key) ?? 0) + amount)
     }
     if (channel === 'internal') {
-      dailyInternalSales.set(key, (dailyInternalSales.get(key) ?? 0) + reportNumeric(order.total))
+      dailyInternalSales.set(key, (dailyInternalSales.get(key) ?? 0) + amount)
     }
-    dailySales.set(key, (dailySales.get(key) ?? 0) + reportNumeric(order.total))
+    dailySales.set(key, (dailySales.get(key) ?? 0) + amount)
   }
 
   for (const payment of collections) {
@@ -224,7 +226,7 @@ export default eventHandler(async (event) => {
   const products = new Map<string, Omit<ReportRankingItem, 'id' | 'percentage'>>()
 
   for (const order of orders) {
-    const orderTotal = reportNumeric(order.total)
+    const orderTotal = reportSalesBeforeTax(order)
     const customer = customers.get(order.customerId) ?? {
       label: order.customerNameSnapshot,
       detail: 'Cliente',
@@ -247,6 +249,9 @@ export default eventHandler(async (event) => {
       sellers.set(order.vendedorEmail, seller)
     }
 
+    const itemsBeforeTax = order.items.reduce((sum, item) => sum + reportNumeric(item.total) - reportNumeric(item.taxAmount), 0)
+    // Distribute the order-level discount so product sales reconcile with the order's net sales.
+    const itemShare = itemsBeforeTax !== 0 ? orderTotal / itemsBeforeTax : 0
     for (const item of order.items) {
       const product = products.get(item.productId) ?? {
         label: item.productNameSnapshot,
@@ -254,7 +259,7 @@ export default eventHandler(async (event) => {
         amount: 0,
         count: 0
       }
-      product.amount += reportNumeric(item.total)
+      product.amount += (reportNumeric(item.total) - reportNumeric(item.taxAmount)) * itemShare
       product.count += reportNumeric(item.quantity)
       products.set(item.productId, product)
     }
@@ -279,16 +284,16 @@ export default eventHandler(async (event) => {
       totalDays
     },
     metrics: {
-      salesBeforeTax,
-      salesBeforeTaxChangePercentage: reportPercentageChange(salesBeforeTax, previousSalesBeforeTax),
+      salesBeforeTax: sales,
+      salesBeforeTaxChangePercentage: reportPercentageChange(sales, previousSales),
       operatingExpenses,
       operatingExpensesChangePercentage: reportPercentageChange(operatingExpenses, previousOperatingExpenses),
       purchaseInvoiceTotals,
       sales,
       previousOrderCount: previousSalesResult.length,
-      previousCounterSales: previousSalesResult.filter(order => reportSalesChannel(order) === 'counter').reduce((sum, order) => sum + reportNumeric(order.total), 0),
-      previousSellerSales: previousSalesResult.filter(order => reportSalesChannel(order) === 'seller').reduce((sum, order) => sum + reportNumeric(order.total), 0),
-      previousInternalSales: previousSalesResult.filter(order => reportSalesChannel(order) === 'internal').reduce((sum, order) => sum + reportNumeric(order.total), 0),
+      previousCounterSales: previousSalesResult.filter(order => reportSalesChannel(order) === 'counter').reduce((sum, order) => sum + reportSalesBeforeTax(order), 0),
+      previousSellerSales: previousSalesResult.filter(order => reportSalesChannel(order) === 'seller').reduce((sum, order) => sum + reportSalesBeforeTax(order), 0),
+      previousInternalSales: previousSalesResult.filter(order => reportSalesChannel(order) === 'internal').reduce((sum, order) => sum + reportSalesBeforeTax(order), 0),
       previousDays: Math.round((start.getTime() - previousStart.getTime()) / dayInMs),
       previousSales,
       salesChangePercentage: reportPercentageChange(sales, previousSales),
@@ -305,11 +310,11 @@ export default eventHandler(async (event) => {
       averageTicket: orders.length > 0 ? sales / orders.length : 0,
       discounts,
       outstandingBalance,
-      collectionCoveragePercentage: reportPercentage(sales - outstandingBalance, sales)
+      collectionCoveragePercentage: reportPercentage(grossSales - outstandingBalance, grossSales)
     },
     salesChannels: ['counter', 'seller', 'internal'].map((key) => {
       const channelOrders = orders.filter(order => reportSalesChannel(order) === key)
-      const amount = channelOrders.reduce((sum, order) => sum + reportNumeric(order.total), 0)
+      const amount = channelOrders.reduce((sum, order) => sum + reportSalesBeforeTax(order), 0)
       return { key, label: key === 'counter' ? 'Mostrador' : key === 'seller' ? 'Vendedor' : 'Clientes internos', amount, count: channelOrders.length, percentage: reportPercentage(amount, sales) }
     }),
     expenseDetails: expenses.map(expense => ({
@@ -336,7 +341,7 @@ export default eventHandler(async (event) => {
     topDebtors: reportTopDebtors(orders),
     topCustomers: ranking(customers, sales),
     topProducts: ranking(products, sales),
-    topSellers: ranking(sellers, orders.filter(order => reportSalesChannel(order) !== 'internal').reduce((sum, order) => sum + reportNumeric(order.total), 0))
+    topSellers: ranking(sellers, orders.filter(order => reportSalesChannel(order) !== 'internal').reduce((sum, order) => sum + reportSalesBeforeTax(order), 0))
   }
 
   return result

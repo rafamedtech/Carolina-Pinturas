@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { reportDailyAverage, reportWeeks } from '../../app/utils/reportPeriods'
 
 const mocks = vi.hoisted(() => ({
   orders: vi.fn(), expenses: vi.fn(), invoices: vi.fn(), payments: vi.fn(), previousPayments: vi.fn()
@@ -32,7 +33,7 @@ afterEach(() => vi.useRealTimers())
 describe('report summary cards', () => {
   it('separates internal customers from seller sales in every period without changing total sales', async () => {
     const order = (name: string, total: number, internal: boolean) => ({
-      id: name, orderDate: new Date('2026-10-01'), total, taxTotal: 0, discountTotal: 0,
+      id: name, orderDate: new Date('2026-10-01'), total: total + total * 0.16, taxTotal: total * 0.16, discountTotal: 0,
       customerId: name, customerNameSnapshot: name, customer: { isInternalOrderCustomer: internal },
       vendedorEmail: 'seller', vendedorNombre: 'Vendedor', payments: [], items: []
     })
@@ -58,13 +59,25 @@ describe('report summary cards', () => {
     mocks.orders.mockResolvedValueOnce([{
       id: 'sale', orderDate: new Date('2026-10-01'), total: 1110, taxTotal: 160, discountTotal: 50,
       customerId: 'customer', customerNameSnapshot: 'Cliente', vendedorEmail: 'seller', vendedorNombre: 'Vendedor',
-      payments: [{ amount: 100 }], items: [], customer: { isInternalOrderCustomer: false }
+      payments: [{ amount: 100 }], items: [
+        { productId: 'p1', productCodeSnapshot: 'P1', productNameSnapshot: 'Pintura', quantity: 2, total: 696, taxAmount: 96 },
+        { productId: 'p2', productCodeSnapshot: 'P2', productNameSnapshot: 'Material', quantity: 1, total: 464, taxAmount: 64 }
+      ], customer: { isInternalOrderCustomer: false }
     }]).mockResolvedValueOnce([{ total: 580, taxTotal: 80, customerNameSnapshot: 'Cliente', customer: { isInternalOrderCustomer: false } }])
     const result = await summary(event)
     expect(result.metrics).toMatchObject({
       salesBeforeTax: 950, salesBeforeTaxChangePercentage: 90,
-      sales: 1110, outstandingBalance: 1010, collections: 0
+      sales: 950, previousSales: 500, salesChangePercentage: 90, averageTicket: 950,
+      outstandingBalance: 1010, collectionCoveragePercentage: 9, collections: 0, netCashFlow: 0
     })
+    expect(result.dailyMovements[0]?.sales).toBe(950)
+    expect(reportWeeks(result.dailyMovements)[0]?.sales).toBe(950)
+    expect(reportDailyAverage(result.metrics.sales, result.period.elapsedDays)).toBe(475)
+    expect(result.salesChannels.find(channel => channel.key === 'seller')).toMatchObject({ amount: 950, percentage: 100 })
+    expect(result.topCustomers[0]).toMatchObject({ amount: 950, percentage: 100 })
+    expect(result.topSellers[0]).toMatchObject({ amount: 950, percentage: 100 })
+    expect(result.topProducts).toMatchObject([{ amount: 570, percentage: 60 }, { amount: 380, percentage: 40 }])
+    expect(result.topDebtors[0]?.amount).toBe(1010)
   })
 
   it('excludes material purchases from the card while preserving cash outflows', async () => {

@@ -46,6 +46,9 @@ const errorMessage = computed(() =>
     </template>
 
     <template v-else-if="data && !error">
+      <p class="text-sm text-muted">
+        Todos los importes de venta se muestran antes de IVA.
+      </p>
       <ReportsSummaryCards :metrics="data.metrics" />
       <ReportsPeriodAnalysis :report="data" />
       <ReportsSalesChannels :channels="data.salesChannels" />

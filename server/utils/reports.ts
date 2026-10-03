@@ -4,6 +4,13 @@ export function reportNumeric(value: { toString(): string } | number | null | un
   return value == null ? 0 : Number(value.toString())
 }
 
+export function reportSalesBeforeTax(order: {
+  total: { toString(): string } | number
+  taxTotal: { toString(): string } | number
+}) {
+  return reportNumeric(order.total) - reportNumeric(order.taxTotal)
+}
+
 export function reportPercentage(amount: number, total: number) {
   return total > 0 ? Math.round((amount / total) * 1000) / 10 : 0
 }
