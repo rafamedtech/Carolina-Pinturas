@@ -2,6 +2,7 @@
 import { reportCurrency } from '~/utils/reportPeriods'
 import type { ReportMetrics } from '~/types/reports'
 import { dashboardNumber } from '~/utils/dashboardFormatters'
+import { purchaseMoney } from '~/utils/purchaseFormat'
 
 const props = defineProps<{
   metrics: ReportMetrics
@@ -17,27 +18,32 @@ function comparison(value: number | null, inverse = false) {
   }
 }
 
+const invoiceTotals = computed(() => {
+  const active = props.metrics.purchaseInvoiceTotals.filter(total => total.amount !== 0 || total.previousAmount !== 0)
+  return active.length ? active : props.metrics.purchaseInvoiceTotals.filter(total => total.currencyCode === 'MXN')
+})
+
 const primaryMetrics = computed(() => [{
   title: 'Total vendido',
-  value: reportCurrency.format(props.metrics.sales),
-  description: `${props.metrics.orderCount} ${props.metrics.orderCount === 1 ? 'pedido activo' : 'pedidos activos'}`,
+  value: reportCurrency.format(props.metrics.salesBeforeTax),
+  description: 'Importe antes de IVA',
   icon: 'i-lucide-chart-no-axes-combined',
   accent: 'text-primary bg-primary/10',
-  comparison: comparison(props.metrics.salesChangePercentage)
+  comparison: comparison(props.metrics.salesBeforeTaxChangePercentage)
 }, {
-  title: 'Cantidad de ventas',
-  value: dashboardNumber.format(props.metrics.orderCount),
-  description: 'Pedidos sin borradores ni cancelados',
-  icon: 'i-lucide-banknote-arrow-up',
+  title: 'Facturas de compras',
+  value: invoiceTotals.value.map(total => `${purchaseMoney(total.amount, total.currencyCode)} ${total.currencyCode}`).join('\n'),
+  description: 'Facturas vigentes de órdenes de compra por fecha de factura',
+  icon: 'i-lucide-receipt-text',
   accent: 'text-success bg-success/10',
-  comparison: comparison(props.metrics.previousOrderCount ? (props.metrics.orderCount - props.metrics.previousOrderCount) / props.metrics.previousOrderCount * 100 : null)
+  comparison: comparison(invoiceTotals.value.length === 1 ? invoiceTotals.value[0]!.changePercentage : null, true)
 }, {
   title: 'Gastos pagados',
-  value: reportCurrency.format(props.metrics.expenses),
-  description: 'Egresos convertidos a MXN',
+  value: reportCurrency.format(props.metrics.operatingExpenses),
+  description: 'Sin compra de materiales · MXN',
   icon: 'i-lucide-banknote-arrow-down',
   accent: 'text-warning bg-warning/10',
-  comparison: comparison(props.metrics.expensesChangePercentage, true)
+  comparison: comparison(props.metrics.operatingExpensesChangePercentage, true)
 }, {
   title: 'Flujo neto',
   value: reportCurrency.format(props.metrics.netCashFlow),
@@ -82,7 +88,7 @@ const operatingMetrics = computed(() => [{
           </span>
         </div>
 
-        <p class="mt-3 text-2xl font-semibold tracking-tight tabular-nums text-highlighted">
+        <p class="mt-3 whitespace-pre-line text-2xl font-semibold tracking-tight tabular-nums text-highlighted">
           {{ metric.value }}
         </p>
 

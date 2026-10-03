@@ -33,13 +33,14 @@ export default eventHandler(async (event) => {
     orderDate: { gte: start, lt: cutoff }
   } satisfies Prisma.SalesOrderWhereInput
 
-  const [orders, previousSalesResult, collections, previousCollectionsResult, expenses, previousExpenses] = await Promise.all([
+  const [orders, previousSalesResult, collections, previousCollectionsResult, expenses, previousExpenses, purchaseInvoices] = await Promise.all([
     prisma.salesOrder.findMany({
       where: salesWhere,
       select: {
         id: true,
         orderDate: true,
         total: true,
+        taxTotal: true,
         discountTotal: true,
         customerId: true,
         customerNameSnapshot: true,
@@ -62,7 +63,7 @@ export default eventHandler(async (event) => {
         statusKey: { notIn: EXCLUDED_SALES_STATUSES },
         orderDate: { gte: previousStart, lt: start }
       },
-      select: { total: true, customerNameSnapshot: true }
+      select: { total: true, taxTotal: true, customerNameSnapshot: true }
     }),
     prisma.salesOrderPayment.findMany({
       where: { paymentDate: { gte: start, lt: cutoff } },
@@ -78,17 +79,39 @@ export default eventHandler(async (event) => {
       select: {
         id: true, expenseDate: true, category: true, description: true,
         providerNameSnapshot: true, paymentMethod: true, currencyCode: true,
-        amount: true, exchangeRate: true, notes: true
+        amount: true, exchangeRate: true, notes: true, purchasePaymentId: true
       }
     }),
     prisma.expense.findMany({
       where: { expenseDate: { gte: previousStart, lt: start } },
-      select: { amount: true, exchangeRate: true }
+      select: { amount: true, exchangeRate: true, category: true, purchasePaymentId: true }
+    }),
+    prisma.purchaseInvoice.findMany({
+      where: {
+        voidedAt: null,
+        order: { status: { notIn: ['borrador', 'cancelada'] } },
+        date: { gte: previousStart, lt: cutoff }
+      },
+      select: { date: true, amount: true, order: { select: { currencyCode: true } } }
     })
   ] as const)
 
   const sales = orders.reduce((sum, order) => sum + reportNumeric(order.total), 0)
   const previousSales = previousSalesResult.reduce((sum, order) => sum + reportNumeric(order.total), 0)
+  const salesBeforeTax = orders.reduce((sum, order) => sum + reportNumeric(order.total) - reportNumeric(order.taxTotal), 0)
+  const previousSalesBeforeTax = previousSalesResult.reduce((sum, order) => sum + reportNumeric(order.total) - reportNumeric(order.taxTotal), 0)
+  const operatingExpenses = expenses.filter(expense => expense.category !== 'Compra de materiales' && !expense.purchasePaymentId)
+    .reduce((sum, expense) => sum + reportNumeric(expense.amount) * reportNumeric(expense.exchangeRate), 0)
+  const previousOperatingExpenses = previousExpenses.filter(expense => expense.category !== 'Compra de materiales' && !expense.purchasePaymentId)
+    .reduce((sum, expense) => sum + reportNumeric(expense.amount) * reportNumeric(expense.exchangeRate), 0)
+  const purchaseInvoiceTotals = ['MXN', 'USD'].map((currencyCode) => {
+    const invoices = purchaseInvoices.filter(invoice => invoice.order.currencyCode === currencyCode)
+    const amount = invoices.filter(invoice => invoice.date >= start)
+      .reduce((sum, invoice) => sum + reportNumeric(invoice.amount), 0)
+    const previousAmount = invoices.filter(invoice => invoice.date < start)
+      .reduce((sum, invoice) => sum + reportNumeric(invoice.amount), 0)
+    return { currencyCode, amount, previousAmount, changePercentage: reportPercentageChange(amount, previousAmount) }
+  })
   const collectionsAmount = collections.reduce((sum, payment) => sum + reportNumeric(payment.amount), 0)
   const previousCollections = reportNumeric(previousCollectionsResult._sum.amount)
   const expensesAmount = expenses.reduce(
@@ -247,6 +270,11 @@ export default eventHandler(async (event) => {
       totalDays
     },
     metrics: {
+      salesBeforeTax,
+      salesBeforeTaxChangePercentage: reportPercentageChange(salesBeforeTax, previousSalesBeforeTax),
+      operatingExpenses,
+      operatingExpensesChangePercentage: reportPercentageChange(operatingExpenses, previousOperatingExpenses),
+      purchaseInvoiceTotals,
       sales,
       previousOrderCount: previousSalesResult.length,
       previousCounterSales: previousSalesResult.filter(order => reportIsCounterSale(order.customerNameSnapshot)).reduce((sum, order) => sum + reportNumeric(order.total), 0),

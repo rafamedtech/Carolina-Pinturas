@@ -7,6 +7,16 @@ export interface ReportPeriod {
 }
 
 export interface ReportMetrics {
+  salesBeforeTax: number
+  salesBeforeTaxChangePercentage: number | null
+  operatingExpenses: number
+  operatingExpensesChangePercentage: number | null
+  purchaseInvoiceTotals: {
+    currencyCode: string
+    amount: number
+    previousAmount: number
+    changePercentage: number | null
+  }[]
   sales: number
   previousOrderCount: number
   previousCounterSales: number
