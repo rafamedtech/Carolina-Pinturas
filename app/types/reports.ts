@@ -21,6 +21,7 @@ export interface ReportMetrics {
   previousOrderCount: number
   previousCounterSales: number
   previousSellerSales: number
+  previousInternalSales: number
   previousDays: number
   previousSales: number
   salesChangePercentage: number | null
@@ -47,6 +48,7 @@ export interface ReportDailyMovement {
   orderCount: number
   counterSales: number
   sellerSales: number
+  internalSales: number
   collections: number
   expenses: number
   netCashFlow: number

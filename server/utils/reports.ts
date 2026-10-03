@@ -41,6 +41,14 @@ export function reportIsCounterSale(customerName: string) {
   return ['MOSTRADOR', 'MOSTRADOR .'].includes(customerName.toUpperCase())
 }
 
+export function reportSalesChannel(order: {
+  customerNameSnapshot: string
+  customer: { isInternalOrderCustomer: boolean }
+}): 'counter' | 'seller' | 'internal' {
+  if (order.customer.isInternalOrderCustomer) return 'internal'
+  return reportIsCounterSale(order.customerNameSnapshot) ? 'counter' : 'seller'
+}
+
 export function reportTopDebtors(orders: readonly {
   customerId: string
   customerNameSnapshot: string

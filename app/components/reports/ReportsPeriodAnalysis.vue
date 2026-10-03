@@ -18,7 +18,8 @@ const comparisons = computed(() => {
     { label: 'Total vendido', current: m.sales, previous: m.previousSales, money: true },
     { label: 'Cantidad de ventas', current: m.orderCount, previous: m.previousOrderCount, money: false },
     { label: 'Mostrador', current: props.report.salesChannels.find(c => c.key === 'counter')?.amount ?? 0, previous: m.previousCounterSales, money: true },
-    { label: 'Clientes del vendedor', current: props.report.salesChannels.find(c => c.key === 'seller')?.amount ?? 0, previous: m.previousSellerSales, money: true },
+    { label: 'Vendedor', current: props.report.salesChannels.find(c => c.key === 'seller')?.amount ?? 0, previous: m.previousSellerSales, money: true },
+    { label: 'Clientes internos', current: props.report.salesChannels.find(c => c.key === 'internal')?.amount ?? 0, previous: m.previousInternalSales, money: true },
     { label: 'Gastos', current: m.expenses, previous: m.previousExpenses, money: true },
     { label: 'Cobros', current: m.collections, previous: m.previousCollections, money: true }
   ]
@@ -64,13 +65,15 @@ function format(value: number, money: boolean) {
             <span class="text-default">{{ reportShortDate(week.start) }} – {{ reportShortDate(week.end) }} <span class="text-muted">· {{ week.days }} {{ week.days === 1 ? 'día' : 'días' }}</span></span>
             <span class="font-semibold tabular-nums">{{ reportCurrency.format(week.sales) }} · {{ week.orderCount }} ventas</span>
           </div>
-          <div class="flex h-5 overflow-hidden rounded bg-elevated" role="img" :aria-label="`Mostrador ${reportCurrency.format(week.counterSales)}; clientes del vendedor ${reportCurrency.format(week.sellerSales)}`">
+          <div class="flex h-5 overflow-hidden rounded bg-elevated" role="img" :aria-label="`Mostrador ${reportCurrency.format(week.counterSales)}; vendedor ${reportCurrency.format(week.sellerSales)}; clientes internos ${reportCurrency.format(week.internalSales)}`">
             <div class="bg-primary" :style="{ width: `${week.counterSales / maxWeekly * 100}%` }" />
             <div class="bg-success" :style="{ width: `${week.sellerSales / maxWeekly * 100}%` }" />
+            <div class="bg-warning" :style="{ width: `${week.internalSales / maxWeekly * 100}%` }" />
           </div>
           <div class="mt-2 flex flex-wrap gap-x-5 gap-y-1 text-xs text-muted">
             <span>Mostrador: {{ reportCurrency.format(week.counterSales) }}</span>
             <span>Vendedor: {{ reportCurrency.format(week.sellerSales) }}</span>
+            <span>Clientes internos: {{ reportCurrency.format(week.internalSales) }}</span>
             <span>Gastos: {{ reportCurrency.format(week.expenses) }}</span>
             <span>Venta diaria: {{ reportCurrency.format(reportDailyAverage(week.sales, week.days)) }}</span>
           </div>

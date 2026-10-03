@@ -33,7 +33,7 @@ const primaryMetrics = computed(() => [{
 }, {
   title: 'Facturas de compras',
   value: invoiceTotals.value.map(total => `${purchaseMoney(total.amount, total.currencyCode)} ${total.currencyCode}`).join('\n'),
-  description: 'Facturas vigentes de órdenes de compra por fecha de factura',
+  description: '',
   icon: 'i-lucide-receipt-text',
   accent: 'text-success bg-success/10',
   comparison: comparison(invoiceTotals.value.length === 1 ? invoiceTotals.value[0]!.changePercentage : null, true)
@@ -95,7 +95,7 @@ const operatingMetrics = computed(() => [{
         <div class="mt-4 flex flex-wrap items-center gap-x-2 gap-y-1 border-t border-default pt-3">
           <UBadge v-bind="metric.comparison" variant="soft" size="sm" />
           <span class="text-xs text-muted">vs. mes anterior completo</span>
-          <span class="text-xs text-muted">{{ metric.description }}</span>
+          <span v-if="metric.description" class="text-xs text-muted">{{ metric.description }}</span>
         </div>
       </UCard>
     </div>

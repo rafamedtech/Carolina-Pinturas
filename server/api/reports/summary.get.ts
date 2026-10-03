@@ -11,7 +11,7 @@ import { formatDate, formatDateRange } from '../../../shared/utils/datetime'
 import {
   reportDateOnly,
   reportTopDebtors,
-  reportIsCounterSale,
+  reportSalesChannel,
   reportMonthBounds,
   reportNumeric,
   reportPercentage,
@@ -43,6 +43,7 @@ export default eventHandler(async (event) => {
         taxTotal: true,
         discountTotal: true,
         customerId: true,
+        customer: { select: { isInternalOrderCustomer: true } },
         customerNameSnapshot: true,
         vendedorEmail: true,
         vendedorNombre: true,
@@ -63,7 +64,7 @@ export default eventHandler(async (event) => {
         statusKey: { notIn: EXCLUDED_SALES_STATUSES },
         orderDate: { gte: previousStart, lt: start }
       },
-      select: { total: true, taxTotal: true, customerNameSnapshot: true }
+      select: { total: true, taxTotal: true, customerNameSnapshot: true, customer: { select: { isInternalOrderCustomer: true } } }
     }),
     prisma.salesOrderPayment.findMany({
       where: { paymentDate: { gte: start, lt: cutoff } },
@@ -132,6 +133,7 @@ export default eventHandler(async (event) => {
 
   const dailyCounts = new Map<string, number>()
   const dailyCounterSales = new Map<string, number>()
+  const dailyInternalSales = new Map<string, number>()
   const dailySales = new Map<string, number>()
   const dailyCollections = new Map<string, number>()
   const dailyExpenses = new Map<string, number>()
@@ -139,8 +141,12 @@ export default eventHandler(async (event) => {
   for (const order of orders) {
     const key = reportDateOnly(order.orderDate)
     dailyCounts.set(key, (dailyCounts.get(key) ?? 0) + 1)
-    if (reportIsCounterSale(order.customerNameSnapshot)) {
+    const channel = reportSalesChannel(order)
+    if (channel === 'counter') {
       dailyCounterSales.set(key, (dailyCounterSales.get(key) ?? 0) + reportNumeric(order.total))
+    }
+    if (channel === 'internal') {
+      dailyInternalSales.set(key, (dailyInternalSales.get(key) ?? 0) + reportNumeric(order.total))
     }
     dailySales.set(key, (dailySales.get(key) ?? 0) + reportNumeric(order.total))
   }
@@ -168,7 +174,8 @@ export default eventHandler(async (event) => {
       sales: dailySales.get(key) ?? 0,
       orderCount: dailyCounts.get(key) ?? 0,
       counterSales: dailyCounterSales.get(key) ?? 0,
-      sellerSales: (dailySales.get(key) ?? 0) - (dailyCounterSales.get(key) ?? 0),
+      sellerSales: (dailySales.get(key) ?? 0) - (dailyCounterSales.get(key) ?? 0) - (dailyInternalSales.get(key) ?? 0),
+      internalSales: dailyInternalSales.get(key) ?? 0,
       collections: dayCollections,
       expenses: dayExpenses,
       netCashFlow: dayCollections - dayExpenses
@@ -228,15 +235,17 @@ export default eventHandler(async (event) => {
     customer.count += 1
     customers.set(order.customerId, customer)
 
-    const seller = sellers.get(order.vendedorEmail) ?? {
-      label: order.vendedorNombre,
-      detail: order.vendedorEmail,
-      amount: 0,
-      count: 0
+    if (reportSalesChannel(order) !== 'internal') {
+      const seller = sellers.get(order.vendedorEmail) ?? {
+        label: order.vendedorNombre,
+        detail: order.vendedorEmail,
+        amount: 0,
+        count: 0
+      }
+      seller.amount += orderTotal
+      seller.count += 1
+      sellers.set(order.vendedorEmail, seller)
     }
-    seller.amount += orderTotal
-    seller.count += 1
-    sellers.set(order.vendedorEmail, seller)
 
     for (const item of order.items) {
       const product = products.get(item.productId) ?? {
@@ -277,8 +286,9 @@ export default eventHandler(async (event) => {
       purchaseInvoiceTotals,
       sales,
       previousOrderCount: previousSalesResult.length,
-      previousCounterSales: previousSalesResult.filter(order => reportIsCounterSale(order.customerNameSnapshot)).reduce((sum, order) => sum + reportNumeric(order.total), 0),
-      previousSellerSales: previousSalesResult.filter(order => !reportIsCounterSale(order.customerNameSnapshot)).reduce((sum, order) => sum + reportNumeric(order.total), 0),
+      previousCounterSales: previousSalesResult.filter(order => reportSalesChannel(order) === 'counter').reduce((sum, order) => sum + reportNumeric(order.total), 0),
+      previousSellerSales: previousSalesResult.filter(order => reportSalesChannel(order) === 'seller').reduce((sum, order) => sum + reportNumeric(order.total), 0),
+      previousInternalSales: previousSalesResult.filter(order => reportSalesChannel(order) === 'internal').reduce((sum, order) => sum + reportNumeric(order.total), 0),
       previousDays: Math.round((start.getTime() - previousStart.getTime()) / dayInMs),
       previousSales,
       salesChangePercentage: reportPercentageChange(sales, previousSales),
@@ -297,10 +307,10 @@ export default eventHandler(async (event) => {
       outstandingBalance,
       collectionCoveragePercentage: reportPercentage(sales - outstandingBalance, sales)
     },
-    salesChannels: ['counter', 'seller'].map((key) => {
-      const channelOrders = orders.filter(order => reportIsCounterSale(order.customerNameSnapshot) === (key === 'counter'))
+    salesChannels: ['counter', 'seller', 'internal'].map((key) => {
+      const channelOrders = orders.filter(order => reportSalesChannel(order) === key)
       const amount = channelOrders.reduce((sum, order) => sum + reportNumeric(order.total), 0)
-      return { key, label: key === 'counter' ? 'Mostrador' : 'Clientes del vendedor', amount, count: channelOrders.length, percentage: reportPercentage(amount, sales) }
+      return { key, label: key === 'counter' ? 'Mostrador' : key === 'seller' ? 'Vendedor' : 'Clientes internos', amount, count: channelOrders.length, percentage: reportPercentage(amount, sales) }
     }),
     expenseDetails: expenses.map(expense => ({
       id: expense.id,
@@ -326,7 +336,7 @@ export default eventHandler(async (event) => {
     topDebtors: reportTopDebtors(orders),
     topCustomers: ranking(customers, sales),
     topProducts: ranking(products, sales),
-    topSellers: ranking(sellers, sales)
+    topSellers: ranking(sellers, orders.filter(order => reportSalesChannel(order) !== 'internal').reduce((sum, order) => sum + reportNumeric(order.total), 0))
   }
 
   return result

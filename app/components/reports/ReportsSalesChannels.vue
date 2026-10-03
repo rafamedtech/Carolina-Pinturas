@@ -4,17 +4,28 @@ import type { ReportBreakdownItem } from '~/types/reports'
 
 const props = defineProps<{ channels: ReportBreakdownItem[] }>()
 const total = computed(() => props.channels.reduce((sum, item) => sum + item.amount, 0))
-const share = computed(() => total.value > 0 ? (props.channels.find(item => item.key === 'counter')?.amount ?? 0) / total.value * 100 : 0)
-const background = computed(() => total.value > 0
-  ? `conic-gradient(var(--ui-primary) 0% ${share.value}%, var(--ui-success) ${share.value}% 100%)`
-  : 'var(--ui-bg-elevated)')
+const channelColors: Record<string, { color: string, class: string }> = {
+  counter: { color: 'var(--ui-primary)', class: 'bg-primary' },
+  seller: { color: 'var(--ui-success)', class: 'bg-success' },
+  internal: { color: 'var(--ui-warning)', class: 'bg-warning' }
+}
+const background = computed(() => {
+  if (total.value <= 0) return 'var(--ui-bg-elevated)'
+  let position = 0
+  const segments = props.channels.map((channel) => {
+    const start = position
+    position += channel.amount / total.value * 100
+    return `${channelColors[channel.key]?.color ?? 'var(--ui-text-muted)'} ${start}% ${position}%`
+  })
+  return `conic-gradient(${segments.join(', ')})`
+})
 </script>
 
 <template>
   <UCard>
     <template #header>
       <h2 class="text-base font-semibold text-highlighted">
-        Mostrador vs. clientes del vendedor
+        Mostrador, vendedor y clientes internos
       </h2>
       <p class="mt-1 text-sm text-muted">
         Participación sobre el total vendido del mes, según el cliente del pedido.
@@ -35,7 +46,7 @@ const background = computed(() => total.value > 0
       <dl class="w-full space-y-5">
         <div v-for="channel in channels" :key="channel.key">
           <dt class="flex items-center gap-2 text-sm text-muted">
-            <span class="size-2.5 rounded-full" :class="channel.key === 'counter' ? 'bg-primary' : 'bg-success'" />
+            <span class="size-2.5 rounded-full" :class="channelColors[channel.key]?.class" />
             {{ channel.label }}
           </dt>
           <dd class="mt-1 flex flex-wrap items-baseline justify-between gap-2">

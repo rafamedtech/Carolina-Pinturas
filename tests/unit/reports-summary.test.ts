@@ -30,12 +30,36 @@ beforeEach(() => {
 afterEach(() => vi.useRealTimers())
 
 describe('report summary cards', () => {
+  it('separates internal customers from seller sales in every period without changing total sales', async () => {
+    const order = (name: string, total: number, internal: boolean) => ({
+      id: name, orderDate: new Date('2026-10-01'), total, taxTotal: 0, discountTotal: 0,
+      customerId: name, customerNameSnapshot: name, customer: { isInternalOrderCustomer: internal },
+      vendedorEmail: 'seller', vendedorNombre: 'Vendedor', payments: [], items: []
+    })
+    mocks.orders.mockResolvedValueOnce([
+      order('MOSTRADOR', 100, false), order('Cliente externo', 300, false), order('Cliente interno', 600, true)
+    ]).mockResolvedValueOnce([
+      order('MOSTRADOR .', 50, false), order('Cliente externo', 150, false), order('Cliente interno', 200, true)
+    ])
+    const result = await summary(event)
+    expect(result.salesChannels).toEqual([
+      { key: 'counter', label: 'Mostrador', amount: 100, count: 1, percentage: 10 },
+      { key: 'seller', label: 'Vendedor', amount: 300, count: 1, percentage: 30 },
+      { key: 'internal', label: 'Clientes internos', amount: 600, count: 1, percentage: 60 }
+    ])
+    expect(result.metrics).toMatchObject({ sales: 1000, previousCounterSales: 50, previousSellerSales: 150, previousInternalSales: 200 })
+    expect(result.dailyMovements[0]).toMatchObject({ sales: 1000, counterSales: 100, sellerSales: 300, internalSales: 600 })
+    expect(result.dailyMovements[1]).toMatchObject({ sales: 0, counterSales: 0, sellerSales: 0, internalSales: 0 })
+    expect(result.topSellers[0]).toMatchObject({ amount: 400, count: 2, percentage: 100 })
+    expect(mocks.orders).toHaveBeenNthCalledWith(1, expect.objectContaining({ select: expect.objectContaining({ customer: { select: { isInternalOrderCustomer: true } } }) }))
+  })
+
   it('subtracts actual taxes and compares the same tax basis for both months', async () => {
     mocks.orders.mockResolvedValueOnce([{
       id: 'sale', orderDate: new Date('2026-10-01'), total: 1110, taxTotal: 160, discountTotal: 50,
       customerId: 'customer', customerNameSnapshot: 'Cliente', vendedorEmail: 'seller', vendedorNombre: 'Vendedor',
-      payments: [{ amount: 100 }], items: []
-    }]).mockResolvedValueOnce([{ total: 580, taxTotal: 80, customerNameSnapshot: 'Cliente' }])
+      payments: [{ amount: 100 }], items: [], customer: { isInternalOrderCustomer: false }
+    }]).mockResolvedValueOnce([{ total: 580, taxTotal: 80, customerNameSnapshot: 'Cliente', customer: { isInternalOrderCustomer: false } }])
     const result = await summary(event)
     expect(result.metrics).toMatchObject({
       salesBeforeTax: 950, salesBeforeTaxChangePercentage: 90,

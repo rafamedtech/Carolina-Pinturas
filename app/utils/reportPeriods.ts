@@ -1,14 +1,14 @@
 import type { ReportDailyMovement } from '~/types/reports'
 
 export function reportWeeks(days: ReportDailyMovement[]) {
-  const weeks: { start: string, end: string, days: number, sales: number, orderCount: number, counterSales: number, sellerSales: number, expenses: number }[] = []
+  const weeks: { start: string, end: string, days: number, sales: number, orderCount: number, counterSales: number, sellerSales: number, internalSales: number, expenses: number }[] = []
   for (const day of days) {
     const monday = new Date(`${day.date}T00:00:00Z`)
     monday.setUTCDate(monday.getUTCDate() - (monday.getUTCDay() + 6) % 7)
     const key = monday.toISOString().slice(0, 10)
     let week = weeks.find(item => item.start === key)
     if (!week) {
-      week = { start: key, end: day.date, days: 0, sales: 0, orderCount: 0, counterSales: 0, sellerSales: 0, expenses: 0 }
+      week = { start: key, end: day.date, days: 0, sales: 0, orderCount: 0, counterSales: 0, sellerSales: 0, internalSales: 0, expenses: 0 }
       weeks.push(week)
     }
     week.end = day.date
@@ -17,6 +17,7 @@ export function reportWeeks(days: ReportDailyMovement[]) {
     week.orderCount += day.orderCount
     week.counterSales += day.counterSales
     week.sellerSales += day.sellerSales
+    week.internalSales += day.internalSales
     week.expenses += day.expenses
   }
   return weeks.map(week => ({ ...week, start: week.start < (days[0]?.date ?? '') ? days[0]!.date : week.start }))
