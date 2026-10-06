@@ -5,7 +5,9 @@ import { purchaseDate } from './purchase'
 export const inventoryQuantity = z.string().regex(/^\d{1,14}(\.\d{1,6})?$/, 'Usa una cantidad positiva con hasta 6 decimales.')
 export const inventoryPositive = inventoryQuantity.refine(s => /[1-9]/.test(s), 'La cantidad debe ser mayor a cero.')
 const reason = z.string().trim().min(3).max(2000)
-const line = z.object({ productId: z.uuid(), quantity: inventoryPositive })
+export const inventoryCost = inventoryPositive.refine(s => Number(s) <= 999_999_999, 'El costo no puede superar 999999999.')
+const costFields = { unitCost: inventoryCost.optional(), costCurrency: z.enum(['MXN', 'USD']).optional() }
+const line = z.object({ productId: z.uuid(), quantity: inventoryPositive, ...costFields })
 const lines = z.array(line).min(1).max(100).refine(v => new Set(v.map(i => i.productId)).size === v.length, 'No repitas productos.')
 export const inventoryTypes = ['inicial', 'entrada', 'salida', 'traspaso', 'devolucion_cliente', 'devolucion_proveedor', 'ajuste', 'surtido', 'recepcion', 'reversion'] as const
 export const inventoryQuery = z.object({
@@ -26,12 +28,17 @@ export const inventoryCommand = z.object({
     z.object({ action: z.literal('countCreate'), warehouseId: z.uuid(), date: purchaseDate, reason }),
     z.object({ action: z.literal('countAdd'), id: z.uuid(), version: z.number().int().positive(), productId: z.uuid() }),
     z.object({ action: z.literal('countRemove'), id: z.uuid(), version: z.number().int().positive(), productId: z.uuid() }),
-    z.object({ action: z.literal('countEdit'), id: z.uuid(), version: z.number().int().positive(), lines: z.array(z.object({ productId: z.uuid(), counted: inventoryQuantity })).min(1) }),
+    z.object({ action: z.literal('countEdit'), id: z.uuid(), version: z.number().int().positive(), lines: z.array(z.object({ productId: z.uuid(), counted: inventoryQuantity, ...costFields })).min(1) }),
     z.object({ action: z.literal('countRefresh'), id: z.uuid(), version: z.number().int().positive() }),
     z.object({ action: z.literal('countSubmit'), id: z.uuid(), version: z.number().int().positive() }),
     z.object({ action: z.literal('countApply'), id: z.uuid(), version: z.number().int().positive() }),
     z.object({ action: z.literal('countCancel'), id: z.uuid(), version: z.number().int().positive() })
   ])
+}).superRefine((input, ctx) => {
+  const c = input.command
+  if (c.action === 'move' && c.type === 'inicial') c.lines.forEach((line, index) => {
+    for (const key of ['unitCost', 'costCurrency'] as const) if (line[key] === undefined) ctx.addIssue({ code: 'custom', path: ['command', 'lines', index, key], message: 'Captura el costo unitario y su moneda.' })
+  })
 })
 export type InventoryCommand = z.infer<typeof inventoryCommand>
 export type InventoryQuery = z.infer<typeof inventoryQuery>

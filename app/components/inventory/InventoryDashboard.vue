@@ -360,6 +360,7 @@ async function exportRows() {
           /><InventoryCountForm
             v-if="selectedCount"
             :count="selectedCount"
+            :activated="Boolean(settings?.enabledAt)"
             :admin="admin"
             :busy="busy"
             @submit="save"

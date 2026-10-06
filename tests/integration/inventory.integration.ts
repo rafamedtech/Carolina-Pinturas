@@ -69,6 +69,9 @@ suite('inventario: PostgreSQL aislado, sin conexión Siigo', () => {
     try {
       const ddl = execFileSync('pnpm', ['exec', 'prisma', 'migrate', 'diff', '--from-empty', '--to-schema', 'prisma/schema.prisma', '--script'], { encoding: 'utf8' })
       await setup.query(ddl)
+      // Exercise the actual additive migration against the previous schema.
+      await setup.query('ALTER TABLE siigo_products DROP COLUMN initial_unit_cost, DROP COLUMN initial_cost_currency, DROP COLUMN unit_cost, DROP COLUMN cost_currency; ALTER TABLE inventory_count_lines DROP COLUMN unit_cost, DROP COLUMN cost_currency;')
+      await setup.query(readFileSync('supabase/migrations/20261006183611_product_inventory_cost.sql', 'utf8'))
       const migration = readFileSync('supabase/migrations/20261005171346_internal_inventory.sql', 'utf8')
       await setup.query(migration.slice(migration.indexOf('INSERT INTO public.inventory_settings')))
     } finally { await setup.end() }
@@ -82,7 +85,7 @@ suite('inventario: PostgreSQL aislado, sin conexión Siigo', () => {
     b = (await command({ action: 'warehouse', code: 'B', name: 'Secundario', address: '', active: true }) as { id: string }).id
     initialProduct = await product()
     serviceProduct = await product('Service')
-    await command({ action: 'move', type: 'inicial', warehouseId: a, date: today, reason: 'Conteo inicial', lines: [{ productId: initialProduct, quantity: '10.123456' }] })
+    await command({ action: 'move', type: 'inicial', warehouseId: a, date: today, reason: 'Conteo inicial', lines: [{ productId: initialProduct, quantity: '10.123456', unitCost: '8.123456', costCurrency: 'MXN' }] })
     legacyId = (await sale(initialProduct, 2, 'entregado', true)).id
     historicalProduct = await product()
     mocks.supplier.mockResolvedValue(customer)
@@ -96,12 +99,74 @@ suite('inventario: PostgreSQL aislado, sin conexión Siigo', () => {
       await command({ action: 'countAdd', id: current.id, version: current.version, productId })
     }
     let count = await db.inventoryCount.findUniqueOrThrow({ where: { id: initialCount.id }, include: { lines: true } })
-    await command({ action: 'countEdit', id: count.id, version: count.version, lines: count.lines.map(l => ({ productId: l.productId, counted: '1.250001' })) })
+    await command({ action: 'countEdit', id: count.id, version: count.version, lines: count.lines.map(l => ({ productId: l.productId, counted: '1.250001', unitCost: l.productId === initialProduct ? '8.123456' : '7.000001', costCurrency: 'MXN' })) })
     count = await db.inventoryCount.findUniqueOrThrow({ where: { id: count.id }, include: { lines: true } })
     await command({ action: 'countSubmit', id: count.id, version: count.version })
     count = await db.inventoryCount.findUniqueOrThrow({ where: { id: count.id }, include: { lines: true } })
     await command({ action: 'countApply', id: count.id, version: count.version })
     await command({ action: 'activate', version: 1 })
+  })
+  it('conserva el costo inicial hasta recibir compras; respeta fechas y restaura costos al anular', async () => {
+    const currentCost = () => db.siigoProduct.findUniqueOrThrow({ where: { id: initialProduct } })
+    expect((await currentCost()).unitCost?.toString()).toBe('8.123456')
+    expect((await currentCost()).initialUnitCost?.toString()).toBe('8.123456')
+    // Backfill uses the same selection rule and preserves the separate baseline.
+    const migration = readFileSync('supabase/migrations/20261006183611_product_inventory_cost.sql', 'utf8')
+    await db.$executeRawUnsafe(migration.slice(migration.indexOf('UPDATE public.siigo_products')))
+    expect((await db.siigoProduct.findUniqueOrThrow({ where: { id: historicalProduct } })).unitCost?.toString()).toBe('10')
+    await expect(db.$executeRaw`UPDATE siigo_products SET unit_cost = NULL, cost_currency = 'MXN' WHERE id = ${initialProduct}::uuid`).rejects.toThrow()
+
+    const purchases: Array<Awaited<ReturnType<typeof createPurchase>>> = []
+    const buy = async (cost: number, receiptDate: string, currencyCode: 'MXN' | 'USD' = 'MXN') => {
+      const p = await currentCost()
+      mocks.product.mockResolvedValue({ id: p.id, code: p.code, name: p.name, active: true })
+      let purchase = await createPurchase({ requestId: randomUUID(), draft: { providerId: customer.id, date: receiptDate, currencyCode, notes: '', items: [{ productId: p.id, quantity: 2, unitCost: cost }] } }, user)
+      const before = (await currentCost()).unitCost?.toString()
+      purchase = await mutatePurchase(purchase.id, { requestId: randomUUID(), version: purchase.version, command: { action: 'confirm' } }, user)
+      expect((await currentCost()).unitCost?.toString()).toBe(before)
+      const input = { requestId: randomUUID(), version: purchase.version, command: { action: 'receive' as const, warehouseId: a, date: receiptDate, items: [{ itemId: purchase.items[0]!.id, quantity: 1 }] } }
+      purchase = await mutatePurchase(purchase.id, input, user)
+      await mutatePurchase(purchase.id, input, user)
+      purchases.push(purchase)
+      return purchase
+    }
+    await buy(12.123456, '2026-10-05')
+    expect((await currentCost()).unitCost?.toString()).toBe('12.123456')
+    await buy(15.000001, '2026-10-06', 'USD')
+    expect((await currentCost()).costCurrency).toBe('USD')
+    await buy(9, '2026-10-04')
+    expect((await currentCost()).unitCost?.toString()).toBe('15.000001')
+    const voidReceipt = async (purchase: typeof purchases[number]) => mutatePurchase(purchase.id, { requestId: randomUUID(), version: purchase.version, command: { action: 'voidReceipt', id: purchase.receipts[0]!.id, reason: 'Corrección de compra' } }, user)
+    await voidReceipt(purchases[2]!)
+    expect((await currentCost()).unitCost?.toString()).toBe('15.000001')
+    await voidReceipt(purchases[1]!)
+    expect((await currentCost()).unitCost?.toString()).toBe('12.123456')
+    expect((await currentCost()).costCurrency).toBe('MXN')
+    await voidReceipt(purchases[0]!)
+    expect((await currentCost()).unitCost?.toString()).toBe('8.123456')
+    // Catalog synchronization must preserve local cost fields.
+    await persistProductCatalog(db, [{ id: initialProduct, code: 'COST', name: 'Pintura prueba', type: 'Product', active: true }])
+    expect((await currentCost()).unitCost?.toString()).toBe('8.123456')
+    mocks.product.mockResolvedValue({ id: historicalProduct, code: 'HIST', name: 'Producto histórico', active: true })
+  })
+  it('serializa costos de recepciones simultáneas en almacenes distintos y vuelve a null sin costo inicial', async () => {
+    const id = await product()
+    const p = await db.siigoProduct.findUniqueOrThrow({ where: { id } })
+    mocks.product.mockResolvedValue({ id, code: p.code, name: p.name, active: true })
+    const orders = []
+    for (const unitCost of [22, 33]) {
+      let purchase = await createPurchase({ requestId: randomUUID(), draft: { providerId: customer.id, date: today, currencyCode: 'MXN', notes: '', items: [{ productId: id, quantity: 1, unitCost }] } }, user)
+      purchase = await mutatePurchase(purchase.id, { requestId: randomUUID(), version: purchase.version, command: { action: 'confirm' } }, user)
+      orders.push(purchase)
+    }
+    expect((await db.siigoProduct.findUniqueOrThrow({ where: { id } })).unitCost).toBeNull()
+    const received = await Promise.all(orders.map((purchase, index) => mutatePurchase(purchase.id, { requestId: randomUUID(), version: purchase.version, command: { action: 'receive', warehouseId: index ? b : a, date: index ? '2026-10-06' : today, items: [{ itemId: purchase.items[0]!.id, quantity: 1 }] } }, user)))
+    expect((await db.siigoProduct.findUniqueOrThrow({ where: { id } })).unitCost?.toString()).toBe('33')
+    await Promise.all(received.map(purchase => mutatePurchase(purchase.id, { requestId: randomUUID(), version: purchase.version, command: { action: 'voidReceipt', id: purchase.receipts[0]!.id, reason: 'Fin de prueba concurrente' } }, user)))
+    const productAfter = await db.siigoProduct.findUniqueOrThrow({ where: { id } })
+    expect(productAfter.unitCost).toBeNull()
+    expect(productAfter.costCurrency).toBeNull()
+    mocks.product.mockResolvedValue({ id: historicalProduct, code: 'HIST', name: 'Producto histórico', active: true })
   })
   it('solo las nuevas recepciones de compras históricas generan inventario tras la activación', async () => {
     const legacyReceipt = historicalPurchase.receipts[0]!
@@ -128,7 +193,7 @@ suite('inventario: PostgreSQL aislado, sin conexión Siigo', () => {
     expect(await db.inventoryMovement.count({ where: { orderId: legacyId } })).toBe(0)
     await transition(legacyId, 'cancelado')
     expect((await balance(initialProduct)).quantity.toString()).toBe('10.123456')
-    await expect(command({ action: 'move', type: 'inicial', warehouseId: a, date: today, reason: 'Segundo saldo', lines: [{ productId: initialProduct, quantity: '1' }] })).rejects.toThrow()
+    await expect(command({ action: 'move', type: 'inicial', warehouseId: a, date: today, reason: 'Segundo saldo', lines: [{ productId: initialProduct, quantity: '1', unitCost: '8.123456', costCurrency: 'MXN' }] })).rejects.toThrow()
   })
   it('serializa reservas concurrentes, libera al cancelar y no permite sobreventa', async () => {
     const id = await product()

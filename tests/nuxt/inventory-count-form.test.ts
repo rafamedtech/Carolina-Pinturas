@@ -10,9 +10,19 @@ const count: InventoryCount = {
   lines: [{ productId: 'product-1', baseVersion: 1, expected: '10', counted: null, product: { code: 'P-1', name: 'Pintura blanca' } }]
 }
 const picker = { props: ['excludedIds', 'busy'], emits: ['add'], template: '<button type="button" @click="$emit(\'add\', \'product-2\')">Agregar segundo producto</button>' }
-const mountForm = (value = count) => mountSuspended(InventoryCountForm, { props: { count: value, admin: true, busy: false }, global: { stubs: { InventoryCountProductPicker: picker } } })
+const mountForm = (value = count) => mountSuspended(InventoryCountForm, { props: { count: value, admin: true, busy: false, activated: true }, global: { stubs: { InventoryCountProductPicker: picker } } })
 
 describe('Conteo físico selectivo', () => {
+  it('captura costo y moneda en el conteo inicial y conserva seis decimales', async () => {
+    const initial = { ...count, lines: [{ ...count.lines[0]!, counted: '5', unitCost: '12.123456', costCurrency: 'USD' }] }
+    const wrapper = await mountForm(initial)
+    await wrapper.setProps({ activated: false })
+    expect(wrapper.find('input[aria-label="Costo unitario de Pintura blanca"]').exists()).toBe(true)
+    await wrapper.get('form').trigger('submit')
+    expect(wrapper.emitted('submit')?.[0]).toEqual([{ action: 'countEdit', id: count.id, version: 2, lines: [{ productId: 'product-1', counted: '5', unitCost: '12.123456', costCurrency: 'USD' }] }])
+    wrapper.unmount()
+  })
+
   it('agrega productos y conserva las cantidades sin guardar de otras partidas', async () => {
     const wrapper = await mountForm()
     await wrapper.get('input[aria-label="Conteo de Pintura blanca"]').setValue('5.123456')

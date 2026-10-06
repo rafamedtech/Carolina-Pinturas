@@ -21,6 +21,8 @@ const emit = defineEmits<{ minimum: [row: InventoryStock], kardex: [row: Invento
           </th><th class="p-3 text-right">
             Disponible
           </th><th class="p-3 text-right">
+            Costo unitario
+          </th><th class="p-3 text-right">
             Mínimo
           </th><th class="p-3">
             <span class="sr-only">Acciones</span>
@@ -47,6 +49,10 @@ const emit = defineEmits<{ minimum: [row: InventoryStock], kardex: [row: Invento
             {{ row.available }}<span v-if="row.low" class="block font-sans text-xs">Bajo mínimo</span>
           </td>
           <td class="p-3 text-right font-mono">
+            <span v-if="row.unitCost">{{ row.unitCost }} {{ row.costCurrency }}</span>
+            <span v-else class="text-muted">Sin costo</span>
+          </td>
+          <td class="p-3 text-right font-mono">
             {{ row.minimum }}
           </td>
           <td class="p-3">
@@ -68,7 +74,7 @@ const emit = defineEmits<{ minimum: [row: InventoryStock], kardex: [row: Invento
           </td>
         </tr>
         <tr v-if="!rows.length">
-          <td colspan="7" class="p-8 text-center text-muted">
+          <td colspan="8" class="p-8 text-center text-muted">
             Sin existencias para estos filtros. Crea un almacén y registra el conteo inicial.
           </td>
         </tr>

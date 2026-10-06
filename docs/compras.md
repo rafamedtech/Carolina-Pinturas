@@ -34,3 +34,11 @@ Todas las escrituras sobre una orden adquieren el mismo bloqueo transaccional me
 - `pnpm lint`, `pnpm typecheck`, `pnpm db:validate`, `pnpm build`.
 
 Verificado en Chrome del usuario con copia temporal aislada y PostgreSQL local: crear/confirmar orden, recepción parcial, factura, abono, gasto vinculado, bloqueo de edición, cuentas por pagar agrupadas, anulación y diseño de impresión. Los reemplazos de autenticación y catálogo de esa copia temporal no forman parte del repositorio.
+
+### Costo vigente por producto
+
+El saldo inicial y los conteos aplicados antes de activar el inventario permiten capturar el costo unitario con impuestos y su moneda (MXN o USD), con hasta seis decimales. Es un costo por producto: debe coincidir al cargar el mismo producto en varios almacenes. Se conserva por separado como costo inicial.
+
+Al registrar una recepción, el costo vigente se obtiene de la última recepción no anulada de una orden confirmada que contenga ese producto. Se ordenan por fecha de recepción, fecha de registro e identificador; por eso cargar una recepción con fecha anterior no sustituye una más reciente. Borradores, confirmaciones, facturas, pagos, devoluciones y movimientos manuales posteriores no cambian el costo. La actualización ocurre en la misma transacción que la recepción, incluso antes de activar el inventario.
+
+Anular una recepción recalcula el costo a partir de las recepciones vigentes; sin ellas, restaura el costo inicial. Se guarda y muestra la moneda original, sin conversión. La migración recupera costos de recepciones existentes; los productos sin compras recibidas ni costo inicial permanecen sin costo, pues no se infiere del precio de venta.

@@ -8,6 +8,7 @@ import type { PurchaseView } from '~/types/purchases'
 import type { PurchaseCommand, PurchaseDraft } from '#shared/schemas/purchase'
 import { usePrisma } from './prisma'
 import { receiveInventory, voidReceiptInventory } from './inventory'
+import { refreshProductCosts } from './product-costs'
 import { getSiigoCustomerDetail } from './siigo-customer-detail'
 import { getProductDetail } from './siigo-products'
 import { upsertSiigoProduct } from './siigo-persistence'
@@ -131,10 +132,13 @@ export async function mutatePurchase(id: string, input: PurchaseCommand, user: A
           assertReceipt(row.items, row.receipts, c.items)
           const receipt = await tx.purchaseReceipt.create({ data: { orderId: id, date: date(c.date), createdBy: user.email, items: { create: c.items } } })
           await receiveInventory(tx, receipt.id, c.warehouseId, user)
+          await refreshProductCosts(tx, row.items.filter(i => c.items.some(l => l.itemId === i.id)).map(i => i.productId))
         } else if (c.action === 'voidReceipt') {
           purchaseAssert(row.receipts.some(r => r.id === c.id && !r.voidedAt), 'Recepción no vigente.')
           await voidReceiptInventory(tx, c.id, c.reason, user)
           await tx.purchaseReceipt.update({ where: { id: c.id }, data: { voidedAt: new Date(), voidReason: c.reason } })
+          const receipt = row.receipts.find(r => r.id === c.id)!
+          await refreshProductCosts(tx, row.items.filter(i => receipt.items.some(l => l.itemId === i.id)).map(i => i.productId))
         } else if (c.action === 'invoice' || c.action === 'editInvoice') {
           purchaseAssert(c.dueDate >= c.date, 'Vencimiento anterior a fecha de factura.')
           const invoiceId = c.action === 'editInvoice' ? c.id : undefined

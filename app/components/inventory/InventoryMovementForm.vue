@@ -6,20 +6,24 @@ import { mexicoToday } from '~/utils/datetime'
 
 const props = defineProps<{ warehouses: InventoryWarehouse[], activated: boolean, admin: boolean, busy: boolean, source?: InventoryMovement }>()
 const emit = defineEmits<{ submit: [command: InventoryCommand['command']] }>()
-const form = reactive({ type: props.activated ? 'entrada' : 'inicial', warehouseId: props.source?.lines[0]?.warehouseId ?? '', destinationId: '', date: mexicoToday(), reason: '', lines: [] as Array<{ productId: string, quantity: string }> })
+const form = reactive({ type: props.activated ? 'entrada' : 'inicial', warehouseId: props.source?.lines[0]?.warehouseId ?? '', destinationId: '', date: mexicoToday(), reason: '', lines: [] as Array<{ productId: string, quantity: string, unitCost?: string, costCurrency?: 'MXN' | 'USD' }> })
 const selected = shallowRef('')
 const requestFetch = useRequestFetch()
-const { data: products, status, error, refresh } = await useAsyncData('inventory-movement-products', () =>
-  fetchAllPages<InventoryProduct>('/api/inventory/products', {}, 100, requestFetch)
+// Keep setup synchronous so opening the modal never waits for the catalogue.
+const { data: products, status, error, refresh } = useAsyncData('inventory-movement-products', () =>
+  fetchAllPages<InventoryProduct>('/api/inventory/products', { controlledOnly: 'true' }, 100, requestFetch),
+{ lazy: true, immediate: !props.source }
 )
+const loadingProducts = computed(() => !props.source && status.value === 'pending')
 const enabledProducts = computed(() => (products.value ?? []).filter(p => p.enabled))
 const availableProducts = computed(() => enabledProducts.value.filter(p => !form.lines.some(l => l.productId === p.id)))
 const items = computed(() => props.source ? props.source.lines.map(l => ({ label: `${l.productCode} · ${l.productName}`, value: l.productId })) : enabledProducts.value.map(p => ({ label: `${p.code} · ${p.name}`, value: p.id })))
 const labels = reactive<Record<string, string>>({})
 function add() {
-  if (!selected.value || props.busy || (!props.source && error.value) || form.lines.some(l => l.productId === selected.value)) return
+  if (!selected.value || props.busy || (!props.source && (error.value || loadingProducts.value)) || form.lines.some(l => l.productId === selected.value)) return
   labels[selected.value] = items.value.find(p => p.value === selected.value)?.label ?? selected.value
-  form.lines.push({ productId: selected.value, quantity: '' })
+  const product = enabledProducts.value.find(p => p.id === selected.value)
+  form.lines.push({ productId: selected.value, quantity: '', unitCost: product?.initialUnitCost ?? undefined, costCurrency: (product?.initialCostCurrency as 'MXN' | 'USD') ?? 'MXN' })
   selected.value = ''
 }
 function submit() {
@@ -86,17 +90,20 @@ const warehouseOptions = computed(() => props.warehouses.filter(w => w.active).m
             v-model="selected"
             :products="availableProducts"
             aria-label="Producto"
-            :loading="status === 'pending'"
-            :disabled="busy || Boolean(error)"
+            :loading="loadingProducts"
+            :disabled="busy || loadingProducts || Boolean(error)"
           />
         </UFormField>
         <UButton
           label="Agregar producto"
           icon="i-lucide-plus"
-          :disabled="!selected || busy || (!source && Boolean(error))"
+          :disabled="!selected || busy || (!source && (loadingProducts || Boolean(error)))"
           @click="add"
         />
       </div>
+      <p v-if="loadingProducts" role="status" class="text-sm text-muted">
+        Cargando productos…
+      </p>
       <p v-if="!source && error" role="alert" class="text-sm text-error">
         No se pudieron cargar los productos.
         <UButton
@@ -105,6 +112,9 @@ const warehouseOptions = computed(() => props.warehouses.filter(w => w.active).m
           :disabled="busy"
           @click="refresh()"
         />
+      </p>
+      <p v-if="form.type === 'inicial' && !source" class="text-sm text-muted">
+        Captura el costo unitario con impuestos. Se usará hasta recibir una compra y debe coincidir en todos los almacenes.
       </p>
       <ul class="divide-y divide-default">
         <li v-for="(line, index) in form.lines" :key="line.productId" class="flex flex-wrap items-center gap-3 py-3">
@@ -115,7 +125,33 @@ const warehouseOptions = computed(() => props.warehouses.filter(w => w.active).m
             aria-label="Cantidad"
             required
             class="w-36"
-          /><UButton
+          />
+          <UFormField v-if="form.type === 'inicial' && !source" label="Costo unitario (con impuestos)" required>
+            <UInputNumber
+              :model-value="line.unitCost ? Number(line.unitCost) : undefined"
+              :min="0"
+              :max="999999999"
+              :step="1"
+              :step-snapping="false"
+              :format-options="{ maximumFractionDigits: 6 }"
+              :increment="false"
+              :decrement="false"
+              :disabled="busy"
+              :aria-label="`Costo unitario de ${labels[line.productId]}`"
+              placeholder="0.00"
+              class="w-44"
+              @update:model-value="line.unitCost = $event === undefined ? undefined : String($event)"
+            />
+          </UFormField>
+          <UFormField v-if="form.type === 'inicial' && !source" label="Moneda">
+            <USelect
+              v-model="line.costCurrency"
+              :items="['MXN', 'USD']"
+              :disabled="busy"
+              :aria-label="`Moneda de ${labels[line.productId]}`"
+            />
+          </UFormField>
+          <UButton
             icon="i-lucide-x"
             aria-label="Quitar producto"
             color="neutral"

@@ -7,6 +7,7 @@ import type { InventoryCommand, InventoryQuery } from '#shared/schemas/inventory
 import type { InventoryStock, OrderInventoryView } from '#shared/types/inventory'
 import { mexicoToday } from '#shared/utils/datetime'
 import { usePrisma } from './prisma'
+import { refreshProductCosts } from './product-costs'
 
 type Tx = Prisma.TransactionClient
 const countInclude = { warehouse: { select: { name: true } }, lines: { include: { product: { select: { code: true, name: true } } }, orderBy: { productId: 'asc' as const } } } satisfies Prisma.InventoryCountInclude
@@ -231,7 +232,9 @@ async function mutate(tx: Tx, input: InventoryCommand, user: AppUser) {
       deltas.push({ warehouseId: c.warehouseId, productId: l.productId, delta: d(l.quantity).mul(['salida', 'traspaso'].includes(c.type) ? -1 : 1).toString() })
       if (c.type === 'traspaso') deltas.push({ warehouseId: c.destinationId!, productId: l.productId, delta: l.quantity })
     }
-    return postInventoryMovement(tx, { type: c.type, originKey: input.requestId, date: c.date, reason: c.reason }, deltas, user)
+    const movement = await postInventoryMovement(tx, { type: c.type, originKey: input.requestId, date: c.date, reason: c.reason }, deltas, user)
+    if (c.type === 'inicial') await refreshProductCosts(tx, c.lines.map(l => l.productId), c.lines)
+    return movement
   }
   if (c.action === 'countCreate') {
     inventoryAssert((await tx.inventoryWarehouse.findUnique({ where: { id: c.warehouseId } }))?.active, 'Selecciona un almacén activo.')
@@ -256,15 +259,17 @@ async function mutate(tx: Tx, input: InventoryCommand, user: AppUser) {
   } else if (c.action === 'countEdit') {
     inventoryAssert(count.status === 'borrador', 'Solo puedes editar conteos en borrador.')
     inventoryAssert(new Set(c.lines.map(l => l.productId)).size === c.lines.length && c.lines.every(l => count.lines.some(i => i.productId === l.productId)), 'Partidas inválidas o repetidas.')
-    for (const l of c.lines) await tx.inventoryCountLine.update({ where: { countId_productId: { countId: c.id, productId: l.productId } }, data: { counted: l.counted } })
+    for (const l of c.lines) await tx.inventoryCountLine.update({ where: { countId_productId: { countId: c.id, productId: l.productId } }, data: { counted: l.counted, ...(l.unitCost ? { unitCost: l.unitCost, costCurrency: l.costCurrency ?? 'MXN' } : {}) } })
   } else if (c.action === 'countRefresh') {
     await lockInventoryBalances(tx, count.lines.map(l => ({ warehouseId: count.warehouseId, productId: l.productId })))
     for (const l of count.lines) {
       const b = await tx.inventoryBalance.findUniqueOrThrow({ where: { warehouseId_productId: { warehouseId: count.warehouseId, productId: l.productId } } })
       if (b.version !== l.baseVersion) await tx.inventoryCountLine.update({ where: { countId_productId: { countId: c.id, productId: l.productId } }, data: { baseVersion: b.version, expected: b.quantity, counted: null } })
     }
-  } else if (c.action === 'countSubmit') inventoryAssert(count.status === 'borrador' && count.lines.length > 0 && count.lines.every(l => l.counted !== null), 'Agrega productos y captura todas las cantidades antes de enviar.')
-  else if (c.action === 'countApply') {
+  } else if (c.action === 'countSubmit') {
+    if (!settings.enabledAt) inventoryAssert(count.lines.every(l => l.counted !== null && (d(l.counted.toString()).isZero() || l.unitCost !== null)), 'Captura el costo unitario de los productos del conteo inicial.')
+    inventoryAssert(count.status === 'borrador' && count.lines.length > 0 && count.lines.every(l => l.counted !== null), 'Agrega productos y captura todas las cantidades antes de enviar.')
+  } else if (c.action === 'countApply') {
     inventoryAssert(count.status === 'pendiente', 'Envía el conteo antes de aprobarlo.')
     await lockInventoryBalances(tx, count.lines.map(l => ({ warehouseId: count.warehouseId, productId: l.productId })))
     const deltas: Delta[] = []
@@ -274,6 +279,10 @@ async function mutate(tx: Tx, input: InventoryCommand, user: AppUser) {
       deltas.push({ warehouseId: count.warehouseId, productId: l.productId, delta: d(l.counted.toString()).minus(b.quantity.toString()).toString() })
     }
     const movement = await postInventoryMovement(tx, { type: settings.enabledAt ? 'ajuste' : 'inicial', originKey: `count:${c.id}`, date: count.date.toISOString().slice(0, 10), reason: count.reason }, deltas, user)
+    if (!settings.enabledAt) {
+      const initialLines = count.lines.filter(l => d(l.counted!.toString()).gt(0))
+      await refreshProductCosts(tx, initialLines.map(l => l.productId), initialLines.map(l => ({ productId: l.productId, unitCost: l.unitCost?.toString(), costCurrency: l.costCurrency ?? undefined })))
+    }
     await tx.inventoryCount.update({ where: { id: c.id }, data: { movementId: movement?.id } })
   }
   return countView(await tx.inventoryCount.update({ where: { id: c.id }, data: { version: { increment: 1 }, status: c.action === 'countApply' ? 'aplicado' : c.action === 'countCancel' ? 'cancelado' : c.action === 'countSubmit' ? 'pendiente' : 'borrador' }, include: countInclude }))
@@ -303,7 +312,7 @@ function pagination(q: InventoryQuery, total: number) {
 export function stockView(b: Prisma.InventoryBalanceGetPayload<{
   include: { product: true, warehouse: true } }>): InventoryStock {
   const available = d(b.quantity.toString()).minus(b.reserved.toString())
-  return { productId: b.productId, warehouseId: b.warehouseId, code: b.product.code, name: b.product.name, unit: b.product.unitName ?? b.product.unitCode, warehouse: b.warehouse.name, quantity: b.quantity.toString(), reserved: b.reserved.toString(), available: available.toString(), minimum: b.minimum.toString(), low: available.lt(b.minimum.toString()), version: b.version }
+  return { productId: b.productId, warehouseId: b.warehouseId, code: b.product.code, name: b.product.name, unit: b.product.unitName ?? b.product.unitCode, warehouse: b.warehouse.name, quantity: b.quantity.toString(), reserved: b.reserved.toString(), available: available.toString(), minimum: b.minimum.toString(), low: available.lt(b.minimum.toString()), version: b.version, unitCost: b.product.unitCost?.toString() ?? null, costCurrency: b.product.costCurrency }
 }
 export async function listInventory(resource: string, q: InventoryQuery) {
   const db = usePrisma()
@@ -318,7 +327,7 @@ export async function listInventory(resource: string, q: InventoryQuery) {
   if (resource === 'products') {
     const where = { ...productFilter, ...(q.controlledOnly === 'true' ? { inventoryProduct: { enabled: true }, AND: [{ OR: [{ active: true }, { active: null }] }] } : {}) }
     const [rows, total] = await Promise.all([db.siigoProduct.findMany({ where, include: { inventoryProduct: true }, orderBy: [{ code: 'asc' }, { id: 'asc' }], skip, take: q.page_size }), db.siigoProduct.count({ where })])
-    return { results: rows.map(p => ({ id: p.id, code: p.code, name: p.name, reference: p.reference ?? undefined, additional_fields: { barcode: p.barcode ?? undefined }, unit: p.unitName ?? p.unitCode, enabled: p.inventoryProduct?.enabled ?? false, version: p.inventoryProduct?.version ?? 1 })), pagination: pagination(q, total) }
+    return { results: rows.map(p => ({ id: p.id, code: p.code, name: p.name, reference: p.reference ?? undefined, additional_fields: { barcode: p.barcode ?? undefined }, unit: p.unitName ?? p.unitCode, initialUnitCost: p.initialUnitCost?.toString() ?? null, initialCostCurrency: p.initialCostCurrency, enabled: p.inventoryProduct?.enabled ?? false, version: p.inventoryProduct?.version ?? 1 })), pagination: pagination(q, total) }
   }
   if (resource === 'stocks') {
     const where = { ...(q.warehouseId ? { warehouseId: q.warehouseId } : {}), ...(q.productId ? { productId: q.productId } : {}), product: { ...productFilter, inventoryProduct: { enabled: true } } }

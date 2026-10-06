@@ -76,6 +76,10 @@ model SiigoProduct {
   description       String?
   barcode           String?
   brand             String?
+  initialUnitCost   Decimal?  @map("initial_unit_cost") @db.Decimal(20, 6)
+  initialCostCurrency String? @map("initial_cost_currency") @db.VarChar(3)
+  unitCost          Decimal?  @map("unit_cost") @db.Decimal(20, 6)
+  costCurrency      String?   @map("cost_currency") @db.VarChar(3)
   availableQuantity Decimal?  @map("available_quantity") @db.Decimal(20, 6)
   siigoCreatedAt    DateTime? @map("siigo_created_at") @db.Timestamptz(6)
   siigoUpdatedAt    DateTime? @map("siigo_updated_at") @db.Timestamptz(6)
@@ -762,6 +766,8 @@ model InventoryCountLine {
   productId   String         @map("product_id") @db.Uuid
   baseVersion Int            @map("base_version")
   expected    Decimal        @db.Decimal(20, 6)
+  unitCost    Decimal?       @map("unit_cost") @db.Decimal(20, 6)
+  costCurrency String?       @map("cost_currency") @db.VarChar(3)
   counted     Decimal?       @db.Decimal(20, 6)
   count       InventoryCount @relation(fields: [countId], references: [id], onDelete: Restrict)
   product     SiigoProduct   @relation(fields: [productId], references: [id], onDelete: Restrict)
