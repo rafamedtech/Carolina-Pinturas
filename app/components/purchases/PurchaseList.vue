@@ -12,6 +12,11 @@ const UButton = resolveComponent('UButton')
 const UBadge = resolveComponent('UBadge')
 const NuxtLink = resolveComponent('NuxtLink')
 const sorting = ref<SortingState>([])
+const isHydrated = shallowRef(false)
+
+onMounted(() => {
+  isHydrated.value = true
+})
 
 const search = shallowRef('')
 const status = shallowRef('all')
@@ -28,7 +33,11 @@ const query = computed(() => ({
   dateFrom: dateRange.value?.start && dateRange.value?.end ? dateRange.value.start.toString() : undefined,
   dateTo: dateRange.value?.start && dateRange.value?.end ? dateRange.value.end.toString() : undefined
 }))
-const { data, error, status: loading, refresh } = await useFetch<{ results: PurchaseView[] }>('/api/purchases', { query })
+const { data, error, status: requestStatus, refresh } = await useFetch<{ results: PurchaseView[] }>('/api/purchases', {
+  lazy: true,
+  query
+})
+const loading = computed(() => requestStatus.value === 'idle' || (isHydrated.value && requestStatus.value === 'pending'))
 const purchases = computed(() => [...(data.value?.results ?? [])])
 
 const tableMeta: TableMeta<PurchaseView> = {
@@ -142,7 +151,7 @@ const columns: TableColumn<PurchaseView>[] = [{
             filename="compras"
             :columns="csvColumns"
             :rows="purchases"
-            :disabled="loading === 'pending'"
+            :disabled="loading"
           />
           <UButton
             to="/compras/cuentas-por-pagar"
@@ -160,7 +169,7 @@ const columns: TableColumn<PurchaseView>[] = [{
             variant="outline"
             aria-label="Actualizar"
             :ui="{ label: 'hidden sm:inline' }"
-            :loading="loading === 'pending'"
+            :loading="loading"
             @click="refresh()"
           />
           <UButton
@@ -186,9 +195,18 @@ const columns: TableColumn<PurchaseView>[] = [{
         class="hidden w-full sm:block"
       />
       <UAlert v-if="error" title="No se pudieron cargar las compras." color="error" />
-      <p v-else-if="loading === 'pending'">
-        Cargando compras…
-      </p>
+      <div
+        v-else-if="loading"
+        class="flex shrink-0 flex-col items-center justify-center gap-3 py-16"
+        role="status"
+        aria-busy="true"
+      >
+        <UIcon name="i-lucide-loader-circle" class="size-8 animate-spin text-primary" />
+        <p class="text-sm text-muted">
+          Cargando
+        </p>
+        <span class="sr-only">Cargando compras…</span>
+      </div>
       <p v-else-if="!data?.results.length" class="py-10 text-center text-muted">
         Sin compras para estos filtros.
       </p>
