@@ -178,11 +178,17 @@ const columns: TableColumn<ExpenseRecord>[] = [{
     </div>
   </div>
 
-  <AppTableSkeleton
+  <div
     v-if="loading"
-    :cols="columns.length"
-    class="hidden shrink-0 md:block"
-  />
+    class="hidden shrink-0 flex-col items-center justify-center gap-3 rounded-lg border border-default py-16 md:flex"
+    role="status"
+    aria-busy="true"
+  >
+    <UIcon name="i-lucide-loader-circle" class="size-8 animate-spin text-primary" />
+    <p class="text-sm text-muted">
+      Cargando
+    </p>
+  </div>
 
   <UTable
     v-else
