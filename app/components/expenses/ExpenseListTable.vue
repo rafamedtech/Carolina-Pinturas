@@ -180,7 +180,7 @@ const columns: TableColumn<ExpenseRecord>[] = [{
 
   <div
     v-if="loading"
-    class="hidden shrink-0 flex-col items-center justify-center gap-3 rounded-lg border border-default py-16 md:flex"
+    class="hidden shrink-0 flex-col items-center justify-center gap-3 py-16 md:flex"
     role="status"
     aria-busy="true"
   >
