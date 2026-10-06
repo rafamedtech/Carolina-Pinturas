@@ -15,13 +15,14 @@ interface PageResponse<T> {
 export async function fetchAllPages<T>(
   url: string,
   query: Record<string, unknown> = {},
-  pageSize = 100
+  pageSize = 100,
+  fetcher: <R>(url: string, options: { query: Record<string, unknown> }) => Promise<R> = $fetch
 ): Promise<T[]> {
   const rows: T[] = []
   let page = 1
 
   while (true) {
-    const response = await $fetch<PageResponse<T>>(url, {
+    const response = await fetcher<PageResponse<T>>(url, {
       query: { ...query, page, page_size: pageSize }
     })
     const pageRows = response.results ?? []

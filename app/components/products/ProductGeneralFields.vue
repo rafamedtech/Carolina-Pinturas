@@ -59,7 +59,7 @@ const types = [{ label: 'Producto', value: 'Product' }, { label: 'Servicio', val
       </UFormField>
       <div class="flex flex-wrap items-center gap-4">
         <USwitch v-model="model.active" label="Activo" />
-        <USwitch v-model="model.stock_control" label="Control de inventario" />
+        <USwitch v-model="model.stock_control" label="Control de inventario en Siigo" />
       </div>
       <UFormField label="Descripción" name="description" class="sm:col-span-2">
         <UTextarea v-model="model.description" maxlength="2500" class="w-full" />

@@ -18,7 +18,8 @@
     "lint:fix": "eslint . --fix",
     "test": "vitest run",
     "typecheck": "nuxt typecheck",
-    "test:purchases-db": "vitest run --config vitest.purchases.config.ts"
+    "test:purchases-db": "vitest run --config vitest.purchases.config.ts",
+    "test:inventory-db": "vitest run --config vitest.inventory.config.ts"
   },
   "dependencies": {
     "@iconify-json/lucide": "^1.2.114",

@@ -88,6 +88,11 @@ model SiigoProduct {
   taxes      SiigoProductTax[]
   warehouses SiigoProductWarehouse[]
   components SiigoProductComponent[]
+  inventoryProduct InventoryProduct?
+  inventoryBalances InventoryBalance[]
+  inventoryReservations InventoryReservation[]
+  inventoryLines InventoryMovementLine[]
+  inventoryCountLines InventoryCountLine[]
   orderItems SalesOrderItem[]
   purchaseItems PurchaseItem[]
 
@@ -271,6 +276,11 @@ model SalesOrder {
   createdByEmail             String    @map("created_by_email")
   createdByRole              String    @map("created_by_role") @db.VarChar(32)
   updatedByEmail             String    @map("updated_by_email")
+  warehouseId                String? @map("warehouse_id") @db.Uuid
+  inventoryManaged           Boolean @default(false) @map("inventory_managed")
+  warehouse                  InventoryWarehouse? @relation(fields: [warehouseId], references: [id], onDelete: Restrict)
+  inventoryReservations      InventoryReservation[]
+  inventoryMovements         InventoryMovement[]
   version                    Int       @default(1)
   createdAt                  DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt                  DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
@@ -284,6 +294,7 @@ model SalesOrder {
   siigoInvoice     SalesOrderSiigoInvoice?
   payments         SalesOrderPayment[]
 
+  @@index([warehouseId], map: "sales_orders_warehouse_id_idx")
   @@index([statusKey, orderDate])
   @@index([customerId, orderDate])
   @@index([vendedorEmail])
@@ -531,6 +542,9 @@ model PurchaseItem {
 }
 
 model PurchaseReceipt {
+  warehouseId String? @map("warehouse_id") @db.Uuid
+  warehouse InventoryWarehouse? @relation(fields: [warehouseId], references: [id], onDelete: Restrict)
+  inventoryMovements InventoryMovement[]
   id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   orderId String @map("order_id") @db.Uuid
   date DateTime @db.Date
@@ -541,6 +555,7 @@ model PurchaseReceipt {
   order PurchaseOrder @relation(fields: [orderId], references: [id], onDelete: Restrict)
   items PurchaseReceiptItem[]
   @@index([orderId])
+  @@index([warehouseId], map: "purchase_receipts_warehouse_id_idx")
   @@map("purchase_receipts")
 }
 
@@ -602,4 +617,170 @@ model PurchaseEvent {
   order PurchaseOrder @relation(fields: [orderId], references: [id], onDelete: Restrict)
   @@index([orderId, createdAt])
   @@map("purchase_events")
+}
+
+model InventorySettings {
+  id        Int       @id @default(1)
+  enabledAt DateTime? @map("enabled_at") @db.Timestamptz(6)
+  version   Int       @default(1)
+
+  @@map("inventory_settings")
+}
+
+model InventoryWarehouse {
+  id           String                  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  code         String                  @unique @db.VarChar(64)
+  name         String                  @db.VarChar(200)
+  address      String?
+  active       Boolean                 @default(true)
+  version      Int                     @default(1)
+  createdAt    DateTime                @default(now()) @map("created_at") @db.Timestamptz(6)
+  balances     InventoryBalance[]
+  reservations InventoryReservation[]
+  lines        InventoryMovementLine[]
+  counts       InventoryCount[]
+  orders       SalesOrder[]
+  receipts     PurchaseReceipt[]
+
+  @@map("inventory_warehouses")
+}
+
+model InventoryProduct {
+  productId String       @id @map("product_id") @db.Uuid
+  enabled   Boolean
+  version   Int          @default(1)
+  product   SiigoProduct @relation(fields: [productId], references: [id], onDelete: Restrict)
+
+  @@map("inventory_products")
+}
+
+model InventoryBalance {
+  warehouseId String             @map("warehouse_id") @db.Uuid
+  productId   String             @map("product_id") @db.Uuid
+  quantity    Decimal            @default(0) @db.Decimal(20, 6)
+  reserved    Decimal            @default(0) @db.Decimal(20, 6)
+  minimum     Decimal            @default(0) @db.Decimal(20, 6)
+  version     Int                @default(1)
+  warehouse   InventoryWarehouse @relation(fields: [warehouseId], references: [id], onDelete: Restrict)
+  product     SiigoProduct       @relation(fields: [productId], references: [id], onDelete: Restrict)
+
+  @@id([warehouseId, productId])
+  @@index([productId])
+  @@map("inventory_balances")
+}
+
+model InventoryReservation {
+  orderId     String             @map("order_id") @db.Uuid
+  productId   String             @map("product_id") @db.Uuid
+  warehouseId String             @map("warehouse_id") @db.Uuid
+  quantity    Decimal            @db.Decimal(20, 6)
+  order       SalesOrder         @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  product     SiigoProduct       @relation(fields: [productId], references: [id], onDelete: Restrict)
+  warehouse   InventoryWarehouse @relation(fields: [warehouseId], references: [id], onDelete: Restrict)
+
+  @@id([orderId, productId])
+  @@index([warehouseId, productId])
+  @@index([productId])
+  @@map("inventory_reservations")
+}
+
+model InventoryMovement {
+  id               String                  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  folio            Int                     @unique @default(autoincrement())
+  type             String                  @db.VarChar(32)
+  originKey        String                  @unique @map("origin_key")
+  date             DateTime                @db.Date
+  reason           String
+  actorId          String                  @map("actor_id") @db.Uuid
+  actorName        String                  @map("actor_name")
+  actorEmail       String                  @map("actor_email")
+  actorRole        String                  @map("actor_role")
+  orderId          String?                 @map("order_id") @db.Uuid
+  receiptId        String?                 @map("receipt_id") @db.Uuid
+  reversalOfId     String?                 @unique @map("reversal_of_id") @db.Uuid
+  sourceMovementId String?                 @map("source_movement_id") @db.Uuid
+  createdAt        DateTime                @default(now()) @map("created_at") @db.Timestamptz(6)
+  order            SalesOrder?             @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  receipt          PurchaseReceipt?        @relation(fields: [receiptId], references: [id], onDelete: Restrict)
+  reversalOf       InventoryMovement?      @relation("inventory_reversal", fields: [reversalOfId], references: [id], onDelete: Restrict)
+  reversal         InventoryMovement?      @relation("inventory_reversal")
+  sourceMovement   InventoryMovement?      @relation("inventory_returns", fields: [sourceMovementId], references: [id], onDelete: Restrict)
+  returns          InventoryMovement[]     @relation("inventory_returns")
+  lines            InventoryMovementLine[]
+  counts           InventoryCount[]
+
+  @@index([orderId])
+  @@index([receiptId])
+  @@index([sourceMovementId])
+  @@index([date, folio])
+  @@map("inventory_movements")
+}
+
+model InventoryMovementLine {
+  id            String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  movementId    String             @map("movement_id") @db.Uuid
+  warehouseId   String             @map("warehouse_id") @db.Uuid
+  productId     String             @map("product_id") @db.Uuid
+  delta         Decimal            @db.Decimal(20, 6)
+  balanceAfter  Decimal            @map("balance_after") @db.Decimal(20, 6)
+  productCode   String             @map("product_code")
+  productName   String             @map("product_name")
+  unitCode      String?            @map("unit_code")
+  unitName      String?            @map("unit_name")
+  warehouseName String             @map("warehouse_name")
+  movement      InventoryMovement  @relation(fields: [movementId], references: [id], onDelete: Restrict)
+  warehouse     InventoryWarehouse @relation(fields: [warehouseId], references: [id], onDelete: Restrict)
+  product       SiigoProduct       @relation(fields: [productId], references: [id], onDelete: Restrict)
+
+  @@unique([movementId, warehouseId, productId])
+  @@index([warehouseId, productId, movementId])
+  @@index([productId])
+  @@map("inventory_movement_lines")
+}
+
+model InventoryCount {
+  id          String               @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  warehouseId String               @map("warehouse_id") @db.Uuid
+  status      String               @default("borrador") @db.VarChar(32)
+  version     Int                  @default(1)
+  date        DateTime             @db.Date
+  reason      String
+  createdBy   String               @map("created_by")
+  movementId  String?              @map("movement_id") @db.Uuid
+  createdAt   DateTime             @default(now()) @map("created_at") @db.Timestamptz(6)
+  warehouse   InventoryWarehouse   @relation(fields: [warehouseId], references: [id], onDelete: Restrict)
+  movement    InventoryMovement?   @relation(fields: [movementId], references: [id], onDelete: Restrict)
+  lines       InventoryCountLine[]
+
+  @@index([warehouseId, status])
+  @@index([movementId])
+  @@map("inventory_counts")
+}
+
+model InventoryCountLine {
+  countId     String         @map("count_id") @db.Uuid
+  productId   String         @map("product_id") @db.Uuid
+  baseVersion Int            @map("base_version")
+  expected    Decimal        @db.Decimal(20, 6)
+  counted     Decimal?       @db.Decimal(20, 6)
+  count       InventoryCount @relation(fields: [countId], references: [id], onDelete: Restrict)
+  product     SiigoProduct   @relation(fields: [productId], references: [id], onDelete: Restrict)
+
+  @@id([countId, productId])
+  @@index([productId])
+  @@map("inventory_count_lines")
+}
+
+model InventoryEvent {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  requestId   String   @unique @map("request_id") @db.Uuid
+  requestHash String   @map("request_hash")
+  action      String
+  actorId     String   @map("actor_id") @db.Uuid
+  actorEmail  String   @map("actor_email")
+  detail      Json     @db.JsonB
+  result      Json     @db.JsonB
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@map("inventory_events")
 }

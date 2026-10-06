@@ -40,6 +40,12 @@ const allLinks: AppNavigationItem[] = [{
     open.value = false
   }
 }, {
+  label: 'Inventario',
+  icon: 'i-lucide-warehouse',
+  to: '/inventario',
+  roles: managementRoles,
+  onSelect: () => { open.value = false }
+}, {
   label: 'Clientes',
   icon: 'i-lucide-users',
   to: '/clientes',

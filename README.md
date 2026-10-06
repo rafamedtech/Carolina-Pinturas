@@ -145,3 +145,66 @@ La revisión visual de la adaptación está documentada en [`design-qa.md`](./de
 4. No expongas ninguna URL de PostgreSQL como variable `NUXT_PUBLIC_*`.
 5. Usa el dominio propio una vez que la vista previa haya validado el inicio de
    sesión, la creación de pedidos y los cambios de estado.
+
+## Inventario interno y almacenes
+
+El módulo `/inventario` lleva existencias exclusivamente en PostgreSQL. Reutiliza
+los productos del catálogo local, pero sus almacenes, saldos y configuración de
+control son independientes de las cantidades y de `stock_control` en Siigo.
+Las operaciones del módulo no llaman a Siigo ni crean documentos fiscales.
+Los flujos existentes de catálogo, compras y ventas conservan sus integraciones
+actuales; únicamente sus efectos sobre inventario se registran localmente.
+
+Las consultas existentes del catálogo de productos guardan también sus datos
+generales en PostgreSQL, incluso si aún no se han usado en pedidos o compras.
+Así quedan disponibles en el buscador local de inventario. Para preparar por
+primera vez el catálogo completo, abre Productos y usa Actualizar. Se conservan las
+configuraciones internas y los saldos; las cantidades de Siigo no se importan al
+inventario. Los servicios, productos inactivos y productos sin control interno
+no son seleccionables en conteos.
+
+Para comenzar, un administrador crea los almacenes, revisa los productos con
+control interno y carga existencias mediante saldos iniciales o conteos físicos.
+Después activa el módulo desde Inventario. No se copian existencias de Siigo ni
+se reconstruyen documentos históricos. Los pedidos creados antes de activar
+conservan su operación histórica. Las nuevas recepciones de compra requieren un
+almacén y agregan existencias incluso si la orden de compra es anterior al corte.
+
+Confirmar un pedido nuevo reserva existencias; surtirlo consume la reserva y
+registra una salida. Las ventas de mostrador guardadas como entregadas descuentan
+inmediatamente. No se permiten faltantes ni saldos negativos. Cancelar libera
+reservas; las unidades ya surtidas regresan solamente mediante una devolución
+física vinculada al movimiento, que puede ser parcial. Cada pedido usa un almacén;
+cada recepción de compra puede usar un almacén distinto.
+
+Admin configura almacenes, control por producto, mínimos, activación, saldos
+iniciales, reversiones y aprobación de ajustes. Mostrador captura movimientos,
+traspasos, devoluciones y conteos. Vendedor consulta existencias, reservas y
+kardex. Los roles repartidor e igualaciones mantienen sus permisos de pedidos.
+Los conteos nuevos empiezan vacíos: se buscan y agregan los productos que se van
+a contar, uno por uno. En borrador se pueden quitar partidas; solo los productos
+seleccionados se ajustan al aplicar el conteo.
+Los conteos deben guardarse, enviarse y aprobarse; si cambió un saldo, se actualiza
+la base y se vuelven a contar las partidas afectadas. Un movimiento aplicado no se
+edita ni elimina: una corrección genera un movimiento inverso auditable.
+
+Las consultas y mutaciones están bajo `/api/inventory`; las cantidades del módulo
+se transportan como cadenas decimales, con hasta seis decimales. Las tablas tienen
+RLS y acceso directo revocado para clientes de Supabase. El saldo se concilia con
+el kardex y las reservas activas. Se trabaja en la unidad del producto, sin costeo,
+valoración, lotes, caducidades, ubicaciones, conversiones, despiece de kits o surtido
+parcial de pedidos.
+
+### Pruebas de inventario con PostgreSQL real
+
+```bash
+pnpm db:start
+INVENTORY_TEST_DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:55322/postgres pnpm test:inventory-db
+```
+
+Esta suite requiere una conexión **local** con permiso de crear bases: crea una
+base temporal con nombre `inventory_test_*`, aplica el esquema y las restricciones,
+ejecuta las pruebas y elimina esa base al terminar. No toma `DATABASE_URL`, no usa
+credenciales de Siigo y no modifica los datos de la aplicación. Cubre concurrencia,
+idempotencia, recepción/anulación, reservas, surtido, devoluciones, traspasos,
+conteos, permisos y reconstrucción del saldo desde el kardex.

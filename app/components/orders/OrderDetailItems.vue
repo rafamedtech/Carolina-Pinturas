@@ -4,13 +4,14 @@ import { h, resolveComponent } from 'vue'
 import type { TableColumn } from '@nuxt/ui'
 import type { SalesOrderDetail, SalesOrderItem } from '~/types/orders'
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   items: readonly SalesOrderItem[]
   currencyCode: string
   orderId: string
   version: number
   editable?: boolean
-}>()
+  quantityEditable?: boolean
+}>(), { quantityEditable: true })
 
 const emit = defineEmits<{
   updated: [order: SalesOrderDetail]
@@ -214,7 +215,7 @@ const columns: TableColumn<SalesOrderItem>[] = [{
   header: () => h('div', { class: 'text-right' }, 'Cantidad'),
   cell: ({ row }) => h('div', { class: 'flex items-center justify-end gap-1' }, [
     h('span', String(row.original.quantity)),
-    props.editable
+    props.editable && props.quantityEditable !== false
       ? h(UButton, {
           'icon': 'i-lucide-pencil',
           'color': 'neutral',
@@ -317,7 +318,7 @@ const columns: TableColumn<SalesOrderItem>[] = [{
                 {{ item.quantity }} {{ item.unit.name || item.unit.code || '' }}
               </p>
               <UButton
-                v-if="editable"
+                v-if="editable && quantityEditable !== false"
                 icon="i-lucide-pencil"
                 color="neutral"
                 variant="ghost"

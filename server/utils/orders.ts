@@ -1,3 +1,5 @@
+import { randomUUID } from 'node:crypto'
+import { inventoryRequest, inventorySettings, syncOrderInventory, assertOrderInventoryEditable } from './inventory'
 import Decimal from 'decimal.js'
 import type { Prisma, SalesOrder } from '../../generated/prisma/client'
 import type { AppUser, SiigoCustomer, SiigoProduct } from '~/types/siigo'
@@ -30,6 +32,7 @@ import {
 } from './siigo-persistence'
 
 const orderDetailInclude = {
+  inventoryMovements: { where: { type: 'surtido' }, select: { id: true } },
   status: true,
   customer: true,
   repartidor: {
@@ -461,6 +464,9 @@ function detail(order: OrderDetailRecord): SalesOrderDetail {
     taxBreakdown: orderTaxBreakdown(order),
     siigoReference: order.siigoReference,
     registeredInSiigoAt: order.registeredInSiigoAt?.toISOString() || null,
+    warehouseId: order.warehouseId,
+    inventoryManaged: order.inventoryManaged,
+    inventoryDispatched: Boolean(order.inventoryMovements?.length),
     version: order.version,
     vendedor: {
       name: order.vendedorNombre,
@@ -593,9 +599,12 @@ export async function createOrder(
     await upsertSiigoProduct(prisma, product)
   }
 
-  const createdOrderId = await prisma.$transaction(async (tx) => {
+  const createdOrderId = await inventoryRequest({ requestId: input.requestId ?? input.initialPayment?.requestId ?? randomUUID(), command: input }, user, async (tx) => {
+    const settings = await inventorySettings(tx)
     const order = await tx.salesOrder.create({
       data: {
+        warehouseId: input.warehouseId ?? null,
+        inventoryManaged: Boolean(settings.enabledAt),
         statusKey: status.key,
         customerId: customer.id,
         customerNameSnapshot: displayName,
@@ -666,10 +675,11 @@ export async function createOrder(
       }
     })
 
+    await syncOrderInventory(tx, order.id, user)
     return order.id
-  }, ORDER_WRITE_TRANSACTION_OPTIONS)
+  })
 
-  return getOrder(createdOrderId, user)
+  return getOrder(String(createdOrderId), user)
 }
 
 export async function updateOrder(
@@ -761,9 +771,13 @@ export async function updateOrder(
   }
 
   await prisma.$transaction(async (tx) => {
+    await tx.$queryRaw`SELECT id FROM sales_orders WHERE id = ${id}::uuid FOR UPDATE`
+    await inventorySettings(tx)
+    await assertOrderInventoryEditable(tx, id, input.lines, input.warehouseId)
     const result = await tx.salesOrder.updateMany({
       where: { id, version: input.version, statusKey: { not: 'entregado' } },
       data: {
+        ...(input.warehouseId !== undefined ? { warehouseId: input.warehouseId } : {}),
         customerId: customer.id,
         customerNameSnapshot: displayName,
         customerRfcSnapshot: customer.rfc_id || customer.identification || null,
@@ -809,6 +823,7 @@ export async function updateOrder(
         ...line
       }))
     })
+    await syncOrderInventory(tx, id, user)
     await createLinePriceHistory(tx, id, lines, user)
     await tx.salesOrderStatusHistory.create({
       data: {
@@ -1004,6 +1019,7 @@ export async function updateOrderStatus(
   assertStatusPermission(user, input.statusKey)
 
   await prisma.$transaction(async (tx) => {
+    await tx.$queryRaw`SELECT id FROM sales_orders WHERE id = ${id}::uuid FOR UPDATE`
     const order = await tx.salesOrder.findFirst({
       where: {
         id,
@@ -1050,6 +1066,7 @@ export async function updateOrderStatus(
       })
     }
 
+    await syncOrderInventory(tx, id, user, order.statusKey)
     await tx.salesOrderStatusHistory.create({
       data: {
         orderId: id,
@@ -1061,7 +1078,7 @@ export async function updateOrderStatus(
         changedByRole: user.role
       }
     })
-  })
+  }, ORDER_WRITE_TRANSACTION_OPTIONS)
 
   return getOrder(id, user)
 }
@@ -1466,6 +1483,10 @@ export async function updateOrderItemQuantity(
   )
 
   await prisma.$transaction(async (tx) => {
+    await tx.$queryRaw`SELECT id FROM sales_orders WHERE id = ${orderId}::uuid FOR UPDATE`
+    await inventorySettings(tx)
+    const currentItems = await tx.salesOrderItem.findMany({ where: { orderId } })
+    await assertOrderInventoryEditable(tx, orderId, currentItems.map(i => ({ productId: i.productId, quantity: i.id === itemId ? newQuantity.toString() : i.quantity.toString() })))
     await tx.salesOrderItem.update({
       where: { id: itemId },
       data: {
@@ -1503,7 +1524,8 @@ export async function updateOrderItemQuantity(
         statusMessage: 'El pedido cambió mientras se actualizaba. Intenta de nuevo.'
       })
     }
-  })
+    await syncOrderInventory(tx, orderId, user)
+  }, ORDER_WRITE_TRANSACTION_OPTIONS)
 
   return getOrder(orderId, user)
 }

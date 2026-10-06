@@ -1,0 +1,9 @@
+export interface InventoryWarehouse { id: string, code: string, name: string, address: string | null, active: boolean, version: number }
+export interface InventorySettings { enabledAt: string | null, version: number }
+export interface InventoryProduct { id: string, code: string, name: string, reference?: string, additional_fields?: { barcode?: string }, unit: string | null, enabled: boolean, version: number }
+export interface InventoryStock { productId: string, warehouseId: string, code: string, name: string, unit: string | null, warehouse: string, quantity: string, reserved: string, available: string, minimum: string, low: boolean, version: number }
+export interface InventoryLine { id: string, productId: string, warehouseId: string, productCode: string, productName: string, warehouseName: string, unitName: string | null, delta: string, balanceAfter: string }
+export interface InventoryMovement { id: string, folio: number, type: string, date: string, reason: string, actorName: string, actorEmail: string, createdAt: string, originKey: string, orderId: string | null, receiptId: string | null, reversalOfId: string | null, sourceMovementId: string | null, reversal: { id: string } | null, lines: InventoryLine[] }
+export interface InventoryCount { id: string, warehouseId: string, warehouse: { name: string }, status: string, version: number, date: string, reason: string, createdBy: string, movementId: string | null, lines: Array<{ productId: string, baseVersion: number, expected: string, counted: string | null, product: { code: string, name: string } }> }
+export interface InventoryPage<T> { results: T[], pagination: { page: number, pageSize: number, totalResults: number, totalPages: number } }
+export interface OrderInventoryView { managed: boolean, warehouseId: string | null, dispatched: boolean, movements: Array<{ id: string, folio: number, type: string }>, stocks: InventoryStock[] }

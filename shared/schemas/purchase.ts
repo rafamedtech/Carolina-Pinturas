@@ -16,7 +16,7 @@ export const purchaseActionSchema = z.discriminatedUnion('action', [
   z.object({ action: z.literal('edit'), draft: purchaseDraftSchema }),
   z.object({ action: z.literal('confirm') }),
   z.object({ action: z.literal('cancel'), reason }),
-  z.object({ action: z.literal('receive'), date: purchaseDate, items: z.array(z.object({ itemId: z.uuid(), quantity: decimal(6) })).min(1).max(100) }),
+  z.object({ action: z.literal('receive'), warehouseId: z.uuid().optional(), date: purchaseDate, items: z.array(z.object({ itemId: z.uuid(), quantity: decimal(6) })).min(1).max(100) }),
   z.object({ action: z.literal('voidReceipt'), id: z.uuid(), reason }),
   z.object({ action: z.literal('invoice'), ...invoiceFields }),
   z.object({ action: z.literal('editInvoice'), id: z.uuid(), ...invoiceFields }),

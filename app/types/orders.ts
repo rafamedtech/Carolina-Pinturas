@@ -151,6 +151,9 @@ export interface SalesOrderDetail extends SalesOrderListItem {
   }>
   siigoReference: string | null
   registeredInSiigoAt: string | null
+  warehouseId?: string | null
+  inventoryManaged?: boolean
+  inventoryDispatched?: boolean
   version: number
   vendedor: {
     name: string

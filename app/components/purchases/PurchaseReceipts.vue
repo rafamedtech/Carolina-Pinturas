@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import type { InventorySettings } from '#shared/types/inventory'
 import { mexicoToday } from '~/utils/datetime'
 import type { PurchaseView } from '~/types/purchases'
 import { purchaseDateLabel, purchaseQuantity, receiptStatus } from '~/utils/purchaseFormat'
@@ -6,6 +7,8 @@ import { purchaseDateLabel, purchaseQuantity, receiptStatus } from '~/utils/purc
 const props = defineProps<{ order: PurchaseView }>()
 const emit = defineEmits<{ saved: [order: PurchaseView] }>()
 const { busy, error, run } = usePurchaseAction(() => props.order, value => emit('saved', value))
+const { data: inventorySettings } = await useFetch<InventorySettings>('/api/inventory/settings')
+const warehouseId = shallowRef('')
 const date = shallowRef(mexicoToday())
 const quantities = reactive<Record<string, number>>({})
 const formOpen = shallowRef(false)
@@ -24,7 +27,7 @@ function receiveAll() {
 }
 async function receive() {
   const items = Object.entries(quantities).filter(([, quantity]) => quantity > 0).map(([itemId, quantity]) => ({ itemId, quantity }))
-  if (await run({ action: 'receive', date: date.value, items })) {
+  if (await run({ action: 'receive', warehouseId: warehouseId.value || undefined, date: date.value, items })) {
     Object.keys(quantities).forEach(k => quantities[k] = 0)
     formOpen.value = false
   }
@@ -82,6 +85,7 @@ async function voidReceipt(reason: string) {
             @click="receiveAll"
           />
         </div>
+        <InventoryWarehousePicker v-model="warehouseId" :disabled="busy" />
         <ul class="divide-y divide-default rounded-lg border border-default">
           <li
             v-for="item in pendingItems"
@@ -109,7 +113,7 @@ async function voidReceipt(reason: string) {
         <div class="flex flex-col-reverse gap-2 sm:flex-row sm:items-center sm:justify-between">
           <p class="flex items-center gap-1.5 text-xs text-muted">
             <UIcon name="i-lucide-info" class="size-4 shrink-0" />
-            No modifica existencias: actualiza el inventario manualmente en Siigo.
+            {{ inventorySettings?.enabledAt ? 'Esta recepción agrega unidades al almacén interno seleccionado.' : 'El inventario interno todavía no está activado. Esta recepción conservará su comportamiento histórico.' }}
           </p>
           <div class="flex gap-2">
             <UButton
@@ -126,7 +130,7 @@ async function voidReceipt(reason: string) {
               icon="i-lucide-package-check"
               class="flex-1 justify-center sm:flex-none"
               :loading="busy"
-              :disabled="!hasQuantities"
+              :disabled="!hasQuantities || Boolean(inventorySettings?.enabledAt && !warehouseId)"
             />
           </div>
         </div>
@@ -166,6 +170,12 @@ async function voidReceipt(reason: string) {
               @click="voiding = receipt.id"
             />
           </div>
+          <p v-if="receipt.warehouseName" class="mt-2 text-xs text-muted">
+            Almacén interno: {{ receipt.warehouseName }}
+          </p>
+          <p v-if="receipt.inventoryMovements?.length" class="mt-1 text-xs text-muted">
+            {{ receipt.inventoryMovements.map(m => `INV-${m.folio} (${m.type.replaceAll('_', ' ')})`).join(', ') }}
+          </p>
           <ul class="mt-2 space-y-1 text-sm">
             <li v-for="item in receipt.items" :key="item.itemId" class="flex justify-between gap-3">
               <span class="truncate text-muted">{{ itemName(item.itemId) }}</span>

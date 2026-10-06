@@ -36,8 +36,8 @@ const generalFields = computed(() => {
     { label: 'Descripción', value: item.description, multiline: true },
     { label: 'Marca', value: item.additional_fields?.brand },
     { label: 'Grupo', value: item.account_group?.name },
-    { label: 'Control de inventario', value: item.stock_control === undefined ? undefined : item.stock_control ? 'Controlado' : 'Sin control' },
-    { label: 'Existencia disponible', value: formatQuantity(item.available_quantity) }
+    { label: 'Control de inventario en Siigo', value: item.stock_control === undefined ? undefined : item.stock_control ? 'Controlado' : 'Sin control' },
+    { label: 'Existencia disponible en Siigo', value: formatQuantity(item.available_quantity) }
   ]
 })
 const fiscalFields = computed(() => {
@@ -109,7 +109,8 @@ function formatQuantity(value?: number) {
         icon="i-lucide-plug-zap"
       />
 
-      <template v-else-if="product">
+      <InventoryProductStock :product-id="productId" />
+      <template v-if="product">
         <UAlert
           v-if="!isManaged"
           title="Este tipo de producto se administra directamente en Siigo."
@@ -183,7 +184,7 @@ function formatQuantity(value?: number) {
             <UCard>
               <template #header>
                 <h2 class="font-semibold text-highlighted">
-                  Existencia por almacén
+                  Existencia por almacén en Siigo
                 </h2>
               </template>
               <ul v-if="product.warehouses?.length" class="space-y-3">

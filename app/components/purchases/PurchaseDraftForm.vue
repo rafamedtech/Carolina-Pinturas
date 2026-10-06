@@ -19,14 +19,6 @@ const supplierOptions = computed(() => suppliers.value?.results.filter(p => p.ac
   identification: p.identification,
   value: p.id
 })) ?? [])
-const productOptions = computed(() => products.value?.results.map(p => ({
-  label: p.name,
-  description: p.code ? `Código: ${p.code}` : 'Sin código',
-  code: p.code,
-  reference: p.reference,
-  barcode: p.additional_fields?.barcode,
-  value: p.id
-})) ?? [])
 const productsById = computed(() => new Map(products.value?.results.map(p => [p.id, p]) ?? []))
 
 const money = computed(() => new Intl.NumberFormat('es-MX', { style: 'currency', currency: draft.currencyCode, minimumFractionDigits: 2, maximumFractionDigits: 2 }))
@@ -133,16 +125,11 @@ const blocker = computed(() => {
         </template>
         <div class="grid gap-4 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]">
           <UFormField label="Producto" class="min-w-0 sm:col-span-3">
-            <USelectMenu
+            <ProductsProductSearch
               v-model="picker.productId"
-              :items="productOptions"
-              value-key="value"
-              :filter-fields="['label', 'code', 'reference', 'barcode']"
-              :search-input="{ placeholder: 'Escribe el nombre o código del producto' }"
+              :products="products?.results ?? []"
               :loading="productStatus === 'pending'"
               :disabled="busy"
-              icon="i-lucide-search"
-              placeholder="Buscar por nombre o código"
               class="w-full min-w-0"
             />
           </UFormField>

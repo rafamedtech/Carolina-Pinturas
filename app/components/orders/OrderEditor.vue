@@ -84,6 +84,7 @@ const pageTitle = computed(() => isEditing.value
       : props.saleType === 'delivery' ? 'Venta a domicilio' : 'Nuevo pedido')
 
 const schema = z.object({
+  warehouseId: z.string().default(''),
   customerId: z.string().uuid('Selecciona un cliente.'),
   statusKey: z.string().min(1, 'Selecciona un estado.'),
   repartidorId: z.string(),
@@ -131,6 +132,7 @@ function productPrice(product: SiigoProduct) {
 
 const { user } = useAuth()
 const state = reactive<Schema>({
+  warehouseId: '',
   customerId: '',
   statusKey: isQuoteMode.value
     ? 'borrador'
@@ -192,6 +194,7 @@ const initialEditorSnapshot = shallowRef<string | null>(null)
 
 function editorSnapshot() {
   return JSON.stringify({
+    warehouseId: state.warehouseId || null,
     customerId: state.customerId,
     repartidorId: state.repartidorId || null,
     orderDate: state.orderDate,
@@ -326,6 +329,7 @@ const initializedOrderId = shallowRef<string | null>(null)
 watch(existingOrder, (value) => {
   if (!value || initializedOrderId.value === value.id) return
 
+  state.warehouseId = value.warehouseId ?? ''
   state.customerId = value.customer.id
   state.statusKey = value.status.key
   state.repartidorId = value.repartidor?.id || ''
@@ -540,6 +544,7 @@ async function confirmSubmit(
           method: 'PUT',
           body: {
             customerId: data.customerId,
+            warehouseId: data.warehouseId || null,
             repartidorId: data.repartidorId || null,
             orderDate: data.orderDate,
             promisedDate: data.promisedDate || null,
@@ -559,6 +564,8 @@ async function confirmSubmit(
           method: 'POST',
           body: {
             ...data,
+            requestId: initialPaymentRequestId.value,
+            warehouseId: data.warehouseId || null,
             repartidorId: data.repartidorId || null,
             promisedDate: data.promisedDate || null,
             paymentMethod: data.paymentMethod || null,
@@ -650,6 +657,7 @@ function submitReview(intent: OrderReviewSubmissionIntent) {
         class="contents"
         @submit="reviewOrder"
       >
+        <InventoryWarehousePicker v-model="state.warehouseId" :disabled="formDisabled" />
         <div class="grid gap-4 lg:grid-cols-2">
           <OrdersOrderCustomerFields
             v-model:customer-id="state.customerId"

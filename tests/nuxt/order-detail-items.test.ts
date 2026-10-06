@@ -67,6 +67,14 @@ afterEach(() => {
 })
 
 describe('OrderDetailItems', () => {
+  it('después del surtido bloquea cantidades y conserva edición de precios y notas', async () => {
+    wrapper = await mountSuspended(OrderDetailItems, {
+      props: { items: [item], currencyCode: 'MXN', orderId: 'order-1', version: 1, editable: true, quantityEditable: false }
+    })
+    expect(wrapper.find('button[aria-label="Editar cantidad de Pintura blanca"]').exists()).toBe(false)
+    expect(wrapper.find('button[aria-label="Editar precio de Pintura blanca"]').exists()).toBe(true)
+    expect(wrapper.find('button[aria-label="Editar observaciones de Pintura blanca"]').exists()).toBe(true)
+  })
   it('permite editar la cantidad y emite el pedido recalculado', async () => {
     wrapper = await mountSuspended(OrderDetailItems, {
       props: {

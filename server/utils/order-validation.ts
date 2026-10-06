@@ -29,6 +29,8 @@ function validateDiscount(
 export const STATUS_KEYS_REQUIRING_REPARTIDOR = ['confirmado', 'surtido', 'en_espera']
 
 const orderFieldsSchema = z.object({
+  requestId: z.uuid().optional(),
+  warehouseId: z.uuid().nullish(),
   customerId: z.string().uuid('Selecciona un cliente válido.'),
   repartidorId: z.string().uuid('Selecciona un repartidor válido.').nullish(),
   statusKey: z.string().trim().min(1).max(32).default('ingresado'),
@@ -49,7 +51,7 @@ const orderFieldsSchema = z.object({
   ...discountFields,
   lines: z.array(z.object({
     productId: z.string().uuid('Selecciona un producto válido.'),
-    quantity: z.number().positive().max(1_000_000),
+    quantity: z.number().positive().max(1_000_000).refine(n => Number(n.toFixed(6)) === n, 'Máximo 6 decimales.'),
     unitPrice: z.number().positive('El precio debe ser mayor a cero.').max(100_000_000).nullish(),
     priceNote: z.string().trim().max(1000).nullish(),
     observations: z.string().trim().max(5000).nullable().optional(),
@@ -77,6 +79,7 @@ export const createOrderSchema = orderFieldsSchema.superRefine((data, ctx) => {
 })
 
 export const updateOrderSchema = orderFieldsSchema.pick({
+  warehouseId: true,
   customerId: true,
   repartidorId: true,
   orderDate: true,

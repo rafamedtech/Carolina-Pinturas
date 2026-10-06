@@ -7,6 +7,7 @@ import { mexicoToday } from '~/utils/datetime'
 import type { PurchaseView } from '~/types/purchases'
 import type { PurchaseCommand, PurchaseDraft } from '#shared/schemas/purchase'
 import { usePrisma } from './prisma'
+import { receiveInventory, voidReceiptInventory } from './inventory'
 import { getSiigoCustomerDetail } from './siigo-customer-detail'
 import { getProductDetail } from './siigo-products'
 import { upsertSiigoProduct } from './siigo-persistence'
@@ -14,7 +15,7 @@ import { purchaseAssert, purchaseBalance, purchaseLineTotal, assertReceipt } fro
 
 export const purchaseInclude = {
   items: { orderBy: { position: 'asc' as const } },
-  receipts: { include: { items: true }, orderBy: { createdAt: 'asc' as const } },
+  receipts: { include: { items: true, warehouse: { select: { name: true } }, inventoryMovements: { select: { id: true, folio: true, type: true } } }, orderBy: { createdAt: 'asc' as const } },
   invoices: { include: { payments: { orderBy: { createdAt: 'asc' as const } } }, orderBy: { createdAt: 'asc' as const } },
   events: { orderBy: { createdAt: 'desc' as const } }
 } satisfies Prisma.PurchaseOrderInclude
@@ -44,7 +45,7 @@ export function purchaseView(row: PurchaseRow): PurchaseView {
     balance: invoices.reduce((s, i) => s.plus(i.balance), new Decimal(0)).toNumber(),
     invoiced: invoices.filter(i => !i.voidedAt).reduce((s, i) => s.plus(i.amount), new Decimal(0)).toNumber(),
     receiptStatus: items.every(i => i.received === i.quantity) ? 'completa' : items.some(i => i.received > 0) ? 'parcial' : 'pendiente', items, invoices,
-    receipts: row.receipts.map(r => ({ id: r.id, date: day(r.date), voidedAt: r.voidedAt?.toISOString() ?? null, voidReason: r.voidReason, items: r.items.map(i => ({ itemId: i.itemId, quantity: Number(i.quantity) })) })),
+    receipts: row.receipts.map(r => ({ warehouseId: r.warehouseId, warehouseName: r.warehouse?.name ?? null, inventoryMovements: r.inventoryMovements ?? [], id: r.id, date: day(r.date), voidedAt: r.voidedAt?.toISOString() ?? null, voidReason: r.voidReason, items: r.items.map(i => ({ itemId: i.itemId, quantity: Number(i.quantity) })) })),
     events: row.events.map(e => ({ id: e.id, action: e.action, createdBy: e.createdBy, createdAt: e.createdAt.toISOString(), detail: e.detail }))
   }
 }
@@ -128,9 +129,11 @@ export async function mutatePurchase(id: string, input: PurchaseCommand, user: A
         purchaseAssert(row.status === 'confirmada', 'La orden debe estar confirmada.')
         if (c.action === 'receive') {
           assertReceipt(row.items, row.receipts, c.items)
-          await tx.purchaseReceipt.create({ data: { orderId: id, date: date(c.date), createdBy: user.email, items: { create: c.items } } })
+          const receipt = await tx.purchaseReceipt.create({ data: { orderId: id, date: date(c.date), createdBy: user.email, items: { create: c.items } } })
+          await receiveInventory(tx, receipt.id, c.warehouseId, user)
         } else if (c.action === 'voidReceipt') {
           purchaseAssert(row.receipts.some(r => r.id === c.id && !r.voidedAt), 'Recepción no vigente.')
+          await voidReceiptInventory(tx, c.id, c.reason, user)
           await tx.purchaseReceipt.update({ where: { id: c.id }, data: { voidedAt: new Date(), voidReason: c.reason } })
         } else if (c.action === 'invoice' || c.action === 'editInvoice') {
           purchaseAssert(c.dueDate >= c.date, 'Vencimiento anterior a fecha de factura.')

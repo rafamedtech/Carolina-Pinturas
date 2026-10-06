@@ -28,14 +28,6 @@ const productMenuReference = {
   }
 }
 
-const productOptions = computed(() => props.products.map(product => ({
-  label: product.name,
-  description: product.code ? `Código: ${product.code}` : 'Sin código',
-  code: product.code,
-  reference: product.reference,
-  barcode: product.additional_fields?.barcode,
-  value: product.id
-})))
 const selectedProduct = computed(() =>
   props.products.find(product => product.id === selectedProductId.value) ?? null
 )
@@ -68,16 +60,12 @@ function addProduct() {
       class="grid grid-cols-1 gap-4 sm:grid-cols-[minmax(0,1fr)_8rem_auto] sm:items-end"
     >
       <UFormField name="product" label="Producto" class="min-w-0">
-        <USelectMenu
+        <ProductsProductSearch
           v-model="selectedProductId"
-          :items="productOptions"
-          value-key="value"
-          :filter-fields="['label', 'code', 'reference', 'barcode']"
-          :search-input="{ placeholder: 'Escribe el nombre o código del producto' }"
+          :products="products"
           :content="{ align: 'start', reference: productMenuReference }"
           :loading="loading"
           :disabled="disabled"
-          placeholder="Buscar por nombre o código"
           data-product-select-trigger
           class="w-full min-w-0"
         />
