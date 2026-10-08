@@ -36,6 +36,7 @@ const emit = defineEmits<{
       />
       <UButton
         v-if="showSaveDraft"
+        :type="quoteMode ? 'submit' : 'button'"
         :label="quoteMode ? 'Guardar cotización' : 'Guardar como cotización'"
         icon="i-lucide-file-text"
         color="neutral"
@@ -43,7 +44,7 @@ const emit = defineEmits<{
         class="justify-center"
         :loading="savingDraft"
         :disabled="disabled"
-        @click="emit('saveDraft')"
+        @click="!quoteMode && emit('saveDraft')"
       />
       <UButton
         v-if="!quoteMode || editing"

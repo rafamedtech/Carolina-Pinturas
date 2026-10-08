@@ -1,9 +1,54 @@
 // @vitest-environment nuxt
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { mountSuspended } from '@nuxt/test-utils/runtime'
 import OrderFormActions from '~/components/orders/OrderFormActions.vue'
 
 describe('OrderFormActions', () => {
+  it('envía una cotización nueva a revisión sin disparar el guardado directo', async () => {
+    const form = document.createElement('form')
+    document.body.appendChild(form)
+    const onSubmit = vi.fn((event: Event) => event.preventDefault())
+    form.addEventListener('submit', onSubmit)
+    const wrapper = await mountSuspended(OrderFormActions, {
+      attachTo: form,
+      props: {
+        saving: false,
+        savingDraft: false,
+        disabled: false,
+        quoteMode: true
+      }
+    })
+
+    try {
+      const button = wrapper.get('button')
+      expect(button.text()).toBe('Guardar cotización')
+      button.element.click()
+
+      expect(onSubmit).toHaveBeenCalledTimes(1)
+      expect(wrapper.emitted('saveDraft')).toBeUndefined()
+    } finally {
+      wrapper.unmount()
+      form.remove()
+    }
+  })
+
+  it('conserva el guardado directo como cotización desde un pedido', async () => {
+    const wrapper = await mountSuspended(OrderFormActions, {
+      props: {
+        saving: false,
+        savingDraft: false,
+        disabled: false,
+        quoteMode: false
+      }
+    })
+
+    const button = wrapper.get('button[type="button"]')
+    await button.trigger('click')
+
+    expect(wrapper.emitted('saveDraft')).toHaveLength(1)
+    wrapper.unmount()
+  })
+
   it('oculta guardar como cotización en una venta de mostrador', async () => {
     const wrapper = await mountSuspended(OrderFormActions, {
       props: {
