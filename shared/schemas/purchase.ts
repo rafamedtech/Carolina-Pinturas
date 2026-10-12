@@ -7,6 +7,7 @@ export const purchaseDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/).refine((s) =
 const decimal = (precision: number) => z.number().positive().max(999_999_999).refine(n => Number(n.toFixed(precision)) === n, `Máximo ${precision} decimales.`)
 export const purchaseDraftSchema = z.object({
   providerId: z.uuid(), date: purchaseDate, currencyCode: z.enum(['MXN', 'USD']),
+  vatRate: z.union([z.literal(0), z.literal(8), z.literal(16)]).default(0),
   notes: z.string().trim().max(2000).default(''),
   items: z.array(z.object({ productId: z.uuid(), quantity: decimal(6), unitCost: decimal(6) })).min(1).max(100)
 }).refine(v => new Set(v.items.map(i => i.productId)).size === v.items.length, 'No repitas productos.')

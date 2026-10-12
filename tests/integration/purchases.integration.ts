@@ -22,7 +22,7 @@ suite('compras: transacciones PostgreSQL con Siigo simulado', () => {
   const productId = randomUUID()
   const user: AppUser = { id: randomUUID(), name: 'Prueba compras', email: `purchase-${randomUUID()}@example.test`, role: 'admin', repartidorId: null }
   let order: PurchaseView
-  const draft = { providerId, date: '2026-09-16', currencyCode: 'USD' as const, notes: '', items: [{ productId, quantity: 10, unitCost: 10.005 }] }
+  const draft = { providerId, date: '2026-09-16', currencyCode: 'USD' as const, vatRate: 0 as const, notes: '', items: [{ productId, quantity: 10, unitCost: 10.005 }] }
   const command = async (c: PurchaseAction) => {
     order = await mutatePurchase(order.id, { requestId: randomUUID(), version: order.version, command: c }, user)
     return order
@@ -34,6 +34,8 @@ suite('compras: transacciones PostgreSQL con Siigo simulado', () => {
     mocks.getPrisma.mockReturnValue(db)
     await db.appUser.create({ data: { userId: user.id, email: user.email, name: user.name, role: 'admin' } })
     await db.siigoCustomer.create({ data: { id: providerId, name: ['Proveedor prueba'], displayName: 'Proveedor prueba', type: 'Supplier', isSupplier: true, active: true, rawPayload: {} } })
+    // El catálogo ya existe al crear órdenes concurrentes; aislamos la idempotencia de la compra.
+    await db.siigoProduct.create({ data: { id: productId, code: 'TEST', name: 'Producto prueba', active: true, rawPayload: {} } })
     mocks.supplier.mockResolvedValue({ id: providerId, name: ['Proveedor prueba'], type: 'Supplier', active: true })
     mocks.product.mockResolvedValue({ id: productId, code: 'TEST', name: 'Producto prueba', active: true })
   })
@@ -72,6 +74,21 @@ suite('compras: transacciones PostgreSQL con Siigo simulado', () => {
     mocks.supplier.mockResolvedValueOnce({ id: providerId, name: ['Proveedor'], type: 'Customer', active: true })
     await expect(createPurchase({ requestId: randomUUID(), draft }, user)).rejects.toThrow()
     await expect(mutatePurchase(order.id, { requestId: randomUUID(), version: 1, command: { action: 'cancel', reason: 'Prueba' } }, user)).rejects.toThrow()
+  })
+  it('persiste IVA y totales al crear, editar, recargar y confirmar una orden', async () => {
+    const input = { requestId: randomUUID(), draft: { ...draft, vatRate: 16 as const } }
+    let taxed = await createPurchase(input, user)
+    expect(taxed).toMatchObject({ subtotal: 100.05, vatRate: 16, vatAmount: 16.01, total: 116.06 })
+    expect(await createPurchase(input, user)).toMatchObject({ id: taxed.id, vatRate: 16, total: 116.06 })
+    const persisted = await db.purchaseOrder.findUniqueOrThrow({ where: { id: taxed.id } })
+    expect(persisted.vatRate).toBe(16)
+    expect(persisted.vatAmount.toString()).toBe('16.01')
+    taxed = await mutatePurchase(taxed.id, { requestId: randomUUID(), version: taxed.version, command: { action: 'edit', draft: { ...draft, vatRate: 8 } } }, user)
+    taxed = purchaseView(await getPurchase(taxed.id))
+    expect(taxed).toMatchObject({ subtotal: 100.05, vatRate: 8, vatAmount: 8, total: 108.05 })
+    taxed = await mutatePurchase(taxed.id, { requestId: randomUUID(), version: taxed.version, command: { action: 'confirm' } }, user)
+    expect(taxed).toMatchObject({ status: 'confirmada', vatRate: 8, vatAmount: 8, total: 108.05 })
+    await expect(mutatePurchase(taxed.id, { requestId: randomUUID(), version: taxed.version, command: { action: 'edit', draft: { ...draft, vatRate: 0 } } }, user)).rejects.toThrow()
   })
   it('serializa recepciones, no excede cantidad y anula correctamente', async () => {
     const version = order.version

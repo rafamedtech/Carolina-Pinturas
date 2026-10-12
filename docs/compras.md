@@ -8,9 +8,11 @@ Aplicar `supabase/migrations/20260916211107_add_purchases.sql` mediante el proce
 
 Las siete tablas nuevas tienen RLS y carecen de permisos para `anon` y `authenticated`. El acceso pasa por las rutas servidor, que consultan el rol interno. Los gastos derivados solo aparecen para administradores, incluidos conteos, sumas SQL y dashboard.
 
+Para persistir IVA, aplicar también `supabase/migrations/20261012231526_purchase_order_vat.sql` y regenerar Prisma antes de ejecutar el servidor actualizado. Migración aplicada en producción `xirmbnxgaflcnqlzagqc` el 12/10/2026 por solicitud del usuario.
+
 ## Operación
 
-1. Crear borrador con proveedor Supplier activo, productos vigentes y costos unitarios antes de impuestos. El formulario permite capturar el porcentaje de IVA del proveedor para consultar subtotal, IVA y total; este porcentaje solo ayuda al cálculo en pantalla y no se guarda. El importe guardado de la orden es la suma de las partidas antes de impuestos. Guardar cambios antes de confirmar; confirmar congela proveedor y partidas. Las órdenes anteriores conservan los costos con los que se registraron.
+1. Crear borrador con proveedor Supplier activo, productos vigentes y costos unitarios antes de impuestos. El formulario permite seleccionar IVA de 0%, 8% o 16%. La orden guarda subtotal, tasa e importe de IVA y total con IVA; estos valores se conservan al editar y confirmar y se muestran en detalle e impresión. El servidor calcula los importes a partir de las partidas, con redondeo a dos decimales. Guardar cambios antes de confirmar; confirmar congela proveedor y partidas. Las órdenes anteriores conservan sus costos y total originales, con IVA registrado en 0%; no se infiere el impuesto histórico.
 2. Registrar recepciones completas o parciales. Actualizar existencias manualmente en Siigo.
 3. Capturar cada factura del proveedor con folio, importe real y vencimiento. Puede registrarse antes de recibir mercancía. La aplicación muestra diferencias entre importe ordenado y facturado.
 4. Registrar abonos únicamente contra una factura vigente. Cada abono genera un gasto por el mismo importe y moneda, con su tipo de cambio a MXN; registrar la factura no genera gasto.

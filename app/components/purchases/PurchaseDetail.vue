@@ -266,9 +266,19 @@ const timeline = computed(() => [...(order.value?.events ?? [])].reverse())
                   </li>
                 </ul>
                 <template #footer>
-                  <div class="flex items-center justify-between gap-4 sm:ms-auto sm:max-w-sm">
-                    <span class="font-semibold text-primary">Total ({{ order.currencyCode }})</span>
-                    <span class="text-lg font-semibold text-primary tabular-nums">{{ money(order.total) }}</span>
+                  <div class="flex flex-col gap-2 sm:ms-auto sm:max-w-sm">
+                    <div class="flex items-center justify-between gap-4 text-sm">
+                      <span class="text-muted">Subtotal</span>
+                      <span class="tabular-nums">{{ money(order.subtotal) }}</span>
+                    </div>
+                    <div class="flex items-center justify-between gap-4 text-sm">
+                      <span class="text-muted">IVA ({{ order.vatRate }}%)</span>
+                      <span class="tabular-nums">{{ money(order.vatAmount) }}</span>
+                    </div>
+                    <div class="flex items-center justify-between gap-4 border-t border-default pt-2">
+                      <span class="font-semibold text-primary">Total ({{ order.currencyCode }})</span>
+                      <span class="text-lg font-semibold text-primary tabular-nums">{{ money(order.total) }}</span>
+                    </div>
                   </div>
                 </template>
               </UCard>
@@ -395,6 +405,12 @@ const timeline = computed(() => [...(order.value?.events ?? [])].reverse())
               </tr>
             </tbody>
           </table>
+          <p class="text-right">
+            Subtotal: {{ money(order.subtotal) }} {{ order.currencyCode }}
+          </p>
+          <p class="text-right">
+            IVA ({{ order.vatRate }}%): {{ money(order.vatAmount) }} {{ order.currencyCode }}
+          </p>
           <p class="text-right text-lg font-semibold">
             Total: {{ money(order.total) }} {{ order.currencyCode }}
           </p>

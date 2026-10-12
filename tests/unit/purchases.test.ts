@@ -3,9 +3,16 @@ import Decimal from 'decimal.js'
 import { purchaseCommandSchema, purchaseDraftSchema } from '../../shared/schemas/purchase'
 import { purchaseBalance, purchaseLineTotal, assertReceipt } from '../../server/utils/purchase-domain'
 import { canAccessAppPath } from '../../app/utils/roleAccess'
+import { purchaseTotals } from '../../shared/utils/purchaseTotals'
 
 const id = '00000000-0000-4000-8000-000000000001'
 describe('reglas de compras', () => {
+  it.each([[0, '0', '200'], [8, '16', '216'], [16, '32', '232']])('calcula IVA %s y total a partir del subtotal', (rate, vat, total) => {
+    const result = purchaseTotals(200, Number(rate))
+    expect(result.vatAmount.toString()).toBe(vat)
+    expect(result.total.toString()).toBe(total)
+    expect(purchaseTotals('0.07', 8).vatAmount.toString()).toBe('0.01')
+  })
   it('redondea cada partida con decimales exactos', () => {
     expect(purchaseLineTotal(3, 0.335).toString()).toBe('1.01')
     expect(purchaseLineTotal(0.1, 10.05).toString()).toBe('1.01')
@@ -14,6 +21,9 @@ describe('reglas de compras', () => {
   it('valida fecha, moneda, cantidades y costos sin precios de venta', () => {
     const draft = { providerId: id, date: '2026-09-16', currencyCode: 'USD', items: [{ productId: id, quantity: 1.123456, unitCost: 2.123456 }] }
     expect(purchaseDraftSchema.safeParse(draft).success).toBe(true)
+    expect(purchaseDraftSchema.parse(draft).vatRate).toBe(0)
+    for (const vatRate of [0, 8, 16]) expect(purchaseDraftSchema.safeParse({ ...draft, vatRate }).success).toBe(true)
+    for (const vatRate of [-1, 7, 8.5, 100, '16', null]) expect(purchaseDraftSchema.safeParse({ ...draft, vatRate }).success).toBe(false)
     expect(purchaseDraftSchema.safeParse({ ...draft, date: '2026-02-30' }).success).toBe(false)
     expect(purchaseDraftSchema.safeParse({ ...draft, items: [...draft.items, ...draft.items] }).success).toBe(false)
     expect(purchaseDraftSchema.safeParse({ ...draft, items: [{ productId: id, quantity: 1, unitCost: 1.1234567 }] }).success).toBe(false)

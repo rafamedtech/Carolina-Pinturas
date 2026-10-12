@@ -29,6 +29,9 @@ export interface PurchaseView {
   providerRfc: string | null
   date: string
   currencyCode: 'MXN' | 'USD'
+  subtotal: number
+  vatRate: 0 | 8 | 16
+  vatAmount: number
   total: number
   balance: number
   invoiced: number

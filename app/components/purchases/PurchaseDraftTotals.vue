@@ -1,17 +1,15 @@
 <script setup lang="ts">
-import Decimal from 'decimal.js'
+import { purchaseTotals } from '#shared/utils/purchaseTotals'
 
 const props = defineProps<{ subtotal: number, units: number, currencyCode: 'MXN' | 'USD', busy: boolean }>()
-// El IVA es una ayuda local: nunca forma parte del borrador guardado.
-const vatRate = shallowRef(0)
+const vatRate = defineModel<0 | 8 | 16>('vatRate', { required: true })
 const vatOptions = [
   { label: '8%', value: 8 },
   { label: '16%', value: 16 },
   { label: '0%', value: 0 }
 ]
 const money = computed(() => new Intl.NumberFormat('es-MX', { style: 'currency', currency: props.currencyCode, minimumFractionDigits: 2, maximumFractionDigits: 2 }))
-const vat = computed(() => new Decimal(props.subtotal).mul(vatRate.value ?? 0).div(100).toDecimalPlaces(2, Decimal.ROUND_HALF_UP))
-const total = computed(() => new Decimal(props.subtotal).plus(vat.value).toNumber())
+const totals = computed(() => purchaseTotals(props.subtotal, vatRate.value))
 </script>
 
 <template>
@@ -23,7 +21,7 @@ const total = computed(() => new Decimal(props.subtotal).plus(vat.value).toNumbe
     >
       <template #hint>
         <UTooltip
-          text="Solo para calcular el total en pantalla. No se guarda en la compra."
+          text="Se guarda en la orden y se aplica al subtotal antes de impuestos para calcular el total."
           :ui="{ content: 'h-auto max-w-64', text: 'whitespace-normal' }"
         >
           <UButton
@@ -54,11 +52,11 @@ const total = computed(() => new Decimal(props.subtotal).plus(vat.value).toNumbe
     </div>
     <div class="flex items-center justify-between gap-4 text-sm">
       <span class="text-muted">IVA ({{ vatRate ?? 0 }}%)</span>
-      <span class="tabular-nums">{{ money.format(vat.toNumber()) }}</span>
+      <span class="tabular-nums">{{ money.format(totals.vatAmount.toNumber()) }}</span>
     </div>
     <div class="flex items-center justify-between gap-4 border-t border-default pt-2">
       <span class="font-semibold text-primary">Total con IVA ({{ currencyCode }})</span>
-      <span class="text-lg font-semibold text-primary tabular-nums">{{ money.format(total) }}</span>
+      <span class="text-lg font-semibold text-primary tabular-nums">{{ money.format(totals.total.toNumber()) }}</span>
     </div>
   </div>
 </template>

@@ -6,6 +6,7 @@ import type { AppUser, SiigoProduct } from '~/types/siigo'
 import { mexicoToday } from '~/utils/datetime'
 import type { PurchaseView } from '~/types/purchases'
 import type { PurchaseCommand, PurchaseDraft } from '#shared/schemas/purchase'
+import { purchaseTotals } from '#shared/utils/purchaseTotals'
 import { usePrisma } from './prisma'
 import { receiveInventory, voidReceiptInventory } from './inventory'
 import { refreshProductCosts } from './product-costs'
@@ -43,6 +44,7 @@ export function purchaseView(row: PurchaseRow): PurchaseView {
   return {
     id: row.id, folio: row.folio, version: row.version, status: row.status, date: day(row.date), currencyCode: row.currencyCode as 'MXN' | 'USD',
     providerId: row.providerId, providerName: row.providerName, providerRfc: row.providerRfc, total: Number(row.total), notes: row.notes,
+    subtotal: Number(row.subtotal), vatRate: row.vatRate as PurchaseView['vatRate'], vatAmount: Number(row.vatAmount),
     balance: invoices.reduce((s, i) => s.plus(i.balance), new Decimal(0)).toNumber(),
     invoiced: invoices.filter(i => !i.voidedAt).reduce((s, i) => s.plus(i.amount), new Decimal(0)).toNumber(),
     receiptStatus: items.every(i => i.received === i.quantity) ? 'completa' : items.some(i => i.received > 0) ? 'parcial' : 'pendiente', items, invoices,
@@ -67,9 +69,9 @@ async function prepareDraft(draft: PurchaseDraft) {
     products.push(product)
   }
   const items = draft.items.map((item, position) => ({ ...item, position, code: products[position]!.code, name: products[position]!.name, productPayload: json(products[position]), total: purchaseLineTotal(item.quantity, item.unitCost).toString() }))
-  const total = items.reduce((sum, i) => sum.plus(i.total), new Decimal(0))
+  const { subtotal, vatAmount, total } = purchaseTotals(items.reduce((sum, i) => sum.plus(i.total), new Decimal(0)), draft.vatRate)
   purchaseAssert(total.lte('9999999999999.99'), 'Total fuera de rango.')
-  return { products, items, data: { providerId: provider.id, providerName: provider.name.join(' '), providerRfc: provider.rfc_id ?? null, providerPayload: json(provider), date: date(draft.date), currencyCode: draft.currencyCode, notes: draft.notes, total: total.toString() } }
+  return { products, items, data: { providerId: provider.id, providerName: provider.name.join(' '), providerRfc: provider.rfc_id ?? null, providerPayload: json(provider), date: date(draft.date), currencyCode: draft.currencyCode, notes: draft.notes, subtotal: subtotal.toString(), vatRate: draft.vatRate, vatAmount: vatAmount.toString(), total: total.toString() } }
 }
 async function replay(requestId: string, requestHash: string) {
   const event = await usePrisma().purchaseEvent.findUnique({ where: { requestId } })
@@ -110,7 +112,7 @@ export async function mutatePurchase(id: string, input: PurchaseCommand, user: A
   if (prior) return prior
   const c = input.command
   const before = await getPurchase(id)
-  const prepared = c.action === 'edit' ? await prepareDraft(c.draft) : c.action === 'confirm' ? await prepareDraft({ providerId: before.providerId, date: day(before.date), currencyCode: before.currencyCode as 'MXN' | 'USD', notes: before.notes, items: before.items.map(i => ({ productId: i.productId, quantity: Number(i.quantity), unitCost: Number(i.unitCost) })) }) : null
+  const prepared = c.action === 'edit' ? await prepareDraft(c.draft) : c.action === 'confirm' ? await prepareDraft({ providerId: before.providerId, date: day(before.date), currencyCode: before.currencyCode as 'MXN' | 'USD', vatRate: before.vatRate as PurchaseDraft['vatRate'], notes: before.notes, items: before.items.map(i => ({ productId: i.productId, quantity: Number(i.quantity), unitCost: Number(i.unitCost) })) }) : null
   if (prepared) await persistProductSnapshots(prepared.products)
   try {
     await usePrisma().$transaction(async (tx) => {

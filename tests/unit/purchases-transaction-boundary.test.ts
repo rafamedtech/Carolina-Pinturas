@@ -50,6 +50,9 @@ describe('compras: límite de la transacción', () => {
     providerPayload: {},
     date: new Date('2026-09-22T00:00:00Z'),
     currencyCode: 'MXN',
+    subtotal: 10,
+    vatRate: 0 as const,
+    vatAmount: 0,
     total: { toString: () => '10' },
     notes: '',
     createdBy: user.email,
@@ -105,6 +108,7 @@ describe('compras: límite de la transacción', () => {
           providerId,
           date: '2026-09-22',
           currencyCode: 'MXN',
+          vatRate: 0,
           notes: 'Actualizada',
           items: [{ productId, quantity: 1, unitCost: 10 }]
         }

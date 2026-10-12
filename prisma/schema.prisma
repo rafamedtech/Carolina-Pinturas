@@ -511,6 +511,9 @@ model PurchaseOrder {
   providerPayload Json @map("provider_payload") @db.JsonB
   date DateTime @db.Date
   currencyCode String @map("currency_code") @db.VarChar(3)
+  subtotal Decimal @db.Decimal(20, 2)
+  vatRate Int @default(0) @map("vat_rate")
+  vatAmount Decimal @default(0) @map("vat_amount") @db.Decimal(20, 2)
   total Decimal @db.Decimal(20, 2)
   notes String
   createdBy String @map("created_by")

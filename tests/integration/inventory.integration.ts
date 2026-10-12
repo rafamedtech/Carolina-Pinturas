@@ -90,7 +90,7 @@ suite('inventario: PostgreSQL aislado, sin conexión Siigo', () => {
     historicalProduct = await product()
     mocks.supplier.mockResolvedValue(customer)
     mocks.product.mockResolvedValue({ id: historicalProduct, code: 'HIST', name: 'Producto histórico', active: true })
-    historicalPurchase = await createPurchase({ requestId: randomUUID(), draft: { providerId: customer.id, date: today, currencyCode: 'MXN', notes: '', items: [{ productId: historicalProduct, quantity: 3, unitCost: 10 }] } }, user)
+    historicalPurchase = await createPurchase({ requestId: randomUUID(), draft: { vatRate: 0, providerId: customer.id, date: today, currencyCode: 'MXN', notes: '', items: [{ productId: historicalProduct, quantity: 3, unitCost: 10 }] } }, user)
     historicalPurchase = await mutatePurchase(historicalPurchase.id, { requestId: randomUUID(), version: historicalPurchase.version, command: { action: 'confirm' } }, user)
     historicalPurchase = await mutatePurchase(historicalPurchase.id, { requestId: randomUUID(), version: historicalPurchase.version, command: { action: 'receive', date: today, items: [{ itemId: historicalPurchase.items[0]!.id, quantity: 1 }] } }, user)
     const initialCount = await command({ action: 'countCreate', warehouseId: b, date: today, reason: 'Conteo inicial real' }) as { id: string }
@@ -120,7 +120,7 @@ suite('inventario: PostgreSQL aislado, sin conexión Siigo', () => {
     const buy = async (cost: number, receiptDate: string, currencyCode: 'MXN' | 'USD' = 'MXN') => {
       const p = await currentCost()
       mocks.product.mockResolvedValue({ id: p.id, code: p.code, name: p.name, active: true })
-      let purchase = await createPurchase({ requestId: randomUUID(), draft: { providerId: customer.id, date: receiptDate, currencyCode, notes: '', items: [{ productId: p.id, quantity: 2, unitCost: cost }] } }, user)
+      let purchase = await createPurchase({ requestId: randomUUID(), draft: { vatRate: 0, providerId: customer.id, date: receiptDate, currencyCode, notes: '', items: [{ productId: p.id, quantity: 2, unitCost: cost }] } }, user)
       const before = (await currentCost()).unitCost?.toString()
       purchase = await mutatePurchase(purchase.id, { requestId: randomUUID(), version: purchase.version, command: { action: 'confirm' } }, user)
       expect((await currentCost()).unitCost?.toString()).toBe(before)
@@ -155,7 +155,7 @@ suite('inventario: PostgreSQL aislado, sin conexión Siigo', () => {
     mocks.product.mockResolvedValue({ id, code: p.code, name: p.name, active: true })
     const orders = []
     for (const unitCost of [22, 33]) {
-      let purchase = await createPurchase({ requestId: randomUUID(), draft: { providerId: customer.id, date: today, currencyCode: 'MXN', notes: '', items: [{ productId: id, quantity: 1, unitCost }] } }, user)
+      let purchase = await createPurchase({ requestId: randomUUID(), draft: { vatRate: 0, providerId: customer.id, date: today, currencyCode: 'MXN', notes: '', items: [{ productId: id, quantity: 1, unitCost }] } }, user)
       purchase = await mutatePurchase(purchase.id, { requestId: randomUUID(), version: purchase.version, command: { action: 'confirm' } }, user)
       orders.push(purchase)
     }
@@ -302,7 +302,7 @@ suite('inventario: PostgreSQL aislado, sin conexión Siigo', () => {
     mocks.supplier.mockResolvedValue(customer)
     const p = await db.siigoProduct.findUniqueOrThrow({ where: { id } })
     mocks.product.mockResolvedValue({ id, code: p.code, name: p.name, active: true })
-    let purchase = await createPurchase({ requestId: randomUUID(), draft: { providerId: customer.id, date: today, currencyCode: 'MXN', notes: '', items: [{ productId: id, quantity: 10, unitCost: 10 }] } }, user)
+    let purchase = await createPurchase({ requestId: randomUUID(), draft: { vatRate: 0, providerId: customer.id, date: today, currencyCode: 'MXN', notes: '', items: [{ productId: id, quantity: 10, unitCost: 10 }] } }, user)
     const act = async (c: PurchaseAction) => {
       purchase = await mutatePurchase(purchase.id, { requestId: randomUUID(), version: purchase.version, command: c }, user)
     }
@@ -338,7 +338,7 @@ suite('inventario: PostgreSQL aislado, sin conexión Siigo', () => {
     const id = await product()
     mocks.supplier.mockResolvedValue(customer)
     mocks.product.mockResolvedValue({ id, code: id.slice(0, 8), name: 'Pintura prueba', active: true })
-    let purchase = await createPurchase({ requestId: randomUUID(), draft: { providerId: customer.id, date: today, currencyCode: 'MXN', notes: '', items: [{ productId: id, quantity: 5, unitCost: 10 }] } }, user)
+    let purchase = await createPurchase({ requestId: randomUUID(), draft: { vatRate: 0, providerId: customer.id, date: today, currencyCode: 'MXN', notes: '', items: [{ productId: id, quantity: 5, unitCost: 10 }] } }, user)
     const act = async (c: PurchaseAction) => {
       purchase = await mutatePurchase(purchase.id, { requestId: randomUUID(), version: purchase.version, command: c }, user)
     }

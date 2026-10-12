@@ -17,7 +17,7 @@ const { data: products, error: productError, status: productStatus } = useFetch<
   lazy: true,
   server: false
 })
-const draft = reactive<PurchaseDraft>({ providerId: props.order?.providerId ?? '', date: props.order?.date ?? mexicoToday(), currencyCode: props.order?.currencyCode ?? 'MXN', notes: props.order?.notes ?? '', items: props.order?.items.map(i => ({ productId: i.productId, quantity: i.quantity, unitCost: i.unitCost })) ?? [] })
+const draft = reactive<PurchaseDraft>({ providerId: props.order?.providerId ?? '', date: props.order?.date ?? mexicoToday(), currencyCode: props.order?.currencyCode ?? 'MXN', vatRate: props.order?.vatRate ?? 0, notes: props.order?.notes ?? '', items: props.order?.items.map(i => ({ productId: i.productId, quantity: i.quantity, unitCost: i.unitCost })) ?? [] })
 const catalogError = computed(() => Boolean(supplierError.value || productError.value))
 const suppliersLoading = computed(() => supplierStatus.value === 'idle' || supplierStatus.value === 'pending')
 const productsLoading = computed(() => productStatus.value === 'idle' || productStatus.value === 'pending')
@@ -287,6 +287,7 @@ const blocker = computed(() => {
 
       <template #footer>
         <PurchasesPurchaseDraftTotals
+          v-model:vat-rate="draft.vatRate"
           :subtotal="subtotal"
           :units="units"
           :currency-code="draft.currencyCode"
