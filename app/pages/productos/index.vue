@@ -88,7 +88,7 @@ const csvColumns: CsvColumn<SiigoProduct>[] = [
   { key: 'name', label: 'Producto' },
   { key: 'unit', label: 'Unidad', value: row => unitsById.get(row.id) ?? '' },
   { key: 'brand', label: 'Marca', value: row => row.additional_fields?.brand || '' },
-  { key: 'type', label: 'Tipo', value: row => row.type || 'Producto' },
+  { key: 'account_group', label: 'Grupo', value: row => row.account_group?.name || '' },
   { key: 'available_quantity', label: 'Existencia', value: row => row.available_quantity ?? '' },
   { key: 'price', label: 'Precio', value: row => formatProductPrice(row) }
 ]
@@ -100,17 +100,13 @@ const columns: TableColumn<SiigoProduct>[] = [{
   accessorKey: 'name',
   header: 'Producto'
 }, {
-  id: 'unit',
-  header: 'Unidad',
-  cell: ({ row }) => unitsById.get(row.original.id) ?? '…'
-}, {
   id: 'brand',
   header: 'Marca',
   cell: ({ row }) => row.original.additional_fields?.brand || '—'
 }, {
-  accessorKey: 'type',
-  header: 'Tipo',
-  cell: ({ row }) => row.getValue('type') || 'Producto'
+  id: 'account_group',
+  header: 'Grupo',
+  cell: ({ row }) => row.original.account_group?.name || '—'
 }, {
   accessorKey: 'available_quantity',
   header: 'Existencia',
@@ -118,7 +114,7 @@ const columns: TableColumn<SiigoProduct>[] = [{
 }, {
   id: 'price',
   header: 'Precio',
-  cell: ({ row }) => formatProductPrice(row.original)
+  cell: ({ row }) => h('span', { class: 'text-primary' }, formatProductPrice(row.original))
 }]
 
 const message = computed(() => error.value?.data?.statusMessage || 'No fue posible cargar el catálogo.')
