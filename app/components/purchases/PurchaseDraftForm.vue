@@ -7,10 +7,20 @@ import type { PurchaseView } from '~/types/purchases'
 
 const props = defineProps<{ order?: PurchaseView, busy: boolean, cancelTo?: string }>()
 const emit = defineEmits<{ save: [draft: PurchaseDraft] }>()
-const { data: suppliers, error: supplierError, status: supplierStatus } = await useFetch<SiigoListResponse<SiigoCustomer>>('/api/siigo/customers', { query: { all: 'true', customer_type: 'Supplier' } })
-const { data: products, error: productError, status: productStatus } = await useFetch<SiigoListResponse<SiigoProduct>>('/api/siigo/products', { query: { all: 'true', active: 'true' } })
+const { data: suppliers, error: supplierError, status: supplierStatus } = useFetch<SiigoListResponse<SiigoCustomer>>('/api/siigo/customers', {
+  query: { all: 'true', customer_type: 'Supplier' },
+  lazy: true,
+  server: false
+})
+const { data: products, error: productError, status: productStatus } = useFetch<SiigoListResponse<SiigoProduct>>('/api/siigo/products', {
+  query: { all: 'true', active: 'true' },
+  lazy: true,
+  server: false
+})
 const draft = reactive<PurchaseDraft>({ providerId: props.order?.providerId ?? '', date: props.order?.date ?? mexicoToday(), currencyCode: props.order?.currencyCode ?? 'MXN', notes: props.order?.notes ?? '', items: props.order?.items.map(i => ({ productId: i.productId, quantity: i.quantity, unitCost: i.unitCost })) ?? [] })
 const catalogError = computed(() => Boolean(supplierError.value || productError.value))
+const suppliersLoading = computed(() => supplierStatus.value === 'idle' || supplierStatus.value === 'pending')
+const productsLoading = computed(() => productStatus.value === 'idle' || productStatus.value === 'pending')
 
 const supplierOptions = computed(() => suppliers.value?.results.filter(p => p.active !== false).map(p => ({
   label: p.commercial_name || p.name.join(' '),
@@ -23,7 +33,7 @@ const productsById = computed(() => new Map(products.value?.results.map(p => [p.
 
 const money = computed(() => new Intl.NumberFormat('es-MX', { style: 'currency', currency: draft.currencyCode, minimumFractionDigits: 2, maximumFractionDigits: 2 }))
 const lineTotal = (item: PurchaseDraft['items'][number]) => new Decimal(item.quantity || 0).mul(item.unitCost || 0).toDecimalPlaces(2, Decimal.ROUND_HALF_UP)
-const total = computed(() => draft.items.reduce((s, i) => s.plus(lineTotal(i)), new Decimal(0)).toNumber())
+const subtotal = computed(() => draft.items.reduce((s, i) => s.plus(lineTotal(i)), new Decimal(0)).toNumber())
 const units = computed(() => draft.items.reduce((s, i) => s.plus(i.quantity || 0), new Decimal(0)).toNumber())
 
 function lineInfo(productId: string) {
@@ -52,6 +62,7 @@ function addProduct() {
 const missingCost = computed(() => draft.items.some(i => !(i.unitCost > 0) || !(i.quantity > 0)))
 const blocker = computed(() => {
   if (catalogError.value) return 'Catálogos de Siigo no disponibles.'
+  if (suppliersLoading.value || productsLoading.value) return 'Cargando catálogos de Siigo…'
   if (!draft.providerId) return 'Selecciona un proveedor.'
   if (!draft.items.length) return 'Agrega al menos un producto.'
   if (missingCost.value) return 'Captura cantidad y costo de cada partida.'
@@ -85,8 +96,8 @@ const blocker = computed(() => {
               value-key="value"
               :filter-fields="['label', 'rfc', 'identification']"
               :search-input="{ placeholder: 'Nombre o RFC del proveedor' }"
-              :loading="supplierStatus === 'pending'"
-              :disabled="busy"
+              :loading="suppliersLoading"
+              :disabled="busy || suppliersLoading"
               icon="i-lucide-truck"
               placeholder="Selecciona proveedor"
               class="w-full"
@@ -128,8 +139,8 @@ const blocker = computed(() => {
             <ProductsProductSearch
               v-model="picker.productId"
               :products="products?.results ?? []"
-              :loading="productStatus === 'pending'"
-              :disabled="busy"
+              :loading="productsLoading"
+              :disabled="busy || productsLoading"
               class="w-full min-w-0"
             />
           </UFormField>
@@ -144,7 +155,7 @@ const blocker = computed(() => {
               class="w-full"
             />
           </UFormField>
-          <UFormField label="Costo unitario (con impuestos)" class="min-w-0">
+          <UFormField label="Costo unitario (antes de impuestos)" class="min-w-0">
             <UInputNumber
               v-model="picker.unitCost"
               :min="0"
@@ -183,8 +194,8 @@ const blocker = computed(() => {
             </p>
           </div>
           <p class="text-right text-sm text-muted">
-            Total
-            <span class="ms-2 text-base font-semibold text-primary tabular-nums">{{ money.format(total) }}</span>
+            Subtotal
+            <span class="ms-2 text-base font-semibold text-primary tabular-nums">{{ money.format(subtotal) }}</span>
           </p>
         </div>
       </template>
@@ -201,7 +212,7 @@ const blocker = computed(() => {
 
       <div v-else>
         <div class="hidden gap-3 border-b border-default bg-elevated/50 px-4 py-2 text-xs font-medium text-muted uppercase md:grid md:grid-cols-[minmax(0,1fr)_9rem_11rem_8rem_2.25rem]">
-          <span>Producto</span><span>Cantidad</span><span>Costo unitario</span><span class="text-right">Importe</span><span class="sr-only">Acciones</span>
+          <span>Producto</span><span>Cantidad</span><span>Costo sin impuestos</span><span class="text-right">Importe</span><span class="sr-only">Acciones</span>
         </div>
         <ul class="divide-y divide-default">
           <li
@@ -241,7 +252,7 @@ const blocker = computed(() => {
                 class="w-full"
               />
             </UFormField>
-            <UFormField label="Costo unitario" :ui="{ label: 'md:sr-only' }">
+            <UFormField label="Costo unitario (antes de impuestos)" :ui="{ label: 'md:sr-only' }">
               <UInputNumber
                 v-model="item.unitCost"
                 :min="0"
@@ -274,17 +285,13 @@ const blocker = computed(() => {
         </ul>
       </div>
 
-      <template v-if="draft.items.length" #footer>
-        <div class="flex flex-col gap-2 sm:ms-auto sm:max-w-sm">
-          <div class="flex items-center justify-between gap-4 text-sm">
-            <span class="text-muted">Unidades</span>
-            <span class="tabular-nums">{{ units.toLocaleString('es-MX', { maximumFractionDigits: 6 }) }}</span>
-          </div>
-          <div class="flex items-center justify-between gap-4 border-t border-default pt-2">
-            <span class="font-semibold text-primary">Total ({{ draft.currencyCode }})</span>
-            <span class="text-lg font-semibold text-primary tabular-nums">{{ money.format(total) }}</span>
-          </div>
-        </div>
+      <template #footer>
+        <PurchasesPurchaseDraftTotals
+          :subtotal="subtotal"
+          :units="units"
+          :currency-code="draft.currencyCode"
+          :busy="busy"
+        />
       </template>
     </UCard>
 

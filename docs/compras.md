@@ -10,7 +10,7 @@ Las siete tablas nuevas tienen RLS y carecen de permisos para `anon` y `authenti
 
 ## Operación
 
-1. Crear borrador con proveedor Supplier activo, productos vigentes y costos finales con impuestos. Guardar cambios antes de confirmar; confirmar congela proveedor y partidas.
+1. Crear borrador con proveedor Supplier activo, productos vigentes y costos unitarios antes de impuestos. El formulario permite capturar el porcentaje de IVA del proveedor para consultar subtotal, IVA y total; este porcentaje solo ayuda al cálculo en pantalla y no se guarda. El importe guardado de la orden es la suma de las partidas antes de impuestos. Guardar cambios antes de confirmar; confirmar congela proveedor y partidas. Las órdenes anteriores conservan los costos con los que se registraron.
 2. Registrar recepciones completas o parciales. Actualizar existencias manualmente en Siigo.
 3. Capturar cada factura del proveedor con folio, importe real y vencimiento. Puede registrarse antes de recibir mercancía. La aplicación muestra diferencias entre importe ordenado y facturado.
 4. Registrar abonos únicamente contra una factura vigente. Cada abono genera un gasto por el mismo importe y moneda, con su tipo de cambio a MXN; registrar la factura no genera gasto.
