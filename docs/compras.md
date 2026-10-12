@@ -20,6 +20,8 @@ Para persistir IVA, aplicar también `supabase/migrations/20261012231526_purchas
 
 Una factura vigente no puede repetir folio para el mismo proveedor (comparación sin distinguir mayúsculas). La cancelación de orden exige que no queden recepciones ni facturas vigentes. Fechas usan la zona horaria del proyecto y selector reutilizable Nuxt UI.
 
+Desde el detalle, **Duplicar** abre una nueva compra con proveedor, moneda, IVA, notas y partidas (cantidades y costos) de la orden guardada, con fecha de hoy. Permite revisar y editar antes de guardar un nuevo borrador con folio propio. No copia recepciones, facturas, pagos ni historial; guardar valida nuevamente los catálogos vigentes.
+
 ## API y concurrencia
 
 - `GET /api/purchases`: listado con `search` (proveedor), `dateFrom`, `dateTo`, `status`.

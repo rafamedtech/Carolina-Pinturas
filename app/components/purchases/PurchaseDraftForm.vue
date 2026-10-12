@@ -5,7 +5,7 @@ import type { PurchaseDraft } from '#shared/schemas/purchase'
 import type { SiigoCustomer, SiigoProduct, SiigoListResponse } from '~/types/siigo'
 import type { PurchaseView } from '~/types/purchases'
 
-const props = defineProps<{ order?: PurchaseView, busy: boolean, cancelTo?: string }>()
+const props = defineProps<{ order?: PurchaseView, copyFrom?: PurchaseView, busy: boolean, cancelTo?: string }>()
 const emit = defineEmits<{ save: [draft: PurchaseDraft] }>()
 const { data: suppliers, error: supplierError, status: supplierStatus } = useFetch<SiigoListResponse<SiigoCustomer>>('/api/siigo/customers', {
   query: { all: 'true', customer_type: 'Supplier' },
@@ -17,7 +17,8 @@ const { data: products, error: productError, status: productStatus } = useFetch<
   lazy: true,
   server: false
 })
-const draft = reactive<PurchaseDraft>({ providerId: props.order?.providerId ?? '', date: props.order?.date ?? mexicoToday(), currencyCode: props.order?.currencyCode ?? 'MXN', vatRate: props.order?.vatRate ?? 0, notes: props.order?.notes ?? '', items: props.order?.items.map(i => ({ productId: i.productId, quantity: i.quantity, unitCost: i.unitCost })) ?? [] })
+const initialOrder = props.order ?? props.copyFrom
+const draft = reactive<PurchaseDraft>({ providerId: initialOrder?.providerId ?? '', date: props.order?.date ?? mexicoToday(), currencyCode: initialOrder?.currencyCode ?? 'MXN', vatRate: initialOrder?.vatRate ?? 0, notes: initialOrder?.notes ?? '', items: initialOrder?.items.map(i => ({ productId: i.productId, quantity: i.quantity, unitCost: i.unitCost })) ?? [] })
 const catalogError = computed(() => Boolean(supplierError.value || productError.value))
 const suppliersLoading = computed(() => supplierStatus.value === 'idle' || supplierStatus.value === 'pending')
 const productsLoading = computed(() => productStatus.value === 'idle' || productStatus.value === 'pending')
@@ -38,7 +39,7 @@ const units = computed(() => draft.items.reduce((s, i) => s.plus(i.quantity || 0
 
 function lineInfo(productId: string) {
   const product = productsById.value.get(productId)
-  const snapshot = props.order?.items.find(i => i.productId === productId)
+  const snapshot = initialOrder?.items.find(i => i.productId === productId)
   const unit = typeof product?.unit === 'string' ? product.unit : product?.unit?.name || product?.unit?.code
   return { name: product?.name || snapshot?.name || 'Producto no disponible', code: product?.code || snapshot?.code || '', unit }
 }

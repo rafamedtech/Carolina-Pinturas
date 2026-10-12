@@ -3,6 +3,13 @@ import type { PurchaseDraft } from '#shared/schemas/purchase'
 import type { PurchaseView } from '~/types/purchases'
 
 useSeoMeta({ title: 'Nueva compra' })
+definePageMeta({ key: route => route.fullPath })
+const route = useRoute()
+const sourceId = typeof route.query.duplicar === 'string' ? route.query.duplicar : ''
+const { data: source, error: sourceError } = await useFetch<PurchaseView>(`/api/purchases/${encodeURIComponent(sourceId)}`, {
+  immediate: Boolean(sourceId)
+})
+const cancelTo = sourceId ? `/compras/${encodeURIComponent(sourceId)}` : '/compras'
 const busy = shallowRef(false)
 const error = shallowRef('')
 let pending: { key: string, requestId: string } | undefined
@@ -29,7 +36,7 @@ async function save(draft: PurchaseDraft) {
       <UDashboardNavbar title="Nueva compra">
         <template #leading>
           <UButton
-            to="/compras"
+            :to="cancelTo"
             icon="i-lucide-arrow-left"
             color="neutral"
             variant="ghost"
@@ -40,12 +47,36 @@ async function save(draft: PurchaseDraft) {
     </template><template #body>
       <UAlert
         v-if="error"
+        class="shrink-0"
         :title="error"
         color="error"
         variant="subtle"
         icon="i-lucide-circle-alert"
       />
-      <PurchasesPurchaseDraftForm :busy="busy" cancel-to="/compras" @save="save" />
+      <UAlert
+        v-if="sourceError"
+        class="shrink-0"
+        title="No se pudo cargar la orden que quieres duplicar."
+        color="error"
+        variant="subtle"
+        icon="i-lucide-circle-alert"
+      />
+      <UAlert
+        v-else-if="source"
+        class="shrink-0"
+        :title="`Duplicando OC-${source.folio}`"
+        description="Revisa los datos y guarda el nuevo borrador. No se copiarán recepciones, facturas ni pagos."
+        color="info"
+        variant="subtle"
+        icon="i-lucide-copy"
+      />
+      <PurchasesPurchaseDraftForm
+        v-if="!sourceId || source"
+        :copy-from="source ?? undefined"
+        :busy="busy"
+        :cancel-to="cancelTo"
+        @save="save"
+      />
     </template>
   </UDashboardPanel>
 </template>

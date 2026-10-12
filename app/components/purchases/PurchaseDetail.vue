@@ -78,6 +78,17 @@ const timeline = computed(() => [...(order.value?.events ?? [])].reverse())
         </template>
         <template #right>
           <UButton
+            v-if="order"
+            :to="{ path: '/compras/nueva', query: { duplicar: order.id } }"
+            label="Duplicar"
+            icon="i-lucide-copy"
+            color="neutral"
+            variant="outline"
+            aria-label="Duplicar orden de compra"
+            :ui="{ label: 'hidden sm:inline' }"
+            :disabled="busy"
+          />
+          <UButton
             label="Actualizar"
             icon="i-lucide-refresh-cw"
             color="neutral"
