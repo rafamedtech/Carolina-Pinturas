@@ -3,7 +3,7 @@ import type { SiigoListResponse, SiigoProduct } from '~/types/siigo'
 export function useProductManagementCatalog(filters: Ref<Record<string, string>>) {
   const query = computed(() => ({ ...filters.value, all: 'true' }))
   const request = useFetch<SiigoListResponse<SiigoProduct>>('/api/siigo/products', {
-    key: 'product-management-catalog', query, server: false, lazy: true
+    key: 'product-management-catalog', query, server: false, lazy: true, immediate: false
   })
   const refreshing = shallowRef(false)
   const refreshError = shallowRef<{ data: { statusMessage: string } }>()

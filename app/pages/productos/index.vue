@@ -26,6 +26,7 @@ function applyFilters(value: Record<string, string>) {
 const isHydrated = shallowRef(false)
 onMounted(() => {
   isHydrated.value = true
+  void reload()
 })
 const loading = computed(() => isHydrated.value && status.value === 'pending')
 
