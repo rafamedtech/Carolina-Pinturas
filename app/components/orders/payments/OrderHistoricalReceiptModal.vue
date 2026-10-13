@@ -19,11 +19,11 @@ const emit = defineEmits<{
 }>()
 const open = defineModel<boolean>('open', { required: true })
 const saving = shallowRef(false)
+const loadingReceipts = shallowRef(true)
 const toast = useToast()
 const {
   data: context,
   error,
-  status,
   refresh
 } = useFetch<HistoricalSiigoReceiptContext>(
   () => `/api/orders/${encodeURIComponent(props.orderId)}/payments/${encodeURIComponent(props.paymentId)}/siigo-receipt/legacy-context`,
@@ -44,11 +44,16 @@ const selectedReceiptItem = computed(() => receiptItems.value.find(item => item.
 
 watch(open, async (isOpen) => {
   if (!isOpen) return
+  loadingReceipts.value = true
   state.voucherId = ''
   state.confirmed = false
-  await refresh()
-  state.voucherId = context.value?.receipts[0]?.id || ''
-})
+  try {
+    await refresh()
+    state.voucherId = context.value?.receipts[0]?.id || ''
+  } finally {
+    loadingReceipts.value = false
+  }
+}, { immediate: true, flush: 'sync' })
 
 function formatCurrency(value: number) {
   return new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(value)
@@ -99,7 +104,15 @@ async function onSubmit(event: FormSubmitEvent<Schema>) {
     :ui="{ content: 'max-w-xl', footer: 'justify-end' }"
   >
     <template #body>
-      <div v-if="status === 'pending'" class="space-y-3">
+      <div
+        v-if="loadingReceipts"
+        role="status"
+        aria-live="polite"
+        class="space-y-3"
+      >
+        <p class="text-sm text-muted">
+          Cargando recepciones de pago de Siigo…
+        </p>
         <USkeleton class="h-16 w-full" />
         <USkeleton class="h-10 w-full" />
       </div>
@@ -121,7 +134,7 @@ async function onSubmit(event: FormSubmitEvent<Schema>) {
       />
 
       <UAlert
-        v-if="context && !context.receipts.length && !canCreateAndStamp"
+        v-if="!loadingReceipts && !error && context && !context.receipts.length && !canCreateAndStamp"
         class="mt-3"
         color="neutral"
         variant="subtle"
@@ -130,7 +143,7 @@ async function onSubmit(event: FormSubmitEvent<Schema>) {
       />
 
       <UForm
-        v-else-if="context"
+        v-if="!loadingReceipts && !error && context?.receipts.length"
         id="historical-receipt-form"
         :schema="schema"
         :state="state"
@@ -188,20 +201,20 @@ async function onSubmit(event: FormSubmitEvent<Schema>) {
         @click="close"
       />
       <UButton
-        v-if="context && !context.receipts.length"
+        v-if="!loadingReceipts && !error && context && !context.receipts.length"
         label="Crear y timbrar en Siigo"
         icon="i-lucide-badge-check"
         :disabled="saving || !canCreateAndStamp"
         @click="emit('createAndStamp')"
       />
       <UButton
-        v-else
+        v-else-if="!loadingReceipts && !error && context?.receipts.length"
         type="submit"
         form="historical-receipt-form"
         label="Asignar pago"
         icon="i-lucide-link"
         :loading="saving"
-        :disabled="saving || status === 'pending' || !context?.receipts.length"
+        :disabled="saving || !state.voucherId"
       />
     </template>
   </UModal>
