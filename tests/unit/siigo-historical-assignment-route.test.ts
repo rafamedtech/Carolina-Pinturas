@@ -92,13 +92,44 @@ describe('asociación local de facturas anteriores', () => {
     expect(mocks.deleteInvoice).not.toHaveBeenCalled()
   })
 
-  it.each(['pending', 'uncertain'])('conserva los intentos fiscales %s', async (status) => {
+  it('conserva una creación fiscal en curso', async () => {
+    const status = 'pending'
     mocks.findOrder.mockResolvedValue({ siigoInvoice: { status } })
     mocks.findInvoice.mockResolvedValue({ status })
     await expect(assign(event(assignment))).rejects.toMatchObject({ statusCode: 409 })
     await expect(remove(event(removal))).rejects.toMatchObject({ statusCode: 409 })
     expect(mocks.deleteInvoice).not.toHaveBeenCalled()
     expect(mocks.updateInvoice).not.toHaveBeenCalled()
+  })
+
+  it('resuelve un timeout incierto al asignar una factura existente validada', async () => {
+    // PED-000814: intento del 17/09/2026 sin ID por timeout de Siigo.
+    mocks.findOrder.mockResolvedValue({
+      siigoReference: null,
+      siigoInvoice: { status: 'uncertain' }
+    })
+    await assign(event(assignment))
+    expect(mocks.updateInvoice).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({
+        status: 'created', siigoInvoiceId: invoiceId, lastError: null
+      })
+    }))
+    expect(mocks.createInvoice).not.toHaveBeenCalled()
+    expect(mocks.request.mock.calls.every(([, options]) => !options?.method)).toBe(true)
+  })
+
+  it('no permite quitar un intento incierto y habilitar otra creación', async () => {
+    mocks.findInvoice.mockResolvedValue({ status: 'uncertain' })
+    await expect(remove(event(removal))).rejects.toMatchObject({ statusCode: 409 })
+    expect(mocks.deleteInvoice).not.toHaveBeenCalled()
+  })
+
+  it('mantiene el intento incierto si la factura seleccionada no corresponde al pedido', async () => {
+    mocks.findOrder.mockResolvedValue({ siigoInvoice: { status: 'uncertain' } })
+    mocks.request.mockResolvedValue({ ...(await mocks.request()), total: 200 })
+    await expect(assign(event(assignment))).rejects.toMatchObject({ statusCode: 422 })
+    expect(mocks.updateInvoice).not.toHaveBeenCalled()
+    expect(mocks.reserve).not.toHaveBeenCalled()
   })
 
   it('conserva la factura anterior si la nueva no coincide con el pedido', async () => {

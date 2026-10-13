@@ -65,8 +65,10 @@ export default eventHandler(async (event): Promise<SalesOrderDetail> => {
         }
       })
       if (!current) throw createError({ statusCode: 404, statusMessage: 'No se encontró el pedido.' })
-      if (current.siigoInvoice && ['pending', 'uncertain'].includes(current.siigoInvoice.status)) {
-        throw createError({ statusCode: 409, statusMessage: 'Resuelve el intento de facturación pendiente antes de cambiar la asociación.' })
+      // Una factura existente validada resuelve un resultado incierto sin
+      // reintentar la creación fiscal. Sólo una creación en curso bloquea.
+      if (current.siigoInvoice?.status === 'pending') {
+        throw createError({ statusCode: 409, statusMessage: 'Hay una creación de factura en curso. Espera a que termine antes de asignar una factura existente.' })
       }
 
       const invoiceData = {
