@@ -105,8 +105,8 @@ function sortableHeader(label: string, align: 'left' | 'right' = 'left') {
   }
 }
 
-function formatAmount(amount: number, currencyCode: string) {
-  return h('div', { class: 'text-right' }, `${amount.toFixed(2)} ${currencyCode}`)
+function formatAmount(amount: number, currencyCode: string, colorClass = '') {
+  return h('div', { class: ['text-right font-bold', colorClass] }, `${amount.toFixed(2)} ${currencyCode}`)
 }
 
 const columns: TableColumn<PurchaseView>[] = [{
@@ -144,7 +144,11 @@ const columns: TableColumn<PurchaseView>[] = [{
 }, {
   accessorKey: 'balance',
   header: sortableHeader('Saldo pendiente', 'right'),
-  cell: ({ row }) => formatAmount(row.original.balance, row.original.currencyCode)
+  cell: ({ row }) => formatAmount(
+    row.original.balance,
+    row.original.currencyCode,
+    row.original.balance === 0 ? 'text-success' : row.original.status === 'vencida' ? 'text-error' : ''
+  )
 }]
 </script>
 
