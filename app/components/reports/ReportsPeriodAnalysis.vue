@@ -1,10 +1,12 @@
 <script setup lang="ts">
+import { tableQueryField, tableQueryText } from '~/utils/tableQuery'
 import { reportCurrency, reportDailyAverage, reportShortDate, reportWeeks } from '~/utils/reportPeriods'
 import type { BusinessReportSummary } from '~/types/reports'
 import { dashboardNumber } from '~/utils/dashboardFormatters'
 
 const props = defineProps<{ report: BusinessReportSummary }>()
 const view = shallowRef('monthly')
+useTableQuery([tableQueryField('analysis_view', view, tableQueryText('monthly', ['monthly', 'weekly', 'daily']))])
 const views = [
   { label: 'Mensual vs. anterior', value: 'monthly' },
   { label: 'Semanal', value: 'weekly' },

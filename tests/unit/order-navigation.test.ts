@@ -30,4 +30,10 @@ describe('orderListReturnPath', () => {
   it('uses the role-specific fallback when the route has no return path', () => {
     expect(orderListReturnPath(undefined, '/igualaciones')).toBe('/igualaciones')
   })
+
+  it('returns to related lists and details with their filters intact', () => {
+    for (const path of ['/pagos?search=Mostrador&page=2', '/inventario?tab=reservations', '/clientes/customer-1?orders_page=3', '/repartidores/driver-1?returnTo=%2Frepartidores%3Fsearch%3DAlex']) {
+      expect(orderListReturnPath(path)).toBe(path)
+    }
+  })
 })

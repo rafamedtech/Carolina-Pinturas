@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { tableQueryField, tableQuerySorting } from '~/utils/tableQuery'
 import { formatDate } from '~/utils/datetime'
 import { h, resolveComponent } from 'vue'
 import type { TableColumn } from '@nuxt/ui'
@@ -22,6 +23,7 @@ function selectRow(_event: Event, row: Row<ExpenseRecord>) {
 const UButton = resolveComponent('UButton')
 const tableExpenses = computed(() => [...props.expenses])
 const sorting = ref<SortingState>([])
+useTableQuery([tableQueryField('sort', sorting, tableQuerySorting)])
 
 function formatCurrency(amount: number, currencyCode: string) {
   return new Intl.NumberFormat('es-MX', {

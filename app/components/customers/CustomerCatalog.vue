@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { tableQueryField, tableQueryText } from '~/utils/tableQuery'
 import type { TableColumn, TableRow } from '@nuxt/ui'
 import type { SiigoCustomer } from '~/types/siigo'
 import type { CsvColumn } from '~/utils/csv'
@@ -13,6 +14,7 @@ const props = withDefaults(defineProps<{
 })
 
 const filter = shallowRef('')
+const { returnTo } = useTableQuery([tableQueryField('search', filter, tableQueryText())])
 const router = useRouter()
 const toast = useToast()
 const {
@@ -73,7 +75,7 @@ const message = computed(() =>
 )
 
 function openRecord(_: Event, row: TableRow<SiigoCustomer>) {
-  router.push(`${props.routeBase}/${encodeURIComponent(row.original.id)}`)
+  router.push({ path: `${props.routeBase}/${encodeURIComponent(row.original.id)}`, query: { returnTo: returnTo.value } })
 }
 
 async function reloadRecords() {

@@ -1,14 +1,14 @@
 <script setup lang="ts">
+import { tableQueryField, tableQueryPage } from '~/utils/tableQuery'
 import type { SalesOrderListResponse } from '~/types/orders'
 
 const props = defineProps<{
   customerId: string
 }>()
 
-const route = useRoute()
 const page = shallowRef(1)
 const pageSize = 25
-const returnTo = computed(() => route.fullPath)
+const { returnTo } = useTableQuery([tableQueryField('orders_page', page, tableQueryPage)])
 
 watch(() => props.customerId, () => {
   page.value = 1

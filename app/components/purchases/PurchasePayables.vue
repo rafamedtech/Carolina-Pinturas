@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { tableQueryField, tableQueryText, tableQueryBoolean } from '~/utils/tableQuery'
 import Decimal from 'decimal.js'
 import type { PurchaseView } from '~/types/purchases'
 import { formatDate } from '~/utils/datetime'
@@ -7,6 +8,11 @@ const { data, error, refresh } = await useFetch<{ results: PurchaseView[] }>('/a
 const status = shallowRef('all')
 const search = shallowRef('')
 const grouped = shallowRef(false)
+const { returnTo } = useTableQuery([
+  tableQueryField('search', search, tableQueryText()),
+  tableQueryField('status', status, tableQueryText('all', ['all', 'pendiente', 'vencida', 'liquidada'])),
+  tableQueryField('grouped', grouped, tableQueryBoolean)
+])
 const rows = computed(() => (data.value?.results ?? []).flatMap(o => o.invoices.filter(i => !i.voidedAt).map(i => ({ ...i, orderId: o.id, orderFolio: o.folio, providerId: o.providerId, providerName: o.providerName, currencyCode: o.currencyCode }))).filter(i => (status.value === 'all' || i.status === status.value) && i.providerName.toLowerCase().includes(search.value.toLowerCase())))
 const totals = computed(() => ['MXN', 'USD'].map(currency => ({ currency, balance: rows.value.filter(i => i.currencyCode === currency).reduce((sum, i) => sum.plus(i.balance), new Decimal(0)).toFixed(2) })))
 const groups = computed(() => {
@@ -74,7 +80,7 @@ const groups = computed(() => {
           </thead><tbody>
             <tr v-for="row in rows" :key="row.id" class="border-b border-default">
               <td class="p-3">
-                <NuxtLink :to="`/compras/${row.orderId}`" class="text-primary underline">{{ row.folio }} / OC-{{ row.orderFolio }}</NuxtLink>
+                <NuxtLink :to="{ path: `/compras/${row.orderId}`, query: { returnTo } }" class="text-primary underline">{{ row.folio }} / OC-{{ row.orderFolio }}</NuxtLink>
               </td><td class="p-3">
                 {{ row.providerName }}
               </td><td class="p-3">

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { tableQueryField, tableQuerySorting } from '~/utils/tableQuery'
 import { formatDate, formatDateTime } from '~/utils/datetime'
 import { h, resolveComponent } from 'vue'
 import type { TableColumn } from '@nuxt/ui'
@@ -23,6 +24,7 @@ const UBadge = resolveComponent('UBadge')
 const currency = new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' })
 const tableOrders = computed(() => [...props.orders])
 const sorting = ref<SortingState>([])
+useTableQuery([tableQueryField('sort', sorting, tableQuerySorting)])
 const columnVisibility = ref<VisibilityState>({
   promisedDate: false,
   rfc: false,

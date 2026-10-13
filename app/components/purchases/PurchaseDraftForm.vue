@@ -5,7 +5,7 @@ import type { PurchaseDraft } from '#shared/schemas/purchase'
 import type { SiigoCustomer, SiigoProduct, SiigoListResponse } from '~/types/siigo'
 import type { PurchaseView } from '~/types/purchases'
 
-const props = defineProps<{ order?: PurchaseView, copyFrom?: PurchaseView, busy: boolean, cancelTo?: string }>()
+const props = defineProps<{ order?: PurchaseView, copyFrom?: PurchaseView, busy: boolean, cancelTo?: string | { path: string, query: { returnTo: string } } }>()
 const emit = defineEmits<{ save: [draft: PurchaseDraft] }>()
 const { data: suppliers, error: supplierError, status: supplierStatus } = useFetch<SiigoListResponse<SiigoCustomer>>('/api/siigo/customers', {
   query: { all: 'true', customer_type: 'Supplier' },

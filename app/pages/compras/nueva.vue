@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { tableReturnPath } from '~/utils/tableQuery'
 import type { PurchaseDraft } from '#shared/schemas/purchase'
 import type { PurchaseView } from '~/types/purchases'
 
@@ -9,7 +10,10 @@ const sourceId = typeof route.query.duplicar === 'string' ? route.query.duplicar
 const { data: source, error: sourceError } = await useFetch<PurchaseView>(`/api/purchases/${encodeURIComponent(sourceId)}`, {
   immediate: Boolean(sourceId)
 })
-const cancelTo = sourceId ? `/compras/${encodeURIComponent(sourceId)}` : '/compras'
+const returnTo = computed(() => tableReturnPath(route.query.returnTo, '/compras', ['/compras', '/compras/cuentas-por-pagar']))
+const cancelTo = computed(() => sourceId
+  ? { path: `/compras/${encodeURIComponent(sourceId)}`, query: { returnTo: returnTo.value } }
+  : returnTo.value)
 const busy = shallowRef(false)
 const error = shallowRef('')
 let pending: { key: string, requestId: string } | undefined
@@ -21,7 +25,7 @@ async function save(draft: PurchaseDraft) {
   error.value = ''
   try {
     const result = await $fetch<PurchaseView>('/api/purchases', { method: 'POST', body: { draft, requestId: pending.requestId } })
-    await navigateTo(`/compras/${result.id}`)
+    await navigateTo({ path: `/compras/${result.id}`, query: { returnTo: returnTo.value } })
   } catch (e) {
     error.value = (e as { data?: { statusMessage?: string } }).data?.statusMessage || 'No se pudo guardar. Reintenta con los mismos datos.'
   } finally {

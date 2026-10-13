@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { tableReturnPath } from '~/utils/tableQuery'
 import type { SiigoCustomer, SiigoCustomerMutationInput } from '~/types/siigo'
 import { SAT_FISCAL_REGIMES } from '~/utils/satFiscalRegimes'
 import { siigoCustomerPhone, siigoCustomerAddress } from '~/utils/siigoCustomer'
@@ -13,6 +14,7 @@ const entityLabel = isSupplierContext ? 'Proveedor' : 'Cliente'
 const entityLabelLower = entityLabel.toLowerCase()
 const entitiesLabelLower = isSupplierContext ? 'proveedores' : 'clientes'
 const collectionPath = isSupplierContext ? '/proveedores' : '/clientes'
+const backPath = computed(() => tableReturnPath(route.query.returnTo, collectionPath))
 const catalogKey = isSupplierContext
   ? 'customers-catalog-request-supplier'
   : 'customers-catalog-request-customer'
@@ -211,7 +213,7 @@ useSeoMeta({ title: () => fullName.value })
       <UDashboardNavbar :title="`Detalle del ${entityLabelLower}`">
         <template #leading>
           <UButton
-            :to="collectionPath"
+            :to="backPath"
             icon="i-lucide-arrow-left"
             color="neutral"
             variant="ghost"

@@ -1,10 +1,12 @@
 <script setup lang="ts">
+import { tableReturnPath } from '~/utils/tableQuery'
 import { formatDate } from '~/utils/datetime'
 import type { TableColumn, TableRow } from '@nuxt/ui'
 import type { RepartidorDelivery, RepartidorDetail } from '~/types/orders'
 
 const route = useRoute()
 const router = useRouter()
+const backPath = computed(() => tableReturnPath(route.query.returnTo, '/repartidores'))
 const repartidorId = computed(() => String(route.params.id))
 const { data: repartidor, status, error, refresh } = useLazyFetch<RepartidorDetail>(
   () => `/api/repartidores/${encodeURIComponent(repartidorId.value)}`,
@@ -34,7 +36,7 @@ const columns: TableColumn<RepartidorDelivery>[] = [{
 }]
 
 function openOrder(_: Event, row: TableRow<RepartidorDelivery>) {
-  router.push(`/ventas/${encodeURIComponent(row.original.id)}`)
+  router.push({ path: `/ventas/${encodeURIComponent(row.original.id)}`, query: { returnTo: route.fullPath } })
 }
 </script>
 
@@ -44,7 +46,7 @@ function openOrder(_: Event, row: TableRow<RepartidorDelivery>) {
       <UDashboardNavbar :title="repartidor?.nombre || 'Detalle del repartidor'">
         <template #leading>
           <UButton
-            to="/repartidores"
+            :to="backPath"
             icon="i-lucide-arrow-left"
             color="neutral"
             variant="ghost"

@@ -1,52 +1,21 @@
 <script setup lang="ts">
-import { parseDate } from '@internationalized/date'
+import { tableQueryField, tableQueryText, tableQueryPage, tableQueryRange } from '~/utils/tableQuery'
 import type { OrderDateRange } from '~/types/orders'
 import type { CreateExpenseInput, ExpenseListResponse, ExpenseRecord } from '~/types/expenses'
 import type { CsvColumn } from '~/utils/csv'
 import { canViewExpenseCategory, visibleExpenseCategories } from '~/utils/expense'
 import { paymentMethodLabel } from '~/utils/orderPayment'
 
-function queryValue(value: unknown) {
-  return typeof value === 'string' ? value : ''
-}
-
-function queryPage(value: unknown) {
-  const parsedPage = Number(queryValue(value))
-  return Number.isInteger(parsedPage) && parsedPage > 0 ? parsedPage : 1
-}
-
-function queryDateRange(from: unknown, to: unknown): OrderDateRange | null {
-  const start = queryValue(from)
-  const end = queryValue(to)
-  if (!start || !end) return null
-
-  try {
-    return { start: parseDate(start), end: parseDate(end) }
-  } catch {
-    return null
-  }
-}
-
-const route = useRoute()
-const router = useRouter()
 const { user } = useAuth()
 const categories = computed(() => user.value
   ? visibleExpenseCategories(user.value.role)
   : [])
-const filter = shallowRef(queryValue(route.query.search))
-const paymentMethod = shallowRef(queryValue(route.query.payment_method) || 'all')
-const initialCategory = queryValue(route.query.category)
-const category = shallowRef(
-  initialCategory && (!user.value || canViewExpenseCategory(user.value.role, initialCategory))
-    ? initialCategory
-    : 'all'
-)
-const dateRange = shallowRef<OrderDateRange | null>(
-  queryDateRange(route.query.date_from, route.query.date_to)
-)
-const page = shallowRef(queryPage(route.query.page))
+const filter = shallowRef('')
+const paymentMethod = shallowRef('all')
+const category = shallowRef('all')
+const dateRange = shallowRef<OrderDateRange | null>(null)
+const page = shallowRef(1)
 const pageSize = 25
-const debouncedFilter = refDebounced(filter, 300)
 const isHydrated = shallowRef(false)
 const modalOpen = shallowRef(false)
 const saving = shallowRef(false)
@@ -59,9 +28,18 @@ onMounted(() => {
   isHydrated.value = true
 })
 
-watch([filter, paymentMethod, category, dateRange], () => {
-  page.value = 1
-})
+useTableQuery([
+  tableQueryField('search', filter, tableQueryText()),
+  tableQueryField('payment_method', paymentMethod, tableQueryText('all')),
+  tableQueryField('category', category, {
+    parse: value => typeof value === 'string' && (!user.value || canViewExpenseCategory(user.value.role, value)) ? value : 'all',
+    serialize: value => value === 'all' ? undefined : value
+  }),
+  tableQueryRange(dateRange),
+  tableQueryField('page', page, tableQueryPage)
+], { page, resetOn: [filter, paymentMethod, category, dateRange] })
+
+const debouncedFilter = refDebounced(filter, 300)
 
 const dateFrom = computed(() => dateRange.value?.start && dateRange.value?.end
   ? dateRange.value.start.toString()
@@ -69,18 +47,6 @@ const dateFrom = computed(() => dateRange.value?.start && dateRange.value?.end
 const dateTo = computed(() => dateRange.value?.start && dateRange.value?.end
   ? dateRange.value.end.toString()
   : undefined)
-const listQuery = computed(() => ({
-  ...(filter.value ? { search: filter.value } : {}),
-  ...(paymentMethod.value !== 'all' ? { payment_method: paymentMethod.value } : {}),
-  ...(category.value !== 'all' ? { category: category.value } : {}),
-  ...(dateFrom.value ? { date_from: dateFrom.value } : {}),
-  ...(dateTo.value ? { date_to: dateTo.value } : {}),
-  ...(page.value > 1 ? { page: String(page.value) } : {})
-}))
-
-watch([debouncedFilter, paymentMethod, category, dateFrom, dateTo, page], () => {
-  void router.replace({ query: listQuery.value })
-})
 
 const {
   data: expenseCatalog,

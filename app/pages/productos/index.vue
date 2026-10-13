@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { tableQueryField, tableQueryText, tableQueryPage, tableQueryDate } from '~/utils/tableQuery'
 import type { TableColumn, TableRow } from '@nuxt/ui'
 import type { SiigoProduct } from '~/types/siigo'
 import type { CsvColumn } from '~/utils/csv'
@@ -11,12 +12,27 @@ const page = ref(1)
 const pageSize = 25
 const router = useRouter()
 
-watch(filter, () => {
-  page.value = 1
-})
-
 const { user } = useAuth()
 const filters = ref<Record<string, string>>({ active: 'true' })
+const dateFilterKeys = ['created_start', 'created_end', 'updated_start', 'updated_end'] as const
+const { returnTo } = useTableQuery([
+  tableQueryField('search', filter, tableQueryText()),
+  {
+    read: (query) => {
+      const value: Record<string, string> = { active: tableQueryText('true', ['true', 'false', 'all']).parse(query.active) }
+      for (const key of dateFilterKeys) {
+        const date = tableQueryDate.parse(query[key])
+        if (date) value[key] = date
+      }
+      if (JSON.stringify(filters.value) !== JSON.stringify(value)) filters.value = value
+    },
+    write: () => ({
+      active: filters.value.active === 'true' ? undefined : filters.value.active,
+      ...Object.fromEntries(dateFilterKeys.map(key => [key, filters.value[key] || undefined]))
+    })
+  },
+  tableQueryField('page', page, tableQueryPage)
+], { page, resetOn: [filter, filters] })
 const { data, status, error, refresh } = useProductManagementCatalog(filters)
 function applyFilters(value: Record<string, string>) {
   filters.value = value
@@ -123,7 +139,7 @@ const firstProduct = computed(() => totalProducts.value ? ((page.value - 1) * pa
 const lastProduct = computed(() => Math.min(page.value * pageSize, totalProducts.value))
 
 function openProduct(_: Event, row: TableRow<SiigoProduct>) {
-  router.push(`/productos/${encodeURIComponent(row.original.id)}`)
+  router.push({ path: `/productos/${encodeURIComponent(row.original.id)}`, query: { returnTo: returnTo.value } })
 }
 </script>
 
@@ -162,14 +178,14 @@ function openProduct(_: Event, row: TableRow<SiigoProduct>) {
           />
           <UButton
             v-if="canManageProducts(user?.role)"
-            to="/productos/nuevo"
+            :to="{ path: '/productos/nuevo', query: { returnTo } }"
             label="Nuevo producto"
             icon="i-lucide-plus"
           />
         </div>
       </div>
 
-      <ProductsProductFilters @change="applyFilters" />
+      <ProductsProductFilters :filters="filters" @change="applyFilters" />
 
       <UAlert
         v-if="error"
@@ -183,6 +199,7 @@ function openProduct(_: Event, row: TableRow<SiigoProduct>) {
       <template v-else>
         <ProductsProductListCards
           :products="products"
+          :return-to="returnTo"
           :loading="loading"
           :unit-for="(product) => unitsById.get(product.id) ?? '…'"
           :price-for="formatProductPrice"

@@ -1,7 +1,7 @@
-const ORDER_LIST_PATHS = ['/ventas', '/igualaciones'] as const
+const ORDER_LIST_PATHS = ['/ventas', '/igualaciones', '/pagos', '/inventario'] as const
 
 export function orderListReturnPath(value: unknown, fallback = '/ventas') {
-  if (typeof value !== 'string') return fallback
+  if (typeof value !== 'string' || value.includes('\\')) return fallback
 
   if (value === '/pedidos-internos') return '/ventas?view=internos'
   if (value.startsWith('/pedidos-internos?')) {
@@ -12,5 +12,6 @@ export function orderListReturnPath(value: unknown, fallback = '/ventas') {
     value === path || value.startsWith(`${path}?`)
   )
 
-  return isOrderListPath ? value : fallback
+  const isRelatedDetail = /^\/(clientes|proveedores|repartidores)\/[^/?#]+(?:\?[^#]*)?$/.test(value)
+  return isOrderListPath || isRelatedDetail ? value : fallback
 }

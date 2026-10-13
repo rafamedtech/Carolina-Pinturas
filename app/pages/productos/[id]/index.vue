@@ -1,10 +1,12 @@
 <script setup lang="ts">
+import { tableReturnPath } from '~/utils/tableQuery'
 import type { SiigoProduct } from '~/types/siigo'
 import { canManageProducts } from '~/utils/roleAccess'
 
 const { user } = useAuth()
 
 const route = useRoute()
+const backPath = computed(() => tableReturnPath(route.query.returnTo, '/productos'))
 const productId = computed(() => String(route.params.id))
 const { data: product, status, error, refresh } = useLazyFetch<SiigoProduct>(
   () => `/api/siigo/products/${encodeURIComponent(productId.value)}`,
@@ -75,7 +77,7 @@ function formatQuantity(value?: number) {
       <UDashboardNavbar title="Detalle del producto">
         <template #leading>
           <UButton
-            to="/productos"
+            :to="backPath"
             icon="i-lucide-arrow-left"
             color="neutral"
             variant="ghost"
@@ -84,7 +86,7 @@ function formatQuantity(value?: number) {
         </template>
         <template #right>
           <template v-if="product && canManageProducts(user?.role) && isManaged">
-            <UButton :to="`/productos/${productId}/editar`" label="Editar" icon="i-lucide-pencil" />
+            <UButton :to="{ path: `/productos/${productId}/editar`, query: { returnTo: backPath } }" label="Editar" icon="i-lucide-pencil" />
             <ProductsProductStatusAction :product="product" @changed="refresh" />
           </template>
           <UButton

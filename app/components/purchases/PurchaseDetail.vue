@@ -1,8 +1,11 @@
 <script setup lang="ts">
+import { tableReturnPath } from '~/utils/tableQuery'
 import type { PurchaseView } from '~/types/purchases'
 import { formatMexicoDateTime } from '~/utils/datetime'
 import { purchaseDateLabel, purchaseMoney, purchaseQuantity, purchaseStatus, receiptStatus } from '~/utils/purchaseFormat'
 
+const route = useRoute()
+const backPath = computed(() => tableReturnPath(route.query.returnTo, '/compras', ['/compras', '/compras/cuentas-por-pagar']))
 const props = defineProps<{ id: string }>()
 const { data: order, error: loadError, refresh, status: loadStatus } = await useFetch<PurchaseView>(`/api/purchases/${props.id}`)
 const { busy, error, run } = usePurchaseAction(() => order.value!, (value) => {
@@ -61,7 +64,7 @@ const timeline = computed(() => [...(order.value?.events ?? [])].reverse())
       <UDashboardNavbar :title="order ? `OC-${order.folio}` : 'Compra'">
         <template #leading>
           <UButton
-            to="/compras"
+            :to="backPath"
             icon="i-lucide-arrow-left"
             color="neutral"
             variant="ghost"
@@ -79,7 +82,7 @@ const timeline = computed(() => [...(order.value?.events ?? [])].reverse())
         <template #right>
           <UButton
             v-if="order"
-            :to="{ path: '/compras/nueva', query: { duplicar: order.id } }"
+            :to="{ path: '/compras/nueva', query: { duplicar: order.id, returnTo: backPath } }"
             label="Duplicar"
             icon="i-lucide-copy"
             color="neutral"

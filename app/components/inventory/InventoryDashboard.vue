@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { tableQueryField, tableQueryText, tableQueryBoolean, tableQueryPage, tableQueryDate } from '~/utils/tableQuery'
 import type { InventoryStock, InventoryWarehouse, InventorySettings, InventoryMovement, InventoryCount, InventoryProduct, InventoryPage } from '#shared/types/inventory'
 import type { InventoryCommand } from '#shared/schemas/inventory'
 import type { CsvColumn } from '~/utils/csv'
@@ -8,14 +9,24 @@ import { formatDate, formatDateTime, mexicoToday } from '~/utils/datetime'
 const { user } = useAuth()
 const admin = computed(() => user.value?.role === 'admin')
 const operational = computed(() => admin.value || user.value?.role === 'mostrador')
-const route = useRoute()
-const tab = shallowRef(route.query.productId ? 'kardex' : 'stocks')
-const search = shallowRef(''), warehouse = shallowRef(String(route.query.warehouseId ?? '')), type = shallowRef(''), from = shallowRef(''), to = shallowRef(''), productId = shallowRef(String(route.query.productId ?? ''))
+const tab = shallowRef('stocks')
+const search = shallowRef(''), warehouse = shallowRef(''), type = shallowRef(''), from = shallowRef(''), to = shallowRef(''), productId = shallowRef('')
 const low = shallowRef(false), pageNumber = shallowRef(1)
 const query = computed(() => ({ page: pageNumber.value, page_size: 25, search: search.value, warehouseId: warehouse.value || undefined, productId: productId.value || undefined, type: type.value || undefined, from: from.value || undefined, to: to.value || undefined, low: low.value ? 'true' : undefined }))
-watch([tab, search, warehouse, type, from, to, productId, low], () => {
-  pageNumber.value = 1
-})
+const { returnTo } = useTableQuery([
+  tableQueryField('productId', productId, tableQueryText()),
+  tableQueryField('tab', tab, {
+    parse: value => tableQueryText(productId.value ? 'kardex' : 'stocks', ['stocks', 'kardex', 'reservations', 'movements', 'counts', 'warehouses']).parse(value),
+    serialize: value => value === 'stocks' && !productId.value ? undefined : value
+  }),
+  tableQueryField('search', search, tableQueryText()),
+  tableQueryField('warehouseId', warehouse, tableQueryText()),
+  tableQueryField('type', type, tableQueryText()),
+  tableQueryField('from', from, tableQueryDate),
+  tableQueryField('to', to, tableQueryDate),
+  tableQueryField('low', low, tableQueryBoolean),
+  tableQueryField('page', pageNumber, tableQueryPage)
+], { page: pageNumber, resetOn: [tab, search, warehouse, type, from, to, productId, low] })
 const requestFetch = useRequestFetch()
 const { data: warehouseData, refresh: refreshWarehouses, error: warehouseError } = await useAsyncData('inventory-warehouses', async () => ({ results: await fetchAllPages<InventoryWarehouse>('/api/inventory/warehouses', {}, 100, requestFetch) }))
 const { data: settings, refresh: refreshSettings } = await useFetch<InventorySettings>('/api/inventory/settings')
@@ -239,7 +250,7 @@ async function exportRows() {
               </thead><tbody class="divide-y divide-default">
                 <tr v-for="row in reservationRows" :key="`${row.orderId}-${row.productId}`">
                   <td class="p-3">
-                    <NuxtLink :to="`/ventas/${row.orderId}`" class="text-primary underline">{{ row.order.folio }}</NuxtLink>
+                    <NuxtLink :to="{ path: `/ventas/${row.orderId}`, query: { returnTo } }" class="text-primary underline">{{ row.order.folio }}</NuxtLink>
                   </td><td class="p-3">
                     {{ row.product.code }} · {{ row.product.name }}
                   </td><td class="p-3">

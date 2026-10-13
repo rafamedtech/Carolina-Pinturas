@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { parseDate } from '@internationalized/date'
+import { tableQueryField, tableQueryText, tableQueryPage, tableQueryRange, tableQueryBoolean } from '~/utils/tableQuery'
 import type { OrderDateRange, OrderStatus, SalesOrderListItem, SalesOrderListResponse } from '~/types/orders'
 import type { CsvColumn } from '~/utils/csv'
 import { paymentStatusLabel } from '~/utils/orderPayment'
@@ -13,34 +13,7 @@ const props = withDefaults(defineProps<{
   igualacion: false
 })
 
-function queryValue(value: unknown) {
-  return typeof value === 'string' ? value : ''
-}
-
-function queryPage(value: unknown) {
-  const parsedPage = Number(queryValue(value))
-  return Number.isInteger(parsedPage) && parsedPage > 0 ? parsedPage : 1
-}
-
-function queryBoolean(value: unknown) {
-  const normalized = queryValue(value)
-  return normalized === 'true' || normalized === '1'
-}
-
-function queryDateRange(from: unknown, to: unknown): OrderDateRange | null {
-  const start = queryValue(from)
-  const end = queryValue(to)
-  if (!start || !end) return null
-
-  try {
-    return { start: parseDate(start), end: parseDate(end) }
-  } catch {
-    return null
-  }
-}
-
 const route = useRoute()
-const router = useRouter()
 const { user } = useAuth()
 const ORDER_VIEW_KEYS = [
   'all',
@@ -55,16 +28,19 @@ const ORDER_VIEW_KEYS = [
 ] as const
 const IGUALACION_VIEW_KEYS = ['mostrador', 'vendedor']
 const canViewInternal = computed(() => user.value?.role === 'admin')
-const initialSelection = props.igualacion
-  ? IGUALACION_VIEW_KEYS.includes(queryValue(route.query.view))
-    ? queryValue(route.query.view)
-    : queryValue(route.query.status) || 'all'
-  : ORDER_VIEW_KEYS.includes(queryValue(route.query.view) as typeof ORDER_VIEW_KEYS[number])
-    && (queryValue(route.query.view) !== 'internos' || canViewInternal.value)
-    ? queryValue(route.query.view)
-    : 'all'
-const filter = shallowRef(queryValue(route.query.search))
-const selectedTab = shallowRef(initialSelection)
+function selectionFromQuery(query: typeof route.query) {
+  const queryValue = (value: unknown) => typeof value === 'string' ? value : ''
+  return props.igualacion
+    ? IGUALACION_VIEW_KEYS.includes(queryValue(query.view))
+      ? queryValue(query.view)
+      : queryValue(query.status) || 'all'
+    : ORDER_VIEW_KEYS.includes(queryValue(query.view) as typeof ORDER_VIEW_KEYS[number])
+      && (queryValue(query.view) !== 'internos' || canViewInternal.value)
+      ? queryValue(query.view)
+      : 'all'
+}
+const filter = shallowRef('')
+const selectedTab = shallowRef(selectionFromQuery(route.query))
 const isInternalCustomersView = computed(() => !props.igualacion && selectedTab.value === 'internos')
 const selectedStatus = computed(() =>
   props.igualacion && selectedTab.value !== 'all' && !IGUALACION_VIEW_KEYS.includes(selectedTab.value)
@@ -79,16 +55,13 @@ const selectedView = computed(() =>
     : undefined
 )
 const selectedQueryView = computed(() => isInternalCustomersView.value ? 'internos' : selectedView.value)
-const paymentStatusKey = shallowRef(queryValue(route.query.payment_status) || 'all')
-const paymentMethodKey = shallowRef(queryValue(route.query.payment_method) || 'all')
-const hideCancelled = shallowRef(queryBoolean(route.query.hide_cancelled))
-const hideQuotes = shallowRef(queryBoolean(route.query.hide_quotes))
-const dateRange = shallowRef<OrderDateRange | null>(
-  queryDateRange(route.query.date_from, route.query.date_to)
-)
-const page = shallowRef(queryPage(route.query.page))
+const paymentStatusKey = shallowRef('all')
+const paymentMethodKey = shallowRef('all')
+const hideCancelled = shallowRef(false)
+const hideQuotes = shallowRef(false)
+const dateRange = shallowRef<OrderDateRange | null>(null)
+const page = shallowRef(1)
 const pageSize = 25
-const debouncedFilter = refDebounced(filter, 300)
 const canCreate = computed(() => Boolean(user.value && canCreateOrders(user.value.role)))
 const isHydrated = shallowRef(false)
 const customerManagerOpen = shallowRef(false)
@@ -97,13 +70,25 @@ onMounted(() => {
   isHydrated.value = true
 })
 
-watch([filter, selectedTab, paymentStatusKey, paymentMethodKey, hideCancelled, hideQuotes, dateRange], () => {
-  page.value = 1
-})
+const { returnTo } = useTableQuery([
+  tableQueryField('search', filter, tableQueryText()),
+  {
+    read: (query) => { selectedTab.value = selectionFromQuery(query) },
+    write: () => ({ status: selectedStatus.value, view: selectedQueryView.value })
+  },
+  tableQueryField('payment_status', paymentStatusKey, tableQueryText('all')),
+  tableQueryField('payment_method', paymentMethodKey, tableQueryText('all')),
+  tableQueryField('hide_cancelled', hideCancelled, tableQueryBoolean),
+  tableQueryField('hide_quotes', hideQuotes, tableQueryBoolean),
+  tableQueryRange(dateRange),
+  tableQueryField('page', page, tableQueryPage)
+], { page, resetOn: [filter, selectedTab, paymentStatusKey, paymentMethodKey, hideCancelled, hideQuotes, dateRange] })
 
 watch(canViewInternal, (canView) => {
   if (!canView && selectedTab.value === 'internos') selectedTab.value = 'all'
 })
+
+const debouncedFilter = refDebounced(filter, 300)
 
 const dateFrom = computed(() => dateRange.value?.start && dateRange.value?.end
   ? dateRange.value.start.toString()
@@ -111,30 +96,6 @@ const dateFrom = computed(() => dateRange.value?.start && dateRange.value?.end
 const dateTo = computed(() => dateRange.value?.start && dateRange.value?.end
   ? dateRange.value.end.toString()
   : undefined)
-const listQuery = computed(() => ({
-  ...(filter.value ? { search: filter.value } : {}),
-  ...(selectedStatus.value ? { status: selectedStatus.value } : {}),
-  ...(selectedQueryView.value ? { view: selectedQueryView.value } : {}),
-  ...(paymentStatusKey.value !== 'all' ? { payment_status: paymentStatusKey.value } : {}),
-  ...(paymentMethodKey.value !== 'all' ? { payment_method: paymentMethodKey.value } : {}),
-  ...(hideCancelled.value ? { hide_cancelled: 'true' } : {}),
-  ...(hideQuotes.value ? { hide_quotes: 'true' } : {}),
-  ...(dateFrom.value ? { date_from: dateFrom.value } : {}),
-  ...(dateTo.value ? { date_to: dateTo.value } : {}),
-  ...(page.value > 1 ? { page: String(page.value) } : {})
-}))
-const returnTo = computed(() => router.resolve({
-  path: route.path,
-  query: listQuery.value
-}).fullPath)
-
-watch(
-  [debouncedFilter, selectedTab, paymentStatusKey, paymentMethodKey, hideCancelled, hideQuotes, dateFrom, dateTo, page],
-  () => {
-    void router.replace({ query: listQuery.value })
-  }
-)
-
 const {
   data: orders,
   status,

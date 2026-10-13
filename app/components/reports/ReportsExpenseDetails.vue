@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { tableQueryField, tableQueryText, tableQueryPage } from '~/utils/tableQuery'
 import { reportCurrency, reportShortDate } from '~/utils/reportPeriods'
 import type { ReportExpenseDetail } from '~/types/reports'
 import { dashboardNumber } from '~/utils/dashboardFormatters'
@@ -6,6 +7,10 @@ import { dashboardNumber } from '~/utils/dashboardFormatters'
 const props = defineProps<{ expenses: ReportExpenseDetail[] }>()
 const search = shallowRef('')
 const page = shallowRef(1)
+useTableQuery([
+  tableQueryField('expenses_search', search, tableQueryText()),
+  tableQueryField('expenses_page', page, tableQueryPage)
+], { page, resetOn: [search] })
 const pageSize = 10
 const filtered = computed(() => {
   const term = search.value.trim().toLocaleLowerCase('es-MX')
@@ -14,8 +19,8 @@ const filtered = computed(() => {
 const total = computed(() => filtered.value.reduce((sum, expense) => sum + expense.amount, 0))
 const visible = computed(() => filtered.value.slice((page.value - 1) * pageSize, page.value * pageSize))
 const pages = computed(() => Math.max(1, Math.ceil(filtered.value.length / pageSize)))
-watch([search, () => props.expenses], () => {
-  page.value = 1
+watch(pages, (total) => {
+  if (page.value > total) page.value = total
 })
 </script>
 

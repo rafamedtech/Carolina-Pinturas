@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { tableReturnPath } from '~/utils/tableQuery'
 import type { SiigoProduct } from '~/types/siigo'
 import type { ProductContext, ProductImage, ProductInput } from '~/types/siigo-products'
 import { canManageProducts } from '~/utils/roleAccess'
@@ -7,7 +8,11 @@ const props = defineProps<{ productId?: string }>()
 const { user } = useAuth()
 const allowed = computed(() => canManageProducts(user.value?.role))
 const title = computed(() => props.productId ? 'Editar producto' : 'Nuevo producto')
-const back = computed(() => props.productId ? `/productos/${props.productId}` : '/productos')
+const route = useRoute()
+const returnTo = computed(() => tableReturnPath(route.query.returnTo, '/productos'))
+const back = computed(() => props.productId
+  ? { path: `/productos/${props.productId}`, query: { returnTo: returnTo.value } }
+  : returnTo.value)
 const { data: context, error: contextError } = await useFetch<ProductContext>('/api/siigo/products/context', { immediate: allowed.value })
 const product = ref<SiigoProduct>()
 const loading = shallowRef(Boolean(props.productId))
@@ -29,7 +34,7 @@ async function submit(input: ProductInput) {
   const saved = await save(input, props.productId)
   if (saved) {
     useToast().add({ title: props.productId ? 'Producto actualizado' : 'Producto creado', color: 'success' })
-    await navigateTo(`/productos/${encodeURIComponent(saved.id)}`)
+    await navigateTo({ path: `/productos/${encodeURIComponent(saved.id)}`, query: { returnTo: returnTo.value } })
   }
 }
 useSeoMeta({ title })
@@ -59,7 +64,7 @@ useSeoMeta({ title })
           <UButton label="Consultar resultado en Siigo" :loading="checking" @click="check(productId)" />
           <div v-for="result in lookupResults" :key="result.id" class="space-y-1">
             <p>{{ result.code }} · {{ result.name }} · {{ result.active ? 'Activo' : 'Inactivo' }}</p>
-            <UButton :to="`/productos/${result.id}`" label="Abrir producto para revisar" variant="outline" />
+            <UButton :to="{ path: `/productos/${result.id}`, query: { returnTo } }" label="Abrir producto para revisar" variant="outline" />
           </div>
           <p class="text-sm text-muted">
             Revisa el producto antes de iniciar otro guardado; Siigo pudo procesar la solicitud.

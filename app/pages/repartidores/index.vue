@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { tableQueryField, tableQueryText } from '~/utils/tableQuery'
 import type { TableColumn, TableRow } from '@nuxt/ui'
 import type { Repartidor } from '~/types/orders'
 import type { CsvColumn } from '~/utils/csv'
@@ -6,6 +7,7 @@ import type { CsvColumn } from '~/utils/csv'
 useSeoMeta({ title: 'Repartidores' })
 
 const filter = ref('')
+const { returnTo } = useTableQuery([tableQueryField('search', filter, tableQueryText())])
 const router = useRouter()
 const { data, status, error, refresh, addToCatalog } = useRepartidoresCatalog({ all: true })
 
@@ -51,7 +53,7 @@ const columns: TableColumn<Repartidor>[] = [{
 const message = computed(() => error.value?.data?.statusMessage || 'No fue posible cargar los repartidores.')
 
 function openRepartidor(_: Event, row: TableRow<Repartidor>) {
-  router.push(`/repartidores/${encodeURIComponent(row.original.id)}`)
+  router.push({ path: `/repartidores/${encodeURIComponent(row.original.id)}`, query: { returnTo: returnTo.value } })
 }
 </script>
 

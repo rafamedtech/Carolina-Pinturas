@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { tableQueryField, tableQuerySorting } from '~/utils/tableQuery'
 import { formatDate } from '~/utils/datetime'
 import { h, resolveComponent } from 'vue'
 import type { TableColumn } from '@nuxt/ui'
@@ -17,6 +18,7 @@ const UButton = resolveComponent('UButton')
 const currency = new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' })
 const tablePayments = computed(() => [...props.payments])
 const sorting = ref<SortingState>([])
+useTableQuery([tableQueryField('sort', sorting, tableQuerySorting)])
 
 function sortableHeader(label: string, align: 'left' | 'right' = 'left') {
   return ({ column }: { column: Column<PaymentListItem, unknown> }) => {

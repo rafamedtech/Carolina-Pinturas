@@ -2,6 +2,7 @@
 import type { SiigoProduct } from '~/types/siigo'
 
 defineProps<{
+  returnTo?: string
   products: readonly SiigoProduct[]
   loading: boolean
   unitFor: (product: SiigoProduct) => string
@@ -42,7 +43,7 @@ defineProps<{
               {{ product.code }}
             </p>
             <NuxtLink
-              :to="`/productos/${encodeURIComponent(product.id)}`"
+              :to="{ path: `/productos/${encodeURIComponent(product.id)}`, query: { returnTo } }"
               class="line-clamp-2 text-lg font-semibold text-primary hover:underline"
               :aria-label="`Abrir producto ${product.name}`"
             >
@@ -87,7 +88,7 @@ defineProps<{
         </dl>
 
         <UButton
-          :to="`/productos/${encodeURIComponent(product.id)}`"
+          :to="{ path: `/productos/${encodeURIComponent(product.id)}`, query: { returnTo } }"
           label="Ver producto"
           icon="i-lucide-arrow-right"
           trailing

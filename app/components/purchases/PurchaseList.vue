@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { tableQueryField, tableQueryText, tableQueryRange, tableQuerySorting } from '~/utils/tableQuery'
 import { h, resolveComponent } from 'vue'
 import type { TableColumn } from '@nuxt/ui'
 import type { Column, SortingState, TableMeta } from '@tanstack/table-core'
@@ -21,6 +22,12 @@ onMounted(() => {
 const search = shallowRef('')
 const status = shallowRef('all')
 const dateRange = shallowRef<OrderDateRange | null>(null)
+const { returnTo } = useTableQuery([
+  tableQueryField('search', search, tableQueryText()),
+  tableQueryField('status', status, tableQueryText('all', ['all', 'confirmada', 'liquidada', 'vencida', 'borrador', 'cancelada'])),
+  tableQueryRange(dateRange),
+  tableQueryField('sort', sorting, tableQuerySorting)
+])
 const statusItems = [
   { label: 'Todas', value: 'all' },
   { label: 'Confirmada', value: 'confirmada' },
@@ -124,7 +131,7 @@ const columns: TableColumn<PurchaseView>[] = [{
   header: sortableHeader('Orden'),
   cell: ({ row }) => h(
     NuxtLink,
-    { to: `/compras/${row.original.id}`, class: 'font-semibold text-primary underline' },
+    { to: { path: `/compras/${row.original.id}`, query: { returnTo: returnTo.value } }, class: 'font-semibold text-primary underline' },
     () => `OC-${row.original.folio}`
   )
 }, {
@@ -191,7 +198,7 @@ const columns: TableColumn<PurchaseView>[] = [{
             @click="refresh()"
           />
           <UButton
-            to="/compras/nueva"
+            :to="{ path: '/compras/nueva', query: { returnTo } }"
             label="Nueva compra"
             icon="i-lucide-plus"
             aria-label="Nueva compra"

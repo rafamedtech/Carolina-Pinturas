@@ -1,18 +1,34 @@
 <script setup lang="ts">
+import { parseDate } from '@internationalized/date'
 import type { DateValue } from '@internationalized/date'
 
+const props = withDefaults(defineProps<{ filters?: Record<string, string> }>(), { filters: () => ({ active: 'true' }) })
 const emit = defineEmits<{ change: [filters: Record<string, string>] }>()
 const active = shallowRef('true')
 const createdStart = shallowRef<DateValue>()
 const createdEnd = shallowRef<DateValue>()
 const updatedStart = shallowRef<DateValue>()
 const updatedEnd = shallowRef<DateValue>()
+watch(() => props.filters, (value) => {
+  active.value = value.active || 'true'
+  const date = (key: string) => {
+    try {
+      return value[key] ? parseDate(value[key]) : undefined
+    } catch {
+      return undefined
+    }
+  }
+  createdStart.value = date('created_start')
+  createdEnd.value = date('created_end')
+  updatedStart.value = date('updated_start')
+  updatedEnd.value = date('updated_end')
+}, { immediate: true })
 const options = [{ label: 'Activos', value: 'true' }, { label: 'Inactivos', value: 'false' }, { label: 'Todos', value: 'all' }]
-const filters = computed(() => Object.fromEntries(Object.entries({ active: active.value, created_start: createdStart.value?.toString(), created_end: createdEnd.value?.toString(), updated_start: updatedStart.value?.toString(), updated_end: updatedEnd.value?.toString() }).filter((entry): entry is [string, string] => Boolean(entry[1]))))
+const draftFilters = computed(() => Object.fromEntries(Object.entries({ active: active.value, created_start: createdStart.value?.toString(), created_end: createdEnd.value?.toString(), updated_start: updatedStart.value?.toString(), updated_end: updatedEnd.value?.toString() }).filter((entry): entry is [string, string] => Boolean(entry[1]))))
 function clear() {
   active.value = 'true'
   createdStart.value = createdEnd.value = updatedStart.value = updatedEnd.value = undefined
-  emit('change', filters.value)
+  emit('change', draftFilters.value)
 }
 </script>
 
@@ -39,7 +55,7 @@ function clear() {
       </UFormField>
     </div>
     <div class="mt-4 flex gap-3">
-      <UButton label="Aplicar filtros" @click="emit('change', filters)" />
+      <UButton label="Aplicar filtros" @click="emit('change', draftFilters)" />
       <UButton
         label="Limpiar filtros"
         variant="outline"
