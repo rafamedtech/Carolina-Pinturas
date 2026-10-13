@@ -105,8 +105,14 @@ function sortableHeader(label: string, align: 'left' | 'right' = 'left') {
   }
 }
 
+const amountFormatter = new Intl.NumberFormat('en-US', {
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2,
+  useGrouping: true
+})
+
 function formatAmount(amount: number, currencyCode: string, colorClass = '') {
-  return h('div', { class: ['text-right font-bold', colorClass] }, `${amount.toFixed(2)} ${currencyCode}`)
+  return h('div', { class: ['text-right font-bold', colorClass] }, `$${amountFormatter.format(amount)} ${currencyCode}`)
 }
 
 const columns: TableColumn<PurchaseView>[] = [{
