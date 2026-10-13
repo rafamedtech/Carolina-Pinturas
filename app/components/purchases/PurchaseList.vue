@@ -5,7 +5,7 @@ import type { Column, SortingState, TableMeta } from '@tanstack/table-core'
 import type { OrderDateRange } from '~/types/orders'
 import type { PurchaseView } from '~/types/purchases'
 import type { CsvColumn } from '~/utils/csv'
-import { purchaseStatus, receiptStatus } from '~/utils/purchaseFormat'
+import { purchaseStatus } from '~/utils/purchaseFormat'
 import { formatDate, mexicoToday } from '~/utils/datetime'
 
 const UButton = resolveComponent('UButton')
@@ -40,6 +40,13 @@ const { data, error, status: requestStatus, refresh } = await useFetch<{ results
 const loading = computed(() => requestStatus.value === 'idle' || (isHydrated.value && requestStatus.value === 'pending'))
 const purchases = computed(() => [...(data.value?.results ?? [])])
 
+function nextInvoiceDueDate(order: PurchaseView): string | undefined {
+  return order.invoices.reduce<string | undefined>((dueDate, invoice) => {
+    if (invoice.voidedAt || invoice.status === 'anulada' || invoice.balance <= 0) return dueDate
+    return !dueDate || invoice.dueDate < dueDate ? invoice.dueDate : dueDate
+  }, undefined)
+}
+
 const tableMeta: TableMeta<PurchaseView> = {
   class: {
     tr: (row) => {
@@ -59,14 +66,14 @@ const tableMeta: TableMeta<PurchaseView> = {
 }
 
 const csvColumns: CsvColumn<PurchaseView>[] = [
+  { key: 'date', label: 'Fecha', value: row => formatDate(row.date) },
   { key: 'folio', label: 'Orden', value: row => `OC-${row.folio}` },
   { key: 'providerName', label: 'Proveedor' },
-  { key: 'date', label: 'Fecha', value: row => formatDate(row.date) },
   { key: 'status', label: 'Estado' },
-  { key: 'receiptStatus', label: 'Recepción' },
+  { key: 'nextDueDate', label: 'Próximo vencimiento', value: row => formatDate(nextInvoiceDueDate(row)) },
   { key: 'total', label: 'Total', value: row => row.total },
-  { key: 'balance', label: 'Saldo facturado', value: row => row.balance },
-  { key: 'currencyCode', label: 'Moneda' }
+  { key: 'currencyCode', label: 'Moneda' },
+  { key: 'balance', label: 'Saldo pendiente', value: row => row.balance }
 ]
 
 function sortableHeader(label: string, align: 'left' | 'right' = 'left') {
@@ -101,6 +108,10 @@ function formatAmount(amount: number, currencyCode: string) {
 }
 
 const columns: TableColumn<PurchaseView>[] = [{
+  accessorKey: 'date',
+  header: sortableHeader('Fecha'),
+  cell: ({ row }) => formatDate(row.original.date)
+}, {
   accessorKey: 'folio',
   header: sortableHeader('Orden'),
   cell: ({ row }) => h(
@@ -112,10 +123,6 @@ const columns: TableColumn<PurchaseView>[] = [{
   accessorKey: 'providerName',
   header: sortableHeader('Proveedor')
 }, {
-  accessorKey: 'date',
-  header: sortableHeader('Fecha'),
-  cell: ({ row }) => formatDate(row.original.date)
-}, {
   accessorKey: 'status',
   header: sortableHeader('Estado'),
   cell: ({ row }) => {
@@ -123,19 +130,18 @@ const columns: TableColumn<PurchaseView>[] = [{
     return h(UBadge, { color: status.color, icon: status.icon, variant: 'soft', ui: { leadingIcon: 'size-4' } }, () => status.label)
   }
 }, {
-  accessorKey: 'receiptStatus',
-  header: sortableHeader('Recepción'),
-  cell: ({ row }) => {
-    const status = receiptStatus(row.original.receiptStatus)
-    return h(UBadge, { color: status.color, icon: status.icon, variant: 'soft', ui: { leadingIcon: 'size-4' } }, () => status.label)
-  }
+  id: 'nextDueDate',
+  accessorFn: nextInvoiceDueDate,
+  header: sortableHeader('Próximo vencimiento'),
+  sortUndefined: 'last',
+  cell: ({ getValue }) => formatDate(getValue<string | undefined>())
 }, {
   accessorKey: 'total',
   header: sortableHeader('Total', 'right'),
   cell: ({ row }) => formatAmount(row.original.total, row.original.currencyCode)
 }, {
   accessorKey: 'balance',
-  header: sortableHeader('Saldo facturado', 'right'),
+  header: sortableHeader('Saldo pendiente', 'right'),
   cell: ({ row }) => formatAmount(row.original.balance, row.original.currencyCode)
 }]
 </script>
