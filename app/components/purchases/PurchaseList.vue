@@ -112,7 +112,7 @@ const amountFormatter = new Intl.NumberFormat('en-US', {
 })
 
 function formatAmount(amount: number, currencyCode: string, colorClass = '') {
-  return h('div', { class: ['text-right font-bold', colorClass] }, `$${amountFormatter.format(amount)} ${currencyCode}`)
+  return h('div', { class: ['text-right font-semibold', colorClass] }, `$${amountFormatter.format(amount)} ${currencyCode}`)
 }
 
 const columns: TableColumn<PurchaseView>[] = [{
