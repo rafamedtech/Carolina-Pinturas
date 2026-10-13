@@ -1,6 +1,6 @@
 import { computed, readonly, ref } from 'vue'
 import type { OrderDiscountType } from '~/types/orders'
-import { discountAmountOf } from '~/utils/orderDiscount'
+import { orderLineAmounts, orderMoney } from '#shared/utils/orderAmounts'
 
 export interface DraftOrderLine {
   productId: string
@@ -18,6 +18,7 @@ export interface DraftOrderLine {
   priceNote: string
   taxIncluded: boolean
   taxPercentage: number
+  taxPercentages?: readonly number[]
   discountType: OrderDiscountType
   discountValue: number
   observations: string
@@ -35,24 +36,21 @@ interface AddOrderProductInput {
   unitPrice: number
   taxIncluded: boolean
   taxPercentage: number
+  taxPercentages?: readonly number[]
 }
 
-// Refleja el cálculo del servidor (server/utils/orders.ts): el descuento se
-// aplica sobre la base sin impuestos y el impuesto sobre la base descontada.
 export function draftLineTotal(line: DraftOrderLine) {
-  const listedTotal = line.quantity * line.unitPrice
-  const base = line.taxIncluded && line.taxPercentage > 0
-    ? listedTotal / (1 + line.taxPercentage / 100)
-    : listedTotal
-  const discounted = base - discountAmountOf(base, line.discountType, line.discountValue)
-  return discounted * (1 + line.taxPercentage / 100)
+  return orderLineAmounts(
+    line.quantity, line.unitPrice, line.taxPercentages ?? line.taxPercentage,
+    line.taxIncluded, line.discountType, line.discountValue
+  ).total.toNumber()
 }
 
 export function useOrderDraft() {
   const internalLines = ref<DraftOrderLine[]>([])
 
   const total = computed(() =>
-    internalLines.value.reduce((sum, line) => sum + draftLineTotal(line), 0)
+    internalLines.value.reduce((sum, line) => sum.plus(draftLineTotal(line)), orderMoney(0)).toNumber()
   )
 
   function addProduct(product: AddOrderProductInput) {
@@ -79,6 +77,7 @@ export function useOrderDraft() {
       priceNote: '',
       taxIncluded: product.taxIncluded,
       taxPercentage: product.taxPercentage,
+      taxPercentages: product.taxPercentages,
       discountType: 'porcentaje',
       discountValue: 0,
       observations: ''

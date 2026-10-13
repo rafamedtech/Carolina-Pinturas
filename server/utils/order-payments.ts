@@ -1,4 +1,5 @@
 import * as z from 'zod'
+import { orderMoney } from '#shared/utils/orderAmounts'
 import type { Prisma, SalesOrderPayment } from '../../generated/prisma/client'
 import type { AppUser, UserRole } from '~/types/siigo'
 import type { OrderPayment } from '~/types/siigo-payments'
@@ -37,12 +38,12 @@ export function paymentMethodFromCfdi(cfdiCode: string) {
 
 export function paymentStatus(totalPaid: number, orderTotal: number) {
   if (totalPaid <= 0) return 'pendiente_pago'
-  return totalPaid + 0.005 >= orderTotal ? 'pago_recibido' : 'abonado'
+  return orderMoney(totalPaid).gte(orderMoney(orderTotal)) ? 'pago_recibido' : 'abonado'
 }
 
 export function assertPaymentFitsBalance(amount: number, paidTotal: number, orderTotal: number) {
-  const balance = Math.max(0, orderTotal - paidTotal)
-  if (amount > balance + 0.005) {
+  const balance = orderMoney(orderTotal).minus(orderMoney(paidTotal))
+  if (orderMoney(amount).gt(balance)) {
     throw createError({
       statusCode: 422,
       statusMessage: `El importe supera el saldo pendiente de ${balance.toFixed(2)}.`

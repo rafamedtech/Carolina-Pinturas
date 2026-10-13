@@ -101,6 +101,8 @@ export interface SalesOrderItem {
   }
   quantity: number
   unitPrice: number
+  taxIncluded?: boolean
+  taxPercentages?: number[]
   discountType: OrderDiscountType
   discountValue: number
   discountPercentage: number

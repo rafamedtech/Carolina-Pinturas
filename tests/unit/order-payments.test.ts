@@ -75,6 +75,14 @@ describe('pagos unificados de pedidos', () => {
     expect(() => assertPaymentFitsBalance(300.01, 200, 500)).toThrow()
   })
 
+  it('reconoce el pago completo en centavos y conserva saldos de un centavo', () => {
+    expect(paymentStatus(300, 300.01)).toBe('abonado')
+    expect(paymentStatus(300.01, 300.01)).toBe('pago_recibido')
+    expect(paymentStatus(299.99, 299.99)).toBe('pago_recibido')
+    expect(() => assertPaymentFitsBalance(0.1, 0.2, 0.3)).not.toThrow()
+    expect(() => assertPaymentFitsBalance(0.02, 300, 300.01)).toThrow()
+  })
+
   it('conserva una traducción local para las formas CFDI de Siigo', () => {
     expect(paymentMethodFromCfdi('01')).toBe('efectivo')
     expect(paymentMethodFromCfdi('02')).toBe('cheque')

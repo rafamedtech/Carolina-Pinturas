@@ -7,6 +7,7 @@ import type { SiigoCustomer, SiigoProduct } from '~/types/siigo'
 import { submittedOrderStatusKey, canManageOrderLogistics } from '~/utils/roleAccess'
 import { DEFAULT_PAYMENT_STATUS, paymentMethodLabel } from '~/utils/orderPayment'
 import { discountAmountOf } from '~/utils/orderDiscount'
+import { orderMoney } from '#shared/utils/orderAmounts'
 import { orderListReturnPath } from '~/utils/orderNavigation'
 import { resolveCreatedOrderStatusKey } from '~/utils/orderCreation'
 import { draftLineTotal } from '~/composables/useOrderDraft'
@@ -213,7 +214,7 @@ function editorSnapshot() {
 
 const orderDiscountAmount = computed(() =>
   discountAmountOf(total.value, state.discountType, state.discountValue))
-const grandTotal = computed(() => total.value - orderDiscountAmount.value)
+const grandTotal = computed(() => orderMoney(total.value).minus(orderDiscountAmount.value).toNumber())
 const {
   data: customers,
   status: customerStatus,
@@ -347,12 +348,12 @@ watch(existingOrder, (value) => {
     // El impuesto se calcula sobre la base ya descontada; el precio con
     // impuesto incluido se detecta comparando contra la base bruta.
     const taxableBase = item.subtotal - item.discountAmount
-    const taxPercentage = taxableBase > 0
+    const taxPercentage = item.taxPercentages?.reduce((sum, rate) => sum + rate, 0) ?? (taxableBase > 0
       ? item.taxAmount / taxableBase * 100
-      : 0
+      : 0)
     const listedTotal = item.quantity * item.unitPrice
-    const taxIncluded = taxPercentage > 0
-      && Math.abs(listedTotal - item.subtotal * (1 + taxPercentage / 100)) < 0.01
+    const taxIncluded = item.taxIncluded ?? (taxPercentage > 0
+      && Math.abs(listedTotal - item.subtotal * (1 + taxPercentage / 100)) < 0.01)
 
     // La primera entrada del historial de precio conserva el precio de lista
     // original; sin historial, el precio guardado es el de lista.
@@ -370,6 +371,7 @@ watch(existingOrder, (value) => {
       priceNote: item.unitPrice !== catalogPrice ? lastHistoryNote || '' : '',
       taxIncluded,
       taxPercentage,
+      taxPercentages: item.taxPercentages,
       discountType: item.discountType,
       discountValue: item.discountValue,
       observations: item.observations || ''
@@ -486,7 +488,8 @@ async function addSelectedProduct(product: SiigoProduct, quantity: number) {
     unitPrice: productPrice(product),
     taxIncluded: product.tax_included ?? false,
     taxPercentage: (product.taxes || []).reduce((sum, tax) =>
-      sum + (Number(tax.percentage) || 0), 0)
+      sum + (Number(tax.percentage) || 0), 0),
+    taxPercentages: (product.taxes || []).map(tax => Number(tax.percentage) || 0)
   })
 }
 

@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { inventoryRequest, inventorySettings, syncOrderInventory, assertOrderInventoryEditable } from './inventory'
 import Decimal from 'decimal.js'
+import { orderLineAmounts as lineAmounts, orderAmounts as orderTotals, orderMoney } from '#shared/utils/orderAmounts'
 import type { Prisma, SalesOrder } from '../../generated/prisma/client'
 import type { AppUser, SiigoCustomer, SiigoProduct } from '~/types/siigo'
 import type { SalesOrderDetail, SalesOrderListItem } from '~/types/orders'
@@ -157,69 +158,17 @@ function productPrice(product: SiigoProduct) {
 
   return {
     currencyCode: price?.currency_code || 'MXN',
-    value: Number.isFinite(value) ? money(value) : money(0)
+    value: Number.isFinite(value) ? orderMoney(value) : orderMoney(0)
   }
 }
 
-function discountOf(base: Decimal, discountType: string, discountValue: Decimal.Value) {
-  return discountType === 'monto'
-    ? money(Decimal.min(money(discountValue), base))
-    : money(base.mul(discountValue).div(100))
-}
-
-// El descuento de la partida se aplica sobre la base sin impuestos; el
-// impuesto se calcula sobre la base ya descontada. `subtotal` conserva la
-// base bruta, de modo que total = subtotal - descuento + impuestos.
-function lineAmounts(
-  quantity: Decimal,
-  unitPrice: Decimal,
-  taxPercentage: Decimal,
-  taxIncluded: boolean,
-  discountType = 'porcentaje',
-  discountValue: Decimal.Value = 0
-) {
-  const listedTotal = money(quantity.mul(unitPrice))
-  const divisor = money(1).plus(taxPercentage.div(100))
-  const subtotal = taxIncluded && taxPercentage.gt(0)
-    ? money(listedTotal.div(divisor))
-    : listedTotal
-  const discountAmount = discountOf(subtotal, discountType, discountValue)
-  const taxableBase = money(subtotal.minus(discountAmount))
-  const taxAmount = money(taxableBase.mul(taxPercentage).div(100))
-  const total = money(taxableBase.plus(taxAmount))
-
-  return { subtotal, discountAmount, taxAmount, total }
-}
-
-// El descuento del pedido se aplica sobre la suma de partidas ya con
-// impuestos; discount_total acumula descuentos de partidas + del pedido.
-function orderTotals(
-  lines: { subtotal: Decimal.Value, discountAmount: Decimal.Value, taxAmount: Decimal.Value, total: Decimal.Value }[],
-  discountType: string,
-  discountValue: Decimal.Value
-) {
-  const subtotal = lines.reduce((sum, line) => sum.plus(line.subtotal), money(0))
-  const lineDiscounts = lines.reduce((sum, line) => sum.plus(line.discountAmount), money(0))
-  const taxTotal = lines.reduce((sum, line) => sum.plus(line.taxAmount), money(0))
-  const linesTotal = lines.reduce((sum, line) => sum.plus(line.total), money(0))
-  const discountAmount = discountOf(linesTotal, discountType, discountValue)
-
-  return {
-    subtotal,
-    taxTotal,
-    discountAmount,
-    discountTotal: money(lineDiscounts.plus(discountAmount)),
-    total: money(linesTotal.minus(discountAmount))
-  }
-}
-
-function taxPercentageFromPayload(taxPayload: Prisma.JsonValue): Decimal {
+function taxPercentagesFromPayload(taxPayload: Prisma.JsonValue): number[] {
   const taxes = Array.isArray(taxPayload) ? taxPayload : []
-  return taxes.reduce((sum: Decimal, tax) => {
-    if (!tax || typeof tax !== 'object' || Array.isArray(tax)) return sum
-    const percentage = Number((tax as { percentage?: unknown }).percentage)
-    return Number.isFinite(percentage) ? sum.plus(percentage) : sum
-  }, money(0))
+  return taxes.flatMap((tax) => {
+    if (!tax || typeof tax !== 'object' || Array.isArray(tax)) return []
+    const percentage = Number(tax.percentage)
+    return Number.isFinite(percentage) ? [percentage] : []
+  })
 }
 
 function buildLine(
@@ -238,10 +187,9 @@ function buildLine(
   const selectedPrice = productPrice(product)
   // El precio editado en el editor sustituye al de lista de Siigo; el cambio
   // queda auditado en sales_order_item_price_history al guardar.
-  const unitPrice = line.unitPrice != null ? money(line.unitPrice) : selectedPrice.value
+  const unitPrice = line.unitPrice != null ? orderMoney(line.unitPrice) : selectedPrice.value
   const priceOverridden = !unitPrice.equals(selectedPrice.value)
-  const percentage = money((product.taxes || []).reduce((sum, tax) =>
-    sum + (Number(tax.percentage) || 0), 0))
+  const percentage = (product.taxes || []).map(tax => Number(tax.percentage) || 0)
   const { subtotal, discountAmount, taxAmount, total } = lineAmounts(
     quantity,
     unitPrice,
@@ -266,8 +214,8 @@ function buildLine(
     unitPrice: unitPrice.toString(),
     taxIncluded: product.tax_included ?? false,
     discountType: line.discountType,
-    discountValue: money(line.discountValue).toString(),
-    discountPercentage: line.discountType === 'porcentaje' ? money(line.discountValue).toString() : '0',
+    discountValue: orderMoney(line.discountValue).toString(),
+    discountPercentage: line.discountType === 'porcentaje' ? orderMoney(line.discountValue).toString() : '0',
     discountAmount: discountAmount.toString(),
     taxPayload: siigoJson(product.taxes || []),
     subtotal: subtotal.toString(),
@@ -498,6 +446,8 @@ function detail(order: OrderDetailRecord): SalesOrderDetail {
       },
       quantity: number(item.quantity),
       unitPrice: number(item.unitPrice),
+      taxIncluded: item.taxIncluded,
+      taxPercentages: taxPercentagesFromPayload(item.taxPayload),
       discountType: item.discountType === 'monto' ? 'monto' : 'porcentaje',
       discountValue: number(item.discountValue),
       discountPercentage: number(item.discountPercentage),
@@ -624,7 +574,7 @@ export async function createOrder(
         currencyCode: lines[0]?.currencyCode || 'MXN',
         subtotal: totals.subtotal.toString(),
         discountType: input.discountType,
-        discountValue: money(input.discountValue).toString(),
+        discountValue: orderMoney(input.discountValue).toString(),
         discountAmount: totals.discountAmount.toString(),
         discountTotal: totals.discountTotal.toString(),
         taxTotal: totals.taxTotal.toString(),
@@ -655,7 +605,7 @@ export async function createOrder(
           provider: 'local',
           externalStatus: 'not_applicable',
           paymentMethod: input.initialPayment.paymentMethod,
-          amount: totals.total.toDecimalPlaces(2).toString(),
+          amount: totals.total.toString(),
           currencyCode: lines[0]?.currencyCode || 'MXN',
           paymentDate: initialPaymentDate!,
           createdByName: user.name,
@@ -800,7 +750,7 @@ export async function updateOrder(
         currencyCode: lines[0]?.currencyCode || 'MXN',
         subtotal: totals.subtotal.toString(),
         discountType: input.discountType,
-        discountValue: money(input.discountValue).toString(),
+        discountValue: orderMoney(input.discountValue).toString(),
         discountAmount: totals.discountAmount.toString(),
         discountTotal: totals.discountTotal.toString(),
         taxTotal: totals.taxTotal.toString(),
@@ -1345,7 +1295,7 @@ export async function updateOrderItemPrice(
   }
 
   const previousPrice = money(item.unitPrice)
-  const newPrice = money(input.unitPrice)
+  const newPrice = orderMoney(input.unitPrice)
   if (previousPrice.equals(newPrice)) {
     throw createError({
       statusCode: 422,
@@ -1354,7 +1304,7 @@ export async function updateOrderItemPrice(
   }
 
   const quantity = money(item.quantity)
-  const taxPercentage = taxPercentageFromPayload(item.taxPayload)
+  const taxPercentage = taxPercentagesFromPayload(item.taxPayload)
   const { subtotal, discountAmount, taxAmount, total } = lineAmounts(
     quantity,
     newPrice,
@@ -1472,7 +1422,7 @@ export async function updateOrderItemQuantity(
   }
 
   const unitPrice = money(item.unitPrice)
-  const taxPercentage = taxPercentageFromPayload(item.taxPayload)
+  const taxPercentage = taxPercentagesFromPayload(item.taxPayload)
   const { subtotal, discountAmount, taxAmount, total } = lineAmounts(
     newQuantity,
     unitPrice,

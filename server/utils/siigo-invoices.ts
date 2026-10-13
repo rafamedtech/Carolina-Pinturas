@@ -1,4 +1,5 @@
 import Decimal from 'decimal.js'
+import { orderMoney as money, orderLineAmounts } from '#shared/utils/orderAmounts'
 import * as z from 'zod'
 import type { SiigoCustomer, SiigoProduct } from '~/types/siigo'
 import type {
@@ -386,6 +387,7 @@ interface InvoiceOrderLine {
   description: string | null
   quantity: number
   unitPrice: number
+  taxIncluded?: boolean
   discountAmount: number
   subtotal: number
   taxAmount: number
@@ -400,24 +402,18 @@ interface InvoiceOrderSource {
   items: InvoiceOrderLine[]
 }
 
-function money(value: Decimal.Value) {
-  return new Decimal(value).toDecimalPlaces(2, Decimal.ROUND_HALF_UP)
-}
-
 function invoiceDiscount(options: {
   line: InvoiceOrderLine
   orderDiscount: Decimal
   linesTotal: Decimal
   discountType: 'Percentage' | 'Value'
+  taxRate: Decimal
 }) {
   const base = new Decimal(options.line.subtotal)
-  const taxRate = options.line.subtotal > options.line.discountAmount
-    ? new Decimal(options.line.taxAmount).div(new Decimal(options.line.subtotal).minus(options.line.discountAmount))
-    : new Decimal(0)
   const allocatedWithTax = options.linesTotal.isZero()
     ? new Decimal(0)
     : options.orderDiscount.mul(options.line.total).div(options.linesTotal)
-  const allocatedBeforeTax = allocatedWithTax.div(taxRate.plus(1))
+  const allocatedBeforeTax = allocatedWithTax.div(options.taxRate.plus(1))
   const discountValue = new Decimal(options.line.discountAmount).plus(allocatedBeforeTax)
 
   if (discountValue.lte(0)) return undefined
@@ -436,6 +432,7 @@ export function buildSiigoInvoiceDraftPayload(options: {
   costCenterId: number | null
 }) {
   const linesTotal = options.order.items.reduce((sum, item) => sum.plus(item.total), new Decimal(0))
+  let invoiceTotal = money(0)
   const items = options.order.items.map((line) => {
     const product = options.products.get(line.code)
     if (!product || product.active === false || product.code !== line.code) {
@@ -452,13 +449,23 @@ export function buildSiigoInvoiceDraftPayload(options: {
     // `unitPrice` conserva el precio mostrado al usuario y puede incluir IVA.
     // Siigo vuelve a calcular los impuestos enviados en `taxes`, por lo que la
     // factura debe recibir el valor unitario de la base antes de impuestos.
-    const price = money(new Decimal(line.subtotal).div(quantity))
+    const taxRates = (product.taxes || []).map(tax => Number(tax.percentage) || 0)
+    const price = line.taxIncluded === undefined
+      ? money(new Decimal(line.subtotal).div(quantity))
+      : orderLineAmounts(quantity, listedPrice, taxRates, line.taxIncluded).price
     const discount = invoiceDiscount({
       line,
       orderDiscount: new Decimal(options.order.discountAmount),
       linesTotal,
-      discountType: options.documentType.discount_type
+      discountType: options.documentType.discount_type,
+      taxRate: taxRates.reduce((sum, rate) => sum.plus(rate), new Decimal(0)).div(100)
     })
+    const amounts = orderLineAmounts(
+      quantity, price, taxRates, false,
+      options.documentType.discount_type === 'Value' ? 'monto' : 'porcentaje',
+      discount ?? 0
+    )
+    invoiceTotal = invoiceTotal.plus(amounts.total)
     const taxes = (product.taxes || []).flatMap((tax) => {
       const id = number(tax.id)
       return id && Number.isInteger(id) ? [{ id }] : []
@@ -474,6 +481,15 @@ export function buildSiigoInvoiceDraftPayload(options: {
       ...(options.input.warehouseId ? { warehouse: options.input.warehouseId } : {})
     }
   })
+  // Validación local anterior a reservar/enviar cualquier operación fiscal.
+  // No ocultar diferencias de precios, impuestos vigentes o descuentos que
+  // el tipo de comprobante no puede representar con su precisión.
+  if (!invoiceTotal.equals(money(options.order.total))) {
+    throw createError({
+      statusCode: 422,
+      statusMessage: `El total calculado para Siigo (${invoiceTotal.toFixed(2)}) no coincide con el pedido (${money(options.order.total).toFixed(2)}). Revisa los precios, impuestos y descuentos del pedido antes de facturar.`
+    })
+  }
   const observations = [`Pedido PED-${String(options.order.folio).padStart(6, '0')}`, options.order.observations]
     .filter(Boolean)
     .join(' · ')
