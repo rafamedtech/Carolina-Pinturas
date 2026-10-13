@@ -4,7 +4,6 @@ import { requireRole } from '../../../../utils/auth'
 import { collectSiigoCatalog } from '../../../../utils/siigo-catalog'
 import { isUsableFiscalRfc, normalizeHistoricalInvoiceOptions } from '../../../../utils/siigo-invoices'
 import { getOrder } from '../../../../utils/orders'
-import { usePrisma } from '../../../../utils/prisma'
 import { getSiigoCustomerDetail } from '../../../../utils/siigo-customer-detail'
 import { siigoRequest } from '../../../../utils/siigo'
 
@@ -15,15 +14,9 @@ export default eventHandler(async (event): Promise<HistoricalSiigoInvoiceContext
     throw createError({ statusCode: 400, statusMessage: 'Falta el identificador del pedido.' })
   }
 
-  const [order, persisted] = await Promise.all([
-    getOrder(orderId, user),
-    usePrisma().salesOrderSiigoInvoice.findUnique({ where: { orderId } })
-  ])
+  const order = await getOrder(orderId, user)
   if (order.status.key === 'borrador') {
     throw createError({ statusCode: 409, statusMessage: 'Convierte la cotización en pedido antes de asignar una factura.' })
-  }
-  if (order.siigoReference || (persisted && persisted.status !== 'failed')) {
-    throw createError({ statusCode: 409, statusMessage: 'Este pedido ya tiene una factura asociada.' })
   }
 
   const customer = await getSiigoCustomerDetail(order.customer.id)

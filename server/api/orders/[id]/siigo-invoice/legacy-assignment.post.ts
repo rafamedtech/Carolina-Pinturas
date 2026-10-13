@@ -32,9 +32,6 @@ export default eventHandler(async (event): Promise<SalesOrderDetail> => {
   if (order.status.key === 'borrador') {
     throw createError({ statusCode: 409, statusMessage: 'Convierte la cotización en pedido antes de asignar una factura.' })
   }
-  if (order.siigoReference || order.invoiceCreated) {
-    throw createError({ statusCode: 409, statusMessage: 'Este pedido ya tiene una factura asociada.' })
-  }
 
   const customer = await getSiigoCustomerDetail(order.customer.id)
   const customerRfc = customer.rfc_id || customer.identification || null
@@ -53,6 +50,13 @@ export default eventHandler(async (event): Promise<SalesOrderDetail> => {
 
   try {
     await usePrisma().$transaction(async (tx) => {
+      const reserved = await tx.salesOrder.updateMany({
+        where: { id: orderId, version: parsed.data.version },
+        data: { version: { increment: 1 } }
+      })
+      if (!reserved.count) {
+        throw createError({ statusCode: 409, statusMessage: 'El pedido cambió. Actualiza e intenta nuevamente.' })
+      }
       const current = await tx.salesOrder.findUnique({
         where: { id: orderId },
         select: {
@@ -61,8 +65,8 @@ export default eventHandler(async (event): Promise<SalesOrderDetail> => {
         }
       })
       if (!current) throw createError({ statusCode: 404, statusMessage: 'No se encontró el pedido.' })
-      if (current.siigoReference || (current.siigoInvoice && current.siigoInvoice.status !== 'failed')) {
-        throw createError({ statusCode: 409, statusMessage: 'Este pedido ya tiene una factura asociada.' })
+      if (current.siigoInvoice && ['pending', 'uncertain'].includes(current.siigoInvoice.status)) {
+        throw createError({ statusCode: 409, statusMessage: 'Resuelve el intento de facturación pendiente antes de cambiar la asociación.' })
       }
 
       const invoiceData = {
@@ -87,7 +91,7 @@ export default eventHandler(async (event): Promise<SalesOrderDetail> => {
         createdByRole: user.role,
         requestedAt: new Date()
       }
-      if (current.siigoInvoice?.status === 'failed') {
+      if (current.siigoInvoice) {
         await tx.salesOrderSiigoInvoice.update({ where: { orderId }, data: invoiceData })
       } else {
         await tx.salesOrderSiigoInvoice.create({ data: { orderId, ...invoiceData } })
@@ -98,8 +102,7 @@ export default eventHandler(async (event): Promise<SalesOrderDetail> => {
           requiresInvoice: true,
           siigoReference: invoice.id,
           registeredInSiigoAt: new Date(),
-          updatedByEmail: user.email,
-          version: { increment: 1 }
+          updatedByEmail: user.email
         }
       })
     })

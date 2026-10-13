@@ -10,6 +10,8 @@ import type {
 
 const props = defineProps<{
   orderId: string
+  invoiceId: string | null
+  version: number
 }>()
 const emit = defineEmits<{
   assigned: [order: SalesOrderDetail]
@@ -17,6 +19,10 @@ const emit = defineEmits<{
 const open = defineModel<boolean>('open', { required: true })
 const saving = shallowRef(false)
 const toast = useToast()
+const confirmingRemoval = shallowRef(false)
+const assignedInvoiceName = computed(() =>
+  context.value?.invoices.find(invoice => invoice.id === props.invoiceId)?.name || props.invoiceId
+)
 const {
   data: context,
   error,
@@ -32,7 +38,7 @@ const schema = z.object({
 })
 type Schema = z.output<typeof schema>
 const state = reactive<Partial<Schema>>({ invoiceId: '', confirmed: false })
-const invoiceItems = computed(() => (context.value?.invoices || []).map(invoice => ({
+const invoiceItems = computed(() => (context.value?.invoices.filter(invoice => invoice.id !== props.invoiceId) || []).map(invoice => ({
   label: invoice.name,
   description: `${formatDate(invoice.date)} · ${formatCurrency(invoice.total)} · Timbrada`,
   value: invoice.id
@@ -40,10 +46,11 @@ const invoiceItems = computed(() => (context.value?.invoices || []).map(invoice 
 
 watch(open, async (isOpen) => {
   if (!isOpen) return
+  confirmingRemoval.value = false
   state.invoiceId = ''
   state.confirmed = false
   await refresh()
-  state.invoiceId = context.value?.invoices[0]?.id || ''
+  state.invoiceId = context.value?.invoices.find(invoice => invoice.id !== props.invoiceId)?.id || ''
 })
 
 function formatCurrency(value: number) {
@@ -54,6 +61,7 @@ async function onSubmit(event: FormSubmitEvent<Schema>) {
   if (saving.value) return
   saving.value = true
   const input: AssignHistoricalSiigoInvoiceInput = {
+    version: props.version,
     invoiceId: event.data.invoiceId,
     confirmation: 'ASIGNAR_FACTURA_HISTORICA'
   }
@@ -66,7 +74,7 @@ async function onSubmit(event: FormSubmitEvent<Schema>) {
     open.value = false
     emit('assigned', order)
     toast.add({
-      title: 'Factura histórica asignada',
+      title: props.invoiceId ? 'Factura asignada cambiada' : 'Factura histórica asignada',
       description: context.value?.invoices.find(invoice => invoice.id === input.invoiceId)?.name,
       color: 'success',
       icon: 'i-lucide-circle-check'
@@ -84,17 +92,56 @@ async function onSubmit(event: FormSubmitEvent<Schema>) {
     saving.value = false
   }
 }
+async function removeAssignment() {
+  if (saving.value || !props.invoiceId) return
+  saving.value = true
+  try {
+    const order = await $fetch<SalesOrderDetail>(
+      `/api/orders/${encodeURIComponent(props.orderId)}/siigo-invoice/legacy-assignment`,
+      { method: 'DELETE', body: { version: props.version, confirmation: 'QUITAR_FACTURA_ASIGNADA' } }
+    )
+    open.value = false
+    emit('assigned', order)
+    toast.add({ title: 'Factura desasignada del pedido', color: 'success', icon: 'i-lucide-circle-check' })
+  } catch (fetchError: unknown) {
+    const response = fetchError as { data?: { statusMessage?: string }, message?: string }
+    toast.add({
+      title: 'No se pudo quitar la factura asignada',
+      description: response.data?.statusMessage || response.message || 'Actualiza e intenta nuevamente.',
+      color: 'error',
+      icon: 'i-lucide-circle-alert'
+    })
+  } finally {
+    saving.value = false
+  }
+}
 </script>
 
 <template>
   <UModal
     v-model:open="open"
-    title="Asignar factura histórica"
+    :title="invoiceId ? 'Cambiar factura asignada' : 'Asignar factura histórica'"
     description="Herramienta temporal para pedidos facturados previamente en Siigo. Solo muestra facturas timbradas del mismo cliente y total."
     :dismissible="!saving"
     :ui="{ content: 'max-w-xl', footer: 'justify-end' }"
   >
     <template #body>
+      <UAlert
+        v-if="invoiceId"
+        class="mb-4"
+        color="info"
+        variant="subtle"
+        title="Factura asignada actualmente"
+        :description="assignedInvoiceName || undefined"
+      />
+      <UAlert
+        v-if="confirmingRemoval"
+        class="mb-4"
+        color="warning"
+        variant="subtle"
+        title="¿Quitar la factura asignada?"
+        description="Se quitará la asociación con este pedido. La factura y sus recepciones de pago seguirán en Siigo."
+      />
       <div v-if="status === 'pending'" class="space-y-3">
         <USkeleton class="h-16 w-full" />
         <USkeleton class="h-10 w-full" />
@@ -109,15 +156,15 @@ async function onSubmit(event: FormSubmitEvent<Schema>) {
       />
 
       <UAlert
-        v-else-if="context && !context.invoices.length"
+        v-else-if="context && !invoiceItems.length"
         color="warning"
         variant="subtle"
         title="Sin facturas compatibles"
-        description="No hay facturas timbradas de este cliente cuyo total coincida con el pedido."
+        description="No hay otras facturas timbradas de este cliente cuyo total coincida con el pedido."
       />
 
       <UForm
-        v-else-if="context"
+        v-else-if="context && !confirmingRemoval"
         id="historical-invoice-form"
         :schema="schema"
         :state="state"
@@ -138,6 +185,7 @@ async function onSubmit(event: FormSubmitEvent<Schema>) {
             v-model="state.invoiceId"
             :items="invoiceItems"
             value-key="value"
+            :disabled="saving"
             class="w-full"
           />
         </UFormField>
@@ -145,7 +193,8 @@ async function onSubmit(event: FormSubmitEvent<Schema>) {
         <UFormField name="confirmed">
           <UCheckbox
             v-model="state.confirmed"
-            label="Confirmo que esta factura corresponde al pedido y que la asociación no podrá reemplazarse."
+            :disabled="saving"
+            label="Confirmo que esta factura corresponde al pedido."
           />
         </UFormField>
       </UForm>
@@ -160,12 +209,30 @@ async function onSubmit(event: FormSubmitEvent<Schema>) {
         @click="close"
       />
       <UButton
+        v-if="invoiceId && !confirmingRemoval"
+        label="Quitar factura asignada"
+        color="error"
+        variant="outline"
+        icon="i-lucide-unlink"
+        :disabled="saving"
+        @click="confirmingRemoval = true"
+      />
+      <UButton
+        v-if="confirmingRemoval"
+        label="Confirmar quitar factura"
+        color="error"
+        icon="i-lucide-unlink"
+        :loading="saving"
+        @click="removeAssignment"
+      />
+      <UButton
+        v-else
         type="submit"
         form="historical-invoice-form"
-        label="Asignar factura"
+        :label="invoiceId ? 'Cambiar factura' : 'Asignar factura'"
         icon="i-lucide-link"
         :loading="saving"
-        :disabled="saving || status === 'pending' || !context?.invoices.length"
+        :disabled="saving || status === 'pending' || !!error || !invoiceItems.length || !state.invoiceId"
       />
     </template>
   </UModal>

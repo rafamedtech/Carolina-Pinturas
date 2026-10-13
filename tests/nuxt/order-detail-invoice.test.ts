@@ -199,7 +199,7 @@ describe('OrderDetail · facturación', () => {
     const invoiceButton = wrapper.findAll('button')
       .find(button => button.text().trim() === 'Facturar')
     expect(invoiceButton?.attributes('disabled')).toBeDefined()
-    expect(wrapper.text()).not.toContain('Asignar factura anterior')
+    expect(wrapper.text()).toContain('Asignar factura anterior')
   })
 
   it('permite abrir los pagos para seleccionar una factura existente', async () => {

@@ -29,6 +29,7 @@ export const createOrderSiigoInvoiceSchema = z.object({
 })
 
 export const assignHistoricalSiigoInvoiceSchema = z.object({
+  version: z.number().int().positive(),
   invoiceId: z.string().uuid(),
   confirmation: z.literal('ASIGNAR_FACTURA_HISTORICA')
 }) satisfies z.ZodType<AssignHistoricalSiigoInvoiceInput>

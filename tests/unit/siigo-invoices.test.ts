@@ -151,10 +151,12 @@ describe('Siigo invoice drafts', () => {
 
   it('exige confirmación explícita para la asociación histórica', () => {
     expect(assignHistoricalSiigoInvoiceSchema.safeParse({
+      version: 1,
       invoiceId: '63f918c2-ca65-4edc-a7db-66bcdd5159fb',
       confirmation: 'ASIGNAR_FACTURA_HISTORICA'
     }).success).toBe(true)
     expect(assignHistoricalSiigoInvoiceSchema.safeParse({
+      version: 1,
       invoiceId: '63f918c2-ca65-4edc-a7db-66bcdd5159fb'
     }).success).toBe(false)
   })

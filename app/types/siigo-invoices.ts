@@ -94,6 +94,7 @@ export interface HistoricalSiigoInvoiceContext {
 }
 
 export interface AssignHistoricalSiigoInvoiceInput {
+  version: number
   invoiceId: string
   confirmation: 'ASIGNAR_FACTURA_HISTORICA'
 }

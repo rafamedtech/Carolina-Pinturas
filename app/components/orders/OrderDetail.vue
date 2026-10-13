@@ -130,7 +130,7 @@ const documentOptions = computed<DropdownMenuItem[][]>(() => {
 
 const mayManagePayment = mayManageLogistics
 const mayAssignHistoricalInvoice = computed(() =>
-  Boolean(user.value?.role === 'admin' && !isQuote.value && !order.value?.invoiceCreated)
+  Boolean(user.value?.role === 'admin' && !isQuote.value)
 )
 const mayEditQuote = computed(() =>
   Boolean(user.value && canCreateOrders(user.value.role))
@@ -501,6 +501,7 @@ async function convertToPedido() {
             </UModal>
             <OrdersSiigoOrderSiigoInvoiceCard
               v-if="!isQuote && mayManagePayment"
+              :key="order.siigoReference || order.id"
               v-model:open="siigoInvoiceOpen"
               v-model:checking="checkingSiigoInvoice"
               :order-id="order.id"
@@ -511,6 +512,8 @@ async function convertToPedido() {
               v-if="user?.role === 'admin' && !isQuote"
               v-model:open="historicalInvoiceOpen"
               :order-id="order.id"
+              :invoice-id="order.siigoReference"
+              :version="order.version"
               @assigned="onHistoricalInvoiceAssigned"
             />
             <UButton

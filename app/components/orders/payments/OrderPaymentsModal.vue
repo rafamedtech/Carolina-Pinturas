@@ -100,8 +100,7 @@ function onSubmit(event: FormSubmitEvent<Schema>) {
 
         <UFormField
           name="date"
-          label="Fecha en que recibiste el pago"
-          description="Puede ser una fecha anterior a hoy. Es la fecha real del cobro, no la del timbrado."
+          label="Fecha de pago"
           required
         >
           <OrdersOrderDatePicker
