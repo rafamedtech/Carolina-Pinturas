@@ -188,7 +188,18 @@ function openProduct(_: Event, row: TableRow<SiigoProduct>) {
           :price-for="formatProductPrice"
         />
 
-        <AppTableSkeleton v-if="loading" :cols="columns.length" class="hidden shrink-0 md:block" />
+        <div
+          v-if="loading"
+          class="hidden shrink-0 flex-col items-center justify-center gap-3 py-16 md:flex"
+          role="status"
+          aria-busy="true"
+        >
+          <UIcon name="i-lucide-loader-circle" class="size-8 animate-spin text-primary" />
+          <p class="text-sm text-muted">
+            Cargando
+          </p>
+          <span class="sr-only">Cargando productos…</span>
+        </div>
 
         <UTable
           v-else
