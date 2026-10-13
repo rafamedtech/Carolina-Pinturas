@@ -23,10 +23,10 @@ const status = shallowRef('all')
 const dateRange = shallowRef<OrderDateRange | null>(null)
 const statusItems = [
   { label: 'Todas', value: 'all' },
-  { label: 'Borrador', value: 'borrador' },
   { label: 'Confirmada', value: 'confirmada' },
   { label: 'Liquidada', value: 'liquidada' },
   { label: 'Vencida', value: 'vencida' },
+  { label: 'Borrador', value: 'borrador' },
   { label: 'Cancelada', value: 'cancelada' }
 ]
 const query = computed(() => ({
