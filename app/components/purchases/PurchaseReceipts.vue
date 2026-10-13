@@ -18,7 +18,7 @@ const status = computed(() => receiptStatus(props.order.receiptStatus))
 const pendingItems = computed(() => props.order.items
   .map(item => ({ ...item, pending: Number((item.quantity - item.received).toFixed(6)) }))
   .filter(item => item.pending > 0))
-const canReceive = computed(() => props.order.status === 'confirmada' && props.order.receiptStatus !== 'completa')
+const canReceive = computed(() => ['confirmada', 'liquidada', 'vencida'].includes(props.order.status) && props.order.receiptStatus !== 'completa')
 const hasQuantities = computed(() => Object.values(quantities).some(q => q > 0))
 const itemName = (id: string) => props.order.items.find(i => i.id === id)?.name ?? 'Producto'
 

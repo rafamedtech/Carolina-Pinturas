@@ -3,6 +3,8 @@ type BadgeColor = 'neutral' | 'primary' | 'success' | 'warning' | 'error' | 'inf
 const PURCHASE_STATUS: Record<string, { label: string, color: BadgeColor, icon: string }> = {
   borrador: { label: 'Borrador', color: 'neutral', icon: 'i-lucide-file-pen' },
   confirmada: { label: 'Confirmada', color: 'primary', icon: 'i-lucide-circle-check' },
+  liquidada: { label: 'Liquidada', color: 'success', icon: 'i-lucide-circle-check' },
+  vencida: { label: 'Vencida', color: 'error', icon: 'i-lucide-clock-alert' },
   cancelada: { label: 'Cancelada', color: 'error', icon: 'i-lucide-circle-x' }
 }
 const RECEIPT_STATUS: Record<string, { label: string, color: BadgeColor, icon: string }> = {

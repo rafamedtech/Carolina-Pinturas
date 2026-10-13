@@ -10,6 +10,7 @@ const formOpen = shallowRef(false)
 const form = reactive({ folio: '', date: mexicoToday(), dueDate: mexicoToday(), amount: 0 })
 const money = (value: number) => purchaseMoney(value, props.order.currencyCode)
 const difference = computed(() => props.order.invoiced - props.order.total)
+const canInvoice = computed(() => ['confirmada', 'liquidada', 'vencida'].includes(props.order.status))
 
 function openForm() {
   form.amount = Math.max(0, Number((props.order.total - props.order.invoiced).toFixed(2)))
@@ -32,7 +33,7 @@ async function add() {
           Facturas y abonos
         </h2>
         <UButton
-          v-if="order.status === 'confirmada' && !formOpen"
+          v-if="canInvoice && !formOpen"
           label="Registrar factura"
           icon="i-lucide-receipt"
           size="sm"
@@ -82,7 +83,7 @@ async function add() {
         icon="i-lucide-circle-alert"
       />
 
-      <form v-if="order.status === 'confirmada' && formOpen" class="grid gap-3 rounded-lg border border-default p-4 sm:grid-cols-2" @submit.prevent="add">
+      <form v-if="canInvoice && formOpen" class="grid gap-3 rounded-lg border border-default p-4 sm:grid-cols-2" @submit.prevent="add">
         <UFormField label="Folio de factura" required>
           <UInput
             v-model="form.folio"

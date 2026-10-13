@@ -13,7 +13,7 @@ import { refreshProductCosts } from './product-costs'
 import { getSiigoCustomerDetail } from './siigo-customer-detail'
 import { getProductDetail } from './siigo-products'
 import { upsertSiigoProduct } from './siigo-persistence'
-import { purchaseAssert, purchaseBalance, purchaseLineTotal, assertReceipt } from './purchase-domain'
+import { purchaseAssert, purchaseBalance, purchaseLineTotal, purchaseOrderStatus, assertReceipt } from './purchase-domain'
 
 export const purchaseInclude = {
   items: { orderBy: { position: 'asc' as const } },
@@ -27,9 +27,9 @@ const date = (s: string) => new Date(`${s}T00:00:00Z`)
 const day = (d: Date) => d.toISOString().slice(0, 10)
 const hash = (v: unknown) => createHash('sha256').update(JSON.stringify(v)).digest('hex')
 export function purchaseView(row: PurchaseRow): PurchaseView {
+  const today = mexicoToday()
   const invoices = row.invoices.map((i) => {
     const balance = i.voidedAt ? 0 : purchaseBalance(i.amount.toString(), i.payments).toNumber()
-    const today = mexicoToday()
     return {
       id: i.id, folio: i.folio, date: day(i.date), dueDate: day(i.dueDate), amount: Number(i.amount), balance,
       status: i.voidedAt ? 'anulada' as const : balance === 0 ? 'liquidada' as const : day(i.dueDate) < today ? 'vencida' as const : 'pendiente' as const,
@@ -42,7 +42,7 @@ export function purchaseView(row: PurchaseRow): PurchaseView {
     received: row.receipts.filter(r => !r.voidedAt).flatMap(r => r.items).filter(r => r.itemId === i.id).reduce((s, r) => s.plus(r.quantity.toString()), new Decimal(0)).toNumber()
   }))
   return {
-    id: row.id, folio: row.folio, version: row.version, status: row.status, date: day(row.date), currencyCode: row.currencyCode as 'MXN' | 'USD',
+    id: row.id, folio: row.folio, version: row.version, status: purchaseOrderStatus(row.status, invoices, today), date: day(row.date), currencyCode: row.currencyCode as 'MXN' | 'USD',
     providerId: row.providerId, providerName: row.providerName, providerRfc: row.providerRfc, total: Number(row.total), notes: row.notes,
     subtotal: Number(row.subtotal), vatRate: row.vatRate as PurchaseView['vatRate'], vatAmount: Number(row.vatAmount),
     balance: invoices.reduce((s, i) => s.plus(i.balance), new Decimal(0)).toNumber(),

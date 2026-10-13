@@ -13,6 +13,15 @@ export function purchaseLineTotal(quantity: number, cost: number) {
 export function purchaseBalance(amount: Decimal.Value, payments: Array<{ amount: { toString(): string }, voidedAt: Date | null }>) {
   return payments.filter(p => !p.voidedAt).reduce((balance, payment) => balance.minus(payment.amount.toString()), new Decimal(amount))
 }
+
+export function purchaseOrderStatus(status: string, invoices: Array<{ balance: number, dueDate: string, voidedAt: string | null }>, today: string) {
+  if (status !== 'confirmada') return status
+  const activeInvoices = invoices.filter(invoice => !invoice.voidedAt)
+  if (!activeInvoices.length) return status
+  if (activeInvoices.every(invoice => invoice.balance === 0)) return 'liquidada'
+  if (activeInvoices.some(invoice => invoice.balance > 0 && invoice.dueDate < today)) return 'vencida'
+  return status
+}
 export function assertReceipt(items: Array<{ id: string, quantity: { toString(): string } }>, receipts: Array<{ voidedAt: Date | null, items: Array<{ itemId: string, quantity: { toString(): string } }> }>, incoming: Array<{ itemId: string, quantity: number }>) {
   purchaseAssert(new Set(incoming.map(i => i.itemId)).size === incoming.length, 'No repitas partidas.')
   for (const line of incoming) {
