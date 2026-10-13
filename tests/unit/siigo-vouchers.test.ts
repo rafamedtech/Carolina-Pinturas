@@ -3,18 +3,22 @@ import type { CreateOrderSiigoPaymentInput } from '../../app/types/siigo-payment
 import {
   assertHistoricalReceiptMatchesPayment,
   assertVoucherReferences,
+  assertSiigoReceiptStampResponse,
   assignHistoricalSiigoReceiptSchema,
   buildSiigoVoucherPayload,
   createOrderSiigoReceiptSchema,
   createOrderSiigoPaymentSchema,
   isSiigoInvoiceStamped,
+  isSiigoPpdInvoice,
   invoicePrefix,
   normalizeCreatedVoucher,
   normalizeHistoricalReceiptDetail,
   normalizeHistoricalReceiptOptions,
   normalizeInvoiceDetail,
   normalizePayableInvoices,
-  payableInvoicesForCustomer
+  payableInvoicesForCustomer,
+  siigoReceiptCustomerEmail,
+  siigoReceiptReconciliationDate
 } from '../../server/utils/siigo-vouchers'
 
 const invoiceId = '63f918c2-ca65-4edc-a7db-66bcdd5159fb'
@@ -117,6 +121,7 @@ describe('recepciones de pago de Siigo México', () => {
   it('separa la configuración fiscal de los datos inmutables del pago local', () => {
     expect(createOrderSiigoReceiptSchema.safeParse({
       invoiceId,
+      date: '2026-10-13',
       documentTypeId: 7714,
       paymentTypeId: 5636,
       cfdiCode: '03',
@@ -130,9 +135,10 @@ describe('recepciones de pago de Siigo México', () => {
     }).success).toBe(false)
   })
 
-  it('exige correo y confirmación específica para crear y timbrar una recepción', () => {
+  it('exige fecha y confirmación fiscal; el navegador no puede elegir el destinatario', () => {
     const receipt = {
       invoiceId,
+      date: '2026-10-13',
       documentTypeId: 7714,
       paymentTypeId: 5636,
       cfdiCode: '03',
@@ -142,16 +148,15 @@ describe('recepciones de pago de Siigo México', () => {
     }
     expect(createOrderSiigoReceiptSchema.safeParse({
       ...receipt,
-      stampEmail: 'cliente@example.com',
       confirmation: 'CREAR_Y_TIMBRAR_RECEPCION_SIIGO'
     }).success).toBe(true)
     expect(createOrderSiigoReceiptSchema.safeParse({
       ...receipt,
+      stampEmail: 'cliente@example.com',
       confirmation: 'CREAR_Y_TIMBRAR_RECEPCION_SIIGO'
     }).success).toBe(false)
     expect(createOrderSiigoReceiptSchema.safeParse({
       ...receipt,
-      stampEmail: 'cliente@example.com',
       confirmation: 'CREAR_RECEPCION_SIIGO'
     }).success).toBe(false)
   })
@@ -170,7 +175,7 @@ describe('recepciones de pago de Siigo México', () => {
     expect(() => invoicePrefix({ name: 'FACTURA-68', number: 22 })).toThrow()
   })
 
-  it('arma el payload oficial sin fijar IDs configurables', () => {
+  it('envía rfc_id requerido por el tenant aunque el ejemplo oficial use rfc.id', () => {
     const result = assertVoucherReferences(references())
     const payload = buildSiigoVoucherPayload({
       input: input(),
@@ -182,11 +187,10 @@ describe('recepciones de pago de Siigo México', () => {
     expect(payload).toEqual({
       document: { id: 7714 },
       date: '2026-07-28',
-      // Regresión documental 2026-07-28: el request schema y ejemplo oficiales
-      // usan la clave literal "rfc.id", aunque la tabla diga customer.rfc_id.
+      // Regresión reportada por el usuario el 2026-10-13.
       customer: {
-        'rfc.id': 'MELM8305281H0',
-        'branch_office': 0
+        rfc_id: 'MELM8305281H0',
+        branch_office: 0
       },
       cost_center: 235,
       items: [{
@@ -204,6 +208,32 @@ describe('recepciones de pago de Siigo México', () => {
       },
       observations: 'Pedido PED-000123'
     })
+  })
+
+  it('rechaza fechas inexistentes y conserva años bisiestos', () => {
+    for (const date of ['2026-02-29', '2026-04-31', '2026-13-01', '13/10/2026', '0001-01-01']) {
+      expect(createOrderSiigoPaymentSchema.safeParse(input({ date })).success).toBe(false)
+    }
+    expect(createOrderSiigoPaymentSchema.safeParse(input({ date: '2028-02-29' })).success).toBe(true)
+  })
+
+  it('resuelve el primer correo válido exclusivamente de los contactos Siigo', () => {
+    expect(siigoReceiptCustomerEmail({ contacts: [{ email: '' }, { email: 'inválido' }, { email: ' cliente@ejemplo.com ' }, { email: 'otro@ejemplo.com' }] })).toBe('cliente@ejemplo.com')
+    expect(siigoReceiptCustomerEmail({ contacts: [] })).toBeNull()
+  })
+
+  it('concilia usando la fecha de emisión persistida sin cambiar la fecha local', () => {
+    const paymentDate = new Date('2026-07-28T00:00:00Z')
+    expect(siigoReceiptReconciliationDate({ request: { date: '2026-10-13' } }, paymentDate)).toBe('2026-10-13')
+    expect(siigoReceiptReconciliationDate({}, paymentDate)).toBe('2026-07-28')
+  })
+
+  it('detecta PPD en ambas formas de la respuesta y no interpreta rechazo como éxito', () => {
+    expect(isSiigoPpdInvoice({ payments: [{ method: 'PPD' }] })).toBe(true)
+    expect(isSiigoPpdInvoice({ payment: { method: 'PUE' } })).toBe(false)
+    expect(() => assertSiigoReceiptStampResponse({ status: 'sent' })).not.toThrow()
+    expect(() => assertSiigoReceiptStampResponse({ status: 'Rejected' })).toThrow()
+    expect(() => assertSiigoReceiptStampResponse({})).toThrow()
   })
 
   it('rechaza facturas de otro cliente, saldos insuficientes y catálogos inactivos', () => {

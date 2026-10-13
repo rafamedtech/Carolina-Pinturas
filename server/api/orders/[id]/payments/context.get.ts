@@ -5,6 +5,8 @@ import { getOrder } from '../../../../utils/orders'
 import { orderPaymentView } from '../../../../utils/order-payments'
 import { usePrisma } from '../../../../utils/prisma'
 import { siigoRequest } from '../../../../utils/siigo'
+import { normalizeSiigoCustomer } from '../../../../utils/siigo-customers'
+import type { SiigoCustomerApiResponse } from '../../../../utils/siigo-customers'
 import {
   normalizeCostCenters,
   normalizeInvoiceDetail,
@@ -12,6 +14,8 @@ import {
   normalizePaymentTypes,
   normalizeVoucherDocumentTypes,
   isSiigoInvoiceStamped,
+  isSiigoPpdInvoice,
+  siigoReceiptCustomerEmail,
   siigoFiscalWritesEnabled
 } from '../../../../utils/siigo-vouchers'
 
@@ -55,6 +59,7 @@ export default eventHandler(async (event): Promise<OrderPaymentContext> => {
     assignedInvoiceId: order.siigoReference,
     assignedInvoiceStamped: false,
     assignedInvoice: null,
+    customerEmail: null,
     documentTypes: [],
     paymentTypes: [],
     costCenters: []
@@ -68,11 +73,12 @@ export default eventHandler(async (event): Promise<OrderPaymentContext> => {
     baseSiigo.unavailableReason = 'Crea o asigna la factura del pedido antes de registrar el pago en Siigo.'
   } else {
     try {
-      const [associatedInvoice, documentResponse, paymentResponse, costCenterResponse] = await Promise.all([
+      const [associatedInvoice, documentResponse, paymentResponse, costCenterResponse, customerResponse] = await Promise.all([
         preferredInvoice(order.siigoReference),
         siigoRequest<unknown>('/v1/document-types', { query: { type: 'RC' } }),
         siigoRequest<unknown>('/v1/payment-types', { query: { document_type: 'FV' } }),
-        siigoRequest<unknown>('/v1/cost-centers')
+        siigoRequest<unknown>('/v1/cost-centers'),
+        siigoRequest<unknown>(`/v1/customers/${encodeURIComponent(order.customer.id)}`)
       ])
 
       const invoices = payableInvoicesForCustomer({ results: [] }, {
@@ -86,12 +92,17 @@ export default eventHandler(async (event): Promise<OrderPaymentContext> => {
       baseSiigo.assignedInvoiceStamped = isSiigoInvoiceStamped(invoiceDetail?.stamp?.status)
       baseSiigo.assignedInvoice = invoices.find(invoice => invoice.id === order.siigoReference) ?? null
       baseSiigo.available = baseSiigo.assignedInvoice !== null
+      if (associatedInvoice && !isSiigoPpdInvoice(associatedInvoice)) {
+        baseSiigo.available = false
+        baseSiigo.unavailableReason = 'La factura debe tener método PPD para registrar una recepción de pago.'
+      }
       if (!baseSiigo.assignedInvoice) {
         baseSiigo.unavailableReason = 'La factura asignada al pedido no está disponible o no tiene saldo pendiente en Siigo.'
       }
       baseSiigo.documentTypes = normalizeVoucherDocumentTypes(documentResponse).filter(item => item.active)
       baseSiigo.paymentTypes = normalizePaymentTypes(paymentResponse).filter(item => item.active)
       baseSiigo.costCenters = normalizeCostCenters(costCenterResponse).filter(item => item.active !== false)
+      baseSiigo.customerEmail = siigoReceiptCustomerEmail(normalizeSiigoCustomer(customerResponse as SiigoCustomerApiResponse))
     } catch (error) {
       baseSiigo.unavailableReason = externalMessage(error)
     }

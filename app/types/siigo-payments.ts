@@ -83,6 +83,7 @@ export interface OrderPaymentContext {
     assignedInvoiceId: string | null
     assignedInvoiceStamped: boolean
     assignedInvoice: SiigoPayableInvoice | null
+    customerEmail?: string | null
     documentTypes: SiigoVoucherDocumentType[]
     paymentTypes: SiigoPaymentType[]
     costCenters: SiigoCostCenter[]
@@ -138,6 +139,7 @@ export interface CreateOrderSiigoPaymentInput {
 }
 
 export interface CreateOrderSiigoReceiptInput {
+  date: string
   invoiceId: string
   documentTypeId: number
   voucherNumber?: number | null
@@ -147,8 +149,7 @@ export interface CreateOrderSiigoReceiptInput {
   paymentMethod: 'PUE' | 'PPD'
   quote: number
   stamp?: boolean
-  stampEmail?: string
-  confirmation: 'CREAR_RECEPCION_SIIGO' | 'CREAR_Y_TIMBRAR_RECEPCION_SIIGO'
+  confirmation: 'CREAR_RECEPCION_SIIGO' | 'CREAR_Y_TIMBRAR_RECEPCION_SIIGO' | 'ACTUALIZAR_Y_TIMBRAR_RECEPCION_SIIGO'
 }
 
 export type CreateOrderPaymentInput = CreateLocalOrderPaymentInput

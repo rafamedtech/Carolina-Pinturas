@@ -11,7 +11,7 @@ const PAYMENT_DELETE_TRANSACTION_OPTIONS = {
   timeout: 15_000
 }
 
-const dateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Usa una fecha con formato AAAA-MM-DD.')
+const dateSchema = z.iso.date('Usa una fecha válida con formato AAAA-MM-DD.')
 const amountSchema = z.number().positive('El importe debe ser mayor a cero.')
   .max(9_999_999_999_999.99)
   .refine(value => Number(value.toFixed(2)) === value, 'El importe admite máximo dos decimales.')

@@ -1,5 +1,5 @@
 import * as z from 'zod'
-import type { SiigoInvoice, SiigoInvoiceDetail } from '~/types/siigo'
+import type { SiigoCustomer, SiigoInvoice, SiigoInvoiceDetail } from '~/types/siigo'
 import type {
   AssignHistoricalSiigoReceiptInput,
   CreateOrderSiigoReceiptInput,
@@ -11,7 +11,8 @@ import type {
   SiigoVoucherDocumentType
 } from '~/types/siigo-payments'
 
-const dateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Usa una fecha con formato AAAA-MM-DD.')
+const dateSchema = z.iso.date('Usa una fecha válida con formato AAAA-MM-DD.')
+  .refine(value => value >= '1900-01-01', 'Selecciona una fecha de emisión válida.')
 
 export const createOrderSiigoPaymentSchema = z.object({
   destination: z.literal('siigo'),
@@ -35,23 +36,16 @@ export const createOrderSiigoReceiptSchema = createOrderSiigoPaymentSchema.omit(
   destination: true,
   requestId: true,
   amount: true,
-  date: true,
   observations: true,
   confirmation: true
 }).extend({
   stamp: z.boolean().optional(),
-  stampEmail: z.string().trim().email('Escribe un correo válido para timbrar la recepción.').max(100).optional(),
-  confirmation: z.enum(['CREAR_RECEPCION_SIIGO', 'CREAR_Y_TIMBRAR_RECEPCION_SIIGO'])
+  confirmation: z.enum(['CREAR_RECEPCION_SIIGO', 'CREAR_Y_TIMBRAR_RECEPCION_SIIGO', 'ACTUALIZAR_Y_TIMBRAR_RECEPCION_SIIGO'])
 }).strict().superRefine((input, context) => {
-  if (input.stamp && !input.stampEmail) {
-    context.addIssue({
-      code: 'custom',
-      path: ['stampEmail'],
-      message: 'Escribe el correo al que Siigo enviará la recepción timbrada.'
-    })
-  }
   const expectedConfirmation = input.stamp
-    ? 'CREAR_Y_TIMBRAR_RECEPCION_SIIGO'
+    ? input.confirmation === 'ACTUALIZAR_Y_TIMBRAR_RECEPCION_SIIGO'
+      ? 'ACTUALIZAR_Y_TIMBRAR_RECEPCION_SIIGO'
+      : 'CREAR_Y_TIMBRAR_RECEPCION_SIIGO'
     : 'CREAR_RECEPCION_SIIGO'
   if (input.confirmation !== expectedConfirmation) {
     context.addIssue({
@@ -68,6 +62,39 @@ export const assignHistoricalSiigoReceiptSchema = z.object({
 }).strict() satisfies z.ZodType<AssignHistoricalSiigoReceiptInput>
 
 export type CreateOrderSiigoPaymentData = z.output<typeof createOrderSiigoPaymentSchema>
+
+// El destinatario fiscal se resuelve siempre desde el cliente vigente en Siigo.
+export function siigoReceiptCustomerEmail(customer: Pick<SiigoCustomer, 'contacts'>): string | null {
+  for (const contact of customer.contacts ?? []) {
+    const email = z.string().trim().email().max(100).safeParse(contact.email)
+    if (email.success) return email.data
+  }
+  return null
+}
+
+// La fecha de emisión puede diferir del pago local. Se guarda antes de crear la
+// recepción para poder conciliar una creación cuyo resultado haya sido ambiguo.
+export function siigoReceiptReconciliationDate(payload: unknown, paymentDate: Date): string {
+  const date = record(record(payload)?.request)?.date
+  return dateSchema.safeParse(date).success ? date as string : paymentDate.toISOString().slice(0, 10)
+}
+
+export function isSiigoPpdInvoice(value: unknown): boolean {
+  const invoice = record(value)
+  const payments = [invoice?.payment, ...(Array.isArray(invoice?.payments) ? invoice.payments : [])]
+  return payments.some(payment => string(record(payment)?.method)?.toUpperCase() === 'PPD')
+}
+
+export function assertSiigoReceiptStampResponse(value: unknown) {
+  const status = string(record(value)?.status)?.toLowerCase()
+  if (status === 'sent' || status === 'accepted') return
+  throw createError({
+    statusCode: status === 'rejected' || status === 'error' ? 422 : 502,
+    statusMessage: status === 'rejected' || status === 'error'
+      ? 'Siigo rechazó el timbrado de la recepción. Revisa sus errores en Siigo.'
+      : 'Siigo no confirmó el envío de la recepción a timbrar. Verifica su estado antes de reintentar.'
+  })
+}
 
 type UnknownRecord = Record<string, unknown>
 
@@ -119,7 +146,8 @@ function normalizeHistoricalReceipt(value: unknown) {
     const quote = positiveInteger(due?.quote)
 
     if (!item || amount === null || amount <= 0 || !prefix || !consecutive || !quote) return []
-    return [{ amount, prefix, consecutive, quote }]
+    const uuid = string(due?.uuid)
+    return [{ amount, prefix, consecutive, quote, ...(uuid ? { uuid } : {}) }]
   })
   const payments = Array.isArray(voucher?.payments)
     ? voucher.payments
@@ -163,6 +191,7 @@ function normalizeHistoricalReceipt(value: unknown) {
   return {
     id,
     name,
+    number: positiveInteger(voucher.number) ?? positiveInteger(document?.number),
     date,
     amount: conditionAmount,
     documentTypeId,
@@ -173,6 +202,7 @@ function normalizeHistoricalReceipt(value: unknown) {
     applications,
     customerId,
     customerRfc,
+    customerBranchOffice: number(customer?.branch_office) ?? 0,
     stampStatus: string(record(voucher.stamp)?.status),
     raw: voucher
   }
@@ -443,7 +473,7 @@ export function normalizeInvoiceDetail(
   const total = number(invoice?.total)
   const balance = number(invoice?.balance)
   const customerId = string(customer?.id)
-  const customerRfc = string(customer?.rfc_id) ?? string(customer?.identification)
+  const customerRfc = string(customer?.rfc_id) ?? string(customer?.['rfc.id']) ?? string(customer?.identification)
   const stampStatus = string(record(invoice?.stamp)?.status)
 
   if (
@@ -564,12 +594,11 @@ export function buildSiigoVoucherPayload(options: {
     document: { id: input.documentTypeId },
     ...(input.voucherNumber ? { number: input.voucherNumber } : {}),
     date: input.date,
-    // Contrato oficial de México consultado el 2026-07-28: la tabla describe
-    // customer.rfc_id, pero el request schema y el ejemplo usan la clave literal
-    // "rfc.id". Se conserva la forma del request hasta validarla en tenant seguro.
+    // 2026-10-13: el tenant rechazó "rfc.id" con "The field rfc_id is required".
+    // La tabla oficial usa rfc_id; su ejemplo conserva la clave obsoleta.
     customer: {
-      'rfc.id': options.customerRfc,
-      'branch_office': invoice.customer?.branch_office ?? 0
+      rfc_id: options.customerRfc,
+      branch_office: invoice.customer?.branch_office ?? 0
     },
     ...(input.costCenterId ? { cost_center: input.costCenterId } : {}),
     items: [{

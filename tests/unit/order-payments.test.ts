@@ -25,6 +25,11 @@ const orderInput = {
 }
 
 describe('pagos unificados de pedidos', () => {
+  it('rechaza un día inexistente antes de persistir el pago', () => {
+    expect(createOrderPaymentSchema.safeParse({
+      destination: 'local', requestId, paymentMethod: 'efectivo', amount: 100, date: '2026-02-29'
+    }).success).toBe(false)
+  })
   it('acepta pagos locales sin RFC ni referencias fiscales', () => {
     expect(createOrderPaymentSchema.safeParse({
       destination: 'local',

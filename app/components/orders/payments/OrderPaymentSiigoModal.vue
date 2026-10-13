@@ -1,5 +1,7 @@
 <script setup lang="ts">
-import { formatDate } from '~/utils/datetime'
+import { formatDate, mexicoToday } from '~/utils/datetime'
+import { parseDate } from '@internationalized/date'
+import type { DateValue } from '@internationalized/date'
 import * as z from 'zod'
 import type { FormSubmitEvent } from '@nuxt/ui'
 import type {
@@ -18,8 +20,10 @@ const emit = defineEmits<{
   submit: [input: CreateOrderSiigoReceiptInput]
 }>()
 const open = defineModel<boolean>('open', { required: true })
+const resumingStamp = computed(() => Boolean(props.payment.siigo?.voucherId))
 
 const schema = z.object({
+  date: z.iso.date('Selecciona una fecha de emisión válida.'),
   invoiceId: z.string().uuid('Selecciona una factura.'),
   documentTypeId: z.number().int().positive('Selecciona el tipo de recepción.'),
   voucherNumber: z.number().int().positive().optional(),
@@ -28,23 +32,12 @@ const schema = z.object({
   cfdiCode: z.string().min(1, 'Selecciona la forma de pago CFDI.'),
   paymentMethod: z.enum(['PUE', 'PPD']),
   quote: z.number().int().positive(),
-  stampEmail: z.preprocess(
-    value => value === '' ? undefined : value,
-    z.string().trim().email('Escribe un correo válido.').max(100).optional()
-  ),
   confirmed: z.boolean().refine(value => value, 'Confirma la creación en Siigo.')
-}).superRefine((input, context) => {
-  if (props.stampAfterCreate && !input.stampEmail) {
-    context.addIssue({
-      code: 'custom',
-      path: ['stampEmail'],
-      message: 'Escribe el correo al que Siigo enviará la recepción timbrada.'
-    })
-  }
 })
 type Schema = z.output<typeof schema>
 
 const state = reactive<Partial<Schema>>({
+  date: mexicoToday(),
   invoiceId: '',
   documentTypeId: undefined,
   voucherNumber: undefined,
@@ -53,8 +46,11 @@ const state = reactive<Partial<Schema>>({
   cfdiCode: '',
   paymentMethod: 'PUE',
   quote: 1,
-  stampEmail: '',
   confirmed: false
+})
+const receiptDate = computed<DateValue | undefined>({
+  get: () => state.date ? parseDate(state.date) : undefined,
+  set: (value) => { state.date = value?.toString() ?? '' }
 })
 const invoiceItems = computed(() => props.context.siigo.assignedInvoice
   ? [{
@@ -123,7 +119,7 @@ function nextQuote(invoiceId: string) {
   const previousQuotes = props.context.payments.flatMap(payment =>
     payment.id !== props.payment.id
     && payment.siigo?.invoiceId === invoiceId
-    && payment.externalStatus !== 'failed'
+    && (payment.externalStatus !== 'failed' || payment.siigo.voucherId)
       ? [payment.siigo.quote]
       : []
   )
@@ -133,13 +129,13 @@ function nextQuote(invoiceId: string) {
 watch(open, (isOpen) => {
   if (!isOpen) return
   state.invoiceId = props.context.siigo.assignedInvoice?.id || ''
-  state.documentTypeId = props.context.siigo.documentTypes[0]?.id
+  state.documentTypeId = props.payment.siigo?.documentTypeId || props.context.siigo.documentTypes[0]?.id
   state.cfdiCode = props.payment.siigo?.cfdiCode || localCfdiCode()
   state.paymentTypeId = props.payment.siigo?.paymentTypeId || defaultPaymentTypeId(state.cfdiCode)
-  state.costCenterId = undefined
-  state.paymentMethod = 'PUE'
+  state.costCenterId = props.payment.siigo?.costCenterId ?? undefined
+  state.paymentMethod = props.payment.siigo?.paymentMethod || 'PUE'
   state.quote = props.payment.siigo?.quote || nextQuote(state.invoiceId)
-  state.stampEmail = ''
+  state.date = mexicoToday()
   state.confirmed = false
 }, { immediate: true })
 
@@ -149,6 +145,7 @@ function formatCurrency(value: number) {
 
 function onSubmit(event: FormSubmitEvent<Schema>) {
   emit('submit', {
+    date: event.data.date,
     invoiceId: event.data.invoiceId,
     documentTypeId: event.data.documentTypeId,
     voucherNumber: event.data.voucherNumber,
@@ -158,9 +155,8 @@ function onSubmit(event: FormSubmitEvent<Schema>) {
     paymentMethod: event.data.paymentMethod,
     quote: event.data.quote,
     stamp: props.stampAfterCreate || undefined,
-    stampEmail: props.stampAfterCreate ? event.data.stampEmail : undefined,
     confirmation: props.stampAfterCreate
-      ? 'CREAR_Y_TIMBRAR_RECEPCION_SIIGO'
+      ? resumingStamp.value ? 'ACTUALIZAR_Y_TIMBRAR_RECEPCION_SIIGO' : 'CREAR_Y_TIMBRAR_RECEPCION_SIIGO'
       : 'CREAR_RECEPCION_SIIGO'
   })
 }
@@ -169,9 +165,11 @@ function onSubmit(event: FormSubmitEvent<Schema>) {
 <template>
   <UModal
     v-model:open="open"
-    :title="stampAfterCreate ? 'Crear y timbrar pago en Siigo' : 'Registrar pago en Siigo'"
+    :title="resumingStamp ? 'Actualizar fecha y timbrar recepción' : stampAfterCreate ? 'Crear y timbrar pago en Siigo' : 'Registrar pago en Siigo'"
     :description="stampAfterCreate
-      ? 'Creará una recepción para este pago y la timbrará ante el SAT. Esta operación fiscal no se puede deshacer desde la aplicación.'
+      ? resumingStamp
+        ? 'Revisará la recepción existente, actualizará su fecha de emisión si cambió y solicitará su timbrado ante el SAT.'
+        : 'Creará una recepción para este pago y solicitará su timbrado ante el SAT. Esta operación fiscal no se puede deshacer desde la aplicación.'
       : 'Creará una recepción borrador para este pago. No se timbrará ni enviará al SAT.'"
     :dismissible="!saving"
     :ui="{ content: 'max-w-2xl', footer: 'justify-end' }"
@@ -221,6 +219,15 @@ function onSubmit(event: FormSubmitEvent<Schema>) {
         </div>
 
         <UFormField
+          name="date"
+          label="Fecha de emisión de la recepción"
+          description="La fecha del pago local se conserva. Selecciona una fecha de emisión permitida por Siigo para timbrar."
+          class="sm:col-span-2"
+          required
+        >
+          <OrdersOrderDatePicker v-model="receiptDate" :disabled="saving" />
+        </UFormField>
+        <UFormField
           class="sm:col-span-2"
           name="invoiceId"
           label="Factura de Siigo"
@@ -237,13 +244,14 @@ function onSubmit(event: FormSubmitEvent<Schema>) {
         <UFormField name="documentTypeId" label="Tipo de recepción" required>
           <USelect
             v-model="state.documentTypeId"
+            :disabled="resumingStamp"
             :items="documentItems"
             value-key="value"
             class="w-full"
           />
         </UFormField>
         <UFormField
-          v-if="needsVoucherNumber"
+          v-if="needsVoucherNumber && !resumingStamp"
           name="voucherNumber"
           label="Consecutivo"
           required
@@ -253,6 +261,7 @@ function onSubmit(event: FormSubmitEvent<Schema>) {
         <UFormField name="paymentTypeId" label="Método de pago CFDI" required>
           <USelect
             v-model="state.paymentTypeId"
+            :disabled="resumingStamp"
             :items="paymentTypeItems"
             value-key="value"
             class="w-full"
@@ -266,6 +275,7 @@ function onSubmit(event: FormSubmitEvent<Schema>) {
         >
           <USelect
             v-model="state.costCenterId"
+            :disabled="resumingStamp"
             :items="costCenterItems"
             value-key="value"
             class="w-full"
@@ -274,6 +284,7 @@ function onSubmit(event: FormSubmitEvent<Schema>) {
         <UFormField name="cfdiCode" label="Forma de pago CFDI" required>
           <USelect
             v-model="state.cfdiCode"
+            :disabled="resumingStamp"
             :items="cfdiItems"
             value-key="value"
             class="w-full"
@@ -282,26 +293,30 @@ function onSubmit(event: FormSubmitEvent<Schema>) {
         <UFormField name="paymentMethod" label="Condición de pago" required>
           <USelect
             v-model="state.paymentMethod"
+            :disabled="resumingStamp"
             :items="siigoMethodItems"
             value-key="value"
             class="w-full"
           />
         </UFormField>
         <UFormField name="quote" label="Número de parcialidad" required>
-          <UInputNumber v-model="state.quote" :min="1" class="w-full" />
+          <UInputNumber
+            v-model="state.quote"
+            :min="1"
+            :disabled="resumingStamp"
+            class="w-full"
+          />
         </UFormField>
         <UFormField
           v-if="stampAfterCreate"
           class="sm:col-span-2"
-          name="stampEmail"
           label="Correo para la recepción timbrada"
-          required
+          description="Se usará el correo del cliente consultado en Siigo. Para cambiarlo, actualiza sus contactos en Siigo."
         >
           <UInput
-            v-model="state.stampEmail"
-            type="email"
-            autocomplete="email"
-            placeholder="cliente@ejemplo.com"
+            :model-value="context.siigo.customerEmail || ''"
+            readonly
+            placeholder="El cliente necesita un correo válido en Siigo"
             class="w-full"
           />
         </UFormField>
@@ -309,7 +324,9 @@ function onSubmit(event: FormSubmitEvent<Schema>) {
           <UCheckbox
             v-model="state.confirmed"
             :label="stampAfterCreate
-              ? 'Confirmo que deseo crear y timbrar esta recepción en Siigo.'
+              ? resumingStamp
+                ? 'Confirmo que deseo actualizar la fecha y timbrar esta recepción existente en Siigo.'
+                : 'Confirmo que deseo crear y timbrar esta recepción en Siigo.'
               : 'Confirmo que deseo crear una recepción borrador para este pago en Siigo.'"
           />
         </UFormField>
@@ -327,10 +344,10 @@ function onSubmit(event: FormSubmitEvent<Schema>) {
       <UButton
         type="submit"
         form="siigo-payment-form"
-        :label="stampAfterCreate ? 'Crear y timbrar' : 'Registrar en Siigo'"
+        :label="resumingStamp ? 'Actualizar y timbrar' : stampAfterCreate ? 'Crear y timbrar' : 'Registrar en Siigo'"
         :icon="stampAfterCreate ? 'i-lucide-badge-check' : 'i-lucide-cloud-upload'"
         :loading="saving"
-        :disabled="saving || !canUseSiigo || !context.siigo.writeEnabled"
+        :disabled="saving || !canUseSiigo || !context.siigo.writeEnabled || (stampAfterCreate && !context.siigo.customerEmail)"
       />
     </template>
   </UModal>

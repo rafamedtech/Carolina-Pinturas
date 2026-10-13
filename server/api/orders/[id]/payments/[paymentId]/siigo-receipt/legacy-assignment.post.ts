@@ -10,7 +10,8 @@ import {
   assertHistoricalReceiptMatchesPayment,
   isSiigoInvoiceStamped,
   normalizeHistoricalReceiptDetail,
-  normalizeInvoiceDetail
+  normalizeInvoiceDetail,
+  siigoReceiptReconciliationDate
 } from '../../../../../../utils/siigo-vouchers'
 
 export default eventHandler(async (event): Promise<OrderPayment> => {
@@ -66,7 +67,7 @@ export default eventHandler(async (event): Promise<OrderPayment> => {
     customerId: order.customer.id,
     customerRfc: order.customer.rfc,
     amount: Number(payment.amount.toString()),
-    date: payment.paymentDate.toISOString().slice(0, 10)
+    date: siigoReceiptReconciliationDate(payment.externalPayload, payment.paymentDate)
   })
 
   try {

@@ -85,8 +85,7 @@ function paymentInvoice(payment: OrderPayment) {
 
 function paymentHasSiigoAction(payment: OrderPayment) {
   return Boolean(paymentInvoice(payment)
-    && !payment.siigo?.voucherId
-    && (payment.provider === 'local' || payment.externalStatus === 'failed'))
+    && ((payment.provider === 'local' && payment.externalStatus === 'not_applicable') || payment.externalStatus === 'failed'))
 }
 
 function paymentInvoiceIsStamped(payment: OrderPayment) {
@@ -224,9 +223,9 @@ async function registerPaymentInSiigo(input: CreateOrderSiigoReceiptInput) {
     }
 
     toast.add({
-      title: requestedStamp ? 'Pago creado y timbrado en Siigo' : 'Pago registrado en Siigo',
+      title: requestedStamp ? 'Recepción enviada a timbrar en Siigo' : 'Pago registrado en Siigo',
       description: payment.siigo?.voucherName || (requestedStamp
-        ? 'La recepción timbrada quedó vinculada.'
+        ? 'La recepción quedó vinculada; consulta su aceptación en Siigo.'
         : 'La recepción borrador quedó vinculada.'),
       color: 'success',
       icon: 'i-lucide-circle-check'
@@ -347,12 +346,12 @@ async function registerPaymentInSiigo(input: CreateOrderSiigoReceiptInput) {
             <UTooltip
               v-if="paymentHasSiigoAction(payment)"
               :text="paymentInvoiceIsStamped(payment)
-                ? 'Crear y timbrar recepción en Siigo'
+                ? payment.siigo?.voucherId ? 'Actualizar fecha y timbrar la recepción existente' : 'Crear y timbrar recepción en Siigo'
                 : 'La factura debe estar timbrada antes de registrar el pago en Siigo.'"
             >
               <span class="inline-flex">
                 <UButton
-                  :label="payment.externalStatus === 'failed' ? 'Reintentar en Siigo' : 'Crear y timbrar en Siigo'"
+                  :label="payment.siigo?.voucherId ? 'Actualizar y timbrar' : payment.externalStatus === 'failed' ? 'Reintentar en Siigo' : 'Crear y timbrar en Siigo'"
                   icon="i-lucide-badge-check"
                   color="neutral"
                   variant="ghost"

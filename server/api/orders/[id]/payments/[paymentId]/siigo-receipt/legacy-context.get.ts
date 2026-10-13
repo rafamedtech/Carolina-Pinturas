@@ -8,7 +8,8 @@ import { cachedSiigoCatalog, collectSiigoCatalog } from '../../../../../../utils
 import {
   isSiigoInvoiceStamped,
   normalizeHistoricalReceiptOptions,
-  normalizeInvoiceDetail
+  normalizeInvoiceDetail,
+  siigoReceiptReconciliationDate
 } from '../../../../../../utils/siigo-vouchers'
 
 function paymentCanBeReconciled(payment: { provider: string, externalStatus: string, siigoVoucherId: string | null }) {
@@ -51,7 +52,7 @@ export default eventHandler(async (event): Promise<HistoricalSiigoReceiptContext
     throw createError({ statusCode: 409, statusMessage: 'La factura asignada debe estar timbrada en Siigo.' })
   }
 
-  const date = payment.paymentDate.toISOString().slice(0, 10)
+  const date = siigoReceiptReconciliationDate(payment.externalPayload, payment.paymentDate)
   const [response, assignedReceipts] = await Promise.all([
     cachedSiigoCatalog(`historical-vouchers:${date}`, () =>
       collectSiigoCatalog<unknown>((page, pageSize) =>
@@ -75,7 +76,7 @@ export default eventHandler(async (event): Promise<HistoricalSiigoReceiptContext
   return {
     invoiceName: invoice.name || order.siigoReference,
     paymentAmount: amount,
-    paymentDate: date,
+    paymentDate: payment.paymentDate.toISOString().slice(0, 10),
     receipts: normalizeHistoricalReceiptOptions(response, {
       invoice,
       customerId: order.customer.id,
