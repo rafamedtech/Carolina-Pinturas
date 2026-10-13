@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { purchaseTotals } from '#shared/utils/purchaseTotals'
 
-const props = defineProps<{ subtotal: number, units: number, currencyCode: 'MXN' | 'USD', busy: boolean }>()
+const props = defineProps<{ subtotal: number, currencyCode: 'MXN' | 'USD', busy: boolean }>()
 const vatRate = defineModel<0 | 8 | 16>('vatRate', { required: true })
 const vatOptions = [
   { label: '8%', value: 8 },
@@ -42,10 +42,6 @@ const totals = computed(() => purchaseTotals(props.subtotal, vatRate.value))
         class="w-full"
       />
     </UFormField>
-    <div class="flex items-center justify-between gap-4 text-sm">
-      <span class="text-muted">Unidades</span>
-      <span class="tabular-nums">{{ units.toLocaleString('es-MX', { maximumFractionDigits: 6 }) }}</span>
-    </div>
     <div class="flex items-center justify-between gap-4 text-sm">
       <span class="text-muted">Subtotal antes de impuestos</span>
       <span class="tabular-nums">{{ money.format(subtotal) }}</span>

@@ -18,7 +18,7 @@ const { data: products, error: productError, status: productStatus } = useFetch<
   server: false
 })
 const initialOrder = props.order ?? props.copyFrom
-const draft = reactive<PurchaseDraft>({ providerId: initialOrder?.providerId ?? '', date: props.order?.date ?? mexicoToday(), currencyCode: initialOrder?.currencyCode ?? 'MXN', vatRate: initialOrder?.vatRate ?? 0, notes: initialOrder?.notes ?? '', items: initialOrder?.items.map(i => ({ productId: i.productId, quantity: i.quantity, unitCost: i.unitCost })) ?? [] })
+const draft = reactive<PurchaseDraft>({ providerId: initialOrder?.providerId ?? '', date: props.order?.date ?? mexicoToday(), currencyCode: initialOrder?.currencyCode ?? 'MXN', vatRate: initialOrder?.vatRate ?? 8, notes: initialOrder?.notes ?? '', items: initialOrder?.items.map(i => ({ productId: i.productId, quantity: i.quantity, unitCost: i.unitCost })) ?? [] })
 const catalogError = computed(() => Boolean(supplierError.value || productError.value))
 const suppliersLoading = computed(() => supplierStatus.value === 'idle' || supplierStatus.value === 'pending')
 const productsLoading = computed(() => productStatus.value === 'idle' || productStatus.value === 'pending')
@@ -35,7 +35,6 @@ const productsById = computed(() => new Map(products.value?.results.map(p => [p.
 const money = computed(() => new Intl.NumberFormat('es-MX', { style: 'currency', currency: draft.currencyCode, minimumFractionDigits: 2, maximumFractionDigits: 2 }))
 const lineTotal = (item: PurchaseDraft['items'][number]) => new Decimal(item.quantity || 0).mul(item.unitCost || 0).toDecimalPlaces(2, Decimal.ROUND_HALF_UP)
 const subtotal = computed(() => draft.items.reduce((s, i) => s.plus(lineTotal(i)), new Decimal(0)).toNumber())
-const units = computed(() => draft.items.reduce((s, i) => s.plus(i.quantity || 0), new Decimal(0)).toNumber())
 
 function lineInfo(productId: string) {
   const product = productsById.value.get(productId)
@@ -290,7 +289,6 @@ const blocker = computed(() => {
         <PurchasesPurchaseDraftTotals
           v-model:vat-rate="draft.vatRate"
           :subtotal="subtotal"
-          :units="units"
           :currency-code="draft.currencyCode"
           :busy="busy"
         />
