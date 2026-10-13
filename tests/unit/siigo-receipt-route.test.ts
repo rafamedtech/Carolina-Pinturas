@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createError } from 'h3'
 
 const mocks = vi.hoisted(() => ({
@@ -38,7 +38,7 @@ const customerId = '6b6ceb28-b2eb-4b98-b3dd-26648a933c81'
 const voucherId = '497f6eca-6276-4993-bfeb-53cbbbba6f08'
 const input = {
   invoiceId, documentTypeId: 7714, paymentTypeId: 5636, costCenterId: 235,
-  cfdiCode: '03', paymentMethod: 'PUE', quote: 1, date: '2026-10-13', stamp: true,
+  cfdiCode: '03', paymentMethod: 'PUE', quote: 1, paymentDate: '2026-10-13', stamp: true,
   confirmation: 'CREAR_Y_TIMBRAR_RECEPCION_SIIGO'
 }
 const invoice = {
@@ -52,20 +52,22 @@ let receipt: Record<string, unknown>
 const event = (body: object = input) => ({ id: 'order-1', paymentId: 'payment-1', body }) as Parameters<typeof route>[0]
 const writes = () => mocks.request.mock.calls.filter(([, options]) => options?.method)
 
+afterEach(() => vi.useRealTimers())
 beforeEach(() => {
+  vi.setSystemTime(new Date('2026-10-13T18:00:00Z'))
   vi.clearAllMocks()
   mocks.role = 'admin'
   payment = {
     id: 'payment-1', orderId: 'order-1', requestId: '19ee1240-591d-4b72-87da-ee034838553c',
     provider: 'local', externalStatus: 'not_applicable', externalError: null,
-    amount: 500, paymentMethod: 'transferencia', paymentDate: new Date('2026-07-28T00:00:00Z'),
+    amount: 500, paymentMethod: 'transferencia', paymentDate: new Date('2026-10-13T00:00:00Z'),
     observations: 'Pedido PED-123', reference: null, currencyCode: 'MXN',
     createdByName: 'Administrador', createdByEmail: 'admin@example.com', createdAt: new Date(),
     siigoVoucherId: null, externalPayload: null
   }
   customer = { id: customerId, name: ['Cliente'], active: true, rfc_id: 'MELM8305281H0', contacts: [{ email: 'actual@cliente.com' }] }
   receipt = {
-    id: voucherId, name: 'RC-2-22', number: 22, document: { id: 7714 }, date: '2026-07-28',
+    id: voucherId, name: 'RC-2-22', number: 22, document: { id: 7714 }, date: '2026-10-13',
     customer: { id: customerId, rfc_id: 'MELM8305281H0' }, cost_center: 235,
     items: [{ due: { prefix: 'FV-1', consecutive: 68, quote: 1, uuid: 'invoice-sat-uuid' }, value: 500 }],
     payments: [{ method: 'PUE', cfdi: { code: '03' }, conditions: [{ id: 5636, value: 500 }] }],
@@ -104,17 +106,18 @@ function failedReceipt() {
 }
 
 describe('creación y recuperación de recepciones de pago', () => {
-  it('envía rfc_id, fecha de emisión y correo vigente; conserva el pago histórico', async () => {
-    const result = await route(event())
-    expect(result.paymentDate).toBe('2026-07-28')
+  it('envía rfc_id, correo vigente y la fecha real, incluso si el pago fue ayer', async () => {
+    payment.paymentDate = new Date('2026-10-12T00:00:00Z')
+    const result = await route(event({ ...input, paymentDate: '2026-10-12' }))
+    expect(result.paymentDate).toBe('2026-10-12')
     expect(writes()).toEqual([
       ['/v1/vouchers', expect.objectContaining({ method: 'POST', body: expect.objectContaining({
-        date: '2026-10-13', customer: { rfc_id: 'MELM8305281H0', branch_office: 0 },
-        observations: 'Pago registrado el 28/07/2026. Pedido PED-123'
+        date: '2026-10-12', customer: { rfc_id: 'MELM8305281H0', branch_office: 0 },
+        observations: 'Pedido PED-123'
       }) })],
       [`/v1/vouchers/${voucherId}/stamp`, { method: 'PUT', body: { mail_to: 'actual@cliente.com' } }]
     ])
-    expect(mocks.reserve.mock.calls[0]?.[0].data.externalPayload.request.date).toBe('2026-10-13')
+    expect(mocks.reserve.mock.calls[0]?.[0].data.externalPayload.request.date).toBe('2026-10-12')
     expect(result.externalStatus).toBe('synced')
   })
 
@@ -135,7 +138,7 @@ describe('creación y recuperación de recepciones de pago', () => {
     mocks.role = 'repartidor'
     await expect(route(event())).rejects.toMatchObject({ statusCode: 403 })
     mocks.role = 'admin'
-    for (const body of [{ ...input, date: '2026-02-29' }, { ...input, confirmation: 'CREAR_RECEPCION_SIIGO' }, { ...input, stampEmail: 'intruso@ejemplo.com' }]) {
+    for (const body of [{ ...input, paymentDate: '2026-02-29' }, { ...input, confirmation: 'CREAR_RECEPCION_SIIGO' }, { ...input, stampEmail: 'intruso@ejemplo.com' }]) {
       await expect(route(event(body))).rejects.toMatchObject({ statusCode: 400 })
     }
     expect(mocks.request).not.toHaveBeenCalled()
@@ -164,13 +167,10 @@ describe('creación y recuperación de recepciones de pago', () => {
     expect(writes().filter(([, options]) => options.method === 'POST')).toHaveLength(1)
   })
 
-  it('corrige la fecha y timbra la misma recepción sin repetir POST ni perder el UUID', async () => {
+  it('timbra la misma recepción sin repetir POST ni cambiar su fecha', async () => {
     failedReceipt()
-    const result = await route(event({ ...input, confirmation: 'ACTUALIZAR_Y_TIMBRAR_RECEPCION_SIIGO' }))
+    const result = await route(event({ ...input, confirmation: 'TIMBRAR_RECEPCION_SIIGO' }))
     expect(writes()).toEqual([
-      [`/v1/vouchers/${voucherId}`, expect.objectContaining({ method: 'PUT', body: expect.objectContaining({
-        number: 22, date: '2026-10-13', items: receipt.items
-      }) })],
       [`/v1/vouchers/${voucherId}/stamp`, { method: 'PUT', body: { mail_to: 'actual@cliente.com' } }]
     ])
     expect(result.siigo?.voucherId).toBe(voucherId)
@@ -191,31 +191,53 @@ describe('creación y recuperación de recepciones de pago', () => {
   it('si ya fue aceptada, concilia sin enviar otra solicitud fiscal', async () => {
     failedReceipt()
     receipt.stamp = { status: 'Accepted' }
-    expect((await route(event({ ...input, confirmation: 'ACTUALIZAR_Y_TIMBRAR_RECEPCION_SIIGO' }))).externalStatus).toBe('synced')
+    expect((await route(event({ ...input, confirmation: 'TIMBRAR_RECEPCION_SIIGO' }))).externalStatus).toBe('synced')
     expect(writes()).toHaveLength(0)
   })
 
-  it('si la corrección es rechazada, conserva la fecha anterior para volver a revisar la misma recepción', async () => {
+  it('permite consultar y conciliar un histórico ya aceptado sin volver a timbrarlo', async () => {
     failedReceipt()
-    const implementation = mocks.request.getMockImplementation()!
-    mocks.request.mockImplementation(async (path, options) => {
-      if (path === `/v1/vouchers/${voucherId}` && options?.method === 'PUT') {
-        throw createError({ statusCode: 400, statusMessage: 'Invalid date' })
-      }
-      return implementation(path, options)
+    payment.paymentDate = new Date('2026-10-02T00:00:00Z')
+    receipt.date = '2026-10-02'
+    receipt.stamp = { status: 'Accepted' }
+    expect((await route(event({ ...input, paymentDate: '2026-10-02', confirmation: 'TIMBRAR_RECEPCION_SIIGO' }))).externalStatus).toBe('synced')
+    expect(writes()).toHaveLength(0)
+  })
+
+  it('no timbra una recepción previa que tenga otra fecha que la real del pago', async () => {
+    failedReceipt()
+    receipt.date = '2026-10-12'
+    payment.externalPayload = { request: { date: '2026-10-12' } }
+    const body = { ...input, confirmation: 'TIMBRAR_RECEPCION_SIIGO' }
+    await expect(route(event(body))).rejects.toMatchObject({ statusCode: 409 })
+    expect(writes()).toHaveLength(0)
+    expect(mocks.reserve).not.toHaveBeenCalled()
+  })
+
+  it('no sustituye el pago del 02/10 por hoy para evitar invalid_date', async () => {
+    payment.paymentDate = new Date('2026-10-02T00:00:00Z')
+    await expect(route(event({ ...input, paymentDate: '2026-10-02' }))).rejects.toMatchObject({
+      statusCode: 422, statusMessage: expect.stringContaining('02/10/2026')
     })
-    const body = { ...input, confirmation: 'ACTUALIZAR_Y_TIMBRAR_RECEPCION_SIIGO' }
-    expect((await route(event(body))).externalStatus).toBe('failed')
-    expect(payment.externalPayload).toMatchObject({ request: { date: '2026-07-28' } })
-    mocks.request.mockImplementation(implementation)
-    expect((await route(event(body))).externalStatus).toBe('synced')
-    expect(writes().some(([, options]) => options.method === 'POST')).toBe(false)
+    await expect(route(event())).rejects.toMatchObject({ statusCode: 409 })
+    expect(mocks.request).not.toHaveBeenCalled()
+    expect(mocks.reserve).not.toHaveBeenCalled()
+    expect(payment.paymentDate).toEqual(new Date('2026-10-02T00:00:00Z'))
+  })
+
+  it('rechaza Crédito Clientes antes de crear un ingreso que maneje vencimiento', async () => {
+    const implementation = mocks.request.getMockImplementation()!
+    mocks.request.mockImplementation(async (path, options) => path === '/v1/payment-types'
+      ? [{ id: 3564, name: 'Crédito Clientes', active: true, due_date: true }]
+      : implementation(path, options))
+    await expect(route(event({ ...input, paymentTypeId: 3564 }))).rejects.toMatchObject({ statusCode: 422 })
+    expect(writes()).toHaveLength(0)
   })
 
   it('no interpreta una respuesta de timbrado vacía como éxito ni vuelve a enviar una recepción rechazada', async () => {
     failedReceipt()
     receipt.stamp = { status: 'Rejected' }
-    const body = { ...input, confirmation: 'ACTUALIZAR_Y_TIMBRAR_RECEPCION_SIIGO' }
+    const body = { ...input, confirmation: 'TIMBRAR_RECEPCION_SIIGO' }
     await expect(route(event(body))).rejects.toMatchObject({ statusCode: 409 })
     expect(writes()).toHaveLength(0)
     receipt.stamp = { status: 'Draft' }

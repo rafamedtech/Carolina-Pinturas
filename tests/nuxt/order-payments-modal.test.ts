@@ -1,5 +1,5 @@
 // @vitest-environment nuxt
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { mountSuspended } from '@nuxt/test-utils/runtime'
 import type { VueWrapper } from '@vue/test-utils'
 import OrderPaymentsModal from '~/components/orders/payments/OrderPaymentsModal.vue'
@@ -44,7 +44,7 @@ const payment: OrderPayment = {
   paymentMethod: 'transferencia',
   amount: 60,
   currencyCode: 'MXN',
-  paymentDate: '2026-08-18',
+  paymentDate: '2026-10-13',
   reference: null,
   observations: null,
   siigo: null,
@@ -54,7 +54,9 @@ const payment: OrderPayment = {
 
 let wrapper: VueWrapper | null = null
 
+beforeEach(() => vi.setSystemTime(new Date('2026-10-13T18:00:00Z')))
 afterEach(() => {
+  vi.useRealTimers()
   wrapper?.unmount()
   wrapper = null
   document.body.innerHTML = ''
@@ -157,7 +159,7 @@ describe('OrderPaymentsModal', () => {
     expect(invoiceSelect.props('disabled')).toBe(true)
   })
 
-  it('muestra el correo de Siigo sin edición y envía la fecha de emisión separada del pago', async () => {
+  it('confirma la fecha real del pago y muestra el correo de Siigo sin edición', async () => {
     const siigoContext: OrderPaymentContext = {
       ...context,
       siigo: {
@@ -193,7 +195,7 @@ describe('OrderPaymentsModal', () => {
     await vi.waitFor(() => {
       expect(wrapper?.emitted('submit')?.[0]).toEqual([expect.objectContaining({
         stamp: true,
-        date: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/),
+        paymentDate: '2026-10-13',
         confirmation: 'CREAR_Y_TIMBRAR_RECEPCION_SIIGO'
       })])
     })
@@ -226,7 +228,7 @@ describe('OrderPaymentsModal', () => {
     })
   })
 
-  it('confirma la actualización de una recepción existente y conserva sus campos fiscales', async () => {
+  it('confirma el timbrado de una recepción existente sin cambiar fechas', async () => {
     const siigoContext: OrderPaymentContext = {
       ...context,
       siigo: {
@@ -251,12 +253,68 @@ describe('OrderPaymentsModal', () => {
         }
       }
     })
-    expect(document.body.textContent).toContain('Actualizar fecha y timbrar recepción')
+    expect(document.body.textContent).toContain('Timbrar recepción existente')
     expect(wrapper.findAllComponents({ name: 'USelect' }).every(select => select.props('disabled'))).toBe(true)
     await wrapper.findComponent({ name: 'UCheckbox' }).setValue(true)
     document.querySelector<HTMLFormElement>('#siigo-payment-form')?.requestSubmit()
     await vi.waitFor(() => expect(wrapper?.emitted('submit')?.[0]).toEqual([expect.objectContaining({
-      confirmation: 'ACTUALIZAR_Y_TIMBRAR_RECEPCION_SIIGO', stamp: true, quote: 2
+      confirmation: 'TIMBRAR_RECEPCION_SIIGO', stamp: true, quote: 2
     })]))
+  })
+
+  it('explica la limitación del pago del 02/10 y no ofrece cambiar su fecha por hoy', async () => {
+    wrapper = await mountSuspended(OrderPaymentSiigoModal, {
+      props: {
+        open: true,
+        payment: { ...payment, paymentDate: '2026-10-02' },
+        saving: false,
+        stampAfterCreate: true,
+        context: {
+          ...context,
+          siigo: {
+            ...context.siigo, writeEnabled: true, customerEmail: 'cliente@example.com',
+            documentTypes: [{ id: 69452, code: '1', name: 'Recibo', active: true }],
+            paymentTypes: [{ id: 3560, name: '03 - Transferencia', active: true }]
+          }
+        }
+      }
+    })
+    expect(document.body.textContent).toContain('02/10/2026')
+    expect(document.body.textContent).toContain('El timbrado se solicitará hoy, 13/10/2026')
+    expect(document.body.textContent).toContain('no documenta una fecha de emisión independiente')
+    expect(document.body.textContent).not.toContain('Fecha de emisión de la recepción')
+    const submit = wrapper.findAllComponents({ name: 'UButton' }).find(button => button.props('label') === 'Crear y timbrar')
+    expect(submit?.props('disabled')).toBe(true)
+    expect(wrapper.findAllComponents({ name: 'UButton' }).some(button => button.props('label') === 'Abrir Siigo Nube')).toBe(true)
+  })
+
+  it('reemplaza la condición de vencimiento de un intento fallido por la condición del ingreso', async () => {
+    wrapper = await mountSuspended(OrderPaymentSiigoModal, {
+      props: {
+        open: true, saving: false, stampAfterCreate: true,
+        payment: {
+          ...payment, provider: 'siigo', externalStatus: 'failed',
+          siigo: {
+            voucherId: null, voucherName: null,
+            invoiceId: context.siigo.assignedInvoice!.id, invoiceName: context.siigo.assignedInvoice!.name,
+            documentTypeId: 69452, paymentTypeId: 3564, costCenterId: null, cfdiCode: '04', paymentMethod: 'PPD', quote: 1
+          }
+        },
+        context: {
+          ...context,
+          siigo: {
+            ...context.siigo, writeEnabled: true, customerEmail: 'cliente@example.com',
+            documentTypes: [{ id: 69452, code: '1', name: 'Recibo', active: true }],
+            paymentTypes: [
+              { id: 3564, name: 'Crédito Clientes', active: true, due_date: true },
+              { id: 3561, name: '04 - Tarjeta de crédito', active: true, due_date: false }
+            ]
+          }
+        }
+      }
+    })
+    const select = wrapper.findAllComponents({ name: 'USelect' }).find(component => component.props('modelValue') === 3561)
+    expect(select?.props('items')).toEqual([{ label: '04 - Tarjeta de crédito', description: undefined, value: 3561 }])
+    expect(document.body.textContent).not.toContain('Crédito Clientes')
   })
 })

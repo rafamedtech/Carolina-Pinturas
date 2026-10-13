@@ -98,7 +98,12 @@ function onSubmit(event: FormSubmitEvent<Schema>) {
           />
         </UFormField>
 
-        <UFormField name="date" label="Fecha de pago" required>
+        <UFormField
+          name="date"
+          label="Fecha en que recibiste el pago"
+          description="Puede ser una fecha anterior a hoy. Es la fecha real del cobro, no la del timbrado."
+          required
+        >
           <OrdersOrderDatePicker
             v-model="paymentDate"
             :disabled="saving"

@@ -1,5 +1,5 @@
 import type { CreateOrderSiigoPaymentInput, OrderPayment } from '~/types/siigo-payments'
-import { formatDate } from '#shared/utils/datetime'
+import { siigoReceiptPaymentDateError } from '#shared/utils/siigoReceiptDates'
 import { ORDER_LOGISTICS_ROLES } from '~/utils/roleAccess'
 import { requireRole } from '../../../../../utils/auth'
 import { getOrder } from '../../../../../utils/orders'
@@ -36,12 +36,6 @@ function publicErrorMessage(error: unknown) {
 function uncertainExternalResult(error: unknown) {
   const statusCode = (error as { statusCode?: number }).statusCode
   return !statusCode || statusCode >= 500
-}
-
-function inputPaymentObservations(paymentDate: Date, receiptDate: string, observations: string | null) {
-  const date = paymentDate.toISOString().slice(0, 10)
-  if (date === receiptDate) return observations
-  return `Pago registrado el ${formatDate(date)}. ${observations ?? ''}`.trim().slice(0, 2500)
 }
 
 export default eventHandler(async (event): Promise<OrderPayment> => {
@@ -85,10 +79,10 @@ export default eventHandler(async (event): Promise<OrderPayment> => {
     })
   }
   const resumeStamp = Boolean(payment.siigoVoucherId)
-  if (resumeStamp !== (parsed.data.confirmation === 'ACTUALIZAR_Y_TIMBRAR_RECEPCION_SIIGO')) {
+  if (resumeStamp !== (parsed.data.confirmation === 'TIMBRAR_RECEPCION_SIIGO')) {
     throw createError({
       statusCode: 409,
-      statusMessage: 'Confirma la operación correspondiente: crear una recepción nueva o actualizar y timbrar la existente.'
+      statusMessage: 'Confirma la operación correspondiente: crear una recepción nueva o timbrar la existente.'
     })
   }
   if (payment.provider !== 'local' && payment.externalStatus !== 'failed') {
@@ -99,6 +93,14 @@ export default eventHandler(async (event): Promise<OrderPayment> => {
       statusCode: 503,
       statusMessage: 'Las recepciones de Siigo están deshabilitadas hasta autorizar la escritura fiscal.'
     })
+  }
+  const paymentDate = payment.paymentDate.toISOString().slice(0, 10)
+  if (parsed.data.paymentDate !== paymentDate) {
+    throw createError({ statusCode: 409, statusMessage: 'La fecha indicada no coincide con la fecha real del pago registrado. Actualiza los datos antes de timbrar.' })
+  }
+  if (parsed.data.stamp && !resumeStamp) {
+    const dateError = siigoReceiptPaymentDateError(paymentDate)
+    if (dateError) throw createError({ statusCode: 422, statusMessage: dateError })
   }
 
   const input: CreateOrderSiigoPaymentInput = {
@@ -113,8 +115,8 @@ export default eventHandler(async (event): Promise<OrderPayment> => {
     paymentMethod: parsed.data.paymentMethod,
     quote: parsed.data.quote,
     amount: Number(payment.amount.toString()),
-    date: parsed.data.date,
-    observations: inputPaymentObservations(payment.paymentDate, parsed.data.date, payment.observations),
+    date: paymentDate,
+    observations: payment.observations,
     confirmation: 'CREAR_RECEPCION_SIIGO'
   }
   const appliedPayments = await usePrisma().salesOrderPayment.aggregate({
@@ -172,12 +174,17 @@ export default eventHandler(async (event): Promise<OrderPayment> => {
       amount: input.amount,
       date: siigoReceiptReconciliationDate(payment.externalPayload, payment.paymentDate)
     })
+    if (existingReceipt.date !== paymentDate) {
+      throw createError({ statusCode: 409, statusMessage: 'La recepción de Siigo tiene otra fecha. Revísala en Siigo Nube para conservar la fecha real del pago antes de timbrar.' })
+    }
     if (isSiigoInvoiceStamped(existingReceipt.stampStatus)) {
       return orderPaymentView(await usePrisma().salesOrderPayment.update({
         where: { id: payment.id },
         data: { externalStatus: 'synced', externalError: null, externalPayload: siigoJson(existingReceipt.raw) }
       }))
     }
+    const dateError = siigoReceiptPaymentDateError(paymentDate)
+    if (dateError) throw createError({ statusCode: 422, statusMessage: dateError })
     if (existingReceipt.stampStatus?.toLowerCase() !== 'draft') {
       throw createError({ statusCode: 409, statusMessage: 'La recepción no está en borrador. Revisa su estado y errores en Siigo antes de volver a timbrar.' })
     }
@@ -189,7 +196,7 @@ export default eventHandler(async (event): Promise<OrderPayment> => {
       || existingReceipt.customerBranchOffice !== (invoice.customer?.branch_office ?? 0)
       || existingReceipt.applications[0]?.quote !== input.quote
       || existingReceipt.costCenterId !== (input.costCenterId ?? null)) {
-      throw createError({ statusCode: 409, statusMessage: 'Los datos de la recepción cambiaron en Siigo. Sólo se permite corregir la fecha y timbrar el mismo pago.' })
+      throw createError({ statusCode: 409, statusMessage: 'Los datos de la recepción cambiaron en Siigo. Revisa el mismo pago antes de timbrar.' })
     }
   }
   const voucherInput = existingReceipt ? { ...input, voucherNumber: existingReceipt.number } : input
@@ -209,9 +216,6 @@ export default eventHandler(async (event): Promise<OrderPayment> => {
     prefix: references.prefix
   })
   if (existingReceipt) {
-    if (existingReceipt.date !== input.date && !Number.isInteger(payload.number)) {
-      throw createError({ statusCode: 409, statusMessage: 'Siigo no devolvió el consecutivo de la recepción. Corrige su fecha directamente en Siigo.' })
-    }
     // Conservar UUID y demás referencias fiscales del documento consultado.
     payload.items = existingReceipt.applications.map(application => ({
       due: {
@@ -265,13 +269,6 @@ export default eventHandler(async (event): Promise<OrderPayment> => {
     })
 
     if (parsed.data.stamp) {
-      if (existingReceipt && existingReceipt.date !== input.date) {
-        await siigoRequest<unknown>(`/v1/vouchers/${encodeURIComponent(created.id)}`, { method: 'PUT', body: payload })
-        await usePrisma().salesOrderPayment.update({
-          where: { id: payment.id },
-          data: { externalPayload: siigoJson({ request: payload, created: created.raw }) }
-        })
-      }
       // Siigo México exige un correo al timbrar. No se reintenta si la respuesta es ambigua.
       const stamped = await siigoRequest<unknown>(`/v1/vouchers/${encodeURIComponent(created.id)}/stamp`, {
         method: 'PUT',

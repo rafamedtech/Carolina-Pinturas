@@ -121,7 +121,7 @@ describe('recepciones de pago de Siigo México', () => {
   it('separa la configuración fiscal de los datos inmutables del pago local', () => {
     expect(createOrderSiigoReceiptSchema.safeParse({
       invoiceId,
-      date: '2026-10-13',
+      paymentDate: '2026-10-13',
       documentTypeId: 7714,
       paymentTypeId: 5636,
       cfdiCode: '03',
@@ -138,7 +138,7 @@ describe('recepciones de pago de Siigo México', () => {
   it('exige fecha y confirmación fiscal; el navegador no puede elegir el destinatario', () => {
     const receipt = {
       invoiceId,
-      date: '2026-10-13',
+      paymentDate: '2026-10-13',
       documentTypeId: 7714,
       paymentTypeId: 5636,
       cfdiCode: '03',

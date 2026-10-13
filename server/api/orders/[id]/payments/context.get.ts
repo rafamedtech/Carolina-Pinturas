@@ -100,7 +100,7 @@ export default eventHandler(async (event): Promise<OrderPaymentContext> => {
         baseSiigo.unavailableReason = 'La factura asignada al pedido no está disponible o no tiene saldo pendiente en Siigo.'
       }
       baseSiigo.documentTypes = normalizeVoucherDocumentTypes(documentResponse).filter(item => item.active)
-      baseSiigo.paymentTypes = normalizePaymentTypes(paymentResponse).filter(item => item.active)
+      baseSiigo.paymentTypes = normalizePaymentTypes(paymentResponse).filter(item => item.active && !item.due_date)
       baseSiigo.costCenters = normalizeCostCenters(costCenterResponse).filter(item => item.active !== false)
       baseSiigo.customerEmail = siigoReceiptCustomerEmail(normalizeSiigoCustomer(customerResponse as SiigoCustomerApiResponse))
     } catch (error) {

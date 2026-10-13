@@ -12,7 +12,7 @@ import type {
 } from '~/types/siigo-payments'
 
 const dateSchema = z.iso.date('Usa una fecha válida con formato AAAA-MM-DD.')
-  .refine(value => value >= '1900-01-01', 'Selecciona una fecha de emisión válida.')
+  .refine(value => value >= '1900-01-01', 'Selecciona una fecha de pago válida.')
 
 export const createOrderSiigoPaymentSchema = z.object({
   destination: z.literal('siigo'),
@@ -36,15 +36,17 @@ export const createOrderSiigoReceiptSchema = createOrderSiigoPaymentSchema.omit(
   destination: true,
   requestId: true,
   amount: true,
+  date: true,
   observations: true,
   confirmation: true
 }).extend({
+  paymentDate: dateSchema,
   stamp: z.boolean().optional(),
-  confirmation: z.enum(['CREAR_RECEPCION_SIIGO', 'CREAR_Y_TIMBRAR_RECEPCION_SIIGO', 'ACTUALIZAR_Y_TIMBRAR_RECEPCION_SIIGO'])
+  confirmation: z.enum(['CREAR_RECEPCION_SIIGO', 'CREAR_Y_TIMBRAR_RECEPCION_SIIGO', 'TIMBRAR_RECEPCION_SIIGO'])
 }).strict().superRefine((input, context) => {
   const expectedConfirmation = input.stamp
-    ? input.confirmation === 'ACTUALIZAR_Y_TIMBRAR_RECEPCION_SIIGO'
-      ? 'ACTUALIZAR_Y_TIMBRAR_RECEPCION_SIIGO'
+    ? input.confirmation === 'TIMBRAR_RECEPCION_SIIGO'
+      ? 'TIMBRAR_RECEPCION_SIIGO'
       : 'CREAR_Y_TIMBRAR_RECEPCION_SIIGO'
     : 'CREAR_RECEPCION_SIIGO'
   if (input.confirmation !== expectedConfirmation) {
@@ -72,8 +74,8 @@ export function siigoReceiptCustomerEmail(customer: Pick<SiigoCustomer, 'contact
   return null
 }
 
-// La fecha de emisión puede diferir del pago local. Se guarda antes de crear la
-// recepción para poder conciliar una creación cuyo resultado haya sido ambiguo.
+// Conservar la fecha enviada por intentos anteriores para conciliar respuestas
+// ambiguas. Una emisión histórica distinta no autoriza cambiar la fecha real.
 export function siigoReceiptReconciliationDate(payload: unknown, paymentDate: Date): string {
   const date = record(record(payload)?.request)?.date
   return dateSchema.safeParse(date).success ? date as string : paymentDate.toISOString().slice(0, 10)
@@ -572,8 +574,12 @@ export function assertVoucherReferences(options: {
   if (input.costCenterId && !options.costCenters.some(item => item.id === input.costCenterId && item.active !== false)) {
     throw createError({ statusCode: 422, statusMessage: 'El centro de costo ya no está activo en Siigo.' })
   }
-  if (!options.paymentTypes.some(item => item.id === input.paymentTypeId && item.active)) {
+  const paymentType = options.paymentTypes.find(item => item.id === input.paymentTypeId && item.active)
+  if (!paymentType) {
     throw createError({ statusCode: 422, statusMessage: 'La condición de pago ya no está activa en Siigo.' })
+  }
+  if (paymentType.due_date) {
+    throw createError({ statusCode: 422, statusMessage: 'Selecciona una condición de ingreso sin vencimiento para la recepción; Crédito Clientes corresponde a la factura pendiente.' })
   }
 
   return { documentType, prefix: invoicePrefix(invoice) }

@@ -346,12 +346,12 @@ async function registerPaymentInSiigo(input: CreateOrderSiigoReceiptInput) {
             <UTooltip
               v-if="paymentHasSiigoAction(payment)"
               :text="paymentInvoiceIsStamped(payment)
-                ? payment.siigo?.voucherId ? 'Actualizar fecha y timbrar la recepción existente' : 'Crear y timbrar recepción en Siigo'
+                ? payment.siigo?.voucherId ? 'Timbrar la recepción existente conservando la fecha del pago' : 'Crear y timbrar recepción en Siigo'
                 : 'La factura debe estar timbrada antes de registrar el pago en Siigo.'"
             >
               <span class="inline-flex">
                 <UButton
-                  :label="payment.siigo?.voucherId ? 'Actualizar y timbrar' : payment.externalStatus === 'failed' ? 'Reintentar en Siigo' : 'Crear y timbrar en Siigo'"
+                  :label="payment.siigo?.voucherId ? 'Timbrar recepción' : payment.externalStatus === 'failed' ? 'Reintentar en Siigo' : 'Crear y timbrar en Siigo'"
                   icon="i-lucide-badge-check"
                   color="neutral"
                   variant="ghost"

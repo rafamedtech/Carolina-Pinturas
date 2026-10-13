@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { formatDate, mexicoToday } from '~/utils/datetime'
-import { parseDate } from '@internationalized/date'
-import type { DateValue } from '@internationalized/date'
+import { siigoReceiptPaymentDateError } from '#shared/utils/siigoReceiptDates'
 import * as z from 'zod'
 import type { FormSubmitEvent } from '@nuxt/ui'
 import type {
@@ -23,7 +22,7 @@ const open = defineModel<boolean>('open', { required: true })
 const resumingStamp = computed(() => Boolean(props.payment.siigo?.voucherId))
 
 const schema = z.object({
-  date: z.iso.date('Selecciona una fecha de emisión válida.'),
+  paymentDate: z.iso.date('Revisa la fecha en que recibiste el pago.'),
   invoiceId: z.string().uuid('Selecciona una factura.'),
   documentTypeId: z.number().int().positive('Selecciona el tipo de recepción.'),
   voucherNumber: z.number().int().positive().optional(),
@@ -37,7 +36,7 @@ const schema = z.object({
 type Schema = z.output<typeof schema>
 
 const state = reactive<Partial<Schema>>({
-  date: mexicoToday(),
+  paymentDate: props.payment.paymentDate,
   invoiceId: '',
   documentTypeId: undefined,
   voucherNumber: undefined,
@@ -48,10 +47,10 @@ const state = reactive<Partial<Schema>>({
   quote: 1,
   confirmed: false
 })
-const receiptDate = computed<DateValue | undefined>({
-  get: () => state.date ? parseDate(state.date) : undefined,
-  set: (value) => { state.date = value?.toString() ?? '' }
-})
+const paymentDateError = computed(() => props.stampAfterCreate && !resumingStamp.value
+  ? siigoReceiptPaymentDateError(props.payment.paymentDate)
+  : null)
+const stampRequestDate = computed(() => mexicoToday())
 const invoiceItems = computed(() => props.context.siigo.assignedInvoice
   ? [{
       label: props.context.siigo.assignedInvoice.name,
@@ -63,7 +62,8 @@ const documentItems = computed(() => props.context.siigo.documentTypes.map(docum
   label: `${document.code} · ${document.name}`,
   value: document.id
 })))
-const paymentTypeItems = computed(() => props.context.siigo.paymentTypes.map(payment => ({
+const receiptPaymentTypes = computed(() => props.context.siigo.paymentTypes.filter(payment => payment.active && !payment.due_date))
+const paymentTypeItems = computed(() => receiptPaymentTypes.value.map(payment => ({
   label: payment.name,
   description: payment.type,
   value: payment.id
@@ -86,7 +86,7 @@ const canUseSiigo = computed(() =>
   props.context.siigo.available
   && selectedInvoice.value?.stamped === true
   && props.context.siigo.documentTypes.length > 0
-  && props.context.siigo.paymentTypes.length > 0
+  && receiptPaymentTypes.value.length > 0
 )
 const cfdiItems = [
   { label: '01 · Efectivo', value: '01' },
@@ -110,9 +110,9 @@ function localCfdiCode() {
 }
 
 function defaultPaymentTypeId(cfdiCode: string) {
-  return props.context.siigo.paymentTypes.find(payment =>
+  return receiptPaymentTypes.value.find(payment =>
     payment.name.trim().startsWith(cfdiCode)
-  )?.id ?? props.context.siigo.paymentTypes[0]?.id
+  )?.id ?? receiptPaymentTypes.value[0]?.id
 }
 
 function nextQuote(invoiceId: string) {
@@ -131,11 +131,12 @@ watch(open, (isOpen) => {
   state.invoiceId = props.context.siigo.assignedInvoice?.id || ''
   state.documentTypeId = props.payment.siigo?.documentTypeId || props.context.siigo.documentTypes[0]?.id
   state.cfdiCode = props.payment.siigo?.cfdiCode || localCfdiCode()
-  state.paymentTypeId = props.payment.siigo?.paymentTypeId || defaultPaymentTypeId(state.cfdiCode)
+  const previousPaymentType = receiptPaymentTypes.value.find(payment => payment.id === props.payment.siigo?.paymentTypeId)
+  state.paymentTypeId = previousPaymentType?.id || defaultPaymentTypeId(state.cfdiCode)
   state.costCenterId = props.payment.siigo?.costCenterId ?? undefined
   state.paymentMethod = props.payment.siigo?.paymentMethod || 'PUE'
   state.quote = props.payment.siigo?.quote || nextQuote(state.invoiceId)
-  state.date = mexicoToday()
+  state.paymentDate = props.payment.paymentDate
   state.confirmed = false
 }, { immediate: true })
 
@@ -145,7 +146,7 @@ function formatCurrency(value: number) {
 
 function onSubmit(event: FormSubmitEvent<Schema>) {
   emit('submit', {
-    date: event.data.date,
+    paymentDate: event.data.paymentDate,
     invoiceId: event.data.invoiceId,
     documentTypeId: event.data.documentTypeId,
     voucherNumber: event.data.voucherNumber,
@@ -156,7 +157,7 @@ function onSubmit(event: FormSubmitEvent<Schema>) {
     quote: event.data.quote,
     stamp: props.stampAfterCreate || undefined,
     confirmation: props.stampAfterCreate
-      ? resumingStamp.value ? 'ACTUALIZAR_Y_TIMBRAR_RECEPCION_SIIGO' : 'CREAR_Y_TIMBRAR_RECEPCION_SIIGO'
+      ? resumingStamp.value ? 'TIMBRAR_RECEPCION_SIIGO' : 'CREAR_Y_TIMBRAR_RECEPCION_SIIGO'
       : 'CREAR_RECEPCION_SIIGO'
   })
 }
@@ -165,10 +166,10 @@ function onSubmit(event: FormSubmitEvent<Schema>) {
 <template>
   <UModal
     v-model:open="open"
-    :title="resumingStamp ? 'Actualizar fecha y timbrar recepción' : stampAfterCreate ? 'Crear y timbrar pago en Siigo' : 'Registrar pago en Siigo'"
+    :title="resumingStamp ? 'Timbrar recepción existente' : stampAfterCreate ? 'Crear y timbrar pago en Siigo' : 'Registrar pago en Siigo'"
     :description="stampAfterCreate
       ? resumingStamp
-        ? 'Revisará la recepción existente, actualizará su fecha de emisión si cambió y solicitará su timbrado ante el SAT.'
+        ? 'Revisará la recepción existente y solicitará su timbrado conservando la fecha real del pago.'
         : 'Creará una recepción para este pago y solicitará su timbrado ante el SAT. Esta operación fiscal no se puede deshacer desde la aplicación.'
       : 'Creará una recepción borrador para este pago. No se timbrará ni enviará al SAT.'"
     :dismissible="!saving"
@@ -182,6 +183,25 @@ function onSubmit(event: FormSubmitEvent<Schema>) {
         class="grid gap-4 sm:grid-cols-2"
         @submit="onSubmit"
       >
+        <UAlert
+          v-if="paymentDateError"
+          class="sm:col-span-2"
+          color="warning"
+          variant="subtle"
+          title="Conserva la fecha real del pago"
+          :description="paymentDateError"
+        >
+          <template #actions>
+            <UButton
+              label="Abrir Siigo Nube"
+              to="https://siigonube.siigo.mx/"
+              target="_blank"
+              color="neutral"
+              variant="outline"
+              icon="i-lucide-external-link"
+            />
+          </template>
+        </UAlert>
         <UAlert
           v-if="!canUseSiigo"
           class="sm:col-span-2"
@@ -210,7 +230,7 @@ function onSubmit(event: FormSubmitEvent<Schema>) {
           </div>
           <div>
             <p class="text-muted">
-              Fecha del pago
+              Fecha en que recibiste el pago
             </p>
             <p class="font-semibold">
               {{ formatDate(payment.paymentDate) }}
@@ -218,15 +238,9 @@ function onSubmit(event: FormSubmitEvent<Schema>) {
           </div>
         </div>
 
-        <UFormField
-          name="date"
-          label="Fecha de emisión de la recepción"
-          description="La fecha del pago local se conserva. Selecciona una fecha de emisión permitida por Siigo para timbrar."
-          class="sm:col-span-2"
-          required
-        >
-          <OrdersOrderDatePicker v-model="receiptDate" :disabled="saving" />
-        </UFormField>
+        <p v-if="stampAfterCreate" class="sm:col-span-2 text-sm text-muted">
+          El timbrado se solicitará hoy, {{ formatDate(stampRequestDate) }}. La fecha del pago es la que capturaste al registrarlo y se conserva en Siigo; no se cambia por la fecha del timbrado.
+        </p>
         <UFormField
           class="sm:col-span-2"
           name="invoiceId"
@@ -325,7 +339,7 @@ function onSubmit(event: FormSubmitEvent<Schema>) {
             v-model="state.confirmed"
             :label="stampAfterCreate
               ? resumingStamp
-                ? 'Confirmo que deseo actualizar la fecha y timbrar esta recepción existente en Siigo.'
+                ? 'Confirmo que deseo timbrar esta recepción existente conservando la fecha real del pago.'
                 : 'Confirmo que deseo crear y timbrar esta recepción en Siigo.'
               : 'Confirmo que deseo crear una recepción borrador para este pago en Siigo.'"
           />
@@ -344,10 +358,10 @@ function onSubmit(event: FormSubmitEvent<Schema>) {
       <UButton
         type="submit"
         form="siigo-payment-form"
-        :label="resumingStamp ? 'Actualizar y timbrar' : stampAfterCreate ? 'Crear y timbrar' : 'Registrar en Siigo'"
+        :label="resumingStamp ? 'Timbrar recepción' : stampAfterCreate ? 'Crear y timbrar' : 'Registrar en Siigo'"
         :icon="stampAfterCreate ? 'i-lucide-badge-check' : 'i-lucide-cloud-upload'"
         :loading="saving"
-        :disabled="saving || !canUseSiigo || !context.siigo.writeEnabled || (stampAfterCreate && !context.siigo.customerEmail)"
+        :disabled="saving || !canUseSiigo || !context.siigo.writeEnabled || Boolean(paymentDateError) || (stampAfterCreate && !context.siigo.customerEmail)"
       />
     </template>
   </UModal>
