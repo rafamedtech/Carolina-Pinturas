@@ -16,7 +16,7 @@ export default eventHandler(async (event) => {
     ...(q.search ? { providerName: { contains: q.search, mode: 'insensitive' } } : {}),
     ...(storedStatus ? { status: storedStatus } : {}),
     date: { ...(q.dateFrom ? { gte: new Date(q.dateFrom) } : {}), ...(q.dateTo ? { lte: new Date(q.dateTo) } : {}) }
-  }, include: purchaseInclude, orderBy: { folio: 'desc' } })
+  }, include: purchaseInclude, orderBy: [{ date: 'desc' }, { folio: 'desc' }] })
   const results = rows.map(purchaseView)
   return { results: q.status ? results.filter(order => order.status === q.status) : results }
 })
