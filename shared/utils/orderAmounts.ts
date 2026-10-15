@@ -1,8 +1,6 @@
 import Decimal from 'decimal.js'
 
-// Siigo México recibe precio unitario y pagos con dos decimales. Redondear
-// la base unitaria antes de multiplicar evita cobrar un total que la factura
-// no puede representar. Las cantidades internas conservan su precisión.
+// Importes monetarios en centavos con redondeo decimal, sin errores binarios.
 export function orderMoney(value: Decimal.Value) {
   return new Decimal(value).toDecimalPlaces(2, Decimal.ROUND_HALF_UP)
 }
@@ -29,9 +27,24 @@ export function orderLineAmounts(
   const price = taxIncluded && rate.gt(0)
     ? orderMoney(listedPrice.div(rate.div(100).plus(1)))
     : listedPrice
-  const subtotal = orderMoney(price.mul(quantity))
+  // El precio con IVA es el importe pactado: multiplicarlo antes de extraer
+  // la base evita que el redondeo unitario cambie lo que se cobra al cliente.
+  const listedTotal = orderMoney(listedPrice.mul(quantity))
+  const factor = rate.div(100).plus(1)
+  const subtotal = taxIncluded && rate.gt(0)
+    ? orderMoney(listedTotal.div(factor))
+    : listedTotal
   const discountAmount = orderDiscount(subtotal, discountType, discountValue)
   const taxableBase = subtotal.minus(discountAmount)
+  if (taxIncluded && rate.gt(0)) {
+    const grossDiscount = discountType === 'monto'
+      ? Decimal.min(listedTotal, orderMoney(discountAmount.mul(factor)))
+      : orderDiscount(listedTotal, discountType, discountValue)
+    const total = listedTotal.minus(grossDiscount)
+    // El IVA absorbe el centavo residual del desglose, nunca el total pactado.
+    const taxAmount = total.minus(taxableBase)
+    return { price, subtotal, discountAmount, taxAmount, total }
+  }
   const taxAmount = rates.reduce<Decimal>(
     (sum, value) => sum.plus(orderMoney(taxableBase.mul(value).div(100))), new Decimal(0)
   )

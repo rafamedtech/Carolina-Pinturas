@@ -59,6 +59,20 @@ registerEndpoint('/api/orders/statuses', () => [])
 registerEndpoint('/api/repartidores', () => [])
 registerEndpoint('/api/orders/tags', () => [])
 
+let storedQuoteTotal = 38800.08
+registerEndpoint('/api/orders/quote-rounding', () => ({
+  id: 'quote-rounding', version: 1, status: { key: 'borrador', name: 'Cotización' },
+  customer: { id: regularCustomer.id }, orderDate: '2026-10-15',
+  paymentStatus: 'pendiente', requiresInvoice: false, tags: [],
+  discountType: 'porcentaje', discountValue: 0, total: storedQuoteTotal,
+  items: [{
+    productId: 'product', code: 'YA116', name: 'Pintura', unit: { code: 'PZA', name: 'Pieza' },
+    quantity: 20, unitPrice: 1940, taxIncluded: true, taxPercentages: [8],
+    subtotal: 35926, discountAmount: 0, taxAmount: 2874.08, total: storedQuoteTotal,
+    discountType: 'porcentaje', discountValue: 0, priceHistory: []
+  }]
+}))
+
 let wrapper: VueWrapper | null = null
 
 afterEach(() => {
@@ -87,4 +101,19 @@ describe('OrderEditor · preferencia de factura del cliente', () => {
     await nextTick()
     expect(customerFields.props('requiresInvoice')).toBe(false)
   })
+})
+
+describe('OrderEditor · recálculo de cotizaciones', () => {
+  it.each([[38800.08, false], [38800, true]])(
+    'habilita guardar únicamente cuando cambia el importe o el contenido (%s)', async (storedTotal, disabled) => {
+      storedQuoteTotal = Number(storedTotal)
+      wrapper = await mountSuspended(OrderEditor, { props: { orderId: 'quote-rounding' } })
+      await vi.waitFor(() => {
+        expect(wrapper!.text()).toContain('38,800.00')
+        const reviewButton = wrapper!.findAll('button').find(button => button.text().trim() === 'Revisar cambios')
+        expect(reviewButton).toBeDefined()
+        expect(reviewButton!.element.disabled).toBe(disabled)
+      })
+    }
+  )
 })

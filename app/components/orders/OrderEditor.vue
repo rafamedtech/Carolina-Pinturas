@@ -432,7 +432,8 @@ const canSubmit = computed(() =>
 )
 const hasEditorChanges = computed(() =>
   initialEditorSnapshot.value !== null
-  && editorSnapshot() !== initialEditorSnapshot.value
+  && (editorSnapshot() !== initialEditorSnapshot.value
+    || (existingOrder.value != null && !orderMoney(grandTotal.value).equals(existingOrder.value.total)))
 )
 const reviewDisabled = computed(() =>
   !canSubmit.value

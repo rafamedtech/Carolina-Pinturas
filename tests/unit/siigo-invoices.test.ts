@@ -42,23 +42,34 @@ const documentType = {
 }
 
 describe('Siigo invoice drafts', () => {
-  // Regresión 2026-10-13: el pedido anterior cobraba 300, pero Siigo
-  // recibía 3 × 86.21 + IVA 16%, cuyo total redondeado es 300.01.
-  it.each([8, 16])('mantiene el total del pedido y pago tras convertir IVA incluido (%s%%)', (rate) => {
-    const amounts = orderLineAmounts(3, 100, rate, true)
+  // Los pedidos históricos conservan sus importes; no recalcularlos al facturar.
+  it.each([
+    [8, 277.77, 22.22, 299.99],
+    [16, 258.63, 41.38, 300.01]
+  ])('conserva los totales históricos con base unitaria redondeada (IVA %s)', (rate, subtotal, taxAmount, total) => {
     const product = normalizeInvoiceProduct({ id: 'product', code: 'P1', name: 'Pintura', taxes: [{ id: 1, percentage: rate }] })
-    const order = {
-      folio: 1, observations: null, discountAmount: 0, total: amounts.total.toNumber(),
-      items: [{ code: 'P1', description: null, quantity: 3, unitPrice: 100,
-        subtotal: amounts.subtotal.toNumber(), discountAmount: 0,
-        taxAmount: amounts.taxAmount.toNumber(), total: amounts.total.toNumber() }]
-    }
-    const options = { input, order, customerRfc: 'MELM8305281H0', products: new Map([['P1', product]]), documentType, costCenterId: null }
-    const payload = buildSiigoInvoiceDraftPayload(options)
-    expect(payload.items[0]!.price).toBe(amounts.price.toNumber())
-    expect(payload.payment.conditions[0]!.value).toBe(rate === 8 ? 299.99 : 300.01)
-    expect(() => buildSiigoInvoiceDraftPayload({ ...options, order: { ...order, total: 300 } })).toThrow('no coincide')
+    const payload = buildSiigoInvoiceDraftPayload({
+      input, customerRfc: 'MELM8305281H0', products: new Map([['P1', product]]), documentType, costCenterId: null,
+      order: { folio: 1, observations: null, discountAmount: 0, total,
+        items: [{ code: 'P1', description: null, quantity: 3, unitPrice: 100, subtotal, discountAmount: 0, taxAmount, total }] }
+    })
+    expect(payload.items[0]!.price).toBe(orderLineAmounts(3, 100, rate, true).price.toNumber())
+    expect(payload.payment.conditions[0]!.value).toBe(total)
   })
+
+  it.each([[8, 3, 100], [16, 3, 100], [8, 20, 1940]])(
+    'bloquea la factura si el redondeo de Siigo cambia el importe pactado (IVA %s, cantidad %s)', (rate, quantity, unitPrice) => {
+      const amounts = orderLineAmounts(quantity, unitPrice, rate, true)
+      const product = normalizeInvoiceProduct({ id: 'product', code: 'P1', name: 'Pintura', taxes: [{ id: 1, percentage: rate }] })
+      expect(() => buildSiigoInvoiceDraftPayload({
+        input, customerRfc: 'MELM8305281H0', products: new Map([['P1', product]]), documentType, costCenterId: null,
+        order: { folio: 1, observations: null, discountAmount: 0, total: amounts.total.toNumber(),
+          items: [{ code: 'P1', description: null, quantity, unitPrice, taxIncluded: true,
+            subtotal: amounts.subtotal.toNumber(), discountAmount: 0,
+            taxAmount: amounts.taxAmount.toNumber(), total: amounts.total.toNumber() }] }
+      })).toThrow('no coincide')
+    }
+  )
 
   it.each(['Percentage', 'Value'] as const)('conserva descuentos de partidas y globales en comprobantes %s', (discountType) => {
     const amounts = orderLineAmounts(2, 100, 16, false, 'porcentaje', 10)

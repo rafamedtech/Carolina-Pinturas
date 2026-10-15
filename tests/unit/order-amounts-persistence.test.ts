@@ -32,16 +32,22 @@ beforeEach(() => {
 })
 
 describe('persistencia de los centavos del pedido y su pago inicial', () => {
-  it.each([[8, '299.99', '277.77', '22.22'], [16, '300.01', '258.63', '41.38']])(
-    'guarda exactamente el mismo total en pedido, partida y pago (IVA %s)', async (rate, total, subtotal, tax) => {
+  it.each([
+    [8, 3, 100, '300', '277.78', '22.22', true],
+    [16, 3, 100, '300', '258.62', '41.38', true],
+    [8, 20, 1940, '38800', '35925.93', '2874.07', true],
+    [8, 20, 1940, '41904', '38800', '3104', false],
+    [16, 20, 1940, '45008', '38800', '6208', false]
+  ])(
+    'guarda exactamente el mismo total en pedido, partida y pago (IVA %s)', async (rate, quantity, price, total, subtotal, tax, taxIncluded) => {
       const product: SiigoProduct = {
-        id, code: 'P1', name: 'Pintura', active: true, tax_included: true,
-        prices: [{ currency_code: 'MXN', price_list: [{ position: 1, value: 100 }] }],
+        id, code: 'P1', name: 'Pintura', active: true, tax_included: Boolean(taxIncluded),
+        prices: [{ currency_code: 'MXN', price_list: [{ position: 1, value: Number(price) }] }],
         taxes: [{ id: 1, percentage: Number(rate) }]
       }
       const input = createOrderSchema.parse({
         customerId: id, repartidorId: id, orderDate: '2026-10-13', requiresInvoice: true,
-        lines: [{ productId: id, quantity: 3 }],
+        lines: [{ productId: id, quantity: Number(quantity) }],
         initialPayment: { requestId: id, paymentMethod: 'efectivo', date: '2026-10-13' }
       })
       await expect(createOrder(input, user, { id, name: ['Cliente'] }, new Map([[id, product]]), {
