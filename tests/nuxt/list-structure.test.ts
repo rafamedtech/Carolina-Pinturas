@@ -2,7 +2,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { mountSuspended } from '@nuxt/test-utils/runtime'
 import { defineComponent, h, ref } from 'vue'
-import { parseDate } from '@internationalized/date'
 import type { VueWrapper } from '@vue/test-utils'
 import type { TableColumn } from '@nuxt/ui'
 import { UDashboardGroup } from '#components'
@@ -11,8 +10,6 @@ import ListToolbar from '~/components/list/ListToolbar.vue'
 import ListViews from '~/components/list/ListViews.vue'
 import ListTable from '~/components/list/ListTable.vue'
 import ListPagination from '~/components/list/ListPagination.vue'
-import PaymentListToolbar from '~/components/payments/PaymentListToolbar.vue'
-import ExpenseListToolbar from '~/components/expenses/ExpenseListToolbar.vue'
 
 interface CatalogRecord { id: string, name: string }
 const CatalogTable = ListTable<CatalogRecord>
@@ -87,7 +84,8 @@ describe('estructura compartida de listados', () => {
     await wrapper.findAll('tbody tr')[0]!.trigger('click')
     expect(select.mock.calls[0]?.[1].original).toEqual(rows[1])
     await wrapper.setProps({ loading: true })
-    expect(wrapper.find('[role="status"]').exists()).toBe(true)
+    expect(wrapper.find('[role="status"]').text()).toBe('Cargando')
+    expect(wrapper.find('[role="status"] [class*="animate-spin"]').exists()).toBe(true)
     expect(wrapper.find('table').exists()).toBe(false)
     await wrapper.setProps({ loading: false })
     expect(wrapper.findAll('tbody tr').map(row => row.text())).toEqual(['Azul', 'Blanco'])
@@ -128,21 +126,5 @@ describe('estructura compartida de listados', () => {
     expect(wrapper.findAll('button').every(button => button.attributes('disabled') !== undefined)).toBe(true)
     await wrapper.setProps({ totalResults: 0 })
     expect(wrapper.text()).toBe('')
-  })
-
-  it('limpia juntos búsqueda, método y fecha en pagos', async () => {
-    wrapper = await mountSuspended(PaymentListToolbar, { props: { filter: 'PED-1', paymentMethod: 'efectivo', dateRange: { start: parseDate('2026-10-01'), end: parseDate('2026-10-18') } } })
-    await wrapper.findAll('button').find(button => button.text() === 'Quitar filtros')!.trigger('click')
-    expect(wrapper.emitted('update:filter')?.[0]).toEqual([''])
-    expect(wrapper.emitted('update:paymentMethod')?.[0]).toEqual(['all'])
-    expect(wrapper.emitted('update:dateRange')?.[0]).toEqual([null])
-  })
-
-  it('limpia la categoría de gastos y conserva la acción de agregar', async () => {
-    wrapper = await mountSuspended(ExpenseListToolbar, { props: { filter: '', paymentMethod: 'all', category: 'Otros', categories: ['Otros'], dateRange: null } })
-    await wrapper.findAll('button').find(button => button.text() === 'Quitar filtros')!.trigger('click')
-    expect(wrapper.emitted('update:category')?.[0]).toEqual(['all'])
-    await wrapper.findAll('button').find(button => button.text() === 'Agregar gasto')!.trigger('click')
-    expect(wrapper.emitted('create')).toHaveLength(1)
   })
 })

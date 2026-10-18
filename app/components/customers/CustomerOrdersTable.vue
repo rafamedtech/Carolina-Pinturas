@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import type { ListLayoutConfig } from '~/types/list'
 import { tableQueryField, tableQueryPage } from '~/utils/tableQuery'
 import type { SalesOrderListResponse } from '~/types/orders'
 
@@ -42,54 +43,44 @@ const loading = computed(() => status.value === 'pending')
 const errorMessage = computed(() =>
   error.value?.data?.statusMessage || 'No fue posible cargar los pedidos del cliente.'
 )
+const { columns, sorting, columnVisibility, selectedOrder, detailOpen, openOrder } = useOrderListTable({ returnTo })
+const listConfig: ListLayoutConfig = {
+  id: 'customer-orders', title: 'Pedidos del cliente', empty: 'No hay pedidos para mostrar.',
+  pagination: { mode: 'server', label: 'pedidos', pageSize }
+}
 </script>
 
 <template>
-  <section class="flex flex-col gap-4" aria-labelledby="customer-orders-title">
-    <div class="flex flex-wrap items-center justify-between gap-3">
-      <div>
-        <h2 id="customer-orders-title" class="font-semibold text-highlighted">
-          Pedidos del cliente
-        </h2>
-        <p class="text-sm text-muted">
-          {{ orders.pagination.totalResults }}
-          {{ orders.pagination.totalResults === 1 ? 'pedido registrado' : 'pedidos registrados' }}
-        </p>
-      </div>
-      <UButton
-        label="Actualizar pedidos"
-        icon="i-lucide-refresh-cw"
-        color="neutral"
-        variant="outline"
-        :loading="loading"
-        @click="refresh()"
+  <ListLayout
+    v-model:page="page"
+    v-model:sorting="sorting"
+    v-model:column-visibility="columnVisibility"
+    :config="listConfig"
+    :data="orders.results"
+    :columns="columns"
+    :loading="loading"
+    :error="Boolean(error)"
+    :error-message="errorMessage"
+    :total-results="orders.pagination.totalResults"
+    :filtered-total="orders.filteredTotal"
+    embedded
+    @refresh="refresh()"
+  >
+    <template #before>
+      <p class="text-sm text-muted">
+        {{ orders.pagination.totalResults }} {{ orders.pagination.totalResults === 1 ? 'pedido registrado' : 'pedidos registrados' }}
+      </p>
+    </template>
+    <template #mobile>
+      <OrdersOrderListCards
+        :orders="orders.results"
+        :loading="false"
+        :return-to="returnTo"
+        @open="openOrder"
       />
-    </div>
-
-    <UAlert
-      v-if="error"
-      color="warning"
-      variant="subtle"
-      title="Pedidos no disponibles"
-      :description="errorMessage"
-      icon="i-lucide-database-zap"
-    />
-
-    <OrdersOrderListTable
-      v-else
-      :orders="orders.results"
-      :loading="loading"
-      :return-to="returnTo"
-    />
-
-    <ListPagination
-      v-if="!error"
-      v-model:page="page"
-      label="pedidos"
-      :total-results="orders.pagination.totalResults"
-      :filtered-total="orders.filteredTotal"
-      :page-size="orders.pagination.pageSize"
-      :loading="loading"
-    />
-  </section>
+    </template>
+    <template #overlays>
+      <OrdersOrderListPreviewModal v-model:open="detailOpen" :order="selectedOrder" :return-to="returnTo" />
+    </template>
+  </ListLayout>
 </template>

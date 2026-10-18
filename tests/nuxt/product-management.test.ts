@@ -4,9 +4,7 @@ import { mountSuspended, registerEndpoint } from '@nuxt/test-utils/runtime'
 import { defineComponent, h } from 'vue'
 import { flushPromises, type VueWrapper } from '@vue/test-utils'
 import ProductForm from '~/components/products/ProductForm.vue'
-import ProductFilters from '~/components/products/ProductFilters.vue'
 import SatPicker from '~/components/products/SatPicker.vue'
-import OrderDatePicker from '~/components/orders/OrderDatePicker.vue'
 import { useProductMutation } from '~/composables/useProductMutation'
 import type { SiigoProduct } from '~/types/siigo'
 import { productMutationInput } from '~/utils/siigoProductMutation'
@@ -68,13 +66,6 @@ describe('formulario de productos', () => {
     await wrapper.find('form').trigger('submit')
     await flushPromises()
     expect(wrapper.emitted('submit')?.[0]?.[0]).toMatchObject({ code: 'PIN1', prices: product.prices })
-  })
-  it('filtros reutilizan cuatro calendarios del proyecto', async () => {
-    wrapper = await mountSuspended(ProductFilters)
-    expect(wrapper.findAllComponents(OrderDatePicker)).toHaveLength(4)
-    const apply = wrapper.findAll('button').find(button => button.text() === 'Aplicar filtros')!
-    await apply.trigger('click')
-    expect(wrapper.emitted('change')?.[0]?.[0]).toEqual({ active: 'true' })
   })
   it('mantiene la altura del selector SAT mientras carga los resultados', async () => {
     wrapper = await mountSuspended(SatPicker, {

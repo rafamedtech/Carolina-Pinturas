@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import type { DropdownMenuItem } from '@nuxt/ui'
+import type { ListLayoutConfig } from '~/types/list'
 import { tableQueryField, tableQueryText, tableQueryPage, tableQueryRange, tableQueryBoolean } from '~/utils/tableQuery'
 import type { OrderDateRange, OrderStatus, SalesOrderListItem, SalesOrderListResponse } from '~/types/orders'
 import type { CsvColumn } from '~/utils/csv'
@@ -223,16 +225,91 @@ const statusTabItems = computed(() => {
     value: item.key
   }))]
 })
+const paymentStatusOptions = [{
+  label: 'Todos los pagos',
+  value: 'all'
+}, ...PAYMENT_STATUSES.map(item => ({
+  label: item.label,
+  value: item.key as string
+}))]
+
+const paymentMethodOptions = [{
+  label: 'Todos los métodos',
+  value: 'all'
+}, ...PAYMENT_METHODS.filter(item => !['cheque', 'otro'].includes(item.key)).map(item => ({
+  label: item.label,
+  value: item.key as string
+}))]
+
+const newOrderItems = computed<DropdownMenuItem[][]>(() => [[
+  {
+    label: 'Cotización',
+    icon: 'i-lucide-file-text',
+    to: {
+      path: '/ventas/nueva-cotizacion',
+      query: { returnTo: returnTo.value }
+    }
+  },
+  {
+    label: 'Venta mostrador',
+    icon: 'i-lucide-store',
+    to: {
+      path: '/ventas/nuevo-pedido',
+      query: {
+        tipo: 'mostrador',
+        returnTo: returnTo.value
+      }
+    }
+  },
+  {
+    label: 'Venta a domicilio',
+    icon: 'i-lucide-truck',
+    to: {
+      path: '/ventas/nuevo-pedido',
+      query: {
+        tipo: 'domicilio',
+        returnTo: returnTo.value
+      }
+    }
+  }
+]])
+
+const filterValues = useListFilterBindings({ paymentStatus: paymentStatusKey, paymentMethod: paymentMethodKey, hideCancelled, hideQuotes })
+const { columns, sorting, columnVisibility, selectedOrder, detailOpen, openOrder } = useOrderListTable({ returnTo, igualacion: props.igualacion })
+const listConfig = computed<ListLayoutConfig>(() => ({
+  id: props.igualacion ? 'igualaciones' : 'sales-orders', title: props.title,
+  empty: props.igualacion ? 'No hay igualaciones para mostrar.' : 'No hay pedidos para mostrar.',
+  search: { placeholder: 'Buscar pedido o cliente' }, dateFilter: { subject: props.igualacion ? 'igualaciones' : 'pedidos' },
+  tabs: statusTabItems.value,
+  filters: [
+    { key: 'paymentStatus', label: 'Estado de pago', type: 'select', defaultValue: 'all', items: paymentStatusOptions },
+    { key: 'paymentMethod', label: 'Método de pago', type: 'select', defaultValue: 'all', items: paymentMethodOptions },
+    { key: 'hideCancelled', label: 'Ocultar cancelados', type: 'checkbox', defaultValue: false },
+    { key: 'hideQuotes', label: 'Ocultar cotizaciones', type: 'checkbox', defaultValue: false }
+  ],
+  create: !props.igualacion && canCreate.value ? { items: newOrderItems.value } : undefined,
+  pagination: { mode: 'server', label: props.igualacion ? 'igualaciones' : 'pedidos', pageSize }
+}))
 </script>
 
 <template>
-  <ListPage
-    :id="igualacion ? 'igualaciones' : 'sales-orders'"
-    :title="title"
+  <ListLayout
+    v-model:search="filter"
+    v-model:date-range="dateRange"
+    v-model:filters="filterValues"
+    v-model:tab="selectedTab"
+    v-model:page="page"
+    v-model:sorting="sorting"
+    v-model:column-visibility="columnVisibility"
+    :config="listConfig"
+    :data="orders.results"
+    :columns="columns"
     :loading="loading"
     :error="Boolean(error)"
     error-title="Pedidos no disponibles"
     :error-message="errorMessage"
+    :total-results="orders.pagination.totalResults"
+    :filtered-total="igualacion ? undefined : orders.filteredTotal"
     @refresh="refresh()"
   >
     <template #actions>
@@ -252,45 +329,18 @@ const statusTabItems = computed(() => {
         :disabled="loading"
       />
     </template>
-    <template #toolbar>
-      <OrdersOrderListToolbar
-        v-model:filter="filter"
-        v-model:status="selectedTab"
-        v-model:payment-status="paymentStatusKey"
-        v-model:payment-method="paymentMethodKey"
-        v-model:hide-cancelled="hideCancelled"
-        v-model:hide-quotes="hideQuotes"
-        v-model:date-range="dateRange"
+    <template #mobile>
+      <OrdersOrderListCards
+        :orders="orders.results"
+        :loading="false"
         :igualacion="igualacion"
-        :can-create="canCreate"
         :return-to="returnTo"
-      />
-    </template>
-    <template #views>
-      <ListViews v-model="selectedTab" :items="statusTabItems" label="Filtrar pedidos por estado" />
-    </template>
-    <OrdersOrderListTable
-      :orders="orders.results"
-      :loading="loading"
-      :igualacion="igualacion"
-      :return-to="returnTo"
-    />
-    <template #pagination>
-      <ListPagination
-        v-model:page="page"
-        :label="igualacion ? 'igualaciones' : 'pedidos'"
-        :total-results="orders.pagination.totalResults"
-        :filtered-total="igualacion ? undefined : orders.filteredTotal"
-        :page-size="orders.pagination.pageSize"
-        :loading="loading"
+        @open="openOrder"
       />
     </template>
     <template #overlays>
-      <OrdersInternalOrderCustomersModal
-        v-if="canViewInternal"
-        v-model:open="customerManagerOpen"
-        @saved="refresh()"
-      />
+      <OrdersOrderListPreviewModal v-model:open="detailOpen" :order="selectedOrder" :return-to="returnTo" />
+      <OrdersInternalOrderCustomersModal v-if="canViewInternal" v-model:open="customerManagerOpen" @saved="refresh()" />
     </template>
-  </ListPage>
+  </ListLayout>
 </template>

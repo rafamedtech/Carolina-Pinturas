@@ -12,24 +12,7 @@ defineProps<{
 
 <template>
   <div class="flex flex-col gap-3 md:hidden" :aria-busy="loading">
-    <template v-if="loading">
-      <UCard
-        v-for="index in 3"
-        :key="index"
-        :ui="{ body: 'flex flex-col gap-4 p-4 sm:p-4' }"
-      >
-        <div class="flex items-center justify-between gap-4">
-          <USkeleton class="h-5 w-32" />
-          <USkeleton class="h-5 w-16" />
-        </div>
-        <USkeleton class="h-4 w-full" />
-        <div class="grid grid-cols-2 gap-4">
-          <USkeleton class="h-10 w-full" />
-          <USkeleton class="h-10 w-full" />
-        </div>
-      </UCard>
-      <span class="sr-only" role="status">Cargando productos…</span>
-    </template>
+    <ListLoading v-if="loading" />
 
     <template v-else-if="products.length">
       <UCard

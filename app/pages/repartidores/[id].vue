@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import type { ListLayoutConfig } from '~/types/list'
 import { tableReturnPath } from '~/utils/tableQuery'
 import { formatDate } from '~/utils/datetime'
 import type { TableColumn, TableRow } from '@nuxt/ui'
@@ -38,6 +39,8 @@ const columns: TableColumn<RepartidorDelivery>[] = [{
 function openOrder(_: Event, row: TableRow<RepartidorDelivery>) {
   router.push({ path: `/ventas/${encodeURIComponent(row.original.id)}`, query: { returnTo: route.fullPath } })
 }
+const deliveryPage = shallowRef(1)
+const deliveryConfig: ListLayoutConfig = { id: 'driver-deliveries', title: 'Pedidos entregados', empty: 'Este repartidor aún no tiene pedidos entregados.', pagination: { mode: 'client', label: 'pedidos', pageSize: 25 } }
 </script>
 
 <template>
@@ -94,36 +97,19 @@ function openOrder(_: Event, row: TableRow<RepartidorDelivery>) {
           </UBadge>
         </div>
 
-        <UCard>
-          <template #header>
-            <h2 class="font-semibold text-highlighted">
-              Pedidos entregados ({{ repartidor.deliveredOrders.length }})
-            </h2>
-          </template>
-
-          <UTable
-            :data="repartidor.deliveredOrders"
-            :columns="columns"
-            empty="Este repartidor aún no tiene pedidos entregados."
-            class="shrink-0"
-            :meta="{ class: { tr: 'cursor-pointer transition-colors hover:bg-elevated/50' } }"
-            @select="openOrder"
-          />
-        </UCard>
+        <ListLayout
+          v-model:page="deliveryPage"
+          :config="deliveryConfig"
+          :data="repartidor.deliveredOrders"
+          :columns="columns"
+          :loading="status === 'pending'"
+          embedded
+          @select="openOrder"
+          @refresh="refresh()"
+        />
       </template>
 
-      <template v-else-if="status === 'pending'">
-        <div class="flex flex-wrap items-start justify-between gap-4" role="status" aria-busy="true">
-          <div class="flex flex-col gap-2">
-            <USkeleton class="h-4 w-24" />
-            <USkeleton class="h-7 w-48" />
-            <USkeleton class="h-4 w-28" />
-          </div>
-          <USkeleton class="h-8 w-24 rounded-full" />
-        </div>
-        <AppTableSkeleton :rows="5" :cols="columns.length" />
-        <span class="sr-only">Cargando repartidor…</span>
-      </template>
+      <ListLoading v-else-if="status === 'pending'" />
     </template>
   </UDashboardPanel>
 </template>

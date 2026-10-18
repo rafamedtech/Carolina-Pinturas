@@ -1,15 +1,15 @@
 <script setup lang="ts">
+import type { ListLayoutConfig } from '~/types/list'
 import { tableQueryField, tableQueryText, tableQueryRange, tableQuerySorting, tableQueryPage } from '~/utils/tableQuery'
 import { h, resolveComponent } from 'vue'
 import type { TableColumn } from '@nuxt/ui'
-import type { Column, SortingState, TableMeta } from '@tanstack/table-core'
+import type { SortingState, TableMeta } from '@tanstack/table-core'
 import type { OrderDateRange } from '~/types/orders'
 import type { PurchaseView } from '~/types/purchases'
 import type { CsvColumn } from '~/utils/csv'
 import { purchaseStatus } from '~/utils/purchaseFormat'
 import { formatDate, mexicoToday } from '~/utils/datetime'
 
-const UButton = resolveComponent('UButton')
 const UBadge = resolveComponent('UBadge')
 const NuxtLink = resolveComponent('NuxtLink')
 const sorting = ref<SortingState>([])
@@ -88,32 +88,7 @@ const csvColumns: CsvColumn<PurchaseView>[] = [
   { key: 'balance', label: 'Saldo pendiente', value: row => row.balance }
 ]
 
-function sortableHeader(label: string, align: 'left' | 'right' = 'left') {
-  return ({ column }: { column: Column<PurchaseView, unknown> }) => {
-    const direction = column.getIsSorted()
-    const nextDirection = column.getNextSortingOrder()
-    const nextDirectionLabel = nextDirection === 'asc'
-      ? 'ascendente'
-      : nextDirection === 'desc'
-        ? 'descendente'
-        : 'quitar el orden'
-
-    return h(UButton, {
-      'label': label,
-      'color': 'neutral',
-      'variant': 'ghost',
-      'size': 'sm',
-      'class': align === 'right' ? 'w-full justify-end' : undefined,
-      'trailingIcon': direction === 'asc'
-        ? 'i-lucide-arrow-up'
-        : direction === 'desc'
-          ? 'i-lucide-arrow-down'
-          : 'i-lucide-arrow-up-down',
-      'aria-label': `Ordenar ${label} ${nextDirectionLabel}`,
-      'onClick': () => column.toggleSorting()
-    })
-  }
-}
+const { sortableHeader } = useListTableColumns<PurchaseView>()
 
 const amountFormatter = new Intl.NumberFormat('en-US', {
   minimumFractionDigits: 2,
@@ -166,12 +141,25 @@ const columns: TableColumn<PurchaseView>[] = [{
     row.original.balance === 0 ? 'text-success' : row.original.status === 'vencida' ? 'text-error' : ''
   )
 }]
+const listConfig = computed<ListLayoutConfig>(() => ({
+  id: 'purchases', title: 'Compras', empty: 'Sin compras para estos filtros.',
+  search: { placeholder: 'Buscar proveedor' }, dateFilter: { subject: 'compras' }, tabs: statusItems,
+  create: { label: 'Nueva compra', to: { path: '/compras/nueva', query: { returnTo: returnTo.value } } },
+  pagination: { mode: 'client', label: 'compras', pageSize }
+}))
 </script>
 
 <template>
-  <ListPage
-    id="purchases"
-    title="Compras"
+  <ListLayout
+    v-model:search="search"
+    v-model:date-range="dateRange"
+    v-model:tab="status"
+    v-model:page="page"
+    v-model:sorting="sorting"
+    :config="listConfig"
+    :data="purchases"
+    :columns="columns"
+    :meta="tableMeta"
     :loading="loading"
     :error="Boolean(error)"
     error-title="No se pudieron cargar las compras."
@@ -195,39 +183,5 @@ const columns: TableColumn<PurchaseView>[] = [{
         :ui="{ label: 'hidden sm:inline' }"
       />
     </template>
-    <template #toolbar>
-      <PurchasesPurchaseListToolbar v-model:search="search" v-model:status="status" v-model:date-range="dateRange">
-        <template #actions>
-          <UButton
-            :to="{ path: '/compras/nueva', query: { returnTo } }"
-            label="Nueva compra"
-            icon="i-lucide-plus"
-            class="w-full justify-center sm:w-auto"
-          />
-        </template>
-      </PurchasesPurchaseListToolbar>
-    </template>
-    <template #views>
-      <ListViews v-model="status" :items="statusItems" label="Filtrar compras por estado" />
-    </template>
-    <ListTable
-      v-model:page="page"
-      v-model:sorting="sorting"
-      :page-size="pageSize"
-      :data="purchases"
-      :columns="columns"
-      :meta="tableMeta"
-      :loading="loading"
-      empty="Sin compras para estos filtros."
-    />
-    <template #pagination>
-      <ListPagination
-        v-model:page="page"
-        label="compras"
-        :total-results="purchases.length"
-        :page-size="pageSize"
-        :loading="loading"
-      />
-    </template>
-  </ListPage>
+  </ListLayout>
 </template>

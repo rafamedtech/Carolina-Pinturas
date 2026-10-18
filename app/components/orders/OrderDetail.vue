@@ -743,7 +743,7 @@ async function convertToPedido() {
           <USkeleton class="h-8 w-28 rounded-full" />
         </div>
         <USkeleton class="h-40 w-full rounded-lg" />
-        <AppTableSkeleton :rows="4" :cols="4" />
+        <ListLoading />
         <span class="sr-only">Cargando pedido…</span>
       </div>
     </template>

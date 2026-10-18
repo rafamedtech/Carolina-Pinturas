@@ -1,6 +1,6 @@
 <script setup lang="ts">
 defineProps<{
-  placeholder: string
+  placeholder?: string
   hasActiveFilters?: boolean
 }>()
 
@@ -17,6 +17,7 @@ defineSlots<{
   <div class="flex flex-wrap items-center justify-between gap-3">
     <div class="flex w-full min-w-0 flex-col gap-2 sm:w-auto sm:flex-row sm:flex-wrap">
       <UInput
+        v-if="placeholder"
         v-model="search"
         icon="i-lucide-search"
         :placeholder="placeholder"

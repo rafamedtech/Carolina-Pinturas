@@ -14,7 +14,8 @@ const emit = defineEmits<{
   created: [repartidor: Repartidor]
 }>()
 
-const open = ref(false)
+defineProps<{ hideTrigger?: boolean }>()
+const open = defineModel<boolean>('open', { default: false })
 const saving = shallowRef(false)
 const toast = useToast()
 const state = reactive<Schema>({
@@ -61,6 +62,7 @@ async function onSubmit(event: FormSubmitEvent<Schema>) {
 <template>
   <UModal v-model:open="open" title="Nuevo repartidor" description="Agrega un repartidor al catálogo">
     <UButton
+      v-if="!hideTrigger"
       label="Nuevo repartidor"
       icon="i-lucide-plus"
       color="neutral"

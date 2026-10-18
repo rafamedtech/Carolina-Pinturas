@@ -1,84 +1,25 @@
 <script setup lang="ts">
+import type { TableColumn } from '@nuxt/ui'
 import type { InventoryStock } from '#shared/types/inventory'
 
-defineProps<{ rows: InventoryStock[], admin?: boolean }>()
+const props = defineProps<{ rows: InventoryStock[], admin?: boolean }>()
 const emit = defineEmits<{ minimum: [row: InventoryStock], kardex: [row: InventoryStock] }>()
+const UButton = resolveComponent('UButton')
+const columns = computed<TableColumn<InventoryStock>[]>(() => [
+  { id: 'product', header: 'Producto', cell: ({ row }) => h('div', [h('p', { class: 'font-medium text-highlighted' }, row.original.name), h('p', `${row.original.code} · ${row.original.unit || 'Unidad'}`)]) },
+  { accessorKey: 'warehouse', header: 'Almacén' },
+  { accessorKey: 'quantity', header: 'Existencia física' },
+  { accessorKey: 'reserved', header: 'Reservado' },
+  { accessorKey: 'available', header: 'Disponible', cell: ({ row }) => h('div', { class: row.original.low ? 'font-semibold text-warning' : 'font-semibold text-primary' }, [row.original.available, row.original.low ? h('span', { class: 'block text-xs' }, 'Bajo mínimo') : null]) },
+  { id: 'cost', header: 'Costo unitario', cell: ({ row }) => row.original.unitCost ? `${row.original.unitCost} ${row.original.costCurrency}` : 'Sin costo' },
+  { accessorKey: 'minimum', header: 'Mínimo' },
+  { id: 'actions', header: 'Acciones', cell: ({ row }) => h('div', { class: 'flex justify-end gap-1' }, [
+    h(UButton, { label: 'Kardex', size: 'sm', variant: 'ghost', color: 'neutral', onClick: () => emit('kardex', row.original) }),
+    props.admin ? h(UButton, { label: 'Mínimo', size: 'sm', variant: 'ghost', onClick: () => emit('minimum', row.original) }) : null
+  ]) }
+])
 </script>
 
 <template>
-  <div class="overflow-x-auto rounded-lg border border-default">
-    <table class="w-full text-sm">
-      <thead class="border-b border-default bg-elevated/50 text-left text-muted">
-        <tr>
-          <th class="p-3">
-            Producto
-          </th><th class="p-3">
-            Almacén
-          </th><th class="p-3 text-right">
-            Existencia física
-          </th><th class="p-3 text-right">
-            Reservado
-          </th><th class="p-3 text-right">
-            Disponible
-          </th><th class="p-3 text-right">
-            Costo unitario
-          </th><th class="p-3 text-right">
-            Mínimo
-          </th><th class="p-3">
-            <span class="sr-only">Acciones</span>
-          </th>
-        </tr>
-      </thead>
-      <tbody class="divide-y divide-default">
-        <tr v-for="row in rows" :key="`${row.warehouseId}-${row.productId}`">
-          <td class="p-3">
-            <p class="font-medium text-highlighted">
-              {{ row.name }}
-            </p><p class="text-muted">
-              {{ row.code }} · {{ row.unit || 'Unidad' }}
-            </p>
-          </td>
-          <td class="p-3">
-            {{ row.warehouse }}
-          </td><td class="p-3 text-right font-mono tabular-nums">
-            {{ row.quantity }}
-          </td><td class="p-3 text-right font-mono tabular-nums">
-            {{ row.reserved }}
-          </td>
-          <td class="p-3 text-right font-mono font-semibold tabular-nums" :class="row.low ? 'text-warning' : 'text-primary'">
-            {{ row.available }}<span v-if="row.low" class="block font-sans text-xs">Bajo mínimo</span>
-          </td>
-          <td class="p-3 text-right font-mono">
-            <span v-if="row.unitCost">{{ row.unitCost }} {{ row.costCurrency }}</span>
-            <span v-else class="text-muted">Sin costo</span>
-          </td>
-          <td class="p-3 text-right font-mono">
-            {{ row.minimum }}
-          </td>
-          <td class="p-3">
-            <div class="flex justify-end gap-1">
-              <UButton
-                label="Kardex"
-                size="sm"
-                variant="ghost"
-                color="neutral"
-                @click="emit('kardex', row)"
-              /><UButton
-                v-if="admin"
-                label="Mínimo"
-                size="sm"
-                variant="ghost"
-                @click="emit('minimum', row)"
-              />
-            </div>
-          </td>
-        </tr>
-        <tr v-if="!rows.length">
-          <td colspan="8" class="p-8 text-center text-muted">
-            Sin existencias para estos filtros. Crea un almacén y registra el conteo inicial.
-          </td>
-        </tr>
-      </tbody>
-    </table>
-  </div>
+  <ListTable :data="rows" :columns="columns" empty="Sin existencias para estos filtros. Crea un almacén y registra el conteo inicial." />
 </template>

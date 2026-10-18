@@ -1,4 +1,9 @@
 <script setup lang="ts">
+import { parseDate } from '@internationalized/date'
+import type { TableColumn } from '@nuxt/ui'
+import { inventoryTypes } from '#shared/schemas/inventory'
+import type { ListLayoutConfig } from '~/types/list'
+import type { OrderDateRange } from '~/types/orders'
 import { tableQueryField, tableQueryText, tableQueryBoolean, tableQueryPage, tableQueryDate } from '~/utils/tableQuery'
 import type { InventoryStock, InventoryWarehouse, InventorySettings, InventoryMovement, InventoryCount, InventoryProduct, InventoryPage } from '#shared/types/inventory'
 import type { InventoryCommand } from '#shared/schemas/inventory'
@@ -86,238 +91,222 @@ async function exportRows() {
   const rows = await fetchAllPages<Row>(endpoint.value, query.value)
   return ['movements', 'kardex'].includes(tab.value) ? (rows as InventoryMovement[]).flatMap(m => m.lines.map(l => ({ ...l, folio: `INV-${m.folio}`, date: m.date, type: m.type, reason: m.reason }))) : rows
 }
+const warehouseFilter = computed({ get: () => warehouse.value || 'all', set: (value: string) => {
+  warehouse.value = value === 'all' ? '' : value
+} })
+const typeFilter = computed({ get: () => type.value || 'all', set: (value: string) => {
+  type.value = value === 'all' ? '' : value
+} })
+const filterValues = useListFilterBindings({ warehouse: warehouseFilter, type: typeFilter, low })
+const dateRange = computed<OrderDateRange | null>({
+  get: () => {
+    try {
+      return from.value || to.value ? { start: from.value ? parseDate(from.value) : undefined, end: to.value ? parseDate(to.value) : undefined } : null
+    } catch {
+      return null
+    }
+  },
+  set: (value) => {
+    from.value = value?.start?.toString() || ''
+    to.value = value?.end?.toString() || ''
+  }
+})
+const listConfig = computed<ListLayoutConfig>(() => ({
+  id: 'inventory', title: 'Inventario', empty: 'Sin registros para estos filtros.',
+  search: { placeholder: 'Buscar código o producto' }, tabs: tabs.value, defaultTab: 'stocks',
+  dateFilter: ['movements', 'kardex', 'counts'].includes(tab.value) ? { subject: 'movimientos de inventario' } : undefined,
+  filters: [
+    { key: 'warehouse', label: 'Almacén', type: 'select', defaultValue: 'all', items: [{ label: 'Todos los almacenes', value: 'all' }, ...(warehouseData.value?.results ?? []).map(w => ({ label: w.name, value: w.id }))] },
+    ...(['movements', 'kardex'].includes(tab.value) ? [{ key: 'type', label: 'Movimiento', type: 'select' as const, defaultValue: 'all', items: [{ label: 'Todos', value: 'all' }, ...inventoryTypes.map(value => ({ label: value.replaceAll('_', ' '), value }))] }] : []),
+    ...(tab.value === 'stocks' ? [{ key: 'low', label: 'Bajo mínimo', type: 'checkbox' as const, defaultValue: false }] : [])
+  ],
+  create: operational.value && (settings.value?.enabledAt || admin.value) && ['stocks', 'movements'].includes(tab.value)
+    ? { label: settings.value?.enabledAt ? 'Nuevo movimiento' : 'Cargar saldo inicial' }
+    : operational.value && tab.value === 'counts'
+      ? { label: 'Nuevo conteo' }
+      : admin.value && tab.value === 'warehouses' ? { label: 'Nuevo almacén' } : undefined,
+  pagination: result.value?.pagination ? { mode: 'server', label: 'registros', pageSize: 25 } : undefined
+}))
+function createInventoryRecord() {
+  if (tab.value === 'counts') countCreateOpen.value = true
+  else if (tab.value === 'warehouses') openWarehouse()
+  else openMove()
+}
+function clearInventoryFilters() {
+  productId.value = ''
+  warehouse.value = ''
+  type.value = ''
+  low.value = false
+}
+
+const NuxtLink = resolveComponent('NuxtLink')
+const reservationColumns: TableColumn<Extract<Row, { orderId: string }>>[] = [
+  { id: 'order', header: 'Pedido', cell: ({ row }) => h(NuxtLink, { to: { path: `/ventas/${row.original.orderId}`, query: { returnTo: returnTo.value } }, class: 'text-primary underline' }, () => String(row.original.order.folio)) },
+  { id: 'product', header: 'Producto', cell: ({ row }) => `${row.original.product.code} · ${row.original.product.name}` },
+  { id: 'warehouse', header: 'Almacén', cell: ({ row }) => row.original.warehouse.name },
+  { accessorKey: 'quantity', header: 'Reservado' }
+]
 </script>
 
 <template>
-  <UDashboardPanel id="inventory">
-    <template #header>
-      <UDashboardNavbar title="Inventario">
-        <template #leading>
-          <UDashboardSidebarCollapse />
-        </template><template #right>
-          <UButton
-            label="Actualizar"
-            icon="i-lucide-refresh-cw"
-            color="neutral"
-            variant="outline"
-            :loading="status === 'pending'"
-            @click="refresh()"
-          /><AppCsvExportButton
-            v-if="['stocks', 'movements', 'kardex'].includes(tab)"
-            :key="tab"
-            :filename="`inventario-${tab}`"
-            :columns="columns"
-            :fetch-all="exportRows"
-          />
-        </template>
-      </UDashboardNavbar>
+  <ListLayout
+    v-model:search="search"
+    v-model:tab="tab"
+    v-model:date-range="dateRange"
+    v-model:filters="filterValues"
+    v-model:page="pageNumber"
+    :config="listConfig"
+    :data="result?.results ?? []"
+    :columns="[]"
+    :loading="status === 'pending'"
+    :error="Boolean(loadError || warehouseError)"
+    :error-message="loadError?.data?.statusMessage || (warehouseError ? 'No se pudieron cargar los almacenes.' : undefined)"
+    :total-results="result?.pagination?.totalResults"
+    @refresh="refresh()"
+    @create="createInventoryRecord"
+    @clear="clearInventoryFilters"
+  >
+    <template #actions>
+      <AppCsvExportButton
+        v-if="['stocks', 'movements', 'kardex'].includes(tab)"
+        :key="tab"
+        :filename="`inventario-${tab}`"
+        :columns="columns"
+        :fetch-all="exportRows"
+      />
     </template>
-    <template #body>
-      <div class="space-y-5">
-        <div class="flex flex-wrap items-center justify-between gap-4 border-b border-default pb-5">
-          <div>
-            <p class="text-xs font-semibold tracking-widest text-primary uppercase">
-              Control de almacenes
-            </p><h1 class="mt-1 text-2xl font-semibold text-highlighted">
-              Cada unidad, en su lugar
-            </h1><p class="mt-1 text-sm text-muted">
-              Existencias físicas, reservas y movimientos internos.
-            </p>
-          </div><UBadge :color="settings?.enabledAt ? 'success' : 'warning'" variant="subtle" size="lg">
-            {{ settings?.enabledAt ? `Activo desde ${formatDateTime(settings.enabledAt)}` : 'Preparando inventario inicial' }}
-          </UBadge>
-        </div>
-        <UAlert
-          v-if="!settings?.enabledAt"
-          title="Carga las existencias reales antes de activar"
-          description="Crea almacenes, registra el saldo inicial o aplica un conteo. Al activar, los pedidos nuevos reservarán y descontarán inventario; los documentos históricos conservarán su comportamiento."
-          color="warning"
-        >
-          <template #actions>
-            <UButton
-              v-if="admin"
-              label="Activar inventario"
-              color="neutral"
-              variant="solid"
-              class="bg-black text-white hover:bg-zinc-800 dark:bg-black dark:text-white dark:hover:bg-zinc-800"
-              @click="activateOpen = true"
-            />
-          </template>
-        </UAlert>
-        <UAlert v-if="error || loadError || warehouseError" :title="error || loadError?.data?.statusMessage || (warehouseError ? 'No se pudieron cargar los almacenes.' : 'No se pudo cargar inventario.')" color="error" />
-        <UTabs
-          v-model="tab"
-          :items="tabs"
-          :content="false"
-          class="w-full"
-        />
-        <InventoryFilters
-          v-model:search="search"
-          v-model:warehouse="warehouse"
-          v-model:type="type"
-          v-model:from="from"
-          v-model:to="to"
-          v-model:low="low"
-          :warehouses="warehouseData?.results ?? []"
-          :show-dates="['movements', 'kardex', 'counts'].includes(tab)"
-          :show-type="['movements', 'kardex'].includes(tab)"
-          :show-low="tab === 'stocks'"
-        />
-        <div v-if="productId" class="flex items-center gap-2 text-sm">
-          <span>Kardex de producto seleccionado</span><UButton
-            label="Quitar filtro de producto"
-            size="sm"
-            variant="ghost"
-            @click="productId = ''"
-          />
-        </div>
-        <div class="flex flex-wrap justify-end gap-2">
-          <UButton
-            v-if="operational && (settings?.enabledAt || admin) && ['stocks', 'movements'].includes(tab)"
-            :label="settings?.enabledAt ? 'Nuevo movimiento' : 'Cargar saldo inicial'"
-            icon="i-lucide-plus"
-            @click="openMove()"
-          /><UButton
-            v-if="operational && tab === 'counts'"
-            label="Nuevo conteo"
-            icon="i-lucide-clipboard-plus"
-            @click="countCreateOpen = true"
-          /><UButton
-            v-if="admin && tab === 'warehouses'"
-            label="Nuevo almacén"
-            icon="i-lucide-plus"
-            @click="openWarehouse()"
-          />
-        </div>
-        <div
-          v-if="status === 'pending'"
-          class="space-y-3"
-          role="status"
-          aria-label="Cargando inventario"
-        >
-          <USkeleton v-for="i in 4" :key="i" class="h-16 w-full" />
-        </div>
-        <template v-else>
-          <InventoryStockTable
-            v-if="tab === 'stocks'"
-            :rows="stockRows"
-            :admin="admin"
-            @minimum="setMinimum"
-            @kardex="showKardex"
-          />
-          <InventoryMovementsTable
-            v-else-if="['movements', 'kardex'].includes(tab)"
-            :rows="movementRows"
-            :admin="admin"
-            :operational="operational"
-            :kardex="tab === 'kardex'"
-            @return="openMove"
-            @reverse="reverse"
-          />
-          <div v-else-if="tab === 'counts'" class="space-y-3">
-            <UCard v-for="row in countRows" :key="row.id">
-              <div class="flex flex-wrap items-center justify-between gap-3">
-                <div>
-                  <p class="font-semibold">
-                    {{ row.warehouse.name }} · {{ formatDate(row.date) }}
-                  </p><p class="text-sm text-muted">
-                    {{ row.reason }} · {{ row.lines.length }} productos
-                  </p>
-                </div><div class="flex items-center gap-3">
-                  <UBadge color="neutral">
-                    {{ row.status }}
-                  </UBadge><UButton label="Abrir conteo" variant="outline" @click="selectedCount = row; countOpen = true" />
-                </div>
-              </div>
-            </UCard><p v-if="!countRows.length" class="p-8 text-center text-muted">
-              Sin conteos registrados.
-            </p>
-          </div>
-          <div v-else-if="tab === 'reservations'" class="overflow-auto rounded-lg border border-default">
-            <table class="w-full text-sm">
-              <thead class="bg-elevated text-left">
-                <tr>
-                  <th class="p-3">
-                    Pedido
-                  </th><th class="p-3">
-                    Producto
-                  </th><th class="p-3">
-                    Almacén
-                  </th><th class="p-3 text-right">
-                    Reservado
-                  </th>
-                </tr>
-              </thead><tbody class="divide-y divide-default">
-                <tr v-for="row in reservationRows" :key="`${row.orderId}-${row.productId}`">
-                  <td class="p-3">
-                    <NuxtLink :to="{ path: `/ventas/${row.orderId}`, query: { returnTo } }" class="text-primary underline">{{ row.order.folio }}</NuxtLink>
-                  </td><td class="p-3">
-                    {{ row.product.code }} · {{ row.product.name }}
-                  </td><td class="p-3">
-                    {{ row.warehouse.name }}
-                  </td><td class="p-3 text-right font-mono">
-                    {{ row.quantity }}
-                  </td>
-                </tr><tr v-if="!reservationRows.length">
-                  <td colspan="4" class="p-8 text-center text-muted">
-                    Sin reservas activas.
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-          <div v-else-if="tab === 'warehouses'" class="space-y-5">
-            <div class="grid gap-3 md:grid-cols-2">
-              <UCard v-for="w in warehouseData?.results" :key="w.id">
-                <div class="flex items-start justify-between gap-3">
-                  <div>
-                    <p class="text-sm text-muted">
-                      {{ w.code }}
-                    </p><h2 class="font-semibold">
-                      {{ w.name }}
-                    </h2><p class="mt-1 text-sm text-muted">
-                      {{ w.address }}
-                    </p><UBadge class="mt-2" :color="w.active ? 'success' : 'neutral'">
-                      {{ w.active ? 'Activo' : 'Inactivo' }}
-                    </UBadge>
-                  </div><UButton
-                    label="Editar"
-                    variant="outline"
-                    size="sm"
-                    @click="openWarehouse(w)"
-                  />
-                </div>
-              </UCard>
-            </div><UCard>
-              <template #header>
-                <h2 class="font-semibold">
-                  Control interno por producto
-                </h2><p class="text-sm text-muted">
-                  Esta configuración pertenece al inventario interno y es independiente del catálogo fiscal.
-                </p>
-              </template><ul class="divide-y divide-default">
-                <li v-for="p in productRows" :key="p.id" class="flex items-center justify-between gap-4 py-3">
-                  <div>
-                    <p class="font-medium">
-                      {{ p.name }}
-                    </p><p class="text-sm text-muted">
-                      {{ p.code }} · {{ p.unit }}
-                    </p>
-                  </div><USwitch
-                    :model-value="p.enabled"
-                    :aria-label="`Control interno de ${p.name}`"
-                    :disabled="busy"
-                    @update:model-value="enabled => save({ action: 'tracking', productId: p.id, version: p.version, enabled })"
-                  />
-                </li>
-              </ul>
-            </UCard>
-          </div>
-        </template>
-        <div v-if="result?.pagination" class="flex flex-wrap items-center justify-between gap-3 text-sm text-muted">
-          <span>{{ result.pagination.totalResults }} registros</span><UPagination v-model:page="pageNumber" :total="result.pagination.totalResults" :items-per-page="25" />
-        </div>
+    <template #before>
+      <div class="flex flex-wrap items-center justify-between gap-4 border-b border-default pb-5">
+        <div>
+          <p class="text-xs font-semibold tracking-widest text-primary uppercase">
+            Control de almacenes
+          </p><h1 class="mt-1 text-2xl font-semibold text-highlighted">
+            Cada unidad, en su lugar
+          </h1><p class="mt-1 text-sm text-muted">
+            Existencias físicas, reservas y movimientos internos.
+          </p>
+        </div><UBadge :color="settings?.enabledAt ? 'success' : 'warning'" variant="subtle" size="lg">
+          {{ settings?.enabledAt ? `Activo desde ${formatDateTime(settings.enabledAt)}` : 'Preparando inventario inicial' }}
+        </UBadge>
       </div>
+      <UAlert
+        v-if="!settings?.enabledAt"
+        title="Carga las existencias reales antes de activar"
+        description="Crea almacenes, registra el saldo inicial o aplica un conteo. Al activar, los pedidos nuevos reservarán y descontarán inventario; los documentos históricos conservarán su comportamiento."
+        color="warning"
+      >
+        <template #actions>
+          <UButton
+            v-if="admin"
+            label="Activar inventario"
+            color="neutral"
+            variant="solid"
+            class="bg-black text-white hover:bg-zinc-800 dark:bg-black dark:text-white dark:hover:bg-zinc-800"
+            @click="activateOpen = true"
+          />
+        </template>
+      </UAlert>
+      <UAlert v-if="error" :title="error" color="error" />
+      <div v-if="productId" class="flex items-center gap-2 text-sm">
+        <span>Kardex de producto seleccionado</span><UButton
+          label="Quitar filtro de producto"
+          size="sm"
+          variant="ghost"
+          @click="productId = ''"
+        />
+      </div>
+    </template>
+    <template #content>
+      <InventoryStockTable
+        v-if="tab === 'stocks'"
+        :rows="stockRows"
+        :admin="admin"
+        @minimum="setMinimum"
+        @kardex="showKardex"
+      />
+      <InventoryMovementsTable
+        v-else-if="['movements', 'kardex'].includes(tab)"
+        :rows="movementRows"
+        :admin="admin"
+        :operational="operational"
+        :kardex="tab === 'kardex'"
+        @return="openMove"
+        @reverse="reverse"
+      />
+      <div v-else-if="tab === 'counts'" class="space-y-3">
+        <UCard v-for="row in countRows" :key="row.id">
+          <div class="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <p class="font-semibold">
+                {{ row.warehouse.name }} · {{ formatDate(row.date) }}
+              </p><p class="text-sm text-muted">
+                {{ row.reason }} · {{ row.lines.length }} productos
+              </p>
+            </div><div class="flex items-center gap-3">
+              <UBadge color="neutral">
+                {{ row.status }}
+              </UBadge><UButton label="Abrir conteo" variant="outline" @click="selectedCount = row; countOpen = true" />
+            </div>
+          </div>
+        </UCard><p v-if="!countRows.length" class="p-8 text-center text-muted">
+          Sin conteos registrados.
+        </p>
+      </div>
+      <ListTable
+        v-else-if="tab === 'reservations'"
+        :data="reservationRows"
+        :columns="reservationColumns"
+        empty="Sin reservas activas."
+      />
+      <div v-else-if="tab === 'warehouses'" class="space-y-5">
+        <div class="grid gap-3 md:grid-cols-2">
+          <UCard v-for="w in warehouseData?.results" :key="w.id">
+            <div class="flex items-start justify-between gap-3">
+              <div>
+                <p class="text-sm text-muted">
+                  {{ w.code }}
+                </p><h2 class="font-semibold">
+                  {{ w.name }}
+                </h2><p class="mt-1 text-sm text-muted">
+                  {{ w.address }}
+                </p><UBadge class="mt-2" :color="w.active ? 'success' : 'neutral'">
+                  {{ w.active ? 'Activo' : 'Inactivo' }}
+                </UBadge>
+              </div><UButton
+                label="Editar"
+                variant="outline"
+                size="sm"
+                @click="openWarehouse(w)"
+              />
+            </div>
+          </UCard>
+        </div><UCard>
+          <template #header>
+            <h2 class="font-semibold">
+              Control interno por producto
+            </h2><p class="text-sm text-muted">
+              Esta configuración pertenece al inventario interno y es independiente del catálogo fiscal.
+            </p>
+          </template><ul class="divide-y divide-default">
+            <li v-for="p in productRows" :key="p.id" class="flex items-center justify-between gap-4 py-3">
+              <div>
+                <p class="font-medium">
+                  {{ p.name }}
+                </p><p class="text-sm text-muted">
+                  {{ p.code }} · {{ p.unit }}
+                </p>
+              </div><USwitch
+                :model-value="p.enabled"
+                :aria-label="`Control interno de ${p.name}`"
+                :disabled="busy"
+                @update:model-value="enabled => save({ action: 'tracking', productId: p.id, version: p.version, enabled })"
+              />
+            </li>
+          </ul>
+        </UCard>
+      </div>
+    </template>
+    <template #overlays>
       <UModal v-model:open="warehouseOpen" :title="editingWarehouse ? 'Editar almacén' : 'Nuevo almacén'">
         <template #body>
           <UAlert
@@ -462,5 +451,5 @@ async function exportRows() {
         </template>
       </UModal>
     </template>
-  </UDashboardPanel>
+  </ListLayout>
 </template>

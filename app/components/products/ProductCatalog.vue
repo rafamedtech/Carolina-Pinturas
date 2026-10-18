@@ -1,4 +1,7 @@
 <script setup lang="ts">
+import { parseDate } from '@internationalized/date'
+import type { OrderDateRange } from '~/types/orders'
+import type { ListLayoutConfig, ListFilterValues } from '~/types/list'
 import { tableQueryField, tableQueryText, tableQueryPage, tableQueryDate } from '~/utils/tableQuery'
 import type { TableColumn, TableRow } from '@nuxt/ui'
 import type { SiigoProduct } from '~/types/siigo'
@@ -33,7 +36,7 @@ const { returnTo } = useTableQuery([
 ], { page, resetOn: [filter, filters] })
 const { data, status, error, refresh } = useProductManagementCatalog(filters)
 function applyFilters(value: Record<string, string>) {
-  filters.value = value
+  filters.value = Object.fromEntries(Object.entries(value).filter(([, entry]) => Boolean(entry)))
   page.value = 1
 }
 
@@ -137,17 +140,55 @@ const totalProducts = computed(() => filteredProducts.value.length)
 function openProduct(_: Event, row: TableRow<SiigoProduct>) {
   router.push({ path: `/productos/${encodeURIComponent(row.original.id)}`, query: { returnTo: returnTo.value } })
 }
+const productTab = computed({ get: () => filters.value.active || 'true', set: (active: string) => applyFilters({ ...filters.value, active }) })
+const createdRange = computed<OrderDateRange | null>({
+  get: () => {
+    try {
+      return filters.value.created_start || filters.value.created_end
+        ? { start: filters.value.created_start ? parseDate(filters.value.created_start) : undefined, end: filters.value.created_end ? parseDate(filters.value.created_end) : undefined }
+        : null
+    } catch {
+      return null
+    }
+  },
+  set: value => applyFilters({ ...filters.value, created_start: value?.start?.toString() || '', created_end: value?.end?.toString() || '' })
+})
+const filterValues = computed<ListFilterValues>({
+  get: () => Object.fromEntries(dateFilterKeys.map(key => [key, filters.value[key] || ''])),
+  set: value => applyFilters({ ...filters.value, ...Object.fromEntries(Object.entries(value).filter((entry): entry is [string, string] => typeof entry[1] === 'string')) })
+})
+const listConfig = computed<ListLayoutConfig>(() => ({
+  id: 'products', title: 'Productos', empty: 'No hay productos para mostrar.',
+  search: { placeholder: 'Buscar en todos los productos' }, dateFilter: { subject: 'productos creados' },
+  tabs: [{ label: 'Activos', value: 'true' }, { label: 'Inactivos', value: 'false' }, { label: 'Todos', value: 'all' }], defaultTab: 'true',
+  filters: [
+    { key: 'created_start', label: 'Creado desde', type: 'date', defaultValue: '' },
+    { key: 'created_end', label: 'Creado hasta', type: 'date', defaultValue: '' },
+    { key: 'updated_start', label: 'Actualizado desde', type: 'date', defaultValue: '' },
+    { key: 'updated_end', label: 'Actualizado hasta', type: 'date', defaultValue: '' }
+  ],
+  create: canManageProducts(user.value?.role) ? { label: 'Nuevo producto', to: { path: '/productos/nuevo', query: { returnTo: returnTo.value } } } : undefined,
+  pagination: { mode: 'external', label: 'productos', pageSize }
+}))
 </script>
 
 <template>
-  <ListPage
-    id="products"
-    title="Productos"
+  <ListLayout
+    v-model:search="filter"
+    v-model:date-range="createdRange"
+    v-model:filters="filterValues"
+    v-model:tab="productTab"
+    v-model:page="page"
+    :config="listConfig"
+    :data="products"
+    :columns="columns"
     :loading="loading"
     :error="Boolean(error)"
     error-title="Catálogo no disponible"
     :error-message="message"
+    :total-results="totalProducts"
     @refresh="reload"
+    @select="openProduct"
   >
     <template #actions>
       <AppCsvExportButton
@@ -157,47 +198,14 @@ function openProduct(_: Event, row: TableRow<SiigoProduct>) {
         :disabled="loading"
       />
     </template>
-    <template #toolbar>
-      <ListToolbar
-        v-model:search="filter"
-        placeholder="Buscar en todos los productos"
-        :has-active-filters="Boolean(filter)"
-        @clear="filter = ''"
-      >
-        <template v-if="canManageProducts(user?.role)" #actions>
-          <UButton
-            :to="{ path: '/productos/nuevo', query: { returnTo } }"
-            label="Nuevo producto"
-            icon="i-lucide-plus"
-            class="w-full justify-center sm:w-auto"
-          />
-        </template>
-      </ListToolbar>
-      <ProductsProductFilters :filters="filters" @change="applyFilters" />
-    </template>
-    <ProductsProductListCards
-      :products="products"
-      :return-to="returnTo"
-      :loading="loading"
-      :unit-for="(product) => unitsById.get(product.id) ?? '…'"
-      :price-for="formatProductPrice"
-    />
-    <ListTable
-      :data="products"
-      :columns="columns"
-      :loading="loading"
-      empty="No hay productos para mostrar."
-      class="hidden md:block"
-      @select="openProduct"
-    />
-    <template #pagination>
-      <ListPagination
-        v-model:page="page"
-        label="productos"
-        :total-results="totalProducts"
-        :page-size="pageSize"
-        :loading="loading"
+    <template #mobile>
+      <ProductsProductListCards
+        :products="products"
+        :return-to="returnTo"
+        :loading="false"
+        :unit-for="(product) => unitsById.get(product.id) ?? '…'"
+        :price-for="formatProductPrice"
       />
     </template>
-  </ListPage>
+  </ListLayout>
 </template>

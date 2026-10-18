@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import type { ListLayoutConfig } from '~/types/list'
 import { tableQueryField, tableQueryText, tableQueryPage } from '~/utils/tableQuery'
 import type { TableColumn, TableRow } from '@nuxt/ui'
 import type { Repartidor } from '~/types/orders'
@@ -58,16 +59,27 @@ const message = computed(() => error.value?.data?.statusMessage || 'No fue posib
 function openRepartidor(_: Event, row: TableRow<Repartidor>) {
   router.push({ path: `/repartidores/${encodeURIComponent(row.original.id)}`, query: { returnTo: returnTo.value } })
 }
+const createOpen = shallowRef(false)
+const listConfig: ListLayoutConfig = {
+  id: 'repartidores', title: 'Repartidores', empty: 'No hay repartidores para mostrar.',
+  search: { placeholder: 'Buscar repartidor' }, create: { label: 'Nuevo repartidor' },
+  pagination: { mode: 'client', label: 'repartidores', pageSize }
+}
 </script>
 
 <template>
-  <ListPage
-    id="repartidores"
-    title="Repartidores"
+  <ListLayout
+    v-model:search="filter"
+    v-model:page="page"
+    :config="listConfig"
+    :data="repartidores"
+    :columns="columns"
     :loading="loading"
     :error="Boolean(error)"
     :error-message="message"
     @refresh="refresh()"
+    @create="createOpen = true"
+    @select="openRepartidor"
   >
     <template #actions>
       <AppCsvExportButton
@@ -77,35 +89,8 @@ function openRepartidor(_: Event, row: TableRow<Repartidor>) {
         :disabled="loading"
       />
     </template>
-    <template #toolbar>
-      <ListToolbar
-        v-model:search="filter"
-        placeholder="Buscar repartidor"
-        :has-active-filters="Boolean(filter)"
-        @clear="filter = ''"
-      >
-        <template #actions>
-          <OrdersOrderRepartidorAddModal @created="addToCatalog" />
-        </template>
-      </ListToolbar>
+    <template #overlays>
+      <OrdersOrderRepartidorAddModal v-model:open="createOpen" hide-trigger @created="addToCatalog" />
     </template>
-    <ListTable
-      v-model:page="page"
-      :page-size="pageSize"
-      :data="repartidores"
-      :columns="columns"
-      :loading="loading"
-      empty="No hay repartidores para mostrar."
-      @select="openRepartidor"
-    />
-    <template #pagination>
-      <ListPagination
-        v-model:page="page"
-        :label="'repartidores'"
-        :total-results="repartidores.length"
-        :page-size="pageSize"
-        :loading="loading"
-      />
-    </template>
-  </ListPage>
+  </ListLayout>
 </template>

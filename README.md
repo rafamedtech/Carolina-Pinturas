@@ -17,7 +17,8 @@ históricos se guardan en PostgreSQL/Supabase mediante Prisma.
 
 ## Estructura de listados
 
-Los módulos comparten panel, buscador, vistas, tabla y paginación con Nuxt UI.
+Los módulos configuran `ListLayout` para compartir buscador, fechas, filtros,
+pestañas, Nuevo, tabla, spinner de carga y paginación con Nuxt UI.
 Consulta [la guía de composición](docs/listados.md) para adaptar un módulo nuevo.
 
 ## Configuración local

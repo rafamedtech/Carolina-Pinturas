@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import type { ListLayoutConfig } from '~/types/list'
 import { tableQueryField, tableQueryText, tableQueryPage } from '~/utils/tableQuery'
 import type { TableColumn, TableRow } from '@nuxt/ui'
 import type { SiigoCustomer } from '~/types/siigo'
@@ -100,16 +101,26 @@ async function reloadRecords() {
     })
   }
 }
+const listConfig = computed<ListLayoutConfig>(() => ({
+  id: props.routeBase === '/proveedores' ? 'suppliers' : 'customers', title: props.title,
+  empty: `No hay ${pluralLower.value} para mostrar.`, search: { placeholder: `Buscar ${singularLower.value}` },
+  create: { label: `Nuevo ${singularLower.value}`, icon: props.routeBase === '/proveedores' ? 'i-lucide-building-2' : 'i-lucide-user-plus', disabled: true, reason: 'Se habilita tras validar la API de Siigo México.' },
+  pagination: { mode: 'client', label: pluralLower.value, pageSize }
+}))
 </script>
 
 <template>
-  <ListPage
-    :id="routeBase === '/proveedores' ? 'suppliers' : 'customers'"
-    :title="title"
+  <ListLayout
+    v-model:search="filter"
+    v-model:page="page"
+    :config="listConfig"
+    :data="records"
+    :columns="columns"
     :loading="loading || refreshing"
     :error="Boolean(error)"
     :error-message="message"
     @refresh="reloadRecords"
+    @select="openRecord"
   >
     <template #actions>
       <AppCsvExportButton
@@ -119,41 +130,5 @@ async function reloadRecords() {
         :disabled="loading"
       />
     </template>
-    <template #toolbar>
-      <ListToolbar
-        v-model:search="filter"
-        :placeholder="`Buscar ${singularLower}`"
-        :has-active-filters="Boolean(filter)"
-        @clear="filter = ''"
-      >
-        <template #actions>
-          <UButton
-            :label="`Nuevo ${singularLower}`"
-            :icon="routeBase === '/proveedores' ? 'i-lucide-building-2' : 'i-lucide-user-plus'"
-            disabled
-            title="Se habilita tras validar la API de Siigo México."
-            class="w-full justify-center sm:w-auto"
-          />
-        </template>
-      </ListToolbar>
-    </template>
-    <ListTable
-      v-model:page="page"
-      :page-size="pageSize"
-      :data="records"
-      :columns="columns"
-      :loading="loading"
-      :empty="`No hay ${pluralLower} para mostrar.`"
-      @select="openRecord"
-    />
-    <template #pagination>
-      <ListPagination
-        v-model:page="page"
-        :label="pluralLower"
-        :total-results="records.length"
-        :page-size="pageSize"
-        :loading="loading"
-      />
-    </template>
-  </ListPage>
+  </ListLayout>
 </template>

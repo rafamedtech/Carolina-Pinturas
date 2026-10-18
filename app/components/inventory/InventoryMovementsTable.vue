@@ -1,9 +1,16 @@
 <script setup lang="ts">
+import type { TableColumn } from '@nuxt/ui'
 import type { InventoryMovement } from '#shared/types/inventory'
 import { formatDate, formatDateTime } from '~/utils/datetime'
 
 defineProps<{ rows: InventoryMovement[], admin: boolean, operational: boolean, kardex?: boolean }>()
 const emit = defineEmits<{ return: [row: InventoryMovement], reverse: [row: InventoryMovement] }>()
+const lineColumns: TableColumn<InventoryMovement['lines'][number]>[] = [
+  { id: 'product', header: 'Producto', cell: ({ row }) => `${row.original.productCode} · ${row.original.productName}` },
+  { accessorKey: 'warehouseName', header: 'Almacén' },
+  { accessorKey: 'delta', header: 'Movimiento', cell: ({ row }) => h('span', { class: row.original.delta.startsWith('-') ? 'text-error font-mono' : 'text-success font-mono' }, `${row.original.delta.startsWith('-') ? '' : '+'}${row.original.delta}`) },
+  { accessorKey: 'balanceAfter', header: 'Existencia resultante' }
+]
 </script>
 
 <template>
@@ -20,35 +27,7 @@ const emit = defineEmits<{ return: [row: InventoryMovement], reverse: [row: Inve
           </div><span class="text-sm text-muted">{{ formatDate(row.date) }}</span>
         </div>
       </template>
-      <div class="overflow-x-auto">
-        <table class="w-full text-sm">
-          <thead class="bg-elevated/40 text-left text-muted">
-            <tr>
-              <th class="p-3">
-                Producto
-              </th><th class="p-3">
-                Almacén
-              </th><th class="p-3 text-right">
-                Movimiento
-              </th><th class="p-3 text-right">
-                Existencia resultante
-              </th>
-            </tr>
-          </thead><tbody class="divide-y divide-default">
-            <tr v-for="line in row.lines" :key="line.id">
-              <td class="p-3">
-                {{ line.productCode }} · {{ line.productName }}
-              </td><td class="p-3">
-                {{ line.warehouseName }}
-              </td><td class="p-3 text-right font-mono" :class="line.delta.startsWith('-') ? 'text-error' : 'text-success'">
-                {{ line.delta.startsWith('-') ? '' : '+' }}{{ line.delta }}
-              </td><td class="p-3 text-right font-mono">
-                {{ line.balanceAfter }}
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
+      <ListTable :data="row.lines" :columns="lineColumns" empty="Sin partidas." />
       <template #footer>
         <div class="flex flex-wrap items-center justify-between gap-3">
           <div class="text-sm">

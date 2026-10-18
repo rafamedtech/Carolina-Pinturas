@@ -36,7 +36,7 @@ const tableMeta = computed(() => props.meta ?? {})
 
 <template>
   <div class="min-w-0 shrink-0" :aria-busy="loading">
-    <AppTableSkeleton v-if="loading" :cols="columns.length" />
+    <ListLoading v-if="loading" />
     <UTable
       v-else
       v-model:sorting="sorting"

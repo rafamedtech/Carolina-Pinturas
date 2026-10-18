@@ -1,10 +1,11 @@
 <script setup lang="ts">
+import type { ListLayoutConfig } from '~/types/list'
+import { PAYMENT_METHODS, paymentMethodLabel } from '~/utils/orderPayment'
 import { tableQueryField, tableQueryText, tableQueryPage, tableQueryRange } from '~/utils/tableQuery'
 import type { OrderDateRange } from '~/types/orders'
 import type { CreateExpenseInput, ExpenseListResponse, ExpenseRecord } from '~/types/expenses'
 import type { CsvColumn } from '~/utils/csv'
 import { canViewExpenseCategory, visibleExpenseCategories } from '~/utils/expense'
-import { paymentMethodLabel } from '~/utils/orderPayment'
 
 const { user } = useAuth()
 const categories = computed(() => user.value
@@ -180,17 +181,39 @@ async function saveExpense(input: CreateExpenseInput) {
     saving.value = false
   }
 }
+const { columns, sorting } = useExpenseListTable()
+const filterValues = useListFilterBindings({ paymentMethod, category })
+const listConfig = computed<ListLayoutConfig>(() => ({
+  id: 'expenses', title: 'Gastos', empty: 'No hay gastos para mostrar.',
+  search: { placeholder: 'Buscar descripción, proveedor o categoría' }, dateFilter: { subject: 'gastos' },
+  filters: [
+    { key: 'category', label: 'Categoría', type: 'select', defaultValue: 'all', items: [{ label: 'Todas las categorías', value: 'all' }, ...categories.value.map(value => ({ label: value, value }))] },
+    { key: 'paymentMethod', label: 'Método de pago', type: 'select', defaultValue: 'all', items: [{ label: 'Todos los métodos', value: 'all' }, ...PAYMENT_METHODS.map(item => ({ label: item.label, value: item.key }))] }
+  ],
+  create: { label: 'Agregar gasto' },
+  pagination: { mode: 'server', label: 'gastos', totalLabel: 'Total gastado:', pageSize }
+}))
 </script>
 
 <template>
-  <ListPage
-    id="expenses"
-    title="Gastos"
+  <ListLayout
+    v-model:search="filter"
+    v-model:date-range="dateRange"
+    v-model:filters="filterValues"
+    v-model:page="page"
+    v-model:sorting="sorting"
+    :config="listConfig"
+    :data="expenseCatalog.results"
+    :columns="columns"
     :loading="loading"
     :error="Boolean(expenseError)"
     error-title="Gastos no disponibles"
     :error-message="expenseErrorMessage"
+    :total-results="expenseCatalog.pagination.totalResults"
+    :filtered-total="expenseCatalog.filteredTotal"
     @refresh="refreshExpenses()"
+    @create="openExpense()"
+    @select="(_event, row) => openExpense(row.original)"
   >
     <template #actions>
       <AppCsvExportButton
@@ -200,27 +223,8 @@ async function saveExpense(input: CreateExpenseInput) {
         :disabled="loading"
       />
     </template>
-    <template #toolbar>
-      <ExpensesExpenseListToolbar
-        v-model:filter="filter"
-        v-model:payment-method="paymentMethod"
-        v-model:category="category"
-        v-model:date-range="dateRange"
-        :categories="categories"
-        @create="openExpense()"
-      />
-    </template>
-    <ExpensesExpenseListTable :expenses="expenseCatalog.results" :loading="loading" @select="openExpense" />
-    <template #pagination>
-      <ListPagination
-        v-model:page="page"
-        label="gastos"
-        total-label="Total gastado:"
-        :total-results="expenseCatalog.pagination.totalResults"
-        :filtered-total="expenseCatalog.filteredTotal"
-        :page-size="expenseCatalog.pagination.pageSize"
-        :loading="loading"
-      />
+    <template #mobile>
+      <ExpensesExpenseListCards :expenses="expenseCatalog.results" @select="openExpense" />
     </template>
     <template #overlays>
       <ExpensesExpenseAddModal
@@ -237,5 +241,5 @@ async function saveExpense(input: CreateExpenseInput) {
         @delete="deleteExpense"
       />
     </template>
-  </ListPage>
+  </ListLayout>
 </template>

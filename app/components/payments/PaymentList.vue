@@ -1,9 +1,10 @@
 <script setup lang="ts">
+import type { ListLayoutConfig } from '~/types/list'
+import { PAYMENT_METHODS, paymentMethodLabel } from '~/utils/orderPayment'
 import { tableQueryField, tableQueryText, tableQueryPage, tableQueryRange } from '~/utils/tableQuery'
 import type { OrderDateRange } from '~/types/orders'
 import type { PaymentListItem, PaymentListResponse } from '~/types/payments'
 import type { CsvColumn } from '~/utils/csv'
-import { paymentMethodLabel } from '~/utils/orderPayment'
 
 const filter = shallowRef('')
 const paymentMethod = shallowRef('all')
@@ -82,16 +83,34 @@ function fetchAllPayments() {
     date_to: dateTo.value
   })
 }
+const { columns, sorting } = usePaymentListTable({ returnTo })
+const filterValues = useListFilterBindings({ paymentMethod })
+const listConfig: ListLayoutConfig = {
+  id: 'payments', title: 'Pagos recibidos', empty: 'No hay pagos para mostrar.',
+  search: { placeholder: 'Buscar pedido, cliente o referencia' }, dateFilter: { subject: 'pagos' },
+  filters: [{ key: 'paymentMethod', label: 'Método de pago', type: 'select', defaultValue: 'all', items: [
+    { label: 'Todos los métodos', value: 'all' }, ...PAYMENT_METHODS.map(item => ({ label: item.label, value: item.key }))
+  ] }],
+  pagination: { mode: 'server', label: 'pagos', totalLabel: 'Total recibido:', pageSize }
+}
 </script>
 
 <template>
-  <ListPage
-    id="payments"
-    title="Pagos recibidos"
+  <ListLayout
+    v-model:search="filter"
+    v-model:date-range="dateRange"
+    v-model:filters="filterValues"
+    v-model:page="page"
+    v-model:sorting="sorting"
+    :config="listConfig"
+    :data="payments.results"
+    :columns="columns"
     :loading="loading"
     :error="Boolean(error)"
     error-title="Pagos no disponibles"
     :error-message="errorMessage"
+    :total-results="payments.pagination.totalResults"
+    :filtered-total="payments.filteredTotal"
     @refresh="refresh()"
   >
     <template #actions>
@@ -102,24 +121,8 @@ function fetchAllPayments() {
         :disabled="loading"
       />
     </template>
-    <template #toolbar>
-      <PaymentsPaymentListToolbar
-        v-model:filter="filter"
-        v-model:payment-method="paymentMethod"
-        v-model:date-range="dateRange"
-      />
+    <template #mobile>
+      <PaymentsPaymentListCards :payments="payments.results" :return-to="returnTo" />
     </template>
-    <PaymentsPaymentListTable :payments="payments.results" :loading="loading" :return-to="returnTo" />
-    <template #pagination>
-      <ListPagination
-        v-model:page="page"
-        label="pagos"
-        total-label="Total recibido:"
-        :total-results="payments.pagination.totalResults"
-        :filtered-total="payments.filteredTotal"
-        :page-size="payments.pagination.pageSize"
-        :loading="loading"
-      />
-    </template>
-  </ListPage>
+  </ListLayout>
 </template>
