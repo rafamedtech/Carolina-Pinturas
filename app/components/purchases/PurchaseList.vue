@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { tableQueryField, tableQueryText, tableQueryRange, tableQuerySorting } from '~/utils/tableQuery'
+import { tableQueryField, tableQueryText, tableQueryRange, tableQuerySorting, tableQueryPage } from '~/utils/tableQuery'
 import { h, resolveComponent } from 'vue'
 import type { TableColumn } from '@nuxt/ui'
 import type { Column, SortingState, TableMeta } from '@tanstack/table-core'
@@ -19,6 +19,8 @@ onMounted(() => {
   isHydrated.value = true
 })
 
+const page = shallowRef(1)
+const pageSize = 25
 const search = shallowRef('')
 const status = shallowRef('all')
 const dateRange = shallowRef<OrderDateRange | null>(null)
@@ -26,8 +28,9 @@ const { returnTo } = useTableQuery([
   tableQueryField('search', search, tableQueryText()),
   tableQueryField('status', status, tableQueryText('all', ['all', 'confirmada', 'liquidada', 'vencida', 'borrador', 'cancelada'])),
   tableQueryRange(dateRange),
-  tableQueryField('sort', sorting, tableQuerySorting)
-])
+  tableQueryField('sort', sorting, tableQuerySorting),
+  tableQueryField('page', page, tableQueryPage)
+], { page, resetOn: [search, status, dateRange] })
 const statusItems = [
   { label: 'Todas', value: 'all' },
   { label: 'Confirmada', value: 'confirmada' },
@@ -166,91 +169,65 @@ const columns: TableColumn<PurchaseView>[] = [{
 </script>
 
 <template>
-  <UDashboardPanel id="purchases">
-    <template #header>
-      <UDashboardNavbar title="Compras">
-        <template #leading>
-          <UDashboardSidebarCollapse />
-        </template><template #right>
-          <AppCsvExportButton
-            filename="compras"
-            :columns="csvColumns"
-            :rows="purchases"
-            :disabled="loading"
-          />
-          <UButton
-            to="/compras/cuentas-por-pagar"
-            label="Cuentas por pagar"
-            icon="i-lucide-wallet"
-            aria-label="Cuentas por pagar"
-            color="neutral"
-            variant="outline"
-            :ui="{ label: 'hidden sm:inline' }"
-          />
-          <UButton
-            label="Actualizar"
-            icon="i-lucide-refresh-cw"
-            color="neutral"
-            variant="outline"
-            aria-label="Actualizar"
-            :ui="{ label: 'hidden sm:inline' }"
-            :loading="loading"
-            @click="refresh()"
-          />
+  <ListPage
+    id="purchases"
+    title="Compras"
+    :loading="loading"
+    :error="Boolean(error)"
+    error-title="No se pudieron cargar las compras."
+    :error-message="error?.data?.statusMessage"
+    @refresh="refresh()"
+  >
+    <template #actions>
+      <AppCsvExportButton
+        filename="compras"
+        :columns="csvColumns"
+        :rows="purchases"
+        :disabled="loading"
+      />
+      <UButton
+        to="/compras/cuentas-por-pagar"
+        label="Cuentas por pagar"
+        icon="i-lucide-wallet"
+        aria-label="Cuentas por pagar"
+        color="neutral"
+        variant="outline"
+        :ui="{ label: 'hidden sm:inline' }"
+      />
+    </template>
+    <template #toolbar>
+      <PurchasesPurchaseListToolbar v-model:search="search" v-model:status="status" v-model:date-range="dateRange">
+        <template #actions>
           <UButton
             :to="{ path: '/compras/nueva', query: { returnTo } }"
             label="Nueva compra"
             icon="i-lucide-plus"
-            aria-label="Nueva compra"
-            :ui="{ label: 'hidden sm:inline' }"
+            class="w-full justify-center sm:w-auto"
           />
         </template>
-      </UDashboardNavbar>
+      </PurchasesPurchaseListToolbar>
     </template>
-    <template #body>
-      <PurchasesPurchaseListToolbar
-        v-model:search="search"
-        v-model:status="status"
-        v-model:date-range="dateRange"
-        :status-items="statusItems"
-      />
-      <UTabs
-        v-model="status"
-        :items="statusItems"
-        class="hidden w-full sm:block"
-      />
-      <UAlert v-if="error" title="No se pudieron cargar las compras." color="error" />
-      <div
-        v-else-if="loading"
-        class="flex shrink-0 flex-col items-center justify-center gap-3 py-16"
-        role="status"
-        aria-busy="true"
-      >
-        <UIcon name="i-lucide-loader-circle" class="size-8 animate-spin text-primary" />
-        <p class="text-sm text-muted">
-          Cargando
-        </p>
-        <span class="sr-only">Cargando compras…</span>
-      </div>
-      <p v-else-if="!data?.results.length" class="py-10 text-center text-muted">
-        Sin compras para estos filtros.
-      </p>
-      <UTable
-        v-else
-        v-model:sorting="sorting"
-        :data="purchases"
-        :columns="columns"
-        :meta="tableMeta"
-        class="shrink-0"
-        :ui="{
-          base: 'min-w-full border-separate border-spacing-0',
-          thead: '[&>tr]:bg-elevated/50 [&>tr]:after:content-none',
-          tbody: '[&>tr]:last:[&>td]:border-b-0',
-          th: 'py-2 first:rounded-l-lg last:rounded-r-lg border-y border-default first:border-l last:border-r',
-          td: 'border-b border-default',
-          separator: 'h-0'
-        }"
+    <template #views>
+      <ListViews v-model="status" :items="statusItems" label="Filtrar compras por estado" />
+    </template>
+    <ListTable
+      v-model:page="page"
+      v-model:sorting="sorting"
+      :page-size="pageSize"
+      :data="purchases"
+      :columns="columns"
+      :meta="tableMeta"
+      :loading="loading"
+      empty="Sin compras para estos filtros."
+    />
+    <template #pagination>
+      <ListPagination
+        v-model:page="page"
+        label="compras"
+        :total-results="purchases.length"
+        :page-size="pageSize"
+        :loading="loading"
       />
     </template>
-  </UDashboardPanel>
+  </ListPage>
 </template>

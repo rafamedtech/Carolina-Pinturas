@@ -201,30 +201,15 @@ const columns = computed<TableColumn<SalesOrderListItem>[]>(() => [numberColumn,
     @open="openOrder"
   />
 
-  <AppTableSkeleton
-    v-if="loading"
-    :cols="columns.length"
-    class="hidden shrink-0 md:block"
+  <ListTable
+    v-model:column-visibility="columnVisibility"
+    v-model:sorting="sorting"
+    :data="tableOrders"
+    :columns="columns"
+    :loading="loading"
+    empty="No hay pedidos para mostrar."
+    class="hidden md:block"
   />
-
-  <template v-else>
-    <UTable
-      v-model:column-visibility="columnVisibility"
-      v-model:sorting="sorting"
-      :data="tableOrders"
-      :columns="columns"
-      empty="No hay pedidos para mostrar."
-      class="hidden shrink-0 md:block"
-      :ui="{
-        base: 'min-w-full border-separate border-spacing-0',
-        thead: '[&>tr]:bg-elevated/50 [&>tr]:after:content-none',
-        tbody: '[&>tr]:last:[&>td]:border-b-0',
-        th: 'py-2 first:rounded-l-lg last:rounded-r-lg border-y border-default first:border-l last:border-r',
-        td: 'border-b border-default',
-        separator: 'h-0'
-      }"
-    />
-  </template>
 
   <UModal
     v-model:open="detailOpen"

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { tableQueryField, tableQueryText } from '~/utils/tableQuery'
+import { tableQueryField, tableQueryText, tableQueryPage } from '~/utils/tableQuery'
 import type { TableColumn, TableRow } from '@nuxt/ui'
 import type { SiigoCustomer } from '~/types/siigo'
 import type { CsvColumn } from '~/utils/csv'
@@ -14,7 +14,12 @@ const props = withDefaults(defineProps<{
 })
 
 const filter = shallowRef('')
-const { returnTo } = useTableQuery([tableQueryField('search', filter, tableQueryText())])
+const page = shallowRef(1)
+const pageSize = 25
+const { returnTo } = useTableQuery([
+  tableQueryField('search', filter, tableQueryText()),
+  tableQueryField('page', page, tableQueryPage)
+], { page, resetOn: [filter] })
 const router = useRouter()
 const toast = useToast()
 const {
@@ -98,75 +103,57 @@ async function reloadRecords() {
 </script>
 
 <template>
-  <UDashboardPanel :id="routeBase === '/proveedores' ? 'suppliers' : 'customers'">
-    <template #header>
-      <UDashboardNavbar :title="title">
-        <template #leading>
-          <UDashboardSidebarCollapse />
-        </template>
-      </UDashboardNavbar>
+  <ListPage
+    :id="routeBase === '/proveedores' ? 'suppliers' : 'customers'"
+    :title="title"
+    :loading="loading || refreshing"
+    :error="Boolean(error)"
+    :error-message="message"
+    @refresh="reloadRecords"
+  >
+    <template #actions>
+      <AppCsvExportButton
+        :filename="routeBase === '/proveedores' ? 'proveedores' : 'clientes'"
+        :columns="csvColumns"
+        :rows="records"
+        :disabled="loading"
+      />
     </template>
-
-    <template #body>
-      <div class="flex flex-wrap items-center justify-between gap-3">
-        <UInput
-          v-model="filter"
-          icon="i-lucide-search"
-          :placeholder="`Buscar ${singularLower}`"
-          class="w-full sm:max-w-sm"
-        />
-        <div class="flex gap-2">
-          <AppCsvExportButton
-            :filename="routeBase === '/proveedores' ? 'proveedores' : 'clientes'"
-            :columns="csvColumns"
-            :rows="records"
-            :disabled="loading"
-          />
-          <UButton
-            label="Recargar"
-            icon="i-lucide-refresh-cw"
-            color="neutral"
-            variant="outline"
-            :loading="loading || refreshing"
-            @click="reloadRecords"
-          />
+    <template #toolbar>
+      <ListToolbar
+        v-model:search="filter"
+        :placeholder="`Buscar ${singularLower}`"
+        :has-active-filters="Boolean(filter)"
+        @clear="filter = ''"
+      >
+        <template #actions>
           <UButton
             :label="`Nuevo ${singularLower}`"
             :icon="routeBase === '/proveedores' ? 'i-lucide-building-2' : 'i-lucide-user-plus'"
             disabled
             title="Se habilita tras validar la API de Siigo México."
+            class="w-full justify-center sm:w-auto"
           />
-        </div>
-      </div>
-
-      <UAlert
-        v-if="error"
-        color="warning"
-        variant="subtle"
-        :title="`${title} no disponibles`"
-        :description="message"
-        icon="i-lucide-plug-zap"
-      />
-
-      <AppTableSkeleton v-else-if="loading" :cols="columns.length" />
-
-      <UTable
-        v-else
-        :data="records"
-        :columns="columns"
-        :empty="`No hay ${pluralLower} para mostrar.`"
-        class="shrink-0"
-        :meta="{ class: { tr: 'cursor-pointer transition-colors hover:bg-elevated/50' } }"
-        :ui="{
-          base: 'table-fixed border-separate border-spacing-0',
-          thead: '[&>tr]:bg-elevated/50 [&>tr]:after:content-none',
-          tbody: '[&>tr]:last:[&>td]:border-b-0',
-          th: 'py-2 first:rounded-l-lg last:rounded-r-lg border-y border-default first:border-l last:border-r',
-          td: 'border-b border-default',
-          separator: 'h-0'
-        }"
-        @select="openRecord"
+        </template>
+      </ListToolbar>
+    </template>
+    <ListTable
+      v-model:page="page"
+      :page-size="pageSize"
+      :data="records"
+      :columns="columns"
+      :loading="loading"
+      :empty="`No hay ${pluralLower} para mostrar.`"
+      @select="openRecord"
+    />
+    <template #pagination>
+      <ListPagination
+        v-model:page="page"
+        :label="pluralLower"
+        :total-results="records.length"
+        :page-size="pageSize"
+        :loading="loading"
       />
     </template>
-  </UDashboardPanel>
+  </ListPage>
 </template>

@@ -4,7 +4,6 @@ import type { OrderDateRange } from '~/types/orders'
 import { PAYMENT_METHODS, PAYMENT_STATUSES } from '~/utils/orderPayment'
 
 const props = withDefaults(defineProps<{
-  items: Array<{ label: string, value: string }>
   returnTo: string
   igualacion?: boolean
   canCreate?: boolean
@@ -105,65 +104,46 @@ function clearFilters() {
 </script>
 
 <template>
-  <div class="flex flex-wrap items-center justify-between gap-3">
-    <div class="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
-      <UInput
-        v-model="filter"
-        icon="i-lucide-search"
-        placeholder="Buscar pedido o cliente"
-        class="w-full sm:w-80"
-      />
-      <USelect
-        v-model="status"
-        :items="items"
-        value-key="value"
-        class="w-full sm:hidden"
-      />
+  <ListToolbar
+    v-model:search="filter"
+    placeholder="Buscar pedido o cliente"
+    :has-active-filters="hasActiveFilters"
+    @clear="clearFilters"
+  >
+    <template #filters>
       <OrdersOrderDateRangePicker v-model="dateRange" />
-      <div class="flex w-full gap-2 sm:w-auto">
-        <UButton
-          label="Más filtros"
-          icon="i-lucide-sliders-horizontal"
-          color="neutral"
-          variant="outline"
-          class="flex-1 justify-start sm:flex-none sm:justify-center"
-          @click="moreFiltersOpen = true"
-        />
-        <UButton
-          v-if="hasActiveFilters"
-          label="Quitar filtros"
-          icon="i-lucide-x"
-          color="neutral"
-          variant="ghost"
-          class="flex-1 justify-center sm:flex-none"
-          @click="clearFilters"
-        />
-      </div>
-    </div>
-
-    <UDropdownMenu
-      v-if="!igualacion && canCreate"
-      :items="newOrderItems"
-      :content="{ align: 'end', collisionPadding: 12 }"
-      :ui="{ content: 'w-64' }"
-    >
       <UButton
-        label="Nuevo"
-        icon="i-lucide-plus"
-        trailing-icon="i-lucide-chevron-down"
-        class="w-full justify-center data-[state=open]:bg-primary/90 sm:w-auto"
+        label="Más filtros"
+        icon="i-lucide-sliders-horizontal"
+        color="neutral"
+        variant="outline"
+        class="w-full justify-start sm:w-auto sm:justify-center"
+        @click="moreFiltersOpen = true"
       />
-    </UDropdownMenu>
-
-    <OrdersOrderListMoreFiltersModal
-      v-model:open="moreFiltersOpen"
-      :payment-status="paymentStatus"
-      :payment-method="paymentMethod"
-      :hide-cancelled="hideCancelled"
-      :hide-quotes="hideQuotes"
-      :payment-status-options="paymentStatusOptions"
-      :payment-method-options="paymentMethodOptions"
-      @apply="applyMoreFilters"
-    />
-  </div>
+    </template>
+    <template v-if="!igualacion && canCreate" #actions>
+      <UDropdownMenu
+        :items="newOrderItems"
+        :content="{ align: 'end', collisionPadding: 12 }"
+        :ui="{ content: 'w-64' }"
+      >
+        <UButton
+          label="Nuevo"
+          icon="i-lucide-plus"
+          trailing-icon="i-lucide-chevron-down"
+          class="w-full justify-center data-[state=open]:bg-primary/90 sm:w-auto"
+        />
+      </UDropdownMenu>
+    </template>
+  </ListToolbar>
+  <OrdersOrderListMoreFiltersModal
+    v-model:open="moreFiltersOpen"
+    :payment-status="paymentStatus"
+    :payment-method="paymentMethod"
+    :hide-cancelled="hideCancelled"
+    :hide-quotes="hideQuotes"
+    :payment-status-options="paymentStatusOptions"
+    :payment-method-options="paymentMethodOptions"
+    @apply="applyMoreFilters"
+  />
 </template>

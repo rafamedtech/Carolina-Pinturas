@@ -82,9 +82,10 @@ const errorMessage = computed(() =>
       :return-to="returnTo"
     />
 
-    <OrdersOrderListPagination
+    <ListPagination
       v-if="!error"
       v-model:page="page"
+      label="pedidos"
       :total-results="orders.pagination.totalResults"
       :filtered-total="orders.filteredTotal"
       :page-size="orders.pagination.pageSize"

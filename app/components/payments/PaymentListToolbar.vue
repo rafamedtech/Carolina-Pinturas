@@ -13,22 +13,30 @@ const paymentMethodOptions = [{
   label: item.label,
   value: item.key as string
 }))]
+
+const hasActiveFilters = computed(() => Boolean(filter.value || paymentMethod.value !== 'all' || dateRange.value))
+function clearFilters() {
+  filter.value = ''
+  paymentMethod.value = 'all'
+  dateRange.value = null
+}
 </script>
 
 <template>
-  <div class="flex w-full flex-col gap-2 sm:flex-row">
-    <UInput
-      v-model="filter"
-      icon="i-lucide-search"
-      placeholder="Buscar pedido, cliente o referencia"
-      class="w-full sm:w-96"
-    />
-    <USelect
-      v-model="paymentMethod"
-      :items="paymentMethodOptions"
-      value-key="value"
-      class="w-full sm:w-48"
-    />
-    <OrdersOrderDateRangePicker v-model="dateRange" />
-  </div>
+  <ListToolbar
+    v-model:search="filter"
+    placeholder="Buscar pedido, cliente o referencia"
+    :has-active-filters="hasActiveFilters"
+    @clear="clearFilters"
+  >
+    <template #filters>
+      <USelect
+        v-model="paymentMethod"
+        :items="paymentMethodOptions"
+        aria-label="Filtrar por método de pago"
+        class="w-full sm:w-48"
+      />
+      <OrdersOrderDateRangePicker v-model="dateRange" subject="pagos" />
+    </template>
+  </ListToolbar>
 </template>

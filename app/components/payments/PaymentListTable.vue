@@ -182,26 +182,12 @@ const columns: TableColumn<PaymentListItem>[] = [{
     </div>
   </div>
 
-  <AppTableSkeleton
-    v-if="loading"
-    :cols="columns.length"
-    class="hidden shrink-0 md:block"
-  />
-
-  <UTable
-    v-else
+  <ListTable
     v-model:sorting="sorting"
     :data="tablePayments"
     :columns="columns"
+    :loading="loading"
     empty="No hay pagos para mostrar."
-    class="hidden shrink-0 md:block"
-    :ui="{
-      base: 'min-w-full border-separate border-spacing-0',
-      thead: '[&>tr]:bg-elevated/50 [&>tr]:after:content-none',
-      tbody: '[&>tr]:last:[&>td]:border-b-0',
-      th: 'py-2 first:rounded-l-lg last:rounded-r-lg border-y border-default first:border-l last:border-r',
-      td: 'border-b border-default',
-      separator: 'h-0'
-    }"
+    class="hidden md:block"
   />
 </template>

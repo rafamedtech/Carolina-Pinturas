@@ -15,6 +15,11 @@ históricos se guardan en PostgreSQL/Supabase mediante Prisma.
 - Resumen y tablas sin datos simulados: cuando Siigo no está configurado, la interfaz muestra un estado de conexión explícito.
 - Pantalla de configuración exclusiva para administradores.
 
+## Estructura de listados
+
+Los módulos comparten panel, buscador, vistas, tabla y paginación con Nuxt UI.
+Consulta [la guía de composición](docs/listados.md) para adaptar un módulo nuevo.
+
 ## Configuración local
 
 ```bash

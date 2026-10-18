@@ -180,34 +180,13 @@ const columns: TableColumn<ExpenseRecord>[] = [{
     </div>
   </div>
 
-  <div
-    v-if="loading"
-    class="hidden shrink-0 flex-col items-center justify-center gap-3 py-16 md:flex"
-    role="status"
-    aria-busy="true"
-  >
-    <UIcon name="i-lucide-loader-circle" class="size-8 animate-spin text-primary" />
-    <p class="text-sm text-muted">
-      Cargando
-    </p>
-  </div>
-
-  <UTable
-    v-else
+  <ListTable
     v-model:sorting="sorting"
     :data="tableExpenses"
     :columns="columns"
+    :loading="loading"
     empty="No hay gastos para mostrar."
-    class="hidden shrink-0 md:block"
-    :ui="{
-      base: 'min-w-full border-separate border-spacing-0',
-      thead: '[&>tr]:bg-elevated/50 [&>tr]:after:content-none',
-      tbody: '[&>tr]:last:[&>td]:border-b-0',
-      th: 'py-2 first:rounded-l-lg last:rounded-r-lg border-y border-default first:border-l last:border-r',
-      td: 'border-b border-default',
-      tr: 'data-[selectable=true]:cursor-pointer',
-      separator: 'h-0'
-    }"
+    class="hidden md:block"
     @select="selectRow"
   />
 </template>

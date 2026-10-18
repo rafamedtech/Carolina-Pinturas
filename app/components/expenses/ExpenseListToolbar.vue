@@ -26,28 +26,46 @@ const categoryOptions = computed(() => [{
   label: item,
   value: item as string
 }))])
+
+const hasActiveFilters = computed(() => Boolean(filter.value || paymentMethod.value !== 'all' || dateRange.value || category.value !== 'all'))
+function clearFilters() {
+  filter.value = ''
+  paymentMethod.value = 'all'
+  dateRange.value = null
+  category.value = 'all'
+}
+const emit = defineEmits<{ create: [] }>()
 </script>
 
 <template>
-  <div class="flex w-full flex-col gap-2 sm:flex-row sm:flex-wrap">
-    <UInput
-      v-model="filter"
-      icon="i-lucide-search"
-      placeholder="Buscar descripción, proveedor o categoría"
-      class="w-full sm:w-96"
-    />
-    <USelect
-      v-model="category"
-      :items="categoryOptions"
-      value-key="value"
-      class="w-full sm:w-56"
-    />
-    <USelect
-      v-model="paymentMethod"
-      :items="paymentMethodOptions"
-      value-key="value"
-      class="w-full sm:w-48"
-    />
-    <OrdersOrderDateRangePicker v-model="dateRange" />
-  </div>
+  <ListToolbar
+    v-model:search="filter"
+    placeholder="Buscar descripción, proveedor o categoría"
+    :has-active-filters="hasActiveFilters"
+    @clear="clearFilters"
+  >
+    <template #filters>
+      <USelect
+        v-model="category"
+        :items="categoryOptions"
+        aria-label="Filtrar por categoría"
+        class="w-full sm:w-56"
+      />
+      <USelect
+        v-model="paymentMethod"
+        :items="paymentMethodOptions"
+        aria-label="Filtrar por método de pago"
+        class="w-full sm:w-48"
+      />
+      <OrdersOrderDateRangePicker v-model="dateRange" subject="gastos" />
+    </template>
+    <template #actions>
+      <UButton
+        label="Agregar gasto"
+        icon="i-lucide-plus"
+        class="w-full justify-center sm:w-auto"
+        @click="emit('create')"
+      />
+    </template>
+  </ListToolbar>
 </template>

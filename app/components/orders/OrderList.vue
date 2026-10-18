@@ -226,43 +226,33 @@ const statusTabItems = computed(() => {
 </script>
 
 <template>
-  <UDashboardPanel :id="igualacion ? 'igualaciones' : 'sales-orders'">
-    <template #header>
-      <UDashboardNavbar :title="title">
-        <template #leading>
-          <UDashboardSidebarCollapse />
-        </template>
-        <template #right>
-          <UButton
-            v-if="isInternalCustomersView"
-            label="Gestionar clientes"
-            icon="i-lucide-users-round"
-            color="neutral"
-            variant="outline"
-            :ui="{ label: 'hidden sm:inline' }"
-            @click="customerManagerOpen = true"
-          />
-          <AppCsvExportButton
-            :filename="igualacion ? 'igualaciones' : 'pedidos'"
-            :columns="csvColumns"
-            :fetch-all="fetchAllOrders"
-            :disabled="loading"
-          />
-          <UButton
-            label="Actualizar"
-            icon="i-lucide-refresh-cw"
-            color="neutral"
-            variant="outline"
-            aria-label="Actualizar"
-            :ui="{ label: 'hidden sm:inline' }"
-            :loading="loading"
-            @click="refresh()"
-          />
-        </template>
-      </UDashboardNavbar>
+  <ListPage
+    :id="igualacion ? 'igualaciones' : 'sales-orders'"
+    :title="title"
+    :loading="loading"
+    :error="Boolean(error)"
+    error-title="Pedidos no disponibles"
+    :error-message="errorMessage"
+    @refresh="refresh()"
+  >
+    <template #actions>
+      <UButton
+        v-if="isInternalCustomersView"
+        label="Gestionar clientes"
+        icon="i-lucide-users-round"
+        color="neutral"
+        variant="outline"
+        :ui="{ label: 'hidden sm:inline' }"
+        @click="customerManagerOpen = true"
+      />
+      <AppCsvExportButton
+        :filename="igualacion ? 'igualaciones' : 'pedidos'"
+        :columns="csvColumns"
+        :fetch-all="fetchAllOrders"
+        :disabled="loading"
+      />
     </template>
-
-    <template #body>
+    <template #toolbar>
       <OrdersOrderListToolbar
         v-model:filter="filter"
         v-model:status="selectedTab"
@@ -271,49 +261,36 @@ const statusTabItems = computed(() => {
         v-model:hide-cancelled="hideCancelled"
         v-model:hide-quotes="hideQuotes"
         v-model:date-range="dateRange"
-        :items="statusTabItems"
         :igualacion="igualacion"
         :can-create="canCreate"
         :return-to="returnTo"
       />
-
-      <UTabs
-        v-model="selectedTab"
-        :items="statusTabItems"
-        class="hidden w-full sm:block"
-      />
-
-      <UAlert
-        v-if="error"
-        color="warning"
-        variant="subtle"
-        title="Pedidos no disponibles"
-        :description="errorMessage"
-        icon="i-lucide-database-zap"
-      />
-
-      <OrdersOrderListTable
-        v-else
-        :orders="orders.results"
-        :loading="loading"
-        :igualacion="igualacion"
-        :return-to="returnTo"
-      />
-
-      <OrdersOrderListPagination
-        v-if="!error"
+    </template>
+    <template #views>
+      <ListViews v-model="selectedTab" :items="statusTabItems" label="Filtrar pedidos por estado" />
+    </template>
+    <OrdersOrderListTable
+      :orders="orders.results"
+      :loading="loading"
+      :igualacion="igualacion"
+      :return-to="returnTo"
+    />
+    <template #pagination>
+      <ListPagination
         v-model:page="page"
+        :label="igualacion ? 'igualaciones' : 'pedidos'"
         :total-results="orders.pagination.totalResults"
         :filtered-total="igualacion ? undefined : orders.filteredTotal"
         :page-size="orders.pagination.pageSize"
         :loading="loading"
       />
-
+    </template>
+    <template #overlays>
       <OrdersInternalOrderCustomersModal
         v-if="canViewInternal"
         v-model:open="customerManagerOpen"
         @saved="refresh()"
       />
     </template>
-  </UDashboardPanel>
+  </ListPage>
 </template>

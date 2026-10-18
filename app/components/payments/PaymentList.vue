@@ -85,64 +85,41 @@ function fetchAllPayments() {
 </script>
 
 <template>
-  <UDashboardPanel id="payments">
-    <template #header>
-      <UDashboardNavbar title="Pagos recibidos">
-        <template #leading>
-          <UDashboardSidebarCollapse />
-        </template>
-        <template #right>
-          <AppCsvExportButton
-            filename="pagos"
-            :columns="csvColumns"
-            :fetch-all="fetchAllPayments"
-            :disabled="loading"
-          />
-          <UButton
-            label="Actualizar"
-            icon="i-lucide-refresh-cw"
-            color="neutral"
-            variant="outline"
-            aria-label="Actualizar"
-            :ui="{ label: 'hidden sm:inline' }"
-            :loading="loading"
-            @click="refresh()"
-          />
-        </template>
-      </UDashboardNavbar>
+  <ListPage
+    id="payments"
+    title="Pagos recibidos"
+    :loading="loading"
+    :error="Boolean(error)"
+    error-title="Pagos no disponibles"
+    :error-message="errorMessage"
+    @refresh="refresh()"
+  >
+    <template #actions>
+      <AppCsvExportButton
+        filename="pagos"
+        :columns="csvColumns"
+        :fetch-all="fetchAllPayments"
+        :disabled="loading"
+      />
     </template>
-
-    <template #body>
+    <template #toolbar>
       <PaymentsPaymentListToolbar
         v-model:filter="filter"
         v-model:payment-method="paymentMethod"
         v-model:date-range="dateRange"
       />
-
-      <UAlert
-        v-if="error"
-        color="warning"
-        variant="subtle"
-        title="Pagos no disponibles"
-        :description="errorMessage"
-        icon="i-lucide-database-zap"
-      />
-
-      <PaymentsPaymentListTable
-        v-else
-        :payments="payments.results"
-        :loading="loading"
-        :return-to="returnTo"
-      />
-
-      <PaymentsPaymentListPagination
-        v-if="!error"
+    </template>
+    <PaymentsPaymentListTable :payments="payments.results" :loading="loading" :return-to="returnTo" />
+    <template #pagination>
+      <ListPagination
         v-model:page="page"
+        label="pagos"
+        total-label="Total recibido:"
         :total-results="payments.pagination.totalResults"
         :filtered-total="payments.filteredTotal"
         :page-size="payments.pagination.pageSize"
         :loading="loading"
       />
     </template>
-  </UDashboardPanel>
+  </ListPage>
 </template>

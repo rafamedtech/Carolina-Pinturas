@@ -183,73 +183,46 @@ async function saveExpense(input: CreateExpenseInput) {
 </script>
 
 <template>
-  <UDashboardPanel id="expenses">
-    <template #header>
-      <UDashboardNavbar title="Gastos">
-        <template #leading>
-          <UDashboardSidebarCollapse />
-        </template>
-        <template #right>
-          <AppCsvExportButton
-            filename="gastos"
-            :columns="csvColumns"
-            :fetch-all="fetchAllExpenses"
-            :disabled="loading"
-          />
-          <UButton
-            label="Actualizar"
-            icon="i-lucide-refresh-cw"
-            color="neutral"
-            variant="outline"
-            aria-label="Actualizar"
-            :ui="{ label: 'hidden sm:inline' }"
-            :loading="loading"
-            @click="refreshExpenses()"
-          />
-          <UButton
-            label="Agregar gasto"
-            icon="i-lucide-plus"
-            :ui="{ label: 'hidden sm:inline' }"
-            @click="openExpense()"
-          />
-        </template>
-      </UDashboardNavbar>
+  <ListPage
+    id="expenses"
+    title="Gastos"
+    :loading="loading"
+    :error="Boolean(expenseError)"
+    error-title="Gastos no disponibles"
+    :error-message="expenseErrorMessage"
+    @refresh="refreshExpenses()"
+  >
+    <template #actions>
+      <AppCsvExportButton
+        filename="gastos"
+        :columns="csvColumns"
+        :fetch-all="fetchAllExpenses"
+        :disabled="loading"
+      />
     </template>
-
-    <template #body>
+    <template #toolbar>
       <ExpensesExpenseListToolbar
         v-model:filter="filter"
         v-model:payment-method="paymentMethod"
         v-model:category="category"
         v-model:date-range="dateRange"
         :categories="categories"
+        @create="openExpense()"
       />
-
-      <UAlert
-        v-if="expenseError"
-        color="warning"
-        variant="subtle"
-        title="Gastos no disponibles"
-        :description="expenseErrorMessage"
-        icon="i-lucide-database-zap"
-      />
-
-      <ExpensesExpenseListTable
-        v-else
-        :expenses="expenseCatalog.results"
-        :loading="loading"
-        @select="openExpense"
-      />
-
-      <ExpensesExpenseListPagination
-        v-if="!expenseError"
+    </template>
+    <ExpensesExpenseListTable :expenses="expenseCatalog.results" :loading="loading" @select="openExpense" />
+    <template #pagination>
+      <ListPagination
         v-model:page="page"
+        label="gastos"
+        total-label="Total gastado:"
         :total-results="expenseCatalog.pagination.totalResults"
         :filtered-total="expenseCatalog.filteredTotal"
         :page-size="expenseCatalog.pagination.pageSize"
         :loading="loading"
       />
-
+    </template>
+    <template #overlays>
       <ExpensesExpenseAddModal
         v-model:open="modalOpen"
         :categories="categories"
@@ -264,5 +237,5 @@ async function saveExpense(input: CreateExpenseInput) {
         @delete="deleteExpense"
       />
     </template>
-  </UDashboardPanel>
+  </ListPage>
 </template>
