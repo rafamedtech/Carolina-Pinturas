@@ -1,4 +1,22 @@
 import * as z from 'zod'
+import { inventoryPositive } from './inventory'
+
+export const productCompositionSchema = z.object({
+  kind: z.enum(['product', 'composite']),
+  version: z.number().int().positive(),
+  components: z.array(z.object({ productId: z.uuid(), quantity: inventoryPositive })).max(100)
+}).superRefine((input, ctx) => {
+  if (input.kind === 'composite' && !input.components.length) ctx.addIssue({ code: 'custom', path: ['components'], message: 'Agrega al menos un componente.' })
+  if (input.kind === 'product' && input.components.length) ctx.addIssue({ code: 'custom', path: ['components'], message: 'Un producto simple no lleva componentes.' })
+  if (new Set(input.components.map(c => c.productId)).size !== input.components.length) ctx.addIssue({ code: 'custom', path: ['components'], message: 'No repitas componentes.' })
+})
+export type ProductComposition = z.infer<typeof productCompositionSchema>
+
+export const inventoryRecipeSchema = z.array(z.object({
+  productId: z.uuid(), quantity: inventoryPositive,
+  code: z.string(), name: z.string(), unit: z.string().nullable()
+})).min(1).max(100)
+export type InventoryRecipe = z.infer<typeof inventoryRecipeSchema>
 
 const money = z.number().finite().positive('El precio debe ser positivo.').refine(
   value => Math.abs(value * 100 - Math.round(value * 100)) < 0.000001,
@@ -8,9 +26,10 @@ export const productInputSchema = z.object({
   code: z.string().trim().min(1, 'Escribe el código.').max(30).regex(/^[A-Za-z0-9_-]+$/, 'Usa un código sin espacios.'),
   name: z.string().trim().min(1, 'Escribe el nombre.').max(100),
   account_group: z.number().int().positive('Selecciona una clasificación.'),
-  type: z.enum(['Product', 'Service', 'ConsumerGood']),
+  type: z.literal('Product'),
+  composition: productCompositionSchema.default({ kind: 'product', version: 1, components: [] }),
   active: z.boolean(),
-  stock_control: z.boolean(),
+  stock_control: z.literal(false),
   tax_included: z.boolean(),
   unit: z.string().trim().min(1, 'Selecciona una unidad SAT.').max(10),
   key: z.string().regex(/^\d{8}$/, 'Selecciona una clave SAT de ocho dígitos.'),
@@ -37,6 +56,8 @@ export const productQuerySchema = z.object({
   all: z.enum(['true', 'false']).optional(),
   refresh: z.enum(['true', 'false']).optional(),
   active: z.enum(['true', 'false', 'all']).default('true'),
+  products_only: z.enum(['true', 'false']).optional(),
+  simple_only: z.enum(['true', 'false']).optional(),
   page: z.coerce.number().int().min(1).max(10000).default(1),
   page_size: z.coerce.number().int().min(1).max(100).default(25),
   code: z.string().trim().max(30).optional(),

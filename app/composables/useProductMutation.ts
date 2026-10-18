@@ -8,6 +8,7 @@ export function useProductMutation() {
   const lookupCode = shallowRef('')
   const checking = shallowRef(false)
   const lookupResults = ref<SiigoProduct[]>([])
+  const operationId = shallowRef('')
 
   async function save(input: ProductInput | { active: boolean }, id?: string) {
     if (saving.value || ambiguous.value) return null
@@ -22,7 +23,8 @@ export function useProductMutation() {
       await refreshNuxtData().catch(() => undefined)
       return product
     } catch (error: unknown) {
-      const failure = error as { statusCode?: number, data?: { statusMessage?: string, data?: { ambiguous?: boolean } } }
+      const failure = error as { statusCode?: number, data?: { statusMessage?: string, data?: { ambiguous?: boolean, operationId?: string } } }
+      operationId.value = failure.data?.data?.operationId ?? ''
       ambiguous.value = failure.data?.data?.ambiguous === true || !failure.statusCode || failure.statusCode >= 500
       errorMessage.value = ambiguous.value
         ? 'No se pudo confirmar el guardado. Consulta el producto antes de volver a intentar.'
@@ -32,9 +34,18 @@ export function useProductMutation() {
       saving.value = false
     }
   }
-  async function check(id?: string) {
+  async function check(id?: string, pendingWriteId?: string) {
     checking.value = true
     try {
+      if (operationId.value || pendingWriteId) {
+        const product = await $fetch<SiigoProduct>('/api/siigo/products/recover', { method: 'POST', body: { operationId: operationId.value || pendingWriteId }, retry: 0 })
+        lookupResults.value = [product]
+        ambiguous.value = false
+        operationId.value = ''
+        errorMessage.value = ''
+        await refreshNuxtData().catch(() => undefined)
+        return product
+      }
       lookupResults.value = id
         ? [await $fetch<SiigoProduct>(`/api/siigo/products/${encodeURIComponent(id)}`, { query: { refresh: 'true' } })]
         : (await $fetch<{ results: SiigoProduct[] }>('/api/siigo/products', { query: { code: lookupCode.value, active: 'all', refresh: 'true' } })).results

@@ -13,6 +13,7 @@ import { refreshProductCosts } from './product-costs'
 import { getSiigoCustomerDetail } from './siigo-customer-detail'
 import { getProductDetail } from './siigo-products'
 import { upsertSiigoProduct } from './siigo-persistence'
+import { assertNoPendingProductWrites, lockCompositions } from './product-compositions'
 import { purchaseAssert, purchaseBalance, purchaseLineTotal, purchaseOrderStatus, assertReceipt } from './purchase-domain'
 
 export const purchaseInclude = {
@@ -86,6 +87,12 @@ async function persistProductSnapshots(products: SiigoProduct[]) {
   // exhaust its timeout before the order items are replaced.
   for (const product of products) await upsertSiigoProduct(prisma, product)
 }
+async function assertSimplePurchaseProducts(tx: Prisma.TransactionClient, ids: string[]) {
+  await lockCompositions(tx)
+  const products = await tx.siigoProduct.findMany({ where: { id: { in: ids } } })
+  purchaseAssert(products.length === new Set(ids).size && products.every(p => p.internalKind === 'product' && (!p.type || p.type === 'Product')), 'Las compras y recepciones solo admiten productos simples.')
+  await assertNoPendingProductWrites(tx, products)
+}
 export async function createPurchase(input: { requestId: string, draft: PurchaseDraft }, user: AppUser) {
   const requestHash = hash({ actor: user.id, ...input })
   const prior = await replay(input.requestId, requestHash)
@@ -94,6 +101,7 @@ export async function createPurchase(input: { requestId: string, draft: Purchase
   await persistProductSnapshots(prepared.products)
   try {
     const id = await usePrisma().$transaction(async (tx) => {
+      await assertSimplePurchaseProducts(tx, input.draft.items.map(i => i.productId))
       const row = await tx.purchaseOrder.create({ data: { ...prepared.data, createdBy: user.email, items: { create: prepared.items }, events: { create: { requestId: input.requestId, requestHash, action: 'create', detail: json(input.draft), createdBy: user.email } } } })
       return row.id
     }, { timeout: 15000 })
@@ -120,6 +128,7 @@ export async function mutatePurchase(id: string, input: PurchaseCommand, user: A
       const locked = await tx.purchaseOrder.updateMany({ where: { id, version: input.version }, data: { version: { increment: 1 } } })
       purchaseAssert(locked.count === 1, 'La compra cambió. Recarga antes de continuar.')
       const row = await tx.purchaseOrder.findUniqueOrThrow({ where: { id }, include: purchaseInclude })
+      if (c.action === 'edit' || c.action === 'confirm' || c.action === 'receive') await assertSimplePurchaseProducts(tx, c.action === 'edit' ? c.draft.items.map(i => i.productId) : row.items.map(i => i.productId))
       if (c.action === 'edit' || c.action === 'confirm') {
         purchaseAssert(row.status === 'borrador', 'Solo puedes modificar o confirmar borradores.')
         purchaseAssert(prepared, 'Faltan datos de la orden.')

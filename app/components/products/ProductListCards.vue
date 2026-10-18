@@ -71,10 +71,10 @@ defineProps<{
           </div>
           <div>
             <dt class="text-muted">
-              Existencia
+              Disponible interno
             </dt>
             <dd class="text-highlighted">
-              {{ product.available_quantity ?? '—' }}
+              {{ product.internal?.composition?.kind === 'composite' ? 'Según componentes' : product.internal?.inventory?.available ?? '—' }}
             </dd>
           </div>
           <div class="col-span-2 flex items-end justify-between gap-4 border-t border-default pt-3">

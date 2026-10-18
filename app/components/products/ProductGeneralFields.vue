@@ -14,7 +14,6 @@ const groups = computed(() => {
   if (model.value.account_group && !options.some(item => item.value === model.value.account_group)) options.push({ label: `Clasificación actual ${model.value.account_group}`, value: model.value.account_group })
   return options
 })
-const types = [{ label: 'Producto', value: 'Product' }, { label: 'Servicio', value: 'Service' }, { label: 'Bien de consumo', value: 'ConsumerGood' }]
 </script>
 
 <template>
@@ -39,9 +38,6 @@ const types = [{ label: 'Producto', value: 'Product' }, { label: 'Servicio', val
           class="w-full"
         />
       </UFormField>
-      <UFormField label="Tipo" name="type" required>
-        <USelect v-model="model.type" :items="types" class="w-full" />
-      </UFormField>
       <UFormField label="Unidad SAT" name="unit" required>
         <ProductsSatPicker v-model="model.unit" kind="unit" label="Unidad SAT" />
       </UFormField>
@@ -59,7 +55,6 @@ const types = [{ label: 'Producto', value: 'Product' }, { label: 'Servicio', val
       </UFormField>
       <div class="flex flex-wrap items-center gap-4">
         <USwitch v-model="model.active" label="Activo" />
-        <USwitch v-model="model.stock_control" label="Control de inventario en Siigo" />
       </div>
       <UFormField label="Descripción" name="description" class="sm:col-span-2">
         <UTextarea v-model="model.description" maxlength="2500" class="w-full" />

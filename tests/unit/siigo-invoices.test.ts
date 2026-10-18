@@ -42,6 +42,18 @@ const documentType = {
 }
 
 describe('Siigo invoice drafts', () => {
+  it('factura el compuesto como una partida propia sin bodega ni desglose de componentes', () => {
+    const product = { id: 'kit', code: 'KIT-1', name: 'Kit', type: 'Product', stock_control: false,
+      internal: { composition: { kind: 'composite' as const, version: 1, components: [{ productId: 'base', quantity: '0.25' }] } } }
+    const payload = buildSiigoInvoiceDraftPayload({
+      input: { ...input, warehouseId: 439 }, customerRfc: 'MELM8305281H0', products: new Map([['KIT-1', product]]), documentType, costCenterId: null,
+      order: { folio: 1, observations: null, discountAmount: 0, total: 300,
+        items: [{ code: 'KIT-1', description: 'Kit a precio propio', quantity: 2, unitPrice: 150, subtotal: 300, discountAmount: 0, taxAmount: 0, total: 300 }] }
+    })
+    expect(payload.items).toEqual([{ code: 'KIT-1', description: 'Kit a precio propio', quantity: 2, price: 150 }])
+    expect(payload.payment.conditions[0]!.value).toBe(300)
+    expect(normalizeInvoiceProduct({ id: 'legacy', code: 'OLD', name: 'Histórico', stock_control: true }).stock_control).toBe(true)
+  })
   // Los pedidos históricos conservan sus importes; no recalcularlos al facturar.
   it.each([
     [8, 277.77, 22.22, 299.99],

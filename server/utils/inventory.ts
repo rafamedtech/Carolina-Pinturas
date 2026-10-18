@@ -8,11 +8,14 @@ import type { InventoryStock, OrderInventoryView } from '#shared/types/inventory
 import { mexicoToday } from '#shared/utils/datetime'
 import { usePrisma } from './prisma'
 import { refreshProductCosts } from './product-costs'
+import { inventoryRecipeSchema } from '#shared/schemas/product'
+import { assertNoPendingProductWrites, lockCompositions } from './product-compositions'
 
 type Tx = Prisma.TransactionClient
 const countInclude = { warehouse: { select: { name: true } }, lines: { include: { product: { select: { code: true, name: true } } }, orderBy: { productId: 'asc' as const } } } satisfies Prisma.InventoryCountInclude
 const countView = (count: Prisma.InventoryCountGetPayload<{ include: typeof countInclude }>) => ({ ...count, date: count.date.toISOString().slice(0, 10) })
-const d = (v: Decimal.Value) => new Decimal(v)
+const InventoryDecimal = Decimal.clone({ precision: 48 })
+const d = (v: Decimal.Value) => new InventoryDecimal(v)
 const json = (v: unknown) => JSON.parse(JSON.stringify(v)) as Prisma.InputJsonValue
 const date = (v: string) => new Date(`${v}T00:00:00Z`)
 export function inventoryAssert(value: unknown, message: string): asserts value {
@@ -37,6 +40,10 @@ export async function lockInventoryBalances(tx: Tx, pairs: Array<{
   await tx.$queryRaw(Prisma.sql`SELECT b.product_id FROM inventory_balances b JOIN (VALUES ${keys}) AS wanted(warehouse_id, product_id) ON b.warehouse_id = wanted.warehouse_id AND b.product_id = wanted.product_id ORDER BY b.warehouse_id, b.product_id FOR UPDATE OF b`)
 }
 async function controlled(tx: Tx, productId: string) {
+  await lockCompositions(tx)
+  const product = await tx.siigoProduct.findUniqueOrThrow({ where: { id: productId } })
+  await assertNoPendingProductWrites(tx, [product])
+  inventoryAssert(product.internalKind === 'product' && (!product.type || product.type === 'Product'), 'Los movimientos y conteos solo admiten productos simples.')
   const config = await tx.inventoryProduct.findUnique({ where: { productId } })
   inventoryAssert(config, 'El producto no existe en el catálogo local.')
   return config.enabled
@@ -59,6 +66,7 @@ export async function postInventoryMovement(tx: Tx, input: MovementInput, deltas
   const byKey = new Map(balances.map(b => [`${b.warehouseId}:${b.productId}`, b]))
   const lines = entries.map((line) => {
     const balance = byKey.get(`${line.warehouseId}:${line.productId}`)!
+    inventoryAssert(balance.product.internalKind === 'product', 'Un producto compuesto no puede tener existencias propias. Revisa el producto del movimiento.')
     const next = d(balance.quantity.toString()).plus(line.delta)
     inventoryAssert(next.lte('99999999999999.999999'), 'La existencia resultante supera el límite permitido.')
     inventoryAssert(next.gte(balance.reserved.toString()), `Existencias insuficientes para ${balance.product.code} en ${balance.warehouse.name}. Disponible: ${d(balance.quantity.toString()).minus(balance.reserved.toString())}.`)
@@ -71,9 +79,16 @@ export async function postInventoryMovement(tx: Tx, input: MovementInput, deltas
   return movement
 }
 export async function syncOrderInventory(tx: Tx, orderId: string, user: AppUser, previousStatus?: string) {
-  await inventorySettings(tx)
+  const settings = await inventorySettings(tx)
   const order = await tx.salesOrder.findUniqueOrThrow({ where: { id: orderId }, include: { items: true } })
-  if (!order.inventoryManaged) return
+  const items = order.items.map(item => ({ item, recipe: item.inventoryRecipe == null
+    ? [{ productId: item.productId, quantity: '1' }]
+    : inventoryRecipeSchema.parse(item.inventoryRecipe) }))
+  const hasComposite = items.some(({ item, recipe }) => recipe.length > 1 || recipe[0]?.productId !== item.productId)
+  if (!order.inventoryManaged && !hasComposite) return
+  // A quotation with components must keep its future inventory obligations,
+  // even when it was captured before the global activation.
+  if (!order.inventoryManaged) await tx.salesOrder.update({ where: { id: orderId }, data: { inventoryManaged: true } })
   const dispatch = await tx.inventoryMovement.findUnique({ where: { originKey: `order:${orderId}:dispatch` } })
   if (dispatch) {
     inventoryAssert(!['borrador', 'ingresado', 'confirmado'].includes(order.statusKey), 'El pedido ya descontó inventario. Registra una devolución para regresar unidades.')
@@ -83,11 +98,22 @@ export async function syncOrderInventory(tx: Tx, orderId: string, user: AppUser,
   const outgoing = ['surtido', 'en_camino', 'entregado'].includes(order.statusKey)
   const prior = await tx.inventoryReservation.findMany({ where: { orderId } })
   const reserve = order.statusKey === 'confirmado' || (order.statusKey === 'en_espera' && prior.length > 0)
+  inventoryAssert(settings.enabledAt || (!outgoing && !reserve), 'Activa el inventario interno antes de confirmar o surtir pedidos con productos compuestos. Puedes guardar la cotización mientras tanto.')
   const wanted = new Map<string, Decimal>()
   if (outgoing || reserve) {
-    const configs = await tx.inventoryProduct.findMany({ where: { productId: { in: order.items.map(i => i.productId) }, enabled: true } })
+    const required = new Set<string>()
+    const demand = items.flatMap(({ item, recipe }) => {
+      if (recipe.length > 1 || recipe[0]?.productId !== item.productId) for (const c of recipe) required.add(c.productId)
+      return recipe.map((c) => {
+        const quantity = d(c.quantity).times(item.quantity.toString())
+        inventoryAssert(quantity.decimalPlaces() <= 6 && quantity.lte('99999999999999.999999'), 'El consumo de componentes debe caber en 14 enteros y 6 decimales. Revisa la cantidad del pedido.')
+        return { productId: c.productId, quantity }
+      })
+    })
+    const configs = await tx.inventoryProduct.findMany({ where: { productId: { in: demand.map(i => i.productId) }, enabled: true } })
     const ids = new Set(configs.map(p => p.productId))
-    for (const item of order.items) if (ids.has(item.productId)) wanted.set(item.productId, (wanted.get(item.productId) ?? d(0)).plus(item.quantity.toString()))
+    inventoryAssert([...required].every(id => ids.has(id)), 'Todos los componentes del pedido deben conservar su control de inventario interno.')
+    for (const item of demand) if (ids.has(item.productId)) wanted.set(item.productId, (wanted.get(item.productId) ?? d(0)).plus(item.quantity))
     if (wanted.size) inventoryAssert(order.warehouseId, 'Selecciona el almacén del pedido antes de confirmar o surtir.')
   }
   const pairs = [...prior, ...[...wanted.keys()].map(productId => ({ productId, warehouseId: order.warehouseId! }))]
@@ -129,6 +155,7 @@ export async function receiveInventory(tx: Tx, receiptId: string, warehouseId: s
   const warehouse = await tx.inventoryWarehouse.findUnique({ where: { id: warehouseId } })
   inventoryAssert(warehouse?.active, 'Selecciona un almacén activo.')
   const receipt = await tx.purchaseReceipt.findUniqueOrThrow({ where: { id: receiptId }, include: { items: { include: { item: true } } } })
+  for (const line of receipt.items) await controlled(tx, line.item.productId)
   const configs = await tx.inventoryProduct.findMany({ where: { productId: { in: receipt.items.map(l => l.item.productId) }, enabled: true } })
   const ids = new Set(configs.map(p => p.productId))
   const deltas: Delta[] = []
@@ -196,6 +223,15 @@ async function mutate(tx: Tx, input: InventoryCommand, user: AppUser) {
     return tx.inventorySettings.update({ where: { id: 1 }, data: { enabledAt: new Date(), version: { increment: 1 } } })
   }
   if (c.action === 'tracking') {
+    await lockCompositions(tx, true)
+    const product = await tx.siigoProduct.findUniqueOrThrow({ where: { id: c.productId } })
+    inventoryAssert(product.internalKind === 'product' || !c.enabled, 'Los productos compuestos no tienen existencias propias.')
+    inventoryAssert(!c.enabled || !product.type || product.type === 'Product', 'Los tipos históricos no pueden activar control de inventario.')
+    if (!c.enabled) {
+      inventoryAssert(!await tx.productComponent.count({ where: { componentId: c.productId } }), 'El producto forma parte de un compuesto y debe conservar su control interno.')
+      const dependencies = await tx.$queryRaw<Array<{ id: string }>>(Prisma.sql`SELECT i.id FROM sales_order_items i JOIN sales_orders o ON o.id = i.order_id WHERE o.status_key NOT IN ('cancelado','entregado') AND i.inventory_recipe @> ${JSON.stringify([{ productId: c.productId }])}::jsonb AND i.product_id <> ${c.productId}::uuid LIMIT 1`)
+      inventoryAssert(!dependencies.length, 'Hay pedidos abiertos que necesitan este componente.')
+    }
     const old = await tx.inventoryProduct.findUnique({ where: { productId: c.productId } })
     inventoryAssert(old?.version === c.version, 'La configuración del producto cambió.')
     inventoryAssert(!await tx.inventoryBalance.count({ where: { productId: c.productId, OR: [{ quantity: { gt: 0 } }, { reserved: { gt: 0 } }] } }), 'El producto tiene existencias o reservas.')
@@ -325,7 +361,7 @@ export async function listInventory(resource: string, q: InventoryQuery) {
     return { results: rows, pagination: pagination(q, total) }
   }
   if (resource === 'products') {
-    const where = { ...productFilter, ...(q.controlledOnly === 'true' ? { inventoryProduct: { enabled: true }, AND: [{ OR: [{ active: true }, { active: null }] }] } : {}) }
+    const where = { ...productFilter, internalKind: 'product', ...(q.controlledOnly === 'true' ? { inventoryProduct: { enabled: true }, AND: [{ OR: [{ active: true }, { active: null }] }, { OR: [{ type: 'Product' }, { type: null }] }] } : {}) }
     const [rows, total] = await Promise.all([db.siigoProduct.findMany({ where, include: { inventoryProduct: true }, orderBy: [{ code: 'asc' }, { id: 'asc' }], skip, take: q.page_size }), db.siigoProduct.count({ where })])
     return { results: rows.map(p => ({ id: p.id, code: p.code, name: p.name, reference: p.reference ?? undefined, additional_fields: { barcode: p.barcode ?? undefined }, unit: p.unitName ?? p.unitCode, initialUnitCost: p.initialUnitCost?.toString() ?? null, initialCostCurrency: p.initialCostCurrency, enabled: p.inventoryProduct?.enabled ?? false, version: p.inventoryProduct?.version ?? 1 })), pagination: pagination(q, total) }
   }
@@ -360,8 +396,10 @@ export async function listInventory(resource: string, q: InventoryQuery) {
 }
 export async function orderInventoryView(id: string): Promise<OrderInventoryView> {
   const db = usePrisma()
-  const order = await db.salesOrder.findUniqueOrThrow({ where: { id }, include: { items: { select: { productId: true } } } })
+  const order = await db.salesOrder.findUniqueOrThrow({ where: { id }, include: { items: { select: { productId: true, inventoryRecipe: true } } } })
   const movements = await db.inventoryMovement.findMany({ where: { orderId: id }, select: { id: true, folio: true, type: true }, orderBy: { folio: 'asc' } })
-  const stocks = order.warehouseId ? await db.inventoryBalance.findMany({ where: { warehouseId: order.warehouseId, productId: { in: order.items.map(i => i.productId) } }, include: { product: true, warehouse: true } }) : []
-  return { managed: order.inventoryManaged, warehouseId: order.warehouseId, dispatched: movements.some(m => m.type === 'surtido'), movements, stocks: stocks.map(stockView) }
+  const productIds = order.items.flatMap(i => i.inventoryRecipe == null ? [i.productId] : inventoryRecipeSchema.parse(i.inventoryRecipe).map(c => c.productId))
+  const stocks = order.warehouseId ? await db.inventoryBalance.findMany({ where: { warehouseId: order.warehouseId, productId: { in: productIds } }, include: { product: true, warehouse: true } }) : []
+  const settings = await db.inventorySettings.findUniqueOrThrow({ where: { id: 1 } })
+  return { managed: order.inventoryManaged, activationRequired: order.inventoryManaged && !settings.enabledAt, warehouseId: order.warehouseId, dispatched: movements.some(m => m.type === 'surtido'), movements, stocks: stocks.map(stockView) }
 }

@@ -3,6 +3,8 @@ import { ORDER_ENTRY_ROLES } from '~/utils/roleAccess'
 import { requireRole } from '../../../utils/auth'
 import { getProductImage } from '../../../utils/product-images'
 import { getProductDetail } from '../../../utils/siigo-products'
+import { attachProductCompositions } from '../../../utils/product-compositions'
+import { usePrisma } from '../../../utils/prisma'
 
 export default eventHandler(async (event) => {
   await requireRole(event, ORDER_ENTRY_ROLES)
@@ -12,5 +14,6 @@ export default eventHandler(async (event) => {
     getProductDetail(id.data, getQuery(event).refresh === 'true'),
     getProductImage(id.data, event)
   ])
-  return { ...product, internal: { image } }
+  const enriched = (await attachProductCompositions(usePrisma(), [product]))[0]!
+  return { ...enriched, internal: { ...enriched.internal, image } }
 })

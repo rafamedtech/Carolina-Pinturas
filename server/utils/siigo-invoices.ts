@@ -200,6 +200,7 @@ export function normalizeInvoiceProduct(value: unknown): SiigoProduct {
     code,
     name,
     active: boolean(product.active) ?? undefined,
+    stock_control: boolean(product.stock_control) ?? undefined,
     taxes
   }
 }
@@ -479,7 +480,8 @@ export function buildSiigoInvoiceDraftPayload(options: {
       price: price.toNumber(),
       ...(discount !== undefined ? { discount } : {}),
       ...(taxes.length ? { taxes } : {}),
-      ...(options.input.warehouseId ? { warehouse: options.input.warehouseId } : {})
+      // Siigo México rejects a warehouse for products without stock control.
+      ...(options.input.warehouseId && product.stock_control === true ? { warehouse: options.input.warehouseId } : {})
     }
   })
   // Validación local anterior a reservar/enviar cualquier operación fiscal.

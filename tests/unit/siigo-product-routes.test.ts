@@ -10,6 +10,10 @@ vi.mock('../../server/utils/auth', () => ({
   }
 }))
 vi.mock('../../server/utils/siigo-products', () => ({ mutateProduct: mocks.mutate, listProducts: mocks.list, getProductDetail: mocks.detail, getProductContext: mocks.context }))
+vi.mock('../../server/utils/managed-products', () => ({ saveManagedProduct: mocks.mutate, recoverProductWrite: vi.fn() }))
+vi.mock('../../server/utils/prisma', () => ({ usePrisma: () => ({}) }))
+vi.mock('../../server/utils/product-catalog-persistence', () => ({ persistProductCatalog: vi.fn() }))
+vi.mock('../../server/utils/product-compositions', () => ({ attachProductCompositions: async (_db: unknown, products: unknown[]) => products }))
 vi.mock('../../server/utils/siigo-product-sat', () => ({ getProductSatCatalog: mocks.sat, searchProductSat: vi.fn() }))
 vi.mock('../../server/utils/product-images', () => ({ getProductImage: mocks.image, saveProductImage: mocks.saveImage, deleteProductImage: mocks.deleteImage }))
 vi.stubGlobal('eventHandler', (handler: unknown) => handler)
@@ -22,6 +26,7 @@ vi.stubGlobal('readMultipartFormData', async (event: { parts?: unknown }) => eve
 const create = (await import('../../server/api/siigo/products/index.post')).default
 const update = (await import('../../server/api/siigo/products/[id].put')).default
 const active = (await import('../../server/api/siigo/products/[id]/active.patch')).default
+const recover = (await import('../../server/api/siigo/products/recover.post')).default
 const list = (await import('../../server/api/siigo/products.get')).default
 const detail = (await import('../../server/api/siigo/products/[id].get')).default
 const context = (await import('../../server/api/siigo/products/context.get')).default
@@ -36,12 +41,23 @@ beforeEach(() => {
   vi.clearAllMocks()
   mocks.role = 'admin'
   mocks.mutate.mockResolvedValue({ id, ...body })
+  mocks.list.mockResolvedValue({ results: [] })
+  mocks.detail.mockResolvedValue({ id, ...body, account_group: { id: 10 }, key: { code: '31211500' }, unit: { code: 'H87' } })
 })
 
 describe('autorización y frontera HTTP de productos', () => {
+  it('excluye combos y servicios de nuevas ventas sin perder el catálogo histórico', async () => {
+    mocks.list.mockResolvedValue({ results: [{ id, type: 'Product' }, { id: 'combo', type: 'Combo' }, { id: 'service', type: 'Service' }, { id: 'pending', type: 'Product', internal: { syncPending: true } }, { id: 'composite', type: 'Product', internal: { composition: { kind: 'composite' } } }] })
+    const saleCatalog = await list(event({ query: { all: 'true', products_only: 'true' } }))
+    expect(saleCatalog.results.map(p => p.id)).toEqual([id, 'composite'])
+    const purchaseCatalog = await list(event({ query: { all: 'true', simple_only: 'true' } }))
+    expect(purchaseCatalog.results.map(p => p.id)).toEqual([id])
+    const history = await list(event({ query: { active: 'all' } }))
+    expect(history.results).toHaveLength(5)
+  })
   it.each(['mostrador', 'vendedor', 'repartidor', 'igualaciones'])('rechaza escritura y catálogos de edición para %s', async (role) => {
     mocks.role = role
-    for (const route of [create, update, active, context, sat, uploadImage, removeImage]) {
+    for (const route of [create, update, active, recover, context, sat, uploadImage, removeImage]) {
       await expect(route(event({ id, body, query: { kind: 'unit' } }))).rejects.toMatchObject({ statusCode: 403 })
     }
     expect(mocks.saveImage).not.toHaveBeenCalled()
@@ -59,11 +75,12 @@ describe('autorización y frontera HTTP de productos', () => {
     await create(event({ body }))
     await update(event({ id, body }))
     await active(event({ id, body: { active: false } }))
-    expect(mocks.mutate.mock.calls).toEqual([[body], [body, id], [{ active: false }, id]])
+    expect(mocks.mutate.mock.calls).toEqual([[body], [body, id], [{ ...body, active: false }, id]])
   })
   it('rechaza UUID, entrada y filtros inválidos antes de Siigo', async () => {
     await expect(update(event({ id: '../../auth', body }))).rejects.toMatchObject({ statusCode: 400 })
     await expect(create(event({ body: {} }))).rejects.toMatchObject({ statusCode: 400 })
+    await expect(recover(event({ body: { operationId: '../auth' } }))).rejects.toMatchObject({ statusCode: 400 })
     await expect(active(event({ id, body: { active: false, prices: [] } }))).rejects.toMatchObject({ statusCode: 400 })
     await expect(list(event({ query: { ids: Array(21).fill(id).join(',') } }))).rejects.toMatchObject({ statusCode: 400 })
     expect(mocks.mutate).not.toHaveBeenCalled()

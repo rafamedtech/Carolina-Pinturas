@@ -105,7 +105,7 @@ const csvColumns: CsvColumn<SiigoProduct>[] = [
   { key: 'unit', label: 'Unidad', value: row => unitsById.get(row.id) ?? '' },
   { key: 'brand', label: 'Marca', value: row => row.additional_fields?.brand || '' },
   { key: 'account_group', label: 'Grupo', value: row => row.account_group?.name || '' },
-  { key: 'available_quantity', label: 'Existencia', value: row => row.available_quantity ?? '' },
+  { key: 'inventory', label: 'Disponible interno', value: row => row.internal?.composition?.kind === 'composite' ? 'Según componentes' : row.internal?.inventory?.available ?? '' },
   { key: 'price', label: 'Precio', value: row => formatProductPrice(row) }
 ]
 
@@ -124,9 +124,9 @@ const columns: TableColumn<SiigoProduct>[] = [{
   header: 'Grupo',
   cell: ({ row }) => row.original.account_group?.name || '—'
 }, {
-  accessorKey: 'available_quantity',
-  header: 'Existencia',
-  cell: ({ row }) => row.getValue('available_quantity') ?? '—'
+  id: 'inventory',
+  header: 'Disponible interno',
+  cell: ({ row }) => row.original.internal?.composition?.kind === 'composite' ? 'Según componentes' : row.original.internal?.inventory?.available ?? '—'
 }, {
   id: 'price',
   header: 'Precio',

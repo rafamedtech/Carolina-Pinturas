@@ -2,7 +2,7 @@
 
 ## Alcance y permisos
 
-Administradores crean y actualizan productos, servicios y bienes de consumo, incluyendo precios, impuestos y estado. Los roles de captura conservan consultas. Pedidos nuevos rechazan productos inactivos; pedidos existentes conservan sus referencias. No hay borrado, ajustes de existencias ni edición de componentes.
+Administradores crean y actualizan productos simples y compuestos, incluyendo precios, impuestos, datos SAT y estado. Ambos se escriben en Siigo como `Product` con `stock_control: false`. La composición se administra exclusivamente en PostgreSQL. Los roles de captura conservan consultas. Pedidos nuevos rechazan productos inactivos y tipos históricos (`Combo`, `Service`, `ConsumerGood`); los pedidos anteriores conservan sus referencias. No hay borrado. Consulta [Productos compuestos](./productos-compuestos.md) para las reglas de inventario y conciliación.
 
 Las mutaciones usan `siigoRequest` exclusivamente en servidor. Ante timeout o respuesta inválida posterior al envío, no se reintenta ni se anuncia éxito: la interfaz ofrece consultar el resultado por ID o código antes de iniciar otra edición. No existe garantía de idempotencia de Siigo para productos.
 
@@ -22,6 +22,8 @@ Para reproducir desde descargas previas, pasar `--source-dir` con `siigo-claves.
 
 - Contrato de [creación](https://developers.siigo.com/docs/siigoapimexico/productos/1-create-product/) y [actualización](https://developers.siigo.com/docs/siigoapimexico/productos/2-edit-product): tipos `Product`, `Service`, `ConsumerGood`.
 - El catálogo real incluye `Combo` y componentes con identificador numérico. Se normaliza el identificador a texto para consulta. La escritura de tipos no documentados se bloquea expresamente; nunca convertir un combo a producto para eludir esa restricción.
+
+Las decisiones del 18/10/2026 sustituyen la edición de servicios/bienes de consumo: se conservan para consulta histórica y quedan fuera de nuevas ventas. Los componentes externos de un `Combo` nunca se convierten automáticamente en una composición interna.
 - El archivo `unidades de medida.xlsx` enlazado en la web de Siigo solo trae 1,089 registros y omite `H87`. Se usa `Unidades de medida SAT.xlsm`, enlazado en el blueprint México: contiene `H87` (Pieza) y 2,418 registros.
 - `key` puede llegar como texto; se normaliza a `{ code }`. Unidades vacías del listado se enriquecen desde detalles con un máximo de cuatro consultas simultáneas y caché compartida.
 - Listas de precios usan `position` para escribir, no el `id` del catálogo.

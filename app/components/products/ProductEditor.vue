@@ -22,7 +22,7 @@ if (props.productId && allowed.value) {
   try {
     product.value = await $fetch<SiigoProduct>(`/api/siigo/products/${encodeURIComponent(props.productId)}`, { headers: useRequestHeaders(['cookie']), query: { refresh: 'true' } })
     productImage.value = product.value.internal?.image ?? null
-    if (!['Product', 'Service', 'ConsumerGood'].includes(product.value.type || 'Product')) loadError.value = 'Este tipo de producto se administra directamente en Siigo.'
+    if ((product.value.type || 'Product') !== 'Product') loadError.value = 'Este tipo de producto se conserva solo para consulta histórica.'
   } catch {
     loadError.value = 'No se pudo cargar el producto. Actualiza la página para reintentar.'
   } finally {
@@ -30,6 +30,10 @@ if (props.productId && allowed.value) {
   }
 }
 const { saving, errorMessage, ambiguous, checking, lookupResults, save, check } = useProductMutation()
+async function recover() {
+  const saved = await check(props.productId, product.value?.internal?.pendingWriteId)
+  if (saved) await navigateTo(`/productos/${saved.id}`)
+}
 async function submit(input: ProductInput) {
   const saved = await save(input, props.productId)
   if (saved) {
@@ -59,9 +63,14 @@ useSeoMeta({ title })
       <UAlert v-if="!allowed" title="Solo administradores pueden gestionar productos." color="warning" />
       <UAlert v-else-if="contextError || loadError" :title="loadError || 'No se pudieron cargar las opciones del producto.'" color="error" />
       <template v-else-if="context && !loading">
+        <UAlert v-if="product?.internal?.syncPending" title="Este producto tiene un guardado pendiente de conciliar." color="warning">
+          <template #actions>
+            <UButton label="Consultar y conciliar guardado" :loading="checking" @click="recover" />
+          </template>
+        </UAlert>
         <UAlert v-if="errorMessage" :title="errorMessage" color="error" />
         <div v-if="ambiguous" class="space-y-3 rounded-lg border border-warning p-4">
-          <UButton label="Consultar resultado en Siigo" :loading="checking" @click="check(productId)" />
+          <UButton label="Consultar resultado en Siigo" :loading="checking" @click="recover" />
           <div v-for="result in lookupResults" :key="result.id" class="space-y-1">
             <p>{{ result.code }} · {{ result.name }} · {{ result.active ? 'Activo' : 'Inactivo' }}</p>
             <UButton :to="{ path: `/productos/${result.id}`, query: { returnTo } }" label="Abrir producto para revisar" variant="outline" />
@@ -80,7 +89,7 @@ useSeoMeta({ title })
           :product="product"
           :context="context"
           :saving="saving"
-          :blocked="ambiguous"
+          :blocked="ambiguous || Boolean(product?.internal?.syncPending)"
           @submit="submit"
           @cancel="navigateTo(back)"
         />

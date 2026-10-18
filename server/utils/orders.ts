@@ -1,5 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { inventoryRequest, inventorySettings, syncOrderInventory, assertOrderInventoryEditable } from './inventory'
+import { captureInventoryRecipes } from './product-compositions'
+import { inventoryRecipeSchema } from '#shared/schemas/product'
 import Decimal from 'decimal.js'
 import { orderLineAmounts as lineAmounts, orderAmounts as orderTotals, orderMoney } from '#shared/utils/orderAmounts'
 import type { Prisma, SalesOrder } from '../../generated/prisma/client'
@@ -456,6 +458,7 @@ function detail(order: OrderDetailRecord): SalesOrderDetail {
       taxAmount: number(item.taxAmount),
       total: number(item.total),
       observations: item.observations,
+      inventoryRecipe: item.inventoryRecipe == null ? null : inventoryRecipeSchema.parse(item.inventoryRecipe),
       priceHistory: item.priceHistory.map(entry => ({
         id: entry.id.toString(),
         previousPrice: number(entry.previousPrice),
@@ -504,7 +507,7 @@ export async function createOrder(
   const prisma = usePrisma()
   const lines = input.lines.map((line, index) => {
     const product = products.get(line.productId)
-    if (!product || product.active === false) {
+    if (!product || product.active === false || (product.type !== undefined && product.type !== 'Product')) {
       throw createError({
         statusCode: 422,
         statusMessage: `El producto ${line.productId} ya no está disponible en Siigo.`
@@ -551,6 +554,7 @@ export async function createOrder(
 
   const createdOrderId = await inventoryRequest({ requestId: input.requestId ?? input.initialPayment?.requestId ?? randomUUID(), command: input }, user, async (tx) => {
     const settings = await inventorySettings(tx)
+    const recipes = await captureInventoryRecipes(tx, input.lines.map(l => l.productId))
     const order = await tx.salesOrder.create({
       data: {
         warehouseId: input.warehouseId ?? null,
@@ -593,6 +597,7 @@ export async function createOrder(
     await tx.salesOrderItem.createMany({
       data: lines.map(({ currencyCode: _currencyCode, catalogPrice: _catalogPrice, priceNote: _priceNote, priceOverridden: _priceOverridden, ...line }) => ({
         orderId: order.id,
+        inventoryRecipe: siigoJson(recipes.get(line.productId)),
         ...line
       }))
     })
@@ -691,7 +696,7 @@ export async function updateOrder(
 
   const lines = input.lines.map((line, index) => {
     const product = products.get(line.productId)
-    if (!product || (product.active === false && !existing.items.some(item => item.productId === product.id))) {
+    if (!product || ((product.active === false || (product.type !== undefined && product.type !== 'Product')) && !existing.items.some(item => item.productId === product.id))) {
       throw createError({
         statusCode: 422,
         statusMessage: `El producto ${line.productId} ya no está disponible en Siigo.`
@@ -724,6 +729,8 @@ export async function updateOrder(
     await tx.$queryRaw`SELECT id FROM sales_orders WHERE id = ${id}::uuid FOR UPDATE`
     await inventorySettings(tx)
     await assertOrderInventoryEditable(tx, id, input.lines, input.warehouseId)
+    const previousItems = await tx.salesOrderItem.findMany({ where: { orderId: id }, select: { productId: true, inventoryRecipe: true } })
+    const recipes = await captureInventoryRecipes(tx, input.lines.map(l => l.productId), previousItems)
     const result = await tx.salesOrder.updateMany({
       where: { id, version: input.version, statusKey: { not: 'entregado' } },
       data: {
@@ -770,6 +777,7 @@ export async function updateOrder(
     await tx.salesOrderItem.createMany({
       data: lines.map(({ currencyCode: _currencyCode, catalogPrice: _catalogPrice, priceNote: _priceNote, priceOverridden: _priceOverridden, ...line }) => ({
         orderId: id,
+        inventoryRecipe: siigoJson(recipes.get(line.productId)),
         ...line
       }))
     })
@@ -1000,6 +1008,10 @@ export async function updateOrderStatus(
       })
     }
     if (order.statusKey === status.key) return
+    if (order.statusKey === 'borrador' && !['borrador', 'cancelado'].includes(status.key)) {
+      const historicalLines = await tx.salesOrderItem.findMany({ where: { orderId: id }, select: { product: { select: { type: true } } } })
+      if (historicalLines.some(i => i.product.type !== null && i.product.type !== 'Product')) throw createError({ statusCode: 422, statusMessage: 'Reemplaza los combos y servicios históricos por productos antes de convertir la cotización en venta.' })
+    }
 
     const result = await tx.salesOrder.updateMany({
       where: { id, version: input.version },

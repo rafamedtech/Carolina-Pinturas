@@ -88,6 +88,7 @@ export interface OrderItemPriceHistoryEntry {
 }
 
 export interface SalesOrderItem {
+  inventoryRecipe?: Array<{ productId: string, quantity: string, code: string, name: string, unit: string | null }> | null
   id: string
   position: number
   productId: string

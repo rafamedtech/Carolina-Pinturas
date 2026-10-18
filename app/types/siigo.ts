@@ -1,4 +1,5 @@
 import type { ProductImage } from './siigo-products'
+import type { ProductComposition } from '#shared/schemas/product'
 
 export type UserRole = 'admin' | 'mostrador' | 'vendedor' | 'repartidor' | 'igualaciones'
 
@@ -72,7 +73,11 @@ export interface SiigoProduct {
   }>
   // App-owned data that Siigo does not provide.
   internal?: {
-    image: ProductImage | null
+    image?: ProductImage | null
+    composition?: Omit<ProductComposition, 'components'> & { components: Array<ProductComposition['components'][number] & { code?: string, name?: string, unit?: string | null }> }
+    syncPending?: boolean
+    pendingWriteId?: string
+    inventory?: { tracked: boolean, available: string | null }
   }
 }
 

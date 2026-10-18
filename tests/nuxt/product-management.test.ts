@@ -27,11 +27,27 @@ registerEndpoint('/api/siigo/products/sat', async () => {
   await new Promise(resolve => setTimeout(resolve, 10))
   return { results: [{ code: 'H87', name: 'Pieza' }], pagination: { page: 1, page_size: 25, total_results: 1 }, retrievedAt: '2026-09-15', source: 'https://example.com' }
 })
+const baseId = '00000000-0000-4000-8000-000000000002'
+registerEndpoint('/api/inventory/products', () => ({ results: [{ id: baseId, code: 'BASE', name: 'Producto base', unit: 'Pieza', enabled: true, version: 1 }], pagination: { totalPages: 1 } }))
 afterEach(() => {
   wrapper?.unmount()
 })
 
 describe('formulario de productos', () => {
+  it('edita y envía una composición fraccionaria sin exponer servicios ni control Siigo', async () => {
+    wrapper = await mountSuspended(ProductForm, { props: {
+      product: { ...product, internal: { composition: { kind: 'composite', version: 3, components: [{ productId: baseId, quantity: '0.25' }] } } }, context, saving: false, blocked: false
+    } })
+    await flushPromises()
+    expect(wrapper.text()).toContain('Producto compuesto')
+    expect(wrapper.text()).toContain('Producto base')
+    expect(wrapper.text()).not.toContain('Control de inventario en Siigo')
+    await wrapper.get('input[aria-label="Cantidad de Producto base"]').setValue('6')
+    await wrapper.find('form').trigger('submit')
+    await flushPromises()
+    expect(wrapper.emitted('submit')?.[0]?.[0]).toMatchObject({ type: 'Product', stock_control: false,
+      composition: { kind: 'composite', version: 3, components: [{ productId: baseId, quantity: '6' }] }, prices: product.prices })
+  })
   it('muestra campos, conserva monedas y bloquea envío mientras guarda', async () => {
     wrapper = await mountSuspended(ProductForm, { props: { product, context, saving: true, blocked: false } })
     expect(wrapper.text()).toContain('Información general')
@@ -45,7 +61,7 @@ describe('formulario de productos', () => {
     await flushPromises()
     expect(wrapper.emitted('submit')).toBeUndefined()
     expect(wrapper.text()).toContain('Escribe el código.')
-    expect(wrapper.text()).toContain('Selecciona una unidad SAT.')
+    expect(wrapper.text()).toContain('Selecciona una clave SAT de ocho dígitos.')
   })
   it('envía edición con los precios originales', async () => {
     wrapper = await mountSuspended(ProductForm, { props: { product, context, saving: false, blocked: false } })

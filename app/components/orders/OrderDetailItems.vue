@@ -290,6 +290,7 @@ const columns: TableColumn<SalesOrderItem>[] = [{
             <h3 class="font-semibold text-highlighted">
               {{ item.name }}
             </h3>
+            <OrdersOrderItemComposition :item="item" />
             <p class="text-sm text-muted">
               Unidad: {{ item.unit.name || item.unit.code || '—' }}
             </p>
@@ -393,7 +394,12 @@ const columns: TableColumn<SalesOrderItem>[] = [{
       :columns="columns"
       empty="El pedido no tiene partidas."
       class="hidden md:block"
-    />
+    >
+      <template #name-cell="{ row }">
+        <span>{{ row.original.name }}</span>
+        <OrdersOrderItemComposition :item="row.original" />
+      </template>
+    </UTable>
 
     <UModal v-model:open="editOpen" title="Editar precio">
       <template #body>

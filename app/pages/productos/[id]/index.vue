@@ -13,7 +13,7 @@ const { data: product, status, error, refresh } = useLazyFetch<SiigoProduct>(
   { key: () => `siigo-product-${productId.value}`, query: { refresh: 'true' } }
 )
 
-const MANAGED_TYPES = ['Product', 'Service', 'ConsumerGood']
+const MANAGED_TYPES = ['Product']
 
 const productName = computed(() => product.value?.name || 'Detalle de producto')
 const isManaged = computed(() => MANAGED_TYPES.includes(product.value?.type || 'Product'))
@@ -24,22 +24,19 @@ const unit = computed(() => {
 const prices = computed(() => product.value?.prices?.flatMap(price =>
   (price.price_list || []).map(item => ({ ...item, currency: price.currency_code || 'MXN' }))
 ) || [])
-const warehouseTotal = computed(() =>
-  product.value?.warehouses?.reduce((total, warehouse) => total + (warehouse.quantity ?? 0), 0) ?? 0
-)
 const message = computed(() => error.value?.data?.statusMessage || 'No fue posible cargar el producto.')
 
 const generalFields = computed(() => {
   const item = product.value
   if (!item) return []
   return [
+    { label: 'Tipo', value: item.internal?.composition?.kind === 'composite' ? 'Producto compuesto' : item.type === 'Product' || !item.type ? 'Producto' : item.type },
     { label: 'Creado', value: formatMexicoDateTime(item.metadata?.created) },
     { label: 'Última actualización', value: formatMexicoDateTime(item.metadata?.last_updated) },
     { label: 'Descripción', value: item.description, multiline: true },
     { label: 'Marca', value: item.additional_fields?.brand },
     { label: 'Grupo', value: item.account_group?.name },
-    { label: 'Control de inventario en Siigo', value: item.stock_control === undefined ? undefined : item.stock_control ? 'Controlado' : 'Sin control' },
-    { label: 'Existencia disponible en Siigo', value: formatQuantity(item.available_quantity) }
+    { label: 'Inventario interno', value: item.internal?.composition?.kind === 'composite' ? 'Control por componentes' : item.internal?.inventory?.tracked ? 'Controlado' : 'Sin control' }
   ]
 })
 const fiscalFields = computed(() => {
@@ -111,12 +108,18 @@ function formatQuantity(value?: number) {
         icon="i-lucide-plug-zap"
       />
 
-      <InventoryProductStock :product-id="productId" />
+      <InventoryProductStock v-if="product?.internal?.composition?.kind !== 'composite'" :product-id="productId" />
       <template v-if="product">
         <UAlert
+          v-if="product.internal?.syncPending"
+          title="Guardado pendiente de conciliación"
+          description="Este producto no está disponible para nuevas ventas hasta revisar su guardado desde Editar."
+          color="warning"
+        />
+        <UAlert
           v-if="!isManaged"
-          title="Este tipo de producto se administra directamente en Siigo."
-          description="Puedes consultar sus datos y componentes aquí."
+          title="Este tipo de producto se conserva para consulta histórica."
+          description="No está disponible para nuevas ventas."
           color="neutral"
         />
 
@@ -139,6 +142,22 @@ function formatQuantity(value?: number) {
 
         <div class="grid gap-4 lg:grid-cols-3">
           <div class="flex flex-col gap-4 lg:col-span-2">
+            <UCard v-if="product.internal?.composition?.kind === 'composite'">
+              <template #header>
+                <h2 class="font-semibold">
+                  Componentes por unidad
+                </h2>
+              </template>
+              <ul class="divide-y divide-default">
+                <li v-for="component in product.internal.composition.components" :key="component.productId" class="flex items-center justify-between gap-3 py-3 text-sm">
+                  <span>{{ component.code }} · {{ component.name ?? component.productId }}</span>
+                  <span class="shrink-0 font-medium tabular-nums">{{ component.quantity }} {{ component.unit }}</span>
+                </li>
+              </ul>
+              <p class="mt-3 text-sm text-muted">
+                Se reserva al confirmar el pedido y se descuenta al surtir. Este producto no tiene existencias propias.
+              </p>
+            </UCard>
             <UCard>
               <template #header>
                 <h2 class="font-semibold text-highlighted">
@@ -180,25 +199,6 @@ function formatQuantity(value?: number) {
               </div>
               <p v-else class="text-sm text-muted">
                 Sin precios registrados.
-              </p>
-            </UCard>
-
-            <UCard>
-              <template #header>
-                <h2 class="font-semibold text-highlighted">
-                  Existencia por almacén en Siigo
-                </h2>
-              </template>
-              <ul v-if="product.warehouses?.length" class="space-y-3">
-                <li v-for="warehouse in product.warehouses" :key="String(warehouse.id)" class="flex items-center justify-between gap-3 text-sm">
-                  <span>{{ warehouse.name || 'Almacén' }}</span><span class="font-medium">{{ formatQuantity(warehouse.quantity) }}</span>
-                </li>
-                <li class="flex items-center justify-between gap-3 border-t border-default pt-3 text-sm">
-                  <span class="text-muted">Total</span><span class="font-semibold text-highlighted">{{ formatQuantity(warehouseTotal) }}</span>
-                </li>
-              </ul>
-              <p v-else class="text-sm text-muted">
-                Sin almacenes registrados.
               </p>
             </UCard>
 

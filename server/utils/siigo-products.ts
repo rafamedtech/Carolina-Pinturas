@@ -45,7 +45,9 @@ export function normalizeProductList(input: unknown): SiigoListResponse<SiigoPro
 export function buildSiigoProductPayload(input: ProductInput, current?: SiigoProduct) {
   // Only writable fields, never spread an external response into a request.
   return {
-    ...input,
+    ...Object.fromEntries(Object.entries(input).filter(([key]) => key !== 'composition')),
+    type: 'Product',
+    stock_control: false,
     taxes: input.taxes.map(({ id }) => ({ id })),
     prices: input.prices.map(group => ({ currency_code: group.currency_code, price_list: group.price_list.map(({ position, value }) => ({ position, value })) })),
     additional_fields: {
@@ -136,8 +138,8 @@ export function filterProducts(products: SiigoProduct[], query: ProductQuery) {
 }
 export async function listProducts(query: ProductQuery) {
   if (query.refresh === 'true') invalidateProductCaches()
-  const { all, refresh: _refresh, ...filters } = query
-  if (all === 'true') {
+  const { all, refresh: _refresh, products_only: _productsOnly, simple_only: _simpleOnly, ...filters } = query
+  if (all === 'true' || query.products_only === 'true' || query.simple_only === 'true') {
     const catalog = query.active === 'true' ? await getActiveProducts() : await cachedSiigoCatalog('all-products', () => collectSiigoCatalog(async (page, size) => normalizeProductList(await siigoRequest<unknown>('/v1/products', { query: { page: String(page), page_size: String(size) } }))))
     const results = filterProducts(catalog.results, query)
     return { results, pagination: { page: 1, page_size: results.length, total_results: results.length } }
@@ -148,7 +150,7 @@ export async function listProducts(query: ProductQuery) {
 
 export async function mutateProduct(input: ProductInput | { active: boolean }, id?: string) {
   const current = id ? normalizeSiigoProduct(await siigoRequest<unknown>(`/v1/products/${encodeURIComponent(id)}`)) : undefined
-  if (current && !['Product', 'Service', 'ConsumerGood'].includes(current.type || 'Product')) throw createError({ statusCode: 422, statusMessage: 'Este tipo de producto se administra directamente en Siigo.' })
+  if (current && current.type !== undefined && current.type !== 'Product') throw createError({ statusCode: 422, statusMessage: 'Este tipo de producto se conserva solo para consulta histórica.' })
   const parsed = productInputSchema.safeParse('code' in input ? input : { ...productMutationInput(current), active: input.active })
   if (!parsed.success) throw createError({ statusCode: 422, statusMessage: 'Completa los datos del producto antes de guardarlo.', data: { issues: parsed.error.issues.map(issue => ({ path: issue.path, message: issue.message })) } })
   if ('code' in input) await validateProductReferences(parsed.data, current)

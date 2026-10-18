@@ -65,6 +65,8 @@ model SiigoProduct {
   accountGroupId    Int?      @map("account_group_id")
   accountGroupName  String?   @map("account_group_name")
   type              String?   @db.VarChar(64)
+  internalKind      String    @default("product") @map("internal_kind") @db.VarChar(16)
+  compositionVersion Int      @default(1) @map("composition_version")
   stockControl      Boolean?  @map("stock_control")
   active            Boolean?
   taxIncluded       Boolean?  @map("tax_included")
@@ -92,6 +94,8 @@ model SiigoProduct {
   taxes      SiigoProductTax[]
   warehouses SiigoProductWarehouse[]
   components SiigoProductComponent[]
+  internalComponents ProductComponent[] @relation("composite_product")
+  usedInComponents ProductComponent[] @relation("component_product")
   inventoryProduct InventoryProduct?
   inventoryBalances InventoryBalance[]
   inventoryReservations InventoryReservation[]
@@ -118,6 +122,33 @@ model SiigoProductPrice {
 
   @@unique([productId, currencyCode, position])
   @@map("siigo_product_prices")
+}
+
+model ProductComponent {
+  productId String @map("product_id") @db.Uuid
+  componentId String @map("component_id") @db.Uuid
+  quantity Decimal @db.Decimal(20, 6)
+  product SiigoProduct @relation("composite_product", fields: [productId], references: [id], onDelete: Restrict)
+  component SiigoProduct @relation("component_product", fields: [componentId], references: [id], onDelete: Restrict)
+
+  @@id([productId, componentId])
+  @@index([componentId])
+  @@map("product_components")
+}
+
+// Durable intent survives an ambiguous remote write or a failed local commit.
+model ProductWrite {
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  productId String? @map("product_id") @db.Uuid
+  isNew Boolean @default(false) @map("is_new")
+  code String @db.VarChar(30)
+  input Json @db.JsonB
+  state String @default("pending") @db.VarChar(16)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@index([productId])
+  @@map("product_writes")
 }
 
 model SiigoProductTax {
@@ -422,6 +453,7 @@ model SalesOrderItem {
   unitCodeSnapshot           String?  @map("unit_code_snapshot")
   unitNameSnapshot           String?  @map("unit_name_snapshot")
   productPayload             Json     @map("product_payload") @db.JsonB
+  inventoryRecipe            Json?    @map("inventory_recipe") @db.JsonB
   quantity                   Decimal  @db.Decimal(20, 6)
   unitPrice                  Decimal  @map("unit_price") @db.Decimal(20, 6)
   taxIncluded                Boolean  @default(false) @map("tax_included")
@@ -443,6 +475,7 @@ model SalesOrderItem {
   @@unique([orderId, position])
   @@index([productId])
   @@map("sales_order_items")
+  @@index([inventoryRecipe], type: Gin, map: "sales_order_items_inventory_recipe_idx")
 }
 
 model SalesOrderItemPriceHistory {

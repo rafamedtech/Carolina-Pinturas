@@ -13,7 +13,7 @@ const { data: suppliers, error: supplierError, status: supplierStatus } = useFet
   server: false
 })
 const { data: products, error: productError, status: productStatus } = useFetch<SiigoListResponse<SiigoProduct>>('/api/siigo/products', {
-  query: { all: 'true', active: 'true' },
+  query: { all: 'true', active: 'true', simple_only: 'true' },
   lazy: true,
   server: false
 })

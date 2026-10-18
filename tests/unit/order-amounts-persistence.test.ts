@@ -3,6 +3,8 @@ import { createOrder } from '../../server/utils/orders'
 import { createOrderSchema } from '../../server/utils/order-validation'
 import type { AppUser, SiigoProduct } from '../../app/types/siigo'
 
+vi.mock('../../server/utils/product-compositions', () => ({ captureInventoryRecipes: async (_tx: unknown, ids: string[]) => new Map(ids.map(id => [id, [{ productId: id, quantity: '1', code: 'PIN', name: 'Pintura', unit: null }]])) }))
+
 const mocks = vi.hoisted(() => ({
   order: vi.fn(), items: vi.fn(), payment: vi.fn(), history: vi.fn()
 }))

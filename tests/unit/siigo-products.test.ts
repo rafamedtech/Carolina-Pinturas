@@ -40,6 +40,20 @@ beforeEach(() => {
 })
 
 describe('contrato de productos México', () => {
+  it('escribe simples y compuestos exclusivamente como Product sin control de inventario en Siigo', () => {
+    const composite = { ...input(), composition: { kind: 'composite' as const, version: 1, components: [{ productId: id, quantity: '0.25' }] } }
+    const payload = buildSiigoProductPayload(composite)
+    expect(payload).toMatchObject({ type: 'Product', stock_control: false })
+    expect(payload).not.toHaveProperty('composition')
+    expect(payload).not.toHaveProperty('components')
+    expect(productInputSchema.safeParse({ ...input(), type: 'Service' }).success).toBe(false)
+    expect(productInputSchema.safeParse({ ...input(), stock_control: true }).success).toBe(false)
+  })
+  it('valida una receta con cantidades de base 0.25, 0.5 y 6; rechaza vacíos, repetidos y exceso de precisión', () => {
+    for (const quantity of ['0.25', '0.5', '6']) expect(productInputSchema.safeParse({ ...input(), composition: { kind: 'composite', version: 1, components: [{ productId: id, quantity }] } }).success).toBe(true)
+    for (const components of [[], [{ productId: id, quantity: '0' }], [{ productId: id, quantity: '-1' }], [{ productId: id, quantity: '0.0000001' }], [{ productId: id, quantity: '1' }, { productId: id, quantity: '2' }]]) expect(productInputSchema.safeParse({ ...input(), composition: { kind: 'composite', version: 1, components } }).success).toBe(false)
+    expect(productInputSchema.safeParse({ ...input(), composition: { kind: 'product', version: 1, components: [{ productId: id, quantity: '1' }] } }).success).toBe(false)
+  })
   it('normaliza clave SAT string, números string y unidad objeto', () => {
     expect(normalizeSiigoProduct({ ...external, available_quantity: '20', key: '31211500' })).toMatchObject({ key: { code: '31211500' }, available_quantity: 20 })
     expect(normalizeSiigoProduct({ ...external, unit: 'H87' }).unit).toEqual({ code: 'H87' })

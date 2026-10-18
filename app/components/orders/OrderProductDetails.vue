@@ -27,7 +27,7 @@ const details = computed(() => [
     label: 'Unidad',
     value: siigoProductUnit(product.value) || '—'
   },
-  { label: 'Tipo', value: product.value.type || '—' },
+  { label: 'Tipo', value: product.value.internal?.composition?.kind === 'composite' ? 'Producto compuesto' : 'Producto' },
   { label: 'Marca', value: product.value.additional_fields?.brand || '—' },
   {
     label: 'Grupo contable',
@@ -36,10 +36,11 @@ const details = computed(() => [
 ])
 const detailOpen = ref(false)
 const availability = computed(() => {
-  if (!product.value.stock_control) return 'Sin control de inventario'
-  if (product.value.available_quantity === undefined) return 'No disponible'
-
-  return `${product.value.available_quantity.toLocaleString('es-MX')} unidades`
+  if (product.value.internal?.composition?.kind === 'composite') return 'Según componentes y almacén'
+  const inventory = product.value.internal?.inventory
+  if (!inventory) return 'Consulta el inventario interno'
+  if (!inventory.tracked) return 'Sin control interno'
+  return `${inventory.available ?? '—'} unidades en total`
 })
 
 function formatCurrency(value?: number | string, currencyCode = 'MXN') {
@@ -113,19 +114,19 @@ function formatCurrency(value?: number | string, currencyCode = 'MXN') {
           </div>
         </dl>
 
-        <div v-if="product.warehouses?.length" class="mt-4 border-t border-default pt-4">
+        <div v-if="product.internal?.composition?.kind === 'composite'" class="mt-4 border-t border-default pt-4">
           <h4 class="text-sm font-medium text-highlighted">
-            Existencia por almacén
+            Componentes por unidad
           </h4>
           <ul class="mt-2 space-y-2">
             <li
-              v-for="warehouse in product.warehouses"
-              :key="String(warehouse.id || warehouse.name)"
+              v-for="component in product.internal.composition.components"
+              :key="component.productId"
               class="flex items-center justify-between gap-3 text-sm"
             >
-              <span class="text-muted">{{ warehouse.name || 'Almacén' }}</span>
+              <span class="text-muted">{{ component.code }} · {{ component.name ?? component.productId }}</span>
               <span class="font-medium tabular-nums text-highlighted">
-                {{ warehouse.quantity?.toLocaleString('es-MX') ?? '—' }}
+                {{ component.quantity }} {{ component.unit }}
               </span>
             </li>
           </ul>

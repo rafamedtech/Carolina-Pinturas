@@ -5,8 +5,10 @@ export function productMutationInput(product?: SiigoProduct): ProductInput {
   return {
     code: product?.code ?? '', name: product?.name ?? '',
     account_group: Number(product?.account_group?.id ?? 0),
-    type: (product?.type ?? 'Product') as ProductInput['type'],
-    active: product?.active ?? true, stock_control: product?.stock_control ?? false,
+    type: 'Product',
+    composition: { kind: product?.internal?.composition?.kind ?? 'product', version: product?.internal?.composition?.version ?? 1,
+      components: (product?.internal?.composition?.components ?? []).map(c => ({ ...c })) },
+    active: product?.active ?? true, stock_control: false,
     tax_included: product?.tax_included ?? false,
     unit: product
       ? (typeof product.unit === 'string' ? product.unit : product.unit?.code ?? '')

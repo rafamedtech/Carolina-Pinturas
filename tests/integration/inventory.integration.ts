@@ -15,15 +15,18 @@ const require = createRequire(import.meta.url)
 const { PrismaPg } = require('@prisma/adapter-pg') as typeof import('@prisma/adapter-pg')
 const { Client } = require('pg') as typeof import('pg')
 
-const mocks = vi.hoisted(() => ({ db: vi.fn(), supplier: vi.fn(), product: vi.fn() }))
+const mocks = vi.hoisted(() => ({ db: vi.fn(), supplier: vi.fn(), product: vi.fn(), mutation: vi.fn(), list: vi.fn() }))
 vi.mock('../../server/utils/prisma', () => ({ usePrisma: mocks.db }))
 vi.mock('../../server/utils/siigo-customer-detail', () => ({ getSiigoCustomerDetail: mocks.supplier }))
-vi.mock('../../server/utils/siigo-products', () => ({ getProductDetail: mocks.product }))
+vi.mock('../../server/utils/siigo-products', () => ({ getProductDetail: mocks.product, mutateProduct: mocks.mutation, validateProductReferences: vi.fn(), listProducts: mocks.list }))
 vi.stubGlobal('createError', createError)
-const { executeInventory, listInventory } = await import('../../server/utils/inventory')
+const { executeInventory, listInventory, orderInventoryView } = await import('../../server/utils/inventory')
 const { createOrder, updateOrder, updateOrderStatus, updateOrderItemQuantity } = await import('../../server/utils/orders')
 const { createPurchase, mutatePurchase } = await import('../../server/utils/purchases')
 const { persistProductCatalog } = await import('../../server/utils/product-catalog-persistence')
+const { saveManagedProduct, recoverProductWrite } = await import('../../server/utils/managed-products')
+const { attachProductCompositions, validateComposition } = await import('../../server/utils/product-compositions')
+const { productMutationInput } = await import('../../app/utils/siigoProductMutation')
 const url = process.env.INVENTORY_TEST_DATABASE_URL
 const suite = url ? describe : describe.skip
 suite('inventario: PostgreSQL aislado, sin conexión Siigo', () => {
@@ -46,6 +49,12 @@ suite('inventario: PostgreSQL aislado, sin conexión Siigo', () => {
   }
   async function entry(productId: string, quantity = '10', warehouseId = a) {
     return command({ action: 'move', type: 'entrada', warehouseId, date: today, reason: 'Entrada de prueba', lines: [{ productId, quantity }] })
+  }
+  async function composite(components: Array<{ productId: string, quantity: string }>) {
+    const id = await product()
+    await db.siigoProduct.update({ where: { id }, data: { internalKind: 'composite', internalComponents: { create: components.map(c => ({ componentId: c.productId, quantity: c.quantity })) } } })
+    await db.inventoryProduct.update({ where: { productId: id }, data: { enabled: false } })
+    return id
   }
   async function sale(productId: string, quantity: number, statusKey = 'confirmado', direct = false, requestId = randomUUID(), paid = false) {
     const p = await db.siigoProduct.findUniqueOrThrow({ where: { id: productId } })
@@ -74,6 +83,9 @@ suite('inventario: PostgreSQL aislado, sin conexión Siigo', () => {
       await setup.query(readFileSync('supabase/migrations/20261006183611_product_inventory_cost.sql', 'utf8'))
       const migration = readFileSync('supabase/migrations/20261005171346_internal_inventory.sql', 'utf8')
       await setup.query(migration.slice(migration.indexOf('INSERT INTO public.inventory_settings')))
+      // Apply the additive composition migration to a genuine previous schema.
+      await setup.query('DROP TABLE product_components, product_writes; ALTER TABLE siigo_products DROP COLUMN internal_kind, DROP COLUMN composition_version; ALTER TABLE sales_order_items DROP COLUMN inventory_recipe;')
+      await setup.query(readFileSync('supabase/migrations/20261018190553_internal_product_compositions.sql', 'utf8'))
     } finally { await setup.end() }
     db = new PrismaClient({ adapter: new PrismaPg({ connectionString: target.toString(), max: 8 }) })
     mocks.db.mockReturnValue(db)
@@ -267,7 +279,7 @@ suite('inventario: PostgreSQL aislado, sin conexión Siigo', () => {
     await transition(order.id, 'entregado')
     expect(await db.inventoryMovement.count({ where: { orderId: order.id, type: 'surtido' } })).toBe(1)
   })
-  it('agrupa partidas repetidas y permite pedidos de servicios sin almacén ni existencias', async () => {
+  it('agrupa partidas repetidas y excluye servicios de nuevas ventas', async () => {
     const id = await product()
     await entry(id, '5')
     const snapshot: SiigoProduct = { id, code: id.slice(0, 8), name: 'Pintura duplicada', active: true, prices: [{ currency_code: 'MXN', price_list: [{ position: 1, value: 10 }] }] }
@@ -281,10 +293,7 @@ suite('inventario: PostgreSQL aislado, sin conexión Siigo', () => {
     const dispatched = await db.salesOrder.findUniqueOrThrow({ where: { id: order.id } })
     await expect(updateOrder(order.id, updateOrderSchema.parse({ customerId: customer.id, repartidorId: courier.id, warehouseId: a, version: dispatched.version, orderDate: today, lines: [{ productId: id, quantity: 1 }, { productId: id, quantity: 4 }] }), user, customer, new Map([[id, snapshot]]), courier)).rejects.toThrow('después del surtido')
     const service: SiigoProduct = { ...snapshot, id: serviceProduct, code: 'SERV', type: 'Service' }
-    const serviceOrder = await createOrder(createOrderSchema.parse({ ...input, requestId: randomUUID(), warehouseId: null, lines: [{ productId: serviceProduct, quantity: 1 }] }), user, customer, new Map([[serviceProduct, service]]), courier)
-    await transition(serviceOrder.id, 'entregado')
-    expect(await db.inventoryReservation.count({ where: { orderId: serviceOrder.id } })).toBe(0)
-    expect(await db.inventoryMovement.count({ where: { orderId: serviceOrder.id } })).toBe(0)
+    await expect(createOrder(createOrderSchema.parse({ ...input, requestId: randomUUID(), warehouseId: null, lines: [{ productId: serviceProduct, quantity: 1 }] }), user, customer, new Map([[serviceProduct, service]]), courier)).rejects.toMatchObject({ statusCode: 422 })
   })
   it('cancelar no devuelve stock; devoluciones parciales están limitadas a lo surtido', async () => {
     const id = await product()
@@ -454,6 +463,216 @@ suite('inventario: PostgreSQL aislado, sin conexión Siigo', () => {
     await expect(command({ action: 'warehouse', id: a, version: w.version, code: w.code, name: w.name, address: '', active: false })).rejects.toThrow()
     await expect(command({ action: 'move', type: 'entrada', warehouseId: a, date: today, reason: 'Sin permiso', lines: [{ productId: id, quantity: '1' }] }, { ...user, role: 'vendedor' })).rejects.toThrow()
   })
+  it('permite cotizar antes de activar, bloquea confirmar y surtir, y después usa la receta original', async () => {
+    const base = await product()
+    await entry(base, '20')
+    const kit = await composite([{ productId: base, quantity: '0.25' }])
+    const settings = await db.inventorySettings.findUniqueOrThrow({ where: { id: 1 } })
+    let quote!: Awaited<ReturnType<typeof sale>>
+    let editedQuote!: Awaited<ReturnType<typeof sale>>
+    await db.inventorySettings.update({ where: { id: 1 }, data: { enabledAt: null } })
+    try {
+      quote = await sale(kit, 2, 'borrador')
+      expect(quote.inventoryManaged).toBe(true)
+      expect((await orderInventoryView(quote.id)).activationRequired).toBe(true)
+      expect((await balance(base)).reserved.toString()).toBe('0')
+      const orderCount = await db.salesOrder.count()
+      const paymentCount = await db.salesOrderPayment.count()
+      for (const status of ['confirmado', 'surtido', 'en_camino', 'entregado']) {
+        await expect(sale(kit, 1, status)).rejects.toThrow('Activa el inventario interno')
+        await expect(transition(quote.id, status)).rejects.toThrow('Activa el inventario interno')
+      }
+      await expect(sale(kit, 1, 'ingresado', true, randomUUID(), true)).rejects.toThrow('Activa el inventario interno')
+      expect(await db.salesOrder.count()).toBe(orderCount)
+      expect(await db.salesOrderPayment.count()).toBe(paymentCount)
+      expect((await db.salesOrder.findUniqueOrThrow({ where: { id: quote.id } })).statusKey).toBe('borrador')
+      expect(await db.inventoryMovement.count({ where: { orderId: quote.id } })).toBe(0)
+      expect(await db.inventoryReservation.count({ where: { orderId: quote.id } })).toBe(0)
+
+      // Adding a compound to an older quotation also opts the order into tracking.
+      const simpleQuote = await sale(base, 1, 'borrador')
+      expect(simpleQuote.inventoryManaged).toBe(false)
+      const p = await db.siigoProduct.findUniqueOrThrow({ where: { id: kit } })
+      const snapshot: SiigoProduct = { id: kit, code: p.code, name: p.name, type: 'Product', prices: [{ currency_code: 'MXN', price_list: [{ position: 1, value: 10 }] }] }
+      editedQuote = await updateOrder(simpleQuote.id, updateOrderSchema.parse({ customerId: customer.id, repartidorId: courier.id, warehouseId: a, version: simpleQuote.version, orderDate: today, lines: [{ productId: kit, quantity: 1 }] }), user, customer, new Map([[kit, snapshot]]), courier)
+      expect(editedQuote.inventoryManaged).toBe(true)
+      await expect(transition(editedQuote.id, 'confirmado')).rejects.toThrow('Activa el inventario interno')
+      await db.productComponent.update({ where: { productId_componentId: { productId: kit, componentId: base } }, data: { quantity: '6' } })
+      await command({ action: 'activate', version: settings.version })
+    } finally {
+      const current = await db.inventorySettings.findUniqueOrThrow({ where: { id: 1 } })
+      if (!current.enabledAt) await db.inventorySettings.update({ where: { id: 1 }, data: { enabledAt: settings.enabledAt } })
+    }
+    expect((await orderInventoryView(quote.id)).activationRequired).toBe(false)
+    await transition(quote.id, 'confirmado')
+    expect((await balance(base)).reserved.toString()).toBe('0.5')
+    await transition(editedQuote.id, 'confirmado')
+    expect((await balance(base)).reserved.toString()).toBe('0.75')
+    await transition(quote.id, 'surtido')
+    expect((await balance(base)).quantity.toString()).toBe('19.5')
+    await transition(editedQuote.id, 'cancelado')
+    expect((await balance(base)).reserved.toString()).toBe('0')
+  })
+  it('un kit reserva componentes fraccionarios y comparte el saldo con productos vendidos directamente', async () => {
+    const base = await product(), accessory = await product()
+    await entry(base, '10')
+    await entry(accessory, '30')
+    const kit = await composite([{ productId: base, quantity: '0.25' }, { productId: accessory, quantity: '6' }])
+    const snapshots = new Map<string, SiigoProduct>()
+    for (const id of [base, kit]) {
+      const p = await db.siigoProduct.findUniqueOrThrow({ where: { id } })
+      snapshots.set(id, { id, code: p.code, name: p.name, type: 'Product', prices: [{ currency_code: 'MXN', price_list: [{ position: 1, value: 20 }] }] })
+    }
+    const order = await createOrder(createOrderSchema.parse({ customerId: customer.id, repartidorId: courier.id, warehouseId: a, statusKey: 'confirmado', orderDate: today, lines: [{ productId: kit, quantity: 2 }, { productId: base, quantity: 1 }] }), user, customer, snapshots, courier)
+    expect((await balance(base)).reserved.toString()).toBe('1.5')
+    expect((await balance(accessory)).reserved.toString()).toBe('12')
+    expect((await balance(kit)).reserved.toString()).toBe('0')
+    const view = await orderInventoryView(order.id)
+    expect(view.stocks.map(s => s.productId).sort()).toEqual([base, accessory].sort())
+    await transition(order.id, 'cancelado')
+    expect((await balance(base)).reserved.toString()).toBe('0')
+    expect((await balance(base)).quantity.toString()).toBe('10')
+    await transition(order.id, 'confirmado')
+    await transition(order.id, 'surtido')
+    await transition(order.id, 'entregado')
+    expect((await balance(base)).quantity.toString()).toBe('8.5')
+    expect((await balance(accessory)).quantity.toString()).toBe('18')
+    expect((await balance(kit)).quantity.toString()).toBe('0')
+    const dispatch = await db.inventoryMovement.findUniqueOrThrow({ where: { originKey: `order:${order.id}:dispatch` }, include: { lines: true } })
+    expect(dispatch.lines).toHaveLength(2)
+    expect(dispatch.lines.some(l => l.productId === kit)).toBe(false)
+    await command({ action: 'return', sourceMovementId: dispatch.id, warehouseId: a, date: today, reason: 'Devolución parcial del kit', lines: [{ productId: base, quantity: '0.25' }, { productId: accessory, quantity: '6' }] })
+    expect((await balance(base)).quantity.toString()).toBe('8.75')
+    expect((await balance(accessory)).quantity.toString()).toBe('24')
+  })
+  it('conserva la receta al editar cantidades y al cambiar el catálogo; pedidos nuevos usan la nueva composición', async () => {
+    const base = await product()
+    await entry(base, '20')
+    const kit = await composite([{ productId: base, quantity: '0.5' }])
+    const order = await sale(kit, 1, 'borrador')
+    await db.productComponent.update({ where: { productId_componentId: { productId: kit, componentId: base } }, data: { quantity: '6' } })
+    const p = await db.siigoProduct.findUniqueOrThrow({ where: { id: kit } })
+    const snapshot: SiigoProduct = { id: kit, code: p.code, name: p.name, type: 'Product', prices: [{ currency_code: 'MXN', price_list: [{ position: 1, value: 10 }] }] }
+    await persistProductCatalog(db, [snapshot])
+    const saved = await updateOrder(order.id, updateOrderSchema.parse({ customerId: customer.id, repartidorId: courier.id, warehouseId: a, version: order.version, orderDate: today, lines: [{ productId: kit, quantity: 2 }] }), user, customer, new Map([[kit, snapshot]]), courier)
+    expect(saved.items[0]!.inventoryRecipe?.[0]?.quantity).toBe('0.5')
+    await transition(order.id, 'confirmado')
+    expect((await balance(base)).reserved.toString()).toBe('1')
+    const fresh = await sale(kit, 1)
+    expect(fresh.items[0]!.inventoryRecipe?.[0]?.quantity).toBe('6')
+    expect((await balance(base)).reserved.toString()).toBe('7')
+    await transition(order.id, 'surtido')
+    expect((await balance(base)).quantity.toString()).toBe('19')
+    await transition(fresh.id, 'cancelado')
+  })
+  it('falta de un componente revierte el pedido entero y dos ventas simultáneas no sobre-reservan', async () => {
+    const base = await product(), absent = await product()
+    await entry(base, '10')
+    const incomplete = await composite([{ productId: base, quantity: '1' }, { productId: absent, quantity: '1' }])
+    const before = await db.salesOrder.count()
+    await expect(sale(incomplete, 1)).rejects.toThrow('disponibilidad')
+    expect(await db.salesOrder.count()).toBe(before)
+    expect((await balance(base)).reserved.toString()).toBe('0')
+    const kit = await composite([{ productId: base, quantity: '6' }])
+    const results = await Promise.allSettled([sale(kit, 1), sale(kit, 1)])
+    expect(results.filter(r => r.status === 'fulfilled')).toHaveLength(1)
+    expect((await balance(base)).reserved.toString()).toBe('6')
+    const winner = results.find(r => r.status === 'fulfilled') as PromiseFulfilledResult<Awaited<ReturnType<typeof sale>>>
+    await transition(winner.value.id, 'cancelado')
+  })
+  it('no redondea silenciosamente consumos menores que la precisión del inventario', async () => {
+    const base = await product()
+    await entry(base, '1')
+    const kit = await composite([{ productId: base, quantity: '0.000001' }])
+    await expect(sale(kit, 0.000001)).rejects.toThrow('6 decimales')
+    expect((await balance(base)).reserved.toString()).toBe('0')
+  })
+  it('impide anidados, auto-referencias, componentes sin control y desactivar componentes históricos pendientes', async () => {
+    const base = await product(), other = await product()
+    const kit = await composite([{ productId: base, quantity: '0.25' }])
+    await expect(db.$transaction(tx => validateComposition(tx, { kind: 'composite', version: 1, components: [{ productId: kit, quantity: '1' }] }, other))).rejects.toThrow('simples')
+    await expect(db.$transaction(tx => validateComposition(tx, { kind: 'composite', version: 1, components: [{ productId: other, quantity: '1' }] }, other))).rejects.toThrow('sí mismo')
+    await command({ action: 'tracking', productId: other, enabled: false, version: 1 })
+    await expect(db.productComponent.create({ data: { productId: kit, componentId: other, quantity: '1' } })).rejects.toThrow()
+    const quote = await sale(kit, 1, 'borrador')
+    await db.productComponent.deleteMany({ where: { productId: kit } })
+    await db.productComponent.create({ data: { productId: kit, componentId: initialProduct, quantity: '1' } })
+    await expect(command({ action: 'tracking', productId: base, enabled: false, version: 1 })).rejects.toThrow('pedidos abiertos')
+    await transition(quote.id, 'cancelado')
+    await command({ action: 'tracking', productId: base, enabled: false, version: 1 })
+    await expect(command({ action: 'tracking', productId: kit, enabled: true, version: 1 })).rejects.toThrow('existencias propias')
+    await expect(entry(kit)).rejects.toThrow('simples')
+    mocks.product.mockResolvedValue({ id: kit, code: 'KIT', name: 'Kit', type: 'Product', active: true })
+    await expect(createPurchase({ requestId: randomUUID(), draft: { vatRate: 0, providerId: customer.id, date: today, currencyCode: 'MXN', notes: '', items: [{ productId: kit, quantity: 1, unitCost: 10 }] } }, user)).rejects.toThrow('simples')
+  })
+  it('guarda el intento antes de Siigo y concilia un alta ambigua sin repetir la escritura externa', async () => {
+    const base = await product()
+    const id = randomUUID()
+    const remote: SiigoProduct = { id, code: `KIT-${id.slice(0, 8)}`, name: 'Kit conciliable', type: 'Product', active: true, stock_control: false, unit: { code: 'H87' }, key: { code: '31211500' }, account_group: { id: 10 } }
+    const input = { ...productMutationInput(remote), composition: { kind: 'composite' as const, version: 1, components: [{ productId: base, quantity: '0.25' }] } }
+    mocks.mutation.mockRejectedValueOnce(createError({ statusCode: 504, data: { ambiguous: true } }))
+    let operationId = ''
+    try {
+      await saveManagedProduct(input)
+    } catch (error) {
+      operationId = (error as { data: { operationId: string } }).data.operationId
+    }
+    expect(operationId).not.toBe('')
+    expect((await db.productWrite.findUniqueOrThrow({ where: { id: operationId } })).state).toBe('unknown')
+    await expect(saveManagedProduct(input)).rejects.toThrow('pendiente')
+    await persistProductCatalog(db, [remote])
+    expect((await attachProductCompositions(db, [remote]))[0]?.internal?.syncPending).toBe(true)
+    await expect(sale(id, 1, 'borrador')).rejects.toThrow('pendiente')
+    mocks.list.mockResolvedValue({ results: [remote] })
+    mocks.product.mockResolvedValue({ ...remote, name: 'Otro resultado' })
+    await expect(recoverProductWrite(operationId)).rejects.toThrow('no refleja')
+    mocks.product.mockResolvedValue(remote)
+    const recovered = await recoverProductWrite(operationId)
+    expect(recovered.internal?.composition).toMatchObject({ kind: 'composite', components: [{ productId: base, quantity: '0.25' }] })
+    expect(recovered.internal?.syncPending).toBe(false)
+    expect((await db.inventoryProduct.findUniqueOrThrow({ where: { productId: id } })).enabled).toBe(false)
+    expect(mocks.mutation).toHaveBeenCalledTimes(1)
+    await recoverProductWrite(operationId)
+    expect((await db.siigoProduct.findUniqueOrThrow({ where: { id } })).compositionVersion).toBe(2)
+  })
+  it('un fallo del commit local después del alta Siigo mantiene el bloqueo y se puede conciliar después', async () => {
+    const base = await product(), id = randomUUID()
+    const remote: SiigoProduct = { id, code: `REC-${id.slice(0, 8)}`, name: 'Resultado externo', type: 'Product', active: true, stock_control: false, unit: { code: 'H87' }, key: { code: '31211500' }, account_group: { id: 10 } }
+    const input = { ...productMutationInput(remote), composition: { kind: 'composite' as const, version: 1, components: [{ productId: base, quantity: '0.5' }] } }
+    mocks.mutation.mockImplementationOnce(async () => {
+      await db.inventoryProduct.update({ where: { productId: base }, data: { enabled: false } })
+      return remote
+    })
+    let operationId = ''
+    try {
+      await saveManagedProduct(input)
+    } catch (error) {
+      operationId = (error as { data: { operationId: string } }).data.operationId
+    }
+    expect(operationId).not.toBe('')
+    expect(await db.siigoProduct.findUnique({ where: { id } })).toBeNull()
+    expect((await db.productWrite.findUniqueOrThrow({ where: { id: operationId } })).state).toBe('unknown')
+    await db.inventoryProduct.update({ where: { productId: base }, data: { enabled: true } })
+    mocks.product.mockResolvedValue(remote)
+    const recovered = await recoverProductWrite(operationId)
+    expect(recovered.internal?.composition?.kind).toBe('composite')
+  })
+  it('permite cambiar tipo sin dependencias y rechaza versiones obsoletas, saldos y pedidos abiertos', async () => {
+    const base = await product(), target = await product()
+    const remote: SiigoProduct = { id: target, code: target.slice(0, 8), name: 'Conversión', type: 'Product', active: true, stock_control: false, unit: { code: 'H87' }, key: { code: '31211500' }, account_group: { id: 10 } }
+    mocks.product.mockResolvedValue(remote)
+    mocks.mutation.mockResolvedValue(remote)
+    const input = { ...productMutationInput(remote), composition: { kind: 'composite' as const, version: 1, components: [{ productId: base, quantity: '6' }] } }
+    await saveManagedProduct(input, target)
+    expect((await db.siigoProduct.findUniqueOrThrow({ where: { id: target } })).internalKind).toBe('composite')
+    await expect(saveManagedProduct(input, target)).rejects.toThrow('cambió')
+    const quote = await sale(target, 1, 'borrador')
+    await expect(db.$transaction(tx => validateComposition(tx, { kind: 'product', version: 2, components: [] }, target))).rejects.toThrow('pedidos abiertos')
+    await transition(quote.id, 'cancelado')
+    const withStock = await product()
+    await entry(withStock)
+    await expect(db.$transaction(tx => validateComposition(tx, { ...input.composition, version: 1 }, withStock))).rejects.toThrow('existencias')
+  })
   it('el kardex reconstruye existencias y las reservas coinciden; SQL protege historial y acceso directo', async () => {
     const balances = await db.inventoryBalance.findMany()
     for (const row of balances) {
@@ -467,6 +686,10 @@ suite('inventario: PostgreSQL aislado, sin conexión Siigo', () => {
       await expect(db.$transaction(async (tx) => {
         await tx.$executeRawUnsafe(`SET LOCAL ROLE ${role}`)
         return tx.inventoryBalance.findMany()
+      })).rejects.toThrow()
+      for (const table of ['product_components', 'product_writes']) await expect(db.$transaction(async (tx) => {
+        await tx.$executeRawUnsafe(`SET LOCAL ROLE ${role}`)
+        return tx.$queryRawUnsafe(`SELECT * FROM ${table}`)
       })).rejects.toThrow()
     }
   })

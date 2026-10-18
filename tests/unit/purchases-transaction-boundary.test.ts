@@ -78,6 +78,9 @@ describe('compras: límite de la transacción', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     const tx = {
+      $queryRaw: vi.fn(),
+      siigoProduct: { findMany: vi.fn().mockResolvedValue([{ ...product, internalKind: 'product' }]) },
+      productWrite: { count: vi.fn().mockResolvedValue(0) },
       purchaseOrder: {
         updateMany: vi.fn().mockResolvedValue({ count: 1 }),
         findUniqueOrThrow: vi.fn().mockResolvedValue(row),

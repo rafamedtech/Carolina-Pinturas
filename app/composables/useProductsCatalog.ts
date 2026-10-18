@@ -9,7 +9,7 @@ export function useProductsCatalog() {
   // este fetch y lo deja consistente en ambos lados desde el arranque.
   const { data, status, error, refresh } = useFetch<SiigoListResponse<SiigoProduct>>('/api/siigo/products', {
     key: 'products-catalog-request',
-    query: { all: 'true' },
+    query: { all: 'true', products_only: 'true' },
     lazy: true,
     server: false
   })
@@ -21,7 +21,7 @@ export function useProductsCatalog() {
   useTrackSiigoLoading(status)
 
   async function refreshCatalog() {
-    await $fetch('/api/siigo/products', { query: { all: 'true', refresh: 'true' } })
+    await $fetch('/api/siigo/products', { query: { all: 'true', products_only: 'true', refresh: 'true' } })
     await refresh()
 
     if (data.value) {

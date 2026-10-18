@@ -45,6 +45,12 @@ function showKardex(row: InventoryStock) {
         </UBadge>
       </div>
     </template><UAlert v-if="loadError || error" :title="error || 'No se pudo cargar inventario.'" color="error" /><div v-if="data?.managed" class="space-y-4">
+      <UAlert
+        v-if="data.activationRequired"
+        title="Inventario pendiente de activación"
+        description="Puedes guardar cotizaciones con productos compuestos. Activa el inventario interno antes de confirmar o surtir el pedido."
+        color="warning"
+      />
       <form v-if="mayAssign && !data.dispatched" class="flex flex-wrap items-end gap-3" @submit.prevent="assign">
         <InventoryWarehousePicker v-model="selected" :disabled="busy" class="min-w-60 flex-1" /><UButton
           type="submit"
