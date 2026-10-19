@@ -8,6 +8,16 @@ El servidor obtiene la fecha desde `sales_order_payments.payment_date` y verific
 
 Para una recepción existente, se vuelve a consultar el documento y se verifica cliente, factura, fecha e importe. No se cambia la fecha antes del timbrado. Un documento ya aceptado puede conciliarse mediante lectura aunque sea histórico. Un resultado incierto no se reintenta automáticamente.
 
+## Diagnóstico de rechazos
+
+Los intentos fallidos conservan en `external_payload.failure` la etapa (`create` o `stamp`), el estado HTTP y los campos documentados de los errores (`code`, `message`, `params`, `detail`). Se mantiene el payload de creación y, cuando existe, la respuesta con el identificador de la recepción. El mensaje visible incluye la etapa, el código y el detalle disponible, incluso cuando Siigo usa el mensaje genérico “Your request could not be completed…”. No se copian encabezados ni credenciales del error.
+
+Evidencia de lectura del 19/10/2026: el tenant devolvió recepciones aceptadas con `payment.method: PPD` y `payment.cfdi.code: 01`. No rechazar esa combinación basándose solamente en una interpretación de `invalid_cfdi`; el mensaje genérico sin código no permite atribuirle esa causa.
+
+Verificación autorizada del mismo día para PED-000970 / FV-A-272: la API rechazó PUE con `invalid_items` (“The due doesn't exist”), aunque Siigo Nube devolvió la cuota `FV-A|272|1` y saldo 323. Con PPD, forma 04 y UUID fiscal, la creación respondió HTTP 400 con `documents_service` y el mensaje genérico. Incluir UUID no resuelve ese fallo. No atribuirlo a una cuota inexistente ni afirmar que quedó timbrado.
+
+La [guía oficial de recepción PPD](https://siigonubeportaldeclientes.aspel.com.mx/registrar-una-recepcion-de-pago-con-metodo-en-parcialidades-o-diferido/) y el portal fijan PPD para registrar el complemento de una factura timbrada. La aplicación inicializa PPD para este flujo y lo valida al solicitar timbrado, conservando la forma real (efectivo, transferencia, crédito o débito). El dato local `tarjeta` exige elegir crédito o débito; no se presupone 28. Para un documento ya creado se conservan sus datos y se exige revisión en Siigo si no corresponden al flujo electrónico.
+
 ## Límite pendiente del contrato externo
 
 Verificación del 13/10/2026:

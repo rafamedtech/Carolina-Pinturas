@@ -63,6 +63,29 @@ afterEach(() => {
 })
 
 describe('OrderPaymentsModal', () => {
+  it('exige distinguir crédito y débito cuando el pago local solo indica tarjeta', async () => {
+    wrapper = await mountSuspended(OrderPaymentSiigoModal, {
+      props: {
+        open: true,
+        context: { ...context, siigo: { ...context.siigo, paymentTypes: [
+          { id: 3561, name: '04 - Tarjeta de crédito', active: true },
+          { id: 3562, name: '28 - Tarjeta de débito', active: true }
+        ] } },
+        payment: { ...payment, paymentMethod: 'tarjeta' }, saving: false, stampAfterCreate: true
+      }
+    })
+    const field = wrapper.findAllComponents({ name: 'UFormField' }).find(component => component.props('name') === 'cfdiCode')
+    expect(field?.findComponent({ name: 'USelect' }).props('modelValue')).toBe('')
+    expect(document.body.textContent).toContain('04 para tarjeta de crédito o 28 para tarjeta de débito')
+    const methodField = wrapper.findAllComponents({ name: 'UFormField' }).find(component => component.props('name') === 'paymentMethod')
+    expect(methodField?.findComponent({ name: 'USelect' }).props('modelValue')).toBe('PPD')
+    expect(methodField?.findComponent({ name: 'USelect' }).props('disabled')).toBe(true)
+    field?.findComponent({ name: 'USelect' }).vm.$emit('update:modelValue', '04')
+    await wrapper.vm.$nextTick()
+    const incomeField = wrapper.findAllComponents({ name: 'UFormField' }).find(component => component.props('name') === 'paymentTypeId')
+    expect(incomeField?.findComponent({ name: 'USelect' }).props('modelValue')).toBe(3561)
+  })
+
   it('permite registrar un pago local aunque el pedido tenga factura y Siigo esté deshabilitado', async () => {
     wrapper = await mountSuspended(OrderPaymentsModal, {
       props: { open: false, context, saving: false }
@@ -115,7 +138,7 @@ describe('OrderPaymentsModal', () => {
     await wrapper.setProps({ open: true })
 
     await vi.waitFor(() => {
-      expect(document.body.textContent).toContain('Condición de pago')
+      expect(document.body.textContent).toContain('Condición de ingreso en Siigo')
       expect(document.body.textContent).toContain('Forma de pago CFDI')
       expect(document.body.textContent).toContain('Método de pago CFDI')
     })
@@ -124,9 +147,9 @@ describe('OrderPaymentsModal', () => {
       field.props('name'),
       field.props('label')
     ]))
-    expect(fields.get('paymentTypeId')).toBe('Método de pago CFDI')
+    expect(fields.get('paymentTypeId')).toBe('Condición de ingreso en Siigo')
     expect(fields.get('cfdiCode')).toBe('Forma de pago CFDI')
-    expect(fields.get('paymentMethod')).toBe('Condición de pago')
+    expect(fields.get('paymentMethod')).toBe('Método de pago CFDI de la recepción')
 
     const selectedValues = wrapper.findAllComponents({ name: 'USelect' })
       .map(component => component.props('modelValue'))

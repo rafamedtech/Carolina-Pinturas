@@ -209,6 +209,7 @@ export interface SiigoInvoice {
   status?: string
   stamp?: {
     status?: string
+    uuid?: string
   }
 }
 

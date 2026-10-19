@@ -43,7 +43,7 @@ const state = reactive<Partial<Schema>>({
   paymentTypeId: undefined,
   costCenterId: undefined,
   cfdiCode: '',
-  paymentMethod: 'PUE',
+  paymentMethod: 'PPD',
   quote: 1,
   confirmed: false
 })
@@ -105,11 +105,13 @@ function localCfdiCode() {
   if (props.payment.paymentMethod === 'efectivo') return '01'
   if (props.payment.paymentMethod === 'cheque') return '02'
   if (props.payment.paymentMethod === 'transferencia') return '03'
-  if (props.payment.paymentMethod === 'tarjeta') return '28'
+  // El registro local "tarjeta" no distingue crédito y débito: exigir selección.
+  if (props.payment.paymentMethod === 'tarjeta') return ''
   return '99'
 }
 
 function defaultPaymentTypeId(cfdiCode: string) {
+  if (!cfdiCode) return undefined
   return receiptPaymentTypes.value.find(payment =>
     payment.name.trim().startsWith(cfdiCode)
   )?.id ?? receiptPaymentTypes.value[0]?.id
@@ -126,6 +128,12 @@ function nextQuote(invoiceId: string) {
   return Math.max(0, ...previousQuotes) + 1
 }
 
+watch(() => state.cfdiCode, (code) => {
+  if (resumingStamp.value || !code) return
+  const matching = receiptPaymentTypes.value.find(payment => payment.name.trim().startsWith(`${code} `))
+  if (matching) state.paymentTypeId = matching.id
+})
+
 watch(open, (isOpen) => {
   if (!isOpen) return
   state.invoiceId = props.context.siigo.assignedInvoice?.id || ''
@@ -134,7 +142,9 @@ watch(open, (isOpen) => {
   const previousPaymentType = receiptPaymentTypes.value.find(payment => payment.id === props.payment.siigo?.paymentTypeId)
   state.paymentTypeId = previousPaymentType?.id || defaultPaymentTypeId(state.cfdiCode)
   state.costCenterId = props.payment.siigo?.costCenterId ?? undefined
-  state.paymentMethod = props.payment.siigo?.paymentMethod || 'PUE'
+  state.paymentMethod = resumingStamp.value
+    ? props.payment.siigo?.paymentMethod || 'PPD'
+    : props.stampAfterCreate ? 'PPD' : props.payment.siigo?.paymentMethod || 'PPD'
   state.quote = props.payment.siigo?.quote || nextQuote(state.invoiceId)
   state.paymentDate = props.payment.paymentDate
   state.confirmed = false
@@ -272,7 +282,7 @@ function onSubmit(event: FormSubmitEvent<Schema>) {
         >
           <UInputNumber v-model="state.voucherNumber" :min="1" class="w-full" />
         </UFormField>
-        <UFormField name="paymentTypeId" label="Método de pago CFDI" required>
+        <UFormField name="paymentTypeId" label="Condición de ingreso en Siigo" required>
           <USelect
             v-model="state.paymentTypeId"
             :disabled="resumingStamp"
@@ -295,7 +305,12 @@ function onSubmit(event: FormSubmitEvent<Schema>) {
             class="w-full"
           />
         </UFormField>
-        <UFormField name="cfdiCode" label="Forma de pago CFDI" required>
+        <UFormField
+          name="cfdiCode"
+          label="Forma de pago CFDI"
+          :description="payment.paymentMethod === 'tarjeta' ? 'Selecciona 04 para tarjeta de crédito o 28 para tarjeta de débito.' : undefined"
+          required
+        >
           <USelect
             v-model="state.cfdiCode"
             :disabled="resumingStamp"
@@ -304,10 +319,15 @@ function onSubmit(event: FormSubmitEvent<Schema>) {
             class="w-full"
           />
         </UFormField>
-        <UFormField name="paymentMethod" label="Condición de pago" required>
+        <UFormField
+          name="paymentMethod"
+          label="Método de pago CFDI de la recepción"
+          description="El complemento de una factura PPD usa PPD, incluso si este pago liquida todo el saldo."
+          required
+        >
           <USelect
             v-model="state.paymentMethod"
-            :disabled="resumingStamp"
+            :disabled="resumingStamp || stampAfterCreate"
             :items="siigoMethodItems"
             value-key="value"
             class="w-full"

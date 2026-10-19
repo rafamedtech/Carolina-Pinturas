@@ -142,7 +142,7 @@ describe('recepciones de pago de Siigo México', () => {
       documentTypeId: 7714,
       paymentTypeId: 5636,
       cfdiCode: '03',
-      paymentMethod: 'PUE',
+      paymentMethod: 'PPD',
       quote: 1,
       stamp: true
     }
@@ -173,6 +173,21 @@ describe('recepciones de pago de Siigo México', () => {
   it('deriva el prefijo usando el consecutivo documentado por Siigo', () => {
     expect(invoicePrefix(invoice())).toBe('FV-1')
     expect(() => invoicePrefix({ name: 'FACTURA-68', number: 22 })).toThrow()
+  })
+
+  it('rechaza la condición de débito cuando la forma seleccionada es crédito', () => {
+    const data = references()
+    data.input.cfdiCode = '04'
+    data.paymentTypes = [{ id: data.input.paymentTypeId, name: '28 - Tarjeta de débito', active: true }]
+    expect(() => assertVoucherReferences(data)).toThrow('no coincide con la forma de pago CFDI')
+  })
+
+  it('conserva y envía el UUID fiscal al referenciar una factura timbrada', () => {
+    const uuid = 'CE0EEAA3-C254-46C9-854D-29CE002802A9'
+    const detail = normalizeInvoiceDetail(invoice({ stamp: { status: 'Accepted', uuid } }))
+    expect(detail.stamp).toEqual({ status: 'Accepted', uuid })
+    expect(buildSiigoVoucherPayload({ input: input(), invoice: detail, customerRfc: 'MELM8305281H0', prefix: 'FV-1' }).items[0]?.due)
+      .toEqual({ prefix: 'FV-1', consecutive: 68, quote: 1, uuid })
   })
 
   it('envía rfc_id requerido por el tenant aunque el ejemplo oficial use rfc.id', () => {

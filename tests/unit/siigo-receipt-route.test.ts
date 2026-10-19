@@ -38,12 +38,12 @@ const customerId = '6b6ceb28-b2eb-4b98-b3dd-26648a933c81'
 const voucherId = '497f6eca-6276-4993-bfeb-53cbbbba6f08'
 const input = {
   invoiceId, documentTypeId: 7714, paymentTypeId: 5636, costCenterId: 235,
-  cfdiCode: '03', paymentMethod: 'PUE', quote: 1, paymentDate: '2026-10-13', stamp: true,
+  cfdiCode: '03', paymentMethod: 'PPD', quote: 1, paymentDate: '2026-10-13', stamp: true,
   confirmation: 'CREAR_Y_TIMBRAR_RECEPCION_SIIGO'
 }
 const invoice = {
   id: invoiceId, name: 'FV-1-68', number: 68, date: '2026-07-20', total: 1000, balance: 1000,
-  stamp: { status: 'Accepted' }, payment: { method: 'PPD', conditions: [{ value: 1000 }] },
+  stamp: { status: 'Accepted', uuid: 'CE0EEAA3-C254-46C9-854D-29CE002802A9' }, payment: { method: 'PPD', conditions: [{ value: 1000 }] },
   customer: { id: customerId, rfc_id: 'MELM8305281H0', branch_office: 0 }
 }
 let payment: Record<string, unknown>
@@ -70,7 +70,7 @@ beforeEach(() => {
     id: voucherId, name: 'RC-2-22', number: 22, document: { id: 7714 }, date: '2026-10-13',
     customer: { id: customerId, rfc_id: 'MELM8305281H0' }, cost_center: 235,
     items: [{ due: { prefix: 'FV-1', consecutive: 68, quote: 1, uuid: 'invoice-sat-uuid' }, value: 500 }],
-    payments: [{ method: 'PUE', cfdi: { code: '03' }, conditions: [{ id: 5636, value: 500 }] }],
+    payments: [{ method: 'PPD', cfdi: { code: '03' }, conditions: [{ id: 5636, value: 500 }] }],
     stamp: { status: 'Draft' }
   }
   mocks.order.mockResolvedValue({ customer: { id: customerId, rfc: 'MELM8305281H0' }, siigoReference: invoiceId, total: 1000 })
@@ -106,6 +106,54 @@ function failedReceipt() {
 }
 
 describe('creación y recuperación de recepciones de pago', () => {
+  it('rechaza el método no electrónico PUE antes de intentar timbrar un complemento PPD', async () => {
+    await expect(route(event({ ...input, paymentMethod: 'PUE' })))
+      .rejects.toMatchObject({ statusCode: 400, statusMessage: expect.stringContaining('la recepción debe usar el método PPD') })
+    expect(mocks.request).not.toHaveBeenCalled()
+    expect(mocks.reserve).not.toHaveBeenCalled()
+  })
+
+  it('concilia por lectura una recepción PUE ya aceptada sin enviarla nuevamente', async () => {
+    failedReceipt()
+    receipt.stamp = { status: 'Accepted' }
+    receipt.payments = [{ method: 'PUE', cfdi: { code: '03' }, conditions: [{ id: 5636, value: 500 }] }]
+    const result = await route(event({ ...input, paymentMethod: 'PUE', confirmation: 'TIMBRAR_RECEPCION_SIIGO' }))
+    expect(result.externalStatus).toBe('synced')
+    expect(writes()).toHaveLength(0)
+  })
+
+  it.each(['create', 'stamp'] as const)('guarda el diagnóstico y la etapa %s sin repetir la operación fiscal', async (stage) => {
+    const implementation = mocks.request.getMockImplementation()!
+    const data = {
+      Authorization: 'secret-token',
+      Errors: [{ Code: 'entry_service', Message: 'Your request could not be completed with the data you submitted. Please verify', Params: ['items'], Detail: 'Detalle de Siigo' }]
+    }
+    mocks.request.mockImplementation(async (path, options) => {
+      if ((stage === 'create' && path === '/v1/vouchers') || (stage === 'stamp' && path.includes('/stamp'))) {
+        throw createError({ statusCode: 400, statusMessage: data.Errors[0]!.Message, data })
+      }
+      return implementation(path, options)
+    })
+    const result = await route(event())
+    expect(result.externalStatus).toBe('failed')
+    expect(result.externalError).toContain(stage === 'create' ? 'No se pudo crear' : 'No se pudo timbrar')
+    expect(result.externalError).toContain('[entry_service]')
+    expect(result.externalError).toContain('Detalle de Siigo')
+    expect(payment.externalPayload).toMatchObject({
+      request: { date: input.paymentDate },
+      failure: { stage, statusCode: 400, errors: [{ code: 'entry_service', params: ['items'], detail: 'Detalle de Siigo' }] },
+      ...(stage === 'stamp' ? { created: { id: voucherId } } : {})
+    })
+    expect(result.siigo?.voucherId).toBe(stage === 'stamp' ? voucherId : null)
+    expect(JSON.stringify(payment.externalPayload)).not.toContain('secret-token')
+    expect(writes()).toHaveLength(stage === 'stamp' ? 2 : 1)
+  })
+
+  it('conserva PPD con efectivo: el tenant aceptó esta combinación el 19/10/2026', async () => {
+    await route(event({ ...input, paymentMethod: 'PPD', cfdiCode: '01' }))
+    expect(writes()[0]?.[1].body.payment).toMatchObject({ method: 'PPD', cfdi: '01' })
+  })
+
   it('envía rfc_id, correo vigente y la fecha real, incluso si el pago fue ayer', async () => {
     payment.paymentDate = new Date('2026-10-12T00:00:00Z')
     const result = await route(event({ ...input, paymentDate: '2026-10-12' }))
@@ -113,7 +161,8 @@ describe('creación y recuperación de recepciones de pago', () => {
     expect(writes()).toEqual([
       ['/v1/vouchers', expect.objectContaining({ method: 'POST', body: expect.objectContaining({
         date: '2026-10-12', customer: { rfc_id: 'MELM8305281H0', branch_office: 0 },
-        observations: 'Pedido PED-123'
+        observations: 'Pedido PED-123',
+        items: [{ due: { prefix: 'FV-1', consecutive: 68, quote: 1, uuid: invoice.stamp.uuid }, value: 500 }]
       }) })],
       [`/v1/vouchers/${voucherId}/stamp`, { method: 'PUT', body: { mail_to: 'actual@cliente.com' } }]
     ])

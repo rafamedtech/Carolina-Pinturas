@@ -44,6 +44,14 @@ export const createOrderSiigoReceiptSchema = createOrderSiigoPaymentSchema.omit(
   stamp: z.boolean().optional(),
   confirmation: z.enum(['CREAR_RECEPCION_SIIGO', 'CREAR_Y_TIMBRAR_RECEPCION_SIIGO', 'TIMBRAR_RECEPCION_SIIGO'])
 }).strict().superRefine((input, context) => {
+  // Siigo Nube fija PPD al aplicar un complemento a una factura ya timbrada.
+  // PUE corresponde al recibo no electrónico; no usarlo para este flujo fiscal.
+  if (input.stamp && input.confirmation !== 'TIMBRAR_RECEPCION_SIIGO' && input.paymentMethod !== 'PPD') {
+    context.addIssue({
+      code: 'custom', path: ['paymentMethod'],
+      message: 'Para timbrar el pago de una factura PPD, la recepción debe usar el método PPD y la forma real del pago.'
+    })
+  }
   const expectedConfirmation = input.stamp
     ? input.confirmation === 'TIMBRAR_RECEPCION_SIIGO'
       ? 'TIMBRAR_RECEPCION_SIIGO'
@@ -508,7 +516,12 @@ export function normalizeInvoiceDetail(
     balance: ppdBalance
       ? Math.min(ppdBalance, options.ppdBalanceLimit!)
       : balance,
-    stamp: stampStatus ? { status: stampStatus } : undefined,
+    stamp: stampStatus
+      ? {
+          status: stampStatus,
+          uuid: string(record(invoice.stamp)?.uuid) ?? undefined
+        }
+      : undefined,
     customer: {
       id: customerId ?? undefined,
       identification: string(customer?.identification) ?? undefined,
@@ -581,6 +594,10 @@ export function assertVoucherReferences(options: {
   if (paymentType.due_date) {
     throw createError({ statusCode: 422, statusMessage: 'Selecciona una condición de ingreso sin vencimiento para la recepción; Crédito Clientes corresponde a la factura pendiente.' })
   }
+  const catalogCfdiCode = /^(\d{2})\s*[-·]/.exec(paymentType.name.trim())?.[1]
+  if (catalogCfdiCode && catalogCfdiCode !== input.cfdiCode) {
+    throw createError({ statusCode: 422, statusMessage: 'La condición de ingreso de Siigo no coincide con la forma de pago CFDI seleccionada.' })
+  }
 
   return { documentType, prefix: invoicePrefix(invoice) }
 }
@@ -611,7 +628,8 @@ export function buildSiigoVoucherPayload(options: {
       due: {
         prefix: options.prefix,
         consecutive: invoice.number,
-        quote: input.quote
+        quote: input.quote,
+        ...(invoice.stamp?.uuid ? { uuid: invoice.stamp.uuid } : {})
       },
       value: input.amount
     }],

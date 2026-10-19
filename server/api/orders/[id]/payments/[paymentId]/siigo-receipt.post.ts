@@ -6,6 +6,7 @@ import { getOrder } from '../../../../../utils/orders'
 import { orderPaymentView } from '../../../../../utils/order-payments'
 import { usePrisma } from '../../../../../utils/prisma'
 import { siigoRequest } from '../../../../../utils/siigo'
+import { siigoErrorDetails, siigoErrorMessages } from '../../../../../utils/siigo-errors'
 import type { SiigoCustomerApiResponse } from '../../../../../utils/siigo-customers'
 import { normalizeSiigoCustomer } from '../../../../../utils/siigo-customers'
 import { siigoJson } from '../../../../../utils/siigo-persistence'
@@ -28,9 +29,11 @@ import {
   siigoFiscalWritesEnabled
 } from '../../../../../utils/siigo-vouchers'
 
-function publicErrorMessage(error: unknown) {
-  const value = error as { statusMessage?: string, message?: string }
-  return (value.statusMessage || value.message || 'Siigo no pudo registrar la recepción.').slice(0, 2500)
+function publicErrorMessage(error: unknown, stage: 'create' | 'stamp') {
+  const value = error as { statusMessage?: string, message?: string, data?: unknown }
+  const message = siigoErrorMessages(value.data, true)
+    || value.statusMessage || value.message || 'Siigo no pudo registrar la recepción.'
+  return `${stage === 'create' ? 'No se pudo crear la recepción' : 'No se pudo timbrar la recepción'}: ${message}`.slice(0, 2500)
 }
 
 function uncertainExternalResult(error: unknown) {
@@ -50,7 +53,7 @@ export default eventHandler(async (event): Promise<OrderPayment> => {
   if (!parsed.success) {
     throw createError({
       statusCode: 400,
-      statusMessage: 'Revisa los datos de la recepción.',
+      statusMessage: parsed.error.issues[0]?.message || 'Revisa los datos de la recepción.',
       data: parsed.error.flatten()
     })
   }
@@ -183,6 +186,9 @@ export default eventHandler(async (event): Promise<OrderPayment> => {
         data: { externalStatus: 'synced', externalError: null, externalPayload: siigoJson(existingReceipt.raw) }
       }))
     }
+    if (parsed.data.stamp && existingReceipt.paymentMethod !== 'PPD') {
+      throw createError({ statusCode: 409, statusMessage: 'La recepción existente usa PUE. Revisa en Siigo su configuración antes de timbrar el complemento PPD.' })
+    }
     const dateError = siigoReceiptPaymentDateError(paymentDate)
     if (dateError) throw createError({ statusCode: 422, statusMessage: dateError })
     if (existingReceipt.stampStatus?.toLowerCase() !== 'draft') {
@@ -254,11 +260,14 @@ export default eventHandler(async (event): Promise<OrderPayment> => {
     throw createError({ statusCode: 409, statusMessage: 'El pago cambió mientras se preparaba la recepción. Actualiza e intenta de nuevo.' })
   }
 
+  let stage: 'create' | 'stamp' = existingReceipt ? 'stamp' : 'create'
+  let createdPayload: unknown = existingReceipt?.raw
   try {
     // Creación fiscal sin reintento automático.
     const created = existingReceipt
       ? { id: existingReceipt.id, name: existingReceipt.name, raw: existingReceipt.raw }
       : normalizeCreatedVoucher(await siigoRequest<unknown>('/v1/vouchers', { method: 'POST', body: payload }))
+    createdPayload = created.raw
     await usePrisma().salesOrderPayment.update({
       where: { id: payment.id },
       data: {
@@ -269,6 +278,7 @@ export default eventHandler(async (event): Promise<OrderPayment> => {
     })
 
     if (parsed.data.stamp) {
+      stage = 'stamp'
       // Siigo México exige un correo al timbrar. No se reintenta si la respuesta es ambigua.
       const stamped = await siigoRequest<unknown>(`/v1/vouchers/${encodeURIComponent(created.id)}/stamp`, {
         method: 'PUT',
@@ -296,7 +306,16 @@ export default eventHandler(async (event): Promise<OrderPayment> => {
       where: { id: payment.id },
       data: {
         externalStatus: uncertainExternalResult(error) ? 'unknown' : 'failed',
-        externalError: publicErrorMessage(error)
+        externalError: publicErrorMessage(error, stage),
+        externalPayload: siigoJson({
+          request: payload,
+          ...(createdPayload ? { created: createdPayload } : {}),
+          failure: {
+            stage,
+            statusCode: (error as { statusCode?: number }).statusCode ?? null,
+            errors: siigoErrorDetails((error as { data?: unknown }).data)
+          }
+        })
       }
     }))
   }
