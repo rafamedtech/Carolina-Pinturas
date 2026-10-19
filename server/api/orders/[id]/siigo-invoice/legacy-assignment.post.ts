@@ -61,7 +61,7 @@ export default eventHandler(async (event): Promise<SalesOrderDetail> => {
         where: { id: orderId },
         select: {
           siigoReference: true,
-          siigoInvoice: { select: { status: true } }
+          siigoInvoice: { select: { status: true, siigoInvoiceId: true, nubeInvoiceCode: true } }
         }
       })
       if (!current) throw createError({ statusCode: 404, statusMessage: 'No se encontró el pedido.' })
@@ -75,6 +75,7 @@ export default eventHandler(async (event): Promise<SalesOrderDetail> => {
         status: 'created',
         siigoInvoiceId: invoice.id,
         siigoInvoiceName: invoice.name,
+        nubeInvoiceCode: current.siigoInvoice?.siigoInvoiceId === invoice.id ? current.siigoInvoice.nubeInvoiceCode : null,
         documentTypeId: invoice.documentTypeId,
         sellerId: invoice.sellerId,
         paymentTypeId: invoice.paymentTypeId,

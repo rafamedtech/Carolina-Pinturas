@@ -65,7 +65,8 @@ describe('OrderHistoricalReceiptModal', () => {
 
   it('oculta los resultados y acciones anteriores mientras vuelve a consultar al reabrir', async () => {
     wrapper = await mountSuspended(OrderHistoricalReceiptModal, {
-      props: { open: false, orderId: 'order-1', paymentId: 'payment-1' }
+      props: { open: false, orderId: 'order-1', paymentId: 'payment-1',
+        siigoUrl: 'https://siigonube.siigo.mx/#/vouchers/844?invoicecode=87200' }
     })
     await wrapper.setProps({ open: true })
     await vi.waitFor(() => expect(document.body.textContent).toContain('Registrar pago en Siigo Nube'))
@@ -87,7 +88,8 @@ describe('OrderHistoricalReceiptModal', () => {
       props: {
         open: false,
         orderId: 'order-1',
-        paymentId: 'payment-1'
+        paymentId: 'payment-1',
+        siigoUrl: 'https://siigonube.siigo.mx/#/vouchers/844?invoicecode=87200'
       }
     })
     await wrapper.setProps({ open: true })
@@ -99,9 +101,22 @@ describe('OrderHistoricalReceiptModal', () => {
 
     const action = wrapper.findAllComponents({ name: 'UButton' })
       .find(button => button.props('label') === 'Registrar pago en Siigo Nube')
-    expect(action?.props('to')).toBe('https://siigonube.siigo.mx/#/vouchers/844')
+    expect(action?.props('to')).toBe('https://siigonube.siigo.mx/#/vouchers/844?invoicecode=87200')
     expect(action?.props('target')).toBe('_blank')
     expect(wrapper.emitted('createAndStamp')).toBeUndefined()
+  })
+
+  it('sin enlace solicita vincular la factura en lugar de abrir un pago vacío', async () => {
+    wrapper = await mountSuspended(OrderHistoricalReceiptModal, {
+      props: { open: false, orderId: 'order-1', paymentId: 'payment-1' }
+    })
+    await wrapper.setProps({ open: true })
+    await vi.waitFor(() => expect(document.body.textContent).toContain('Vincular factura para registrar pago'))
+    const action = wrapper.findAllComponents({ name: 'UButton' })
+      .find(button => button.props('label') === 'Vincular factura para registrar pago')!
+    expect(action.props('to')).toBeUndefined()
+    await action.trigger('click')
+    expect(wrapper.emitted('configureLink')).toHaveLength(1)
   })
 
   it('muestra el pago aplicado a la factura en el selector', async () => {

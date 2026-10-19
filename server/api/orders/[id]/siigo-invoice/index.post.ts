@@ -75,6 +75,7 @@ async function reserveAttempt(options: {
     status: 'pending',
     siigoInvoiceId: null,
     siigoInvoiceName: null,
+    nubeInvoiceCode: null,
     documentTypeId: options.input.documentTypeId,
     sellerId: options.input.sellerId,
     paymentTypeId: options.input.paymentTypeId,

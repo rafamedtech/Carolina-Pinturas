@@ -378,6 +378,7 @@ model SalesOrderSiigoInvoice {
   status           String   @db.VarChar(16)
   siigoInvoiceId   String?  @unique @map("siigo_invoice_id") @db.Uuid
   siigoInvoiceName String?  @map("siigo_invoice_name")
+  nubeInvoiceCode  Int?     @map("nube_invoice_code")
   documentTypeId   Int      @map("document_type_id")
   sellerId         Int      @map("seller_id")
   paymentTypeId    Int      @map("payment_type_id")

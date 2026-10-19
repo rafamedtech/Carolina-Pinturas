@@ -83,6 +83,7 @@ export interface OrderPaymentContext {
     assignedInvoiceId: string | null
     assignedInvoiceStamped: boolean
     assignedInvoice: SiigoPayableInvoice | null
+    invoiceNubeCode?: number | null
     customerEmail?: string | null
     documentTypes: SiigoVoucherDocumentType[]
     paymentTypes: SiigoPaymentType[]

@@ -3,7 +3,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { mockNuxtImport, mountSuspended, registerEndpoint } from '@nuxt/test-utils/runtime'
 import type { VueWrapper } from '@vue/test-utils'
 import OrderPaymentsCard from '~/components/orders/payments/OrderPaymentsCard.vue'
-import { SIIGO_NUBE_DOCUMENTS_URL, SIIGO_NUBE_REGISTER_PAYMENT_URL } from '~/utils/siigoNube'
+import OrderSiigoInvoiceLinkModal from '~/components/orders/payments/OrderSiigoInvoiceLinkModal.vue'
+import { SIIGO_NUBE_DOCUMENTS_URL, siigoNubeInvoiceUrl, siigoNubePaymentUrl } from '~/utils/siigoNube'
 import type { OrderPaymentContext } from '~/types/siigo-payments'
 
 const { useAuthMock } = vi.hoisted(() => ({
@@ -72,6 +73,7 @@ beforeEach(() => {
   context.siigo.assignedInvoiceStamped = false
   context.siigo.assignedInvoice!.stamped = false
   context.siigo.assignedInvoice!.stampStatus = 'Draft'
+  context.siigo.invoiceNubeCode = 87200
   context.siigo.writeEnabled = true
   context.payments[0]!.provider = 'local'
   context.payments[0]!.externalStatus = 'not_applicable'
@@ -95,6 +97,23 @@ function action(label: string) {
 }
 
 describe('OrderPaymentsCard · registro en Siigo Nube', () => {
+  it('sin enlace guardado pide vincular la factura y no abre un registro vacío', async () => {
+    context.siigo.invoiceNubeCode = null
+    await mountPayments(true)
+    const button = action('Vincular factura para registrar pago')
+    expect(button?.props('to')).toBeUndefined()
+    expect(action('Registrar pago en Siigo Nube')).toBeUndefined()
+    await button!.trigger('click')
+    await vi.waitFor(() => expect(document.body.textContent).toContain('Guarda el enlace de FV-A-253 una sola vez'))
+    wrapper!.findComponent(OrderSiigoInvoiceLinkModal).vm.$emit('saved', 87200)
+    await vi.waitFor(() => expect(action('Registrar pago en Siigo Nube')?.props('to')).toBe(siigoNubePaymentUrl(87200)))
+  })
+
+  it('ofrece abrir directamente la factura vinculada', async () => {
+    await mountPayments(true)
+    expect(action('Abrir factura en Siigo Nube')?.props('to')).toBe(siigoNubeInvoiceUrl(87200))
+  })
+
   it('deshabilita el registro y oculta la asignación mientras la factura sigue en borrador', async () => {
     await mountPayments()
     expect(action('Registrar pago en Siigo Nube')?.props('disabled')).toBe(true)
@@ -105,7 +124,7 @@ describe('OrderPaymentsCard · registro en Siigo Nube', () => {
     context.siigo.writeEnabled = false
     await mountPayments(true)
     const link = action('Registrar pago en Siigo Nube')
-    expect(link?.props('to')).toBe(SIIGO_NUBE_REGISTER_PAYMENT_URL)
+    expect(link?.props('to')).toBe(siigoNubePaymentUrl(87200))
     expect(link?.props('target')).toBe('_blank')
     expect(link?.props('disabled')).toBe(false)
     expect(wrapper?.text()).toContain('Asignar pago de Siigo')
@@ -118,7 +137,7 @@ describe('OrderPaymentsCard · registro en Siigo Nube', () => {
     context.payments[0]!.provider = 'siigo'
     context.payments[0]!.externalStatus = 'failed'
     await mountPayments(true)
-    expect(action('Registrar pago en Siigo Nube')?.props('to')).toBe(SIIGO_NUBE_REGISTER_PAYMENT_URL)
+    expect(action('Registrar pago en Siigo Nube')?.props('to')).toBe(siigoNubePaymentUrl(87200))
     expect(wrapper?.text()).not.toContain('Reintentar en Siigo')
   })
 

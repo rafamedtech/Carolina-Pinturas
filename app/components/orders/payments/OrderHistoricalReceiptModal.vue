@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { formatDate } from '~/utils/datetime'
-import { SIIGO_NUBE_REGISTER_PAYMENT_URL } from '~/utils/siigoNube'
 import * as z from 'zod'
 import type { FormSubmitEvent } from '@nuxt/ui'
 import type {
@@ -17,6 +16,7 @@ const props = defineProps<{
 }>()
 const emit = defineEmits<{
   assigned: [payment: OrderPayment]
+  configureLink: []
 }>()
 const open = defineModel<boolean>('open', { required: true })
 const saving = shallowRef(false)
@@ -144,7 +144,7 @@ async function onSubmit(event: FormSubmitEvent<Schema>) {
       />
 
       <p v-if="!loadingReceipts && !error && context && !context.receipts.length" class="mt-3 text-sm text-muted">
-        {{ reviewSiigoFirst ? 'Revisa primero si la recepción ya existe en Siigo Nube para evitar duplicarla.' : 'Registra y timbra la recepción en Siigo Nube seleccionando la factura de este pedido.' }}
+        {{ reviewSiigoFirst ? 'Revisa primero si la recepción ya existe en Siigo Nube para evitar duplicarla.' : siigoUrl ? 'Siigo abrirá el registro de pago con esta factura preseleccionada. Conserva la fecha, forma e importe del pago local.' : 'Vincula el enlace de la factura para abrir el registro de pago con su información en Siigo Nube.' }}
         Después vuelve a abrir «Asignar pago de Siigo» para vincularla aquí.
       </p>
 
@@ -199,12 +199,13 @@ async function onSubmit(event: FormSubmitEvent<Schema>) {
       />
       <UButton
         v-if="!loadingReceipts && !error && context && !context.receipts.length"
-        :label="reviewSiigoFirst ? 'Revisar en Siigo Nube' : 'Registrar pago en Siigo Nube'"
-        :to="siigoUrl || SIIGO_NUBE_REGISTER_PAYMENT_URL"
+        :label="reviewSiigoFirst ? 'Revisar en Siigo Nube' : siigoUrl ? 'Registrar pago en Siigo Nube' : 'Vincular factura para registrar pago'"
+        :to="siigoUrl"
         target="_blank"
         rel="noopener noreferrer"
         icon="i-lucide-external-link"
         :disabled="saving"
+        @click="!siigoUrl && emit('configureLink')"
       />
       <UButton
         v-else-if="!loadingReceipts && !error && context?.receipts.length"

@@ -59,6 +59,7 @@ export default eventHandler(async (event): Promise<OrderPaymentContext> => {
     assignedInvoiceId: order.siigoReference,
     assignedInvoiceStamped: false,
     assignedInvoice: null,
+    invoiceNubeCode: null,
     customerEmail: null,
     documentTypes: [],
     paymentTypes: [],
@@ -73,12 +74,16 @@ export default eventHandler(async (event): Promise<OrderPaymentContext> => {
     baseSiigo.unavailableReason = 'Crea o asigna la factura del pedido antes de registrar el pago en Siigo.'
   } else {
     try {
-      const [associatedInvoice, documentResponse, paymentResponse, costCenterResponse, customerResponse] = await Promise.all([
+      const [associatedInvoice, documentResponse, paymentResponse, costCenterResponse, customerResponse, savedInvoice] = await Promise.all([
         preferredInvoice(order.siigoReference),
         siigoRequest<unknown>('/v1/document-types', { query: { type: 'RC' } }),
         siigoRequest<unknown>('/v1/payment-types', { query: { document_type: 'FV' } }),
         siigoRequest<unknown>('/v1/cost-centers'),
-        siigoRequest<unknown>(`/v1/customers/${encodeURIComponent(order.customer.id)}`)
+        siigoRequest<unknown>(`/v1/customers/${encodeURIComponent(order.customer.id)}`),
+        usePrisma().salesOrderSiigoInvoice.findFirst({
+          where: { orderId: id, siigoInvoiceId: order.siigoReference, status: 'created' },
+          select: { nubeInvoiceCode: true }
+        })
       ])
 
       const invoices = payableInvoicesForCustomer({ results: [] }, {
@@ -91,6 +96,7 @@ export default eventHandler(async (event): Promise<OrderPaymentContext> => {
       const invoiceDetail = associatedInvoice ? normalizeInvoiceDetail(associatedInvoice) : null
       baseSiigo.assignedInvoiceStamped = isSiigoInvoiceStamped(invoiceDetail?.stamp?.status)
       baseSiigo.assignedInvoice = invoices.find(invoice => invoice.id === order.siigoReference) ?? null
+      baseSiigo.invoiceNubeCode = savedInvoice?.nubeInvoiceCode ?? null
       baseSiigo.available = baseSiigo.assignedInvoice !== null
       if (associatedInvoice && !isSiigoPpdInvoice(associatedInvoice)) {
         baseSiigo.available = false
