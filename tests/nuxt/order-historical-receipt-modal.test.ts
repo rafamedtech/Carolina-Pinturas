@@ -52,12 +52,12 @@ describe('OrderHistoricalReceiptModal', () => {
       releaseReceipts = resolve
     })
     wrapper = await mountSuspended(OrderHistoricalReceiptModal, {
-      props: { open: true, orderId: 'order-1', paymentId: 'payment-2', canCreateAndStamp: true }
+      props: { open: true, orderId: 'order-1', paymentId: 'payment-2' }
     })
     await vi.waitFor(() => expect(document.body.textContent).toContain('Cargando recepciones'))
     expect(document.body.querySelector('#historical-receipt-form')).toBeNull()
     expect([...document.body.querySelectorAll('button')].some(button => button.textContent?.trim() === 'Asignar pago')).toBe(false)
-    expect(document.body.textContent).not.toContain('Crear y timbrar en Siigo')
+    expect(document.body.textContent).not.toContain('Registrar pago en Siigo Nube')
     releaseReceipts!()
     await vi.waitFor(() => expect(document.body.textContent).toContain('RC-2-22'))
     expect(document.body.textContent).not.toContain('Cargando recepciones')
@@ -65,10 +65,10 @@ describe('OrderHistoricalReceiptModal', () => {
 
   it('oculta los resultados y acciones anteriores mientras vuelve a consultar al reabrir', async () => {
     wrapper = await mountSuspended(OrderHistoricalReceiptModal, {
-      props: { open: false, orderId: 'order-1', paymentId: 'payment-1', canCreateAndStamp: true }
+      props: { open: false, orderId: 'order-1', paymentId: 'payment-1' }
     })
     await wrapper.setProps({ open: true })
-    await vi.waitFor(() => expect(document.body.textContent).toContain('Crear y timbrar en Siigo'))
+    await vi.waitFor(() => expect(document.body.textContent).toContain('Registrar pago en Siigo Nube'))
     await wrapper.setProps({ open: false })
     receiptGate = new Promise<void>((resolve) => {
       releaseReceipts = resolve
@@ -76,32 +76,32 @@ describe('OrderHistoricalReceiptModal', () => {
     await wrapper.setProps({ open: true })
     await vi.waitFor(() => expect(document.body.textContent).toContain('Cargando recepciones'))
     expect(document.body.textContent).not.toContain('Sin pagos compatibles')
-    expect(document.body.textContent).not.toContain('Crear y timbrar en Siigo')
+    expect(document.body.textContent).not.toContain('Registrar pago en Siigo Nube')
     expect(document.body.querySelector('#historical-receipt-form')).toBeNull()
     releaseReceipts!()
-    await vi.waitFor(() => expect(document.body.textContent).toContain('Crear y timbrar en Siigo'))
+    await vi.waitFor(() => expect(document.body.textContent).toContain('Registrar pago en Siigo Nube'))
   })
 
-  it('ofrece crear y timbrar cuando no encuentra una recepción compatible', async () => {
+  it('ofrece abrir Siigo Nube cuando no encuentra una recepción compatible', async () => {
     wrapper = await mountSuspended(OrderHistoricalReceiptModal, {
       props: {
         open: false,
         orderId: 'order-1',
-        paymentId: 'payment-1',
-        canCreateAndStamp: true
+        paymentId: 'payment-1'
       }
     })
     await wrapper.setProps({ open: true })
 
     await vi.waitFor(() => {
       expect(document.body.textContent).toContain('Sin pagos compatibles')
-      expect(document.body.textContent).toContain('Crear y timbrar en Siigo')
+      expect(document.body.textContent).toContain('Registrar pago en Siigo Nube')
     })
 
     const action = wrapper.findAllComponents({ name: 'UButton' })
-      .find(button => button.props('label') === 'Crear y timbrar en Siigo')
-    await action?.trigger('click')
-    expect(wrapper.emitted('createAndStamp')).toHaveLength(1)
+      .find(button => button.props('label') === 'Registrar pago en Siigo Nube')
+    expect(action?.props('to')).toBe('https://siigonube.siigo.mx/#/vouchers/844')
+    expect(action?.props('target')).toBe('_blank')
+    expect(wrapper.emitted('createAndStamp')).toBeUndefined()
   })
 
   it('muestra el pago aplicado a la factura en el selector', async () => {
@@ -109,8 +109,7 @@ describe('OrderHistoricalReceiptModal', () => {
       props: {
         open: false,
         orderId: 'order-1',
-        paymentId: 'payment-2',
-        canCreateAndStamp: true
+        paymentId: 'payment-2'
       }
     })
     await wrapper.setProps({ open: true })

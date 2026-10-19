@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { formatDate } from '~/utils/datetime'
+import { SIIGO_NUBE_REGISTER_PAYMENT_URL } from '~/utils/siigoNube'
 import * as z from 'zod'
 import type { FormSubmitEvent } from '@nuxt/ui'
 import type {
@@ -11,11 +12,11 @@ import type {
 const props = defineProps<{
   orderId: string
   paymentId: string
-  canCreateAndStamp: boolean
+  siigoUrl?: string
+  reviewSiigoFirst?: boolean
 }>()
 const emit = defineEmits<{
   assigned: [payment: OrderPayment]
-  createAndStamp: []
 }>()
 const open = defineModel<boolean>('open', { required: true })
 const saving = shallowRef(false)
@@ -125,22 +126,27 @@ async function onSubmit(event: FormSubmitEvent<Schema>) {
         :description="error.data?.statusMessage || error.message"
       />
 
+      <div v-if="!loadingReceipts && !error && context" class="mb-4 rounded-lg bg-elevated p-3 text-sm">
+        <p class="text-muted">
+          Factura {{ context.invoiceName }}
+        </p>
+        <p class="mt-1 font-semibold">
+          Pago local: {{ formatCurrency(context.paymentAmount) }} · {{ formatDate(context.paymentDate) }}
+        </p>
+      </div>
+
       <UAlert
-        v-else-if="context && !context.receipts.length"
+        v-if="!loadingReceipts && !error && context && !context.receipts.length"
         color="warning"
         variant="subtle"
         title="Sin pagos compatibles"
         description="No hay recepciones de esta factura cuyo cliente, fecha e importe coincidan con el pago local."
       />
 
-      <UAlert
-        v-if="!loadingReceipts && !error && context && !context.receipts.length && !canCreateAndStamp"
-        class="mt-3"
-        color="neutral"
-        variant="subtle"
-        title="Creación fiscal deshabilitada"
-        description="La integración no está autorizada para crear y timbrar recepciones en Siigo."
-      />
+      <p v-if="!loadingReceipts && !error && context && !context.receipts.length" class="mt-3 text-sm text-muted">
+        {{ reviewSiigoFirst ? 'Revisa primero si la recepción ya existe en Siigo Nube para evitar duplicarla.' : 'Registra y timbra la recepción en Siigo Nube seleccionando la factura de este pedido.' }}
+        Después vuelve a abrir «Asignar pago de Siigo» para vincularla aquí.
+      </p>
 
       <UForm
         v-if="!loadingReceipts && !error && context?.receipts.length"
@@ -150,15 +156,6 @@ async function onSubmit(event: FormSubmitEvent<Schema>) {
         class="space-y-4"
         @submit="onSubmit"
       >
-        <div class="rounded-lg bg-elevated p-3 text-sm">
-          <p class="text-muted">
-            Factura {{ context.invoiceName }}
-          </p>
-          <p class="mt-1 font-semibold">
-            Pago local: {{ formatCurrency(context.paymentAmount) }} · {{ formatDate(context.paymentDate) }}
-          </p>
-        </div>
-
         <UFormField name="voucherId" label="Recepción de pago de Siigo" required>
           <USelectMenu
             v-model="state.voucherId"
@@ -202,10 +199,12 @@ async function onSubmit(event: FormSubmitEvent<Schema>) {
       />
       <UButton
         v-if="!loadingReceipts && !error && context && !context.receipts.length"
-        label="Crear y timbrar en Siigo"
-        icon="i-lucide-badge-check"
-        :disabled="saving || !canCreateAndStamp"
-        @click="emit('createAndStamp')"
+        :label="reviewSiigoFirst ? 'Revisar en Siigo Nube' : 'Registrar pago en Siigo Nube'"
+        :to="siigoUrl || SIIGO_NUBE_REGISTER_PAYMENT_URL"
+        target="_blank"
+        rel="noopener noreferrer"
+        icon="i-lucide-external-link"
+        :disabled="saving"
       />
       <UButton
         v-else-if="!loadingReceipts && !error && context?.receipts.length"

@@ -2,6 +2,10 @@
 
 ## Comportamiento de la aplicación
 
+Desde el 19/10/2026, el modal de pagos reemplaza el timbrado y los reintentos por API por **Registrar pago en Siigo Nube**. Abre una pestaña en `https://siigonube.siigo.mx/#/vouchers/844`, el formulario que utiliza el menú Crear → Recepción de pagos. El usuario selecciona cliente y factura, conserva fecha, importe y forma real del pago, y realiza el timbrado dentro de Siigo. Después vincula la recepción mediante **Asignar pago de Siigo**. El modal de asignación ofrece el mismo enlace si no encuentra recepciones compatibles.
+
+Se comprobó que el UUID de `/v1/invoices` no abre la factura usando la ruta del portal: Siigo Nube exige su código numérico interno, que no aparece en la respuesta pública consultada. No se fabrican enlaces de factura ni se fija un código de otro pedido. Los resultados pendientes o inciertos y las recepciones ya creadas abren la lista de documentos para revisión, evitando dirigir al usuario a crear un duplicado.
+
 Al registrar un pago local se captura **la fecha en que se recibió el dinero**. Puede ser histórica y se guarda como fecha calendario, sin convertirla a otro día por zona horaria. El formulario de timbrado confirma ese registro; no pide una fecha de emisión ni permite sustituir la fecha real por hoy.
 
 El servidor obtiene la fecha desde `sales_order_payments.payment_date` y verifica que coincida con la confirmada por el navegador. La solicitud de recepción usa esa misma fecha en `date`. El correo se obtiene de los contactos vigentes del cliente en Siigo. Las condiciones que manejan vencimiento, como Crédito Clientes, se excluyen de los ingresos.

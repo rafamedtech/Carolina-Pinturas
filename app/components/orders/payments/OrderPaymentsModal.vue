@@ -68,7 +68,7 @@ function onSubmit(event: FormSubmitEvent<Schema>) {
   <UModal
     v-model:open="open"
     title="Agregar pago"
-    description="Registra un abono o liquida el pedido. Si después se factura, podrás registrar este pago en Siigo."
+    description="Registra un abono o liquida el pedido. Si después se factura, podrás abrir Siigo Nube para registrar la recepción y después vincularla aquí."
     :ui="{ content: 'max-w-2xl', footer: 'justify-end' }"
   >
     <template #body>

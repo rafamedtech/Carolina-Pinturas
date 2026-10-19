@@ -2,11 +2,11 @@
 import { formatDate } from '~/utils/datetime'
 import type {
   CreateOrderPaymentInput,
-  CreateOrderSiigoReceiptInput,
   OrderPayment,
   OrderPaymentContext
 } from '~/types/siigo-payments'
 import { canDeletePaymentRecord, paymentMethodLabel } from '~/utils/orderPayment'
+import { SIIGO_NUBE_DOCUMENTS_URL, SIIGO_NUBE_REGISTER_PAYMENT_URL } from '~/utils/siigoNube'
 
 const props = defineProps<{
   orderId: string
@@ -21,10 +21,6 @@ const open = shallowRef(false)
 const saving = shallowRef(false)
 const deleteOpen = shallowRef(false)
 const deletingPayment = shallowRef<OrderPayment | null>(null)
-const siigoOpen = shallowRef(false)
-const syncing = shallowRef(false)
-const syncingPayment = shallowRef<OrderPayment | null>(null)
-const stampAfterCreate = shallowRef(false)
 const historicalOpen = shallowRef(false)
 const historicalPayment = shallowRef<OrderPayment | null>(null)
 const toast = useToast()
@@ -85,7 +81,8 @@ function paymentInvoice(payment: OrderPayment) {
 
 function paymentHasSiigoAction(payment: OrderPayment) {
   return Boolean(paymentInvoice(payment)
-    && ((payment.provider === 'local' && payment.externalStatus === 'not_applicable') || payment.externalStatus === 'failed'))
+    && ((payment.provider === 'local' && payment.externalStatus === 'not_applicable')
+      || ['failed', 'unknown', 'pending'].includes(payment.externalStatus)))
 }
 
 function paymentInvoiceIsStamped(payment: OrderPayment) {
@@ -111,20 +108,12 @@ function openHistoricalSiigoPayment(payment: OrderPayment) {
   historicalOpen.value = true
 }
 
-function openSiigoPayment(payment: OrderPayment) {
-  if (!paymentHasSiigoAction(payment) || !paymentInvoiceIsStamped(payment)) return
-  syncingPayment.value = payment
-  stampAfterCreate.value = true
-  siigoOpen.value = true
+function paymentNeedsSiigoReview(payment: OrderPayment) {
+  return Boolean(payment.siigo?.voucherId || ['pending', 'unknown'].includes(payment.externalStatus))
 }
 
-function createAndStampHistoricalPayment() {
-  if (!historicalPayment.value || !context.value?.siigo.writeEnabled) return
-  syncingPayment.value = historicalPayment.value
-  stampAfterCreate.value = true
-  historicalOpen.value = false
-  historicalPayment.value = null
-  siigoOpen.value = true
+function paymentSiigoUrl(payment: OrderPayment) {
+  return paymentNeedsSiigoReview(payment) ? SIIGO_NUBE_DOCUMENTS_URL : SIIGO_NUBE_REGISTER_PAYMENT_URL
 }
 
 async function onPaymentDeleted(paymentId: string) {
@@ -190,59 +179,6 @@ async function createPayment(input: CreateOrderPaymentInput) {
     saving.value = false
   }
 }
-
-async function registerPaymentInSiigo(input: CreateOrderSiigoReceiptInput) {
-  if (!syncingPayment.value || syncing.value) return
-  syncing.value = true
-
-  try {
-    const payment = await $fetch<OrderPayment>(
-      `/api/orders/${encodeURIComponent(props.orderId)}/payments/${encodeURIComponent(syncingPayment.value.id)}/siigo-receipt`,
-      { method: 'POST', body: input }
-    )
-    siigoOpen.value = false
-    const requestedStamp = input.stamp === true
-    syncingPayment.value = null
-    stampAfterCreate.value = false
-    await refresh()
-    emit('created', payment)
-
-    if (payment.externalStatus !== 'synced') {
-      toast.add({
-        title: payment.externalStatus === 'unknown'
-          ? 'Resultado de Siigo incierto'
-          : payment.siigo?.voucherId
-            ? 'Recepción creada; no se pudo timbrar'
-            : 'La recepción no se creó en Siigo',
-        description: payment.externalError || 'Verifica el pago antes de volver a intentarlo.',
-        color: 'warning',
-        icon: 'i-lucide-triangle-alert',
-        duration: 9000
-      })
-      return
-    }
-
-    toast.add({
-      title: requestedStamp ? 'Recepción enviada a timbrar en Siigo' : 'Pago registrado en Siigo',
-      description: payment.siigo?.voucherName || (requestedStamp
-        ? 'La recepción quedó vinculada; consulta su aceptación en Siigo.'
-        : 'La recepción borrador quedó vinculada.'),
-      color: 'success',
-      icon: 'i-lucide-circle-check'
-    })
-  } catch (fetchError: unknown) {
-    const response = fetchError as { data?: { statusMessage?: string }, message?: string }
-    toast.add({
-      title: 'No se pudo registrar el pago en Siigo',
-      description: response.data?.statusMessage || response.message || 'Revisa los datos e intenta nuevamente.',
-      color: 'error',
-      icon: 'i-lucide-circle-alert',
-      duration: 8000
-    })
-  } finally {
-    syncing.value = false
-  }
-}
 </script>
 
 <template>
@@ -300,6 +236,11 @@ async function registerPaymentInSiigo(input: CreateOrderSiigoReceiptInput) {
         </div>
       </div>
 
+      <p v-if="context.siigo.assignedInvoiceStamped" class="text-sm text-muted">
+        Registra la recepción en Siigo Nube con la factura, el importe y la fecha de este pago.
+        Después usa «Asignar pago de Siigo» para vincularla aquí.
+      </p>
+
       <ul v-if="context.payments.length" class="divide-y divide-default">
         <li
           v-for="payment in context.payments"
@@ -326,8 +267,8 @@ async function registerPaymentInSiigo(input: CreateOrderSiigoReceiptInput) {
             </div>
             <p class="mt-1 text-sm text-muted">
               {{ paymentMethodLabel(payment.paymentMethod) }} · {{ formatDate(payment.paymentDate) }}
-              <template v-if="payment.siigo">
-                · Factura {{ payment.siigo.invoiceName }}
+              <template v-if="payment.siigo || context.siigo.assignedInvoice">
+                · Factura {{ payment.siigo?.invoiceName || context.siigo.assignedInvoice?.name }}
               </template>
             </p>
             <p class="mt-1 text-xs text-dimmed">
@@ -346,18 +287,20 @@ async function registerPaymentInSiigo(input: CreateOrderSiigoReceiptInput) {
             <UTooltip
               v-if="paymentHasSiigoAction(payment)"
               :text="paymentInvoiceIsStamped(payment)
-                ? payment.siigo?.voucherId ? 'Timbrar la recepción existente conservando la fecha del pago' : 'Crear y timbrar recepción en Siigo'
+                ? paymentNeedsSiigoReview(payment) ? 'Verifica la recepción existente en Siigo Nube antes de registrar otra.' : 'Abre Siigo Nube y selecciona la factura indicada para registrar la recepción.'
                 : 'La factura debe estar timbrada antes de registrar el pago en Siigo.'"
             >
               <span class="inline-flex">
                 <UButton
-                  :label="payment.siigo?.voucherId ? 'Timbrar recepción' : payment.externalStatus === 'failed' ? 'Reintentar en Siigo' : 'Crear y timbrar en Siigo'"
-                  icon="i-lucide-badge-check"
+                  :label="paymentNeedsSiigoReview(payment) ? 'Revisar en Siigo Nube' : 'Registrar pago en Siigo Nube'"
+                  :to="paymentSiigoUrl(payment)"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  icon="i-lucide-external-link"
                   color="neutral"
                   variant="ghost"
                   size="xs"
                   :disabled="!paymentInvoiceIsStamped(payment)"
-                  @click="openSiigoPayment(payment)"
                 />
               </span>
             </UTooltip>
@@ -409,23 +352,14 @@ async function registerPaymentInSiigo(input: CreateOrderSiigoReceiptInput) {
         :payment="deletingPayment"
         @deleted="onPaymentDeleted"
       />
-      <OrdersPaymentsOrderPaymentSiigoModal
-        v-if="syncingPayment"
-        v-model:open="siigoOpen"
-        :context="context"
-        :payment="syncingPayment"
-        :saving="syncing"
-        :stamp-after-create="stampAfterCreate"
-        @submit="registerPaymentInSiigo"
-      />
       <OrdersPaymentsOrderHistoricalReceiptModal
         v-if="historicalPayment"
         v-model:open="historicalOpen"
         :order-id="orderId"
         :payment-id="historicalPayment.id"
-        :can-create-and-stamp="context.siigo.writeEnabled && historicalPayment.externalStatus !== 'unknown'"
+        :siigo-url="paymentSiigoUrl(historicalPayment)"
+        :review-siigo-first="paymentNeedsSiigoReview(historicalPayment)"
         @assigned="onHistoricalPaymentAssigned"
-        @create-and-stamp="createAndStampHistoricalPayment"
       />
     </template>
   </div>

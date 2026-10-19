@@ -1,9 +1,9 @@
 // @vitest-environment nuxt
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { mockNuxtImport, mountSuspended, registerEndpoint } from '@nuxt/test-utils/runtime'
 import type { VueWrapper } from '@vue/test-utils'
 import OrderPaymentsCard from '~/components/orders/payments/OrderPaymentsCard.vue'
-import OrderPaymentSiigoModal from '~/components/orders/payments/OrderPaymentSiigoModal.vue'
+import { SIIGO_NUBE_DOCUMENTS_URL, SIIGO_NUBE_REGISTER_PAYMENT_URL } from '~/utils/siigoNube'
 import type { OrderPaymentContext } from '~/types/siigo-payments'
 
 const { useAuthMock } = vi.hoisted(() => ({
@@ -68,71 +68,80 @@ afterEach(() => {
   clearNuxtData()
 })
 
-describe('OrderPaymentsCard · timbrado', () => {
-  it('deshabilita Crear y timbrar en Siigo mientras la factura siga en borrador', async () => {
-    wrapper = await mountSuspended(OrderPaymentsCard, {
-      props: { orderId: 'order-stamp' },
-      global: {
-        stubs: {
-          UTooltip: { template: '<div><slot /></div>' }
-        }
-      }
-    })
+beforeEach(() => {
+  context.siigo.assignedInvoiceStamped = false
+  context.siigo.assignedInvoice!.stamped = false
+  context.siigo.assignedInvoice!.stampStatus = 'Draft'
+  context.siigo.writeEnabled = true
+  context.payments[0]!.provider = 'local'
+  context.payments[0]!.externalStatus = 'not_applicable'
+  context.payments[0]!.siigo = null
+})
 
-    await vi.waitFor(() => expect(wrapper?.text()).toContain('Crear y timbrar en Siigo'))
-    const registerButton = wrapper.findAll('button')
-      .find(button => button.text().trim() === 'Crear y timbrar en Siigo')
-    expect(registerButton?.attributes('disabled')).toBeDefined()
+async function mountPayments(stamped = false) {
+  context.siigo.assignedInvoiceStamped = stamped
+  context.siigo.assignedInvoice!.stamped = stamped
+  context.siigo.assignedInvoice!.stampStatus = stamped ? 'Accepted' : 'Draft'
+  wrapper = await mountSuspended(OrderPaymentsCard, {
+    props: { orderId: 'order-stamp' },
+    global: { stubs: { UTooltip: { template: '<div><slot /></div>' } } }
   })
+  await vi.waitFor(() => expect(wrapper?.text()).toContain('Factura FV-A-253'))
+  return wrapper
+}
 
-  it('oculta la asignación de pagos existentes mientras la factura siga en borrador', async () => {
-    wrapper = await mountSuspended(OrderPaymentsCard, {
-      props: { orderId: 'order-stamp' },
-      global: {
-        stubs: {
-          UTooltip: { template: '<div><slot /></div>' }
-        }
-      }
-    })
+function action(label: string) {
+  return wrapper!.findAllComponents({ name: 'UButton' }).find(button => button.props('label') === label)
+}
 
-    await vi.waitFor(() => expect(wrapper?.text()).toContain('Crear y timbrar en Siigo'))
+describe('OrderPaymentsCard · registro en Siigo Nube', () => {
+  it('deshabilita el registro y oculta la asignación mientras la factura sigue en borrador', async () => {
+    await mountPayments()
+    expect(action('Registrar pago en Siigo Nube')?.props('disabled')).toBe(true)
     expect(wrapper?.text()).not.toContain('Asignar pago de Siigo')
   })
 
-  it('permite al administrador buscar un pago existente cuando la factura está timbrada', async () => {
-    context.siigo.assignedInvoiceStamped = true
-    context.siigo.assignedInvoice!.stampStatus = 'Accepted'
-    context.siigo.assignedInvoice!.stamped = true
-    wrapper = await mountSuspended(OrderPaymentsCard, {
-      props: { orderId: 'order-stamp' },
-      global: {
-        stubs: {
-          UTooltip: { template: '<div><slot /></div>' }
-        }
-      }
-    })
-
-    await vi.waitFor(() => expect(wrapper?.text()).toContain('Asignar pago de Siigo'))
+  it('abre el formulario de Siigo en otra pestaña, sin formulario de timbrado de la aplicación', async () => {
+    context.siigo.writeEnabled = false
+    await mountPayments(true)
+    const link = action('Registrar pago en Siigo Nube')
+    expect(link?.props('to')).toBe(SIIGO_NUBE_REGISTER_PAYMENT_URL)
+    expect(link?.props('target')).toBe('_blank')
+    expect(link?.props('disabled')).toBe(false)
+    expect(wrapper?.text()).toContain('Asignar pago de Siigo')
+    expect(wrapper?.text()).toContain('el importe y la fecha de este pago')
+    expect(wrapper?.text()).not.toContain('Crear y timbrar')
+    expect(wrapper?.findComponent({ name: 'OrderPaymentSiigoModal' }).exists()).toBe(false)
   })
 
-  it('abre el registro directo en modo de creación y timbrado', async () => {
-    context.siigo.assignedInvoiceStamped = true
-    context.siigo.assignedInvoice!.stampStatus = 'Accepted'
-    context.siigo.assignedInvoice!.stamped = true
-    wrapper = await mountSuspended(OrderPaymentsCard, {
-      props: { orderId: 'order-stamp' },
-      global: {
-        stubs: {
-          UTooltip: { template: '<div><slot /></div>' }
-        }
-      }
-    })
+  it('un intento fallido sin recepción abre Siigo en lugar de repetir el POST fiscal', async () => {
+    context.payments[0]!.provider = 'siigo'
+    context.payments[0]!.externalStatus = 'failed'
+    await mountPayments(true)
+    expect(action('Registrar pago en Siigo Nube')?.props('to')).toBe(SIIGO_NUBE_REGISTER_PAYMENT_URL)
+    expect(wrapper?.text()).not.toContain('Reintentar en Siigo')
+  })
 
-    await vi.waitFor(() => expect(wrapper?.text()).toContain('Crear y timbrar en Siigo'))
-    const registerButton = wrapper.findAll('button')
-      .find(button => button.text().trim() === 'Crear y timbrar en Siigo')
-    await registerButton?.trigger('click')
+  it.each(['pending', 'unknown'] as const)('ofrece revisar documentos para un resultado %s', async (externalStatus) => {
+    context.payments[0]!.provider = 'siigo'
+    context.payments[0]!.externalStatus = externalStatus
+    await mountPayments(true)
+    expect(action('Revisar en Siigo Nube')?.props('to')).toBe(SIIGO_NUBE_DOCUMENTS_URL)
+    expect(action('Registrar pago en Siigo Nube')).toBeUndefined()
+  })
 
-    expect(wrapper.findComponent(OrderPaymentSiigoModal).props('stampAfterCreate')).toBe(true)
+  it('una recepción existente se revisa en Siigo para evitar crear otra', async () => {
+    const payment = context.payments[0]!
+    payment.provider = 'siigo'
+    payment.externalStatus = 'failed'
+    payment.siigo = {
+      voucherId: '497f6eca-6276-4993-bfeb-53cbbbba6f08', voucherName: 'RC-1-22',
+      invoiceId: context.siigo.assignedInvoice!.id, invoiceName: 'FV-A-253',
+      documentTypeId: 69452, paymentTypeId: 3560, costCenterId: null,
+      cfdiCode: '03', paymentMethod: 'PPD', quote: 1
+    }
+    await mountPayments(true)
+    expect(action('Revisar en Siigo Nube')?.props('to')).toBe(SIIGO_NUBE_DOCUMENTS_URL)
+    expect(wrapper?.text()).not.toContain('Timbrar recepción')
   })
 })
