@@ -98,8 +98,22 @@ describe('listado de pedidos', () => {
 
     expect(mocks.findMany).toHaveBeenLastCalledWith(expect.objectContaining({
       where: expect.objectContaining({
-        AND: expect.arrayContaining([{ NOT: counterFilter }])
+        AND: expect.arrayContaining([{
+          NOT: counterFilter,
+          customer: { isInternalOrderCustomer: false }
+        }])
       })
     }))
+  })
+
+  it('excluye clientes internos en vendedor también del conteo y del importe total', async () => {
+    await listOrders({ page: 2, pageSize: 25, view: 'vendedor', search: 'Cliente' }, admin)
+
+    const where = mocks.findMany.mock.calls[0]![0].where
+    expect(where.AND).toEqual(expect.arrayContaining([
+      expect.objectContaining({ customer: { isInternalOrderCustomer: false } })
+    ]))
+    expect(mocks.count).toHaveBeenCalledWith({ where })
+    expect(mocks.aggregate).toHaveBeenCalledWith({ where, _sum: { total: true } })
   })
 })

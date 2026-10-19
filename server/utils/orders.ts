@@ -883,7 +883,10 @@ export async function listOrders(options: {
       case 'mostrador':
         return counterCustomerFilter
       case 'vendedor':
-        return { NOT: counterCustomerFilter }
+        return {
+          NOT: counterCustomerFilter,
+          customer: { isInternalOrderCustomer: false }
+        }
       case 'pendiente_pago':
         return { paymentStatus: { in: ['pendiente_pago', 'abonado'] } }
       case 'entregado':
