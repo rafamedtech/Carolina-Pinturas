@@ -47,7 +47,10 @@ onMounted(() => {
 })
 const loading = computed(() => isHydrated.value && status.value === 'pending')
 
-const catalog = computed(() => data.value?.results || [])
+// Apply the exclusion before search, pagination, totals and CSV export.
+const catalog = computed(() => (data.value?.results ?? []).filter(product =>
+  product.account_group?.name?.trim().replace(/\s+/g, ' ').toLocaleLowerCase('es-MX') !== 'servicios gravados'
+))
 const normalizedFilter = computed(() => filter.value.trim().toLocaleLowerCase())
 const filteredProducts = computed(() => {
   if (!normalizedFilter.value) return catalog.value
