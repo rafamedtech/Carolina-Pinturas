@@ -3,7 +3,7 @@ import { parseDate } from '@internationalized/date'
 import type { DateValue } from '@internationalized/date'
 import type { OrderStatus, Repartidor } from '~/types/orders'
 import type { SiigoCustomer } from '~/types/siigo'
-import { PAYMENT_STATUSES, PAYMENT_METHODS } from '~/utils/orderPayment'
+import { PAYMENT_STATUSES, PAYMENT_METHODS, ORDER_PAYMENT_METHODS } from '~/utils/orderPayment'
 import { siigoCustomerPhone, siigoCustomerAddress, siigoCustomerName } from '~/utils/siigoCustomer'
 
 const props = withDefaults(defineProps<{
@@ -87,10 +87,14 @@ const paymentStatusOptions = PAYMENT_STATUSES.map(status => ({
   label: status.label,
   value: status.key as string
 }))
-const paymentMethodOptions = PAYMENT_METHODS.map(method => ({
-  label: method.label,
-  value: method.key as string
-}))
+const paymentMethodOptions = computed(() => {
+  const items: Array<{ label: string, value: string }> = PAYMENT_METHODS.map(method => ({ label: method.label, value: method.key }))
+  const selected = ORDER_PAYMENT_METHODS.find(method => method.key === paymentMethod.value)
+  if (selected && !items.some(item => item.value === selected.key)) {
+    items.push({ label: selected.label, value: selected.key })
+  }
+  return items
+})
 
 const tagItems = computed(() => [...new Set([...props.tagOptions, ...tags.value])])
 

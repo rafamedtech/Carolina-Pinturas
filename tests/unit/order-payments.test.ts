@@ -92,7 +92,8 @@ describe('pagos unificados de pedidos', () => {
     expect(paymentMethodFromCfdi('01')).toBe('efectivo')
     expect(paymentMethodFromCfdi('02')).toBe('cheque')
     expect(paymentMethodFromCfdi('03')).toBe('transferencia')
-    expect(paymentMethodFromCfdi('28')).toBe('tarjeta')
+    expect(paymentMethodFromCfdi('04')).toBe('tarjeta_credito')
+    expect(paymentMethodFromCfdi('28')).toBe('tarjeta_debito')
     expect(paymentMethodFromCfdi('99')).toBe('otro')
   })
 

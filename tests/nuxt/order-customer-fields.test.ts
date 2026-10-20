@@ -94,6 +94,15 @@ afterEach(() => {
 })
 
 describe('OrderCustomerFields', () => {
+  it('conserva visible la forma de pago de Siigo al editar un pedido', async () => {
+    const mounted = await mountFields()
+    await mounted.setProps({ paymentMethod: 'tarjeta_credito' })
+    const field = mounted.findAllComponents({ name: 'UFormField' }).find(component => component.props('name') === 'paymentMethod')!
+    const select = field.findComponent({ name: 'USelect' })
+    expect(select.props('modelValue')).toBe('tarjeta_credito')
+    expect(select.props('items')).toContainEqual({ label: 'Tarjeta de crédito', value: 'tarjeta_credito' })
+  })
+
   it('muestra un cliente fijo y oculta buscador y contacto en una venta de mostrador', async () => {
     const mounted = await mountFields({
       counterSale: true,

@@ -63,6 +63,29 @@ afterEach(() => {
 })
 
 describe('OrderPaymentsModal', () => {
+  it.each([
+    ['tarjeta_credito', '04 - Tarjeta de crédito'],
+    ['tarjeta_debito', '28 - Tarjeta de débito']
+  ])('muestra las formas de Siigo y guarda %s sin perder la distinción de tarjeta', async (method, label) => {
+    wrapper = await mountSuspended(OrderPaymentsModal, {
+      props: { open: false, context, saving: false }
+    })
+    await wrapper.setProps({ open: true })
+    const field = wrapper.findAllComponents({ name: 'UFormField' }).find(component => component.props('name') === 'paymentMethod')!
+    const select = field.findComponent({ name: 'USelect' })
+    const items = select.props('items') as Array<{ label: string, value: string }>
+    expect(items).toContainEqual({ label, value: method })
+    expect(items).toContainEqual({ label: '03 - Transferencia electrónica de fondos', value: 'transferencia' })
+    expect(items.map(item => item.value)).not.toContain('tarjeta')
+    expect(items.map(item => item.value)).not.toContain('otro')
+    select.vm.$emit('update:modelValue', method)
+    await wrapper.vm.$nextTick()
+    document.querySelector('#order-payment-form')!.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }))
+    await vi.waitFor(() => expect(wrapper?.emitted('submit')?.[0]).toEqual([expect.objectContaining({
+      destination: 'local', paymentMethod: method, amount: 110, date: '2026-10-13'
+    })]))
+  })
+
   it('exige distinguir crédito y débito cuando el pago local solo indica tarjeta', async () => {
     wrapper = await mountSuspended(OrderPaymentSiigoModal, {
       props: {

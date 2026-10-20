@@ -8,6 +8,12 @@ Se retiraron del modal las acciones de timbrado, registro o apertura de Siigo Nu
 
 La columna opcional `nube_invoice_code` y su migración publicada se conservan por compatibilidad con bases existentes; el flujo de pagos ya no la consulta ni requiere enlaces de Siigo.
 
+## Formas de pago locales
+
+El selector **Método de pago** de **Agregar pago** utiliza las formas CFDI del selector de recepción de pagos de Siigo México, con código y nombre. El catálogo compartido está en `shared/utils/paymentMethods.ts`; conserva claves locales estables y su equivalencia al código CFDI. Crédito (`04`, `tarjeta_credito`) y débito (`28`, `tarjeta_debito`) se registran por separado. No se ofrece `99 - Por definir` para dinero ya recibido.
+
+El servidor valida las mismas opciones al agregar un pago. Los valores históricos `tarjeta` y `otro` conservan sus etiquetas y siguen disponibles en filtros y edición de pedidos anteriores; no se infiere si una tarjeta histórica era de crédito o débito. Las consultas, los tickets y la conversión CFDI usan el mismo catálogo. Este cambio no crea ni modifica documentos fiscales ni cambia los catálogos de captura de compras o gastos.
+
 Al registrar un pago local se captura **la fecha en que se recibió el dinero**. Puede ser histórica y se guarda como fecha calendario, sin convertirla a otro día por zona horaria. La conciliación conserva esa fecha y no permite sustituirla por hoy.
 
 Las rutas de emisión por API conservadas en el servidor, sin acceso desde este modal, obtienen la fecha desde `sales_order_payments.payment_date` y verifican que coincida con la confirmada por el navegador. La solicitud de recepción usa esa misma fecha en `date`. El correo se obtiene de los contactos vigentes del cliente en Siigo. Las condiciones que manejan vencimiento, como Crédito Clientes, se excluyen de los ingresos.

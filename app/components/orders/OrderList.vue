@@ -4,7 +4,7 @@ import type { ListLayoutConfig } from '~/types/list'
 import { tableQueryField, tableQueryText, tableQueryPage, tableQueryRange, tableQueryBoolean } from '~/utils/tableQuery'
 import type { OrderDateRange, OrderStatus, SalesOrderListItem, SalesOrderListResponse } from '~/types/orders'
 import type { CsvColumn } from '~/utils/csv'
-import { paymentStatusLabel } from '~/utils/orderPayment'
+import { ORDER_PAYMENT_METHODS, paymentStatusLabel } from '~/utils/orderPayment'
 import { canCreateOrders } from '~/utils/roleAccess'
 
 const props = withDefaults(defineProps<{
@@ -236,7 +236,7 @@ const paymentStatusOptions = [{
 const paymentMethodOptions = [{
   label: 'Todos los métodos',
   value: 'all'
-}, ...PAYMENT_METHODS.filter(item => !['cheque', 'otro'].includes(item.key)).map(item => ({
+}, ...ORDER_PAYMENT_METHODS.map(item => ({
   label: item.label,
   value: item.key as string
 }))]

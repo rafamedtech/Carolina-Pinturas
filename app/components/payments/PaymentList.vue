@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { ListLayoutConfig } from '~/types/list'
-import { PAYMENT_METHODS, paymentMethodLabel } from '~/utils/orderPayment'
+import { ORDER_PAYMENT_METHODS, paymentMethodLabel } from '~/utils/orderPayment'
 import { tableQueryField, tableQueryText, tableQueryPage, tableQueryRange } from '~/utils/tableQuery'
 import type { OrderDateRange } from '~/types/orders'
 import type { PaymentListItem, PaymentListResponse } from '~/types/payments'
@@ -89,7 +89,7 @@ const listConfig: ListLayoutConfig = {
   id: 'payments', title: 'Pagos recibidos', empty: 'No hay pagos para mostrar.',
   search: { placeholder: 'Buscar pedido, cliente o referencia' }, dateFilter: { subject: 'pagos' },
   filters: [{ key: 'paymentMethod', label: 'Método de pago', type: 'select', defaultValue: 'all', items: [
-    { label: 'Todos los métodos', value: 'all' }, ...PAYMENT_METHODS.map(item => ({ label: item.label, value: item.key }))
+    { label: 'Todos los métodos', value: 'all' }, ...ORDER_PAYMENT_METHODS.map(item => ({ label: item.label, value: item.key }))
   ] }],
   pagination: { mode: 'server', label: 'pagos', totalLabel: 'Total recibido:', pageSize }
 }

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { formatDate, mexicoToday } from '~/utils/datetime'
 import { siigoReceiptPaymentDateError } from '#shared/utils/siigoReceiptDates'
+import { SIIGO_PAYMENT_METHODS, paymentMethodCfdiCode } from '~/utils/orderPayment'
 import * as z from 'zod'
 import type { FormSubmitEvent } from '@nuxt/ui'
 import type {
@@ -89,11 +90,7 @@ const canUseSiigo = computed(() =>
   && receiptPaymentTypes.value.length > 0
 )
 const cfdiItems = [
-  { label: '01 · Efectivo', value: '01' },
-  { label: '02 · Cheque nominativo', value: '02' },
-  { label: '03 · Transferencia electrónica', value: '03' },
-  { label: '04 · Tarjeta de crédito', value: '04' },
-  { label: '28 · Tarjeta de débito', value: '28' },
+  ...SIIGO_PAYMENT_METHODS.map(method => ({ label: `${method.cfdiCode} · ${method.label}`, value: method.cfdiCode })),
   { label: '99 · Por definir', value: '99' }
 ]
 const siigoMethodItems = [
@@ -102,12 +99,9 @@ const siigoMethodItems = [
 ]
 
 function localCfdiCode() {
-  if (props.payment.paymentMethod === 'efectivo') return '01'
-  if (props.payment.paymentMethod === 'cheque') return '02'
-  if (props.payment.paymentMethod === 'transferencia') return '03'
   // El registro local "tarjeta" no distingue crédito y débito: exigir selección.
   if (props.payment.paymentMethod === 'tarjeta') return ''
-  return '99'
+  return paymentMethodCfdiCode(props.payment.paymentMethod) ?? '99'
 }
 
 function defaultPaymentTypeId(cfdiCode: string) {

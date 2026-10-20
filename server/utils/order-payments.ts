@@ -3,7 +3,7 @@ import { orderMoney } from '#shared/utils/orderAmounts'
 import type { Prisma, SalesOrderPayment } from '../../generated/prisma/client'
 import type { AppUser, UserRole } from '~/types/siigo'
 import type { OrderPayment } from '~/types/siigo-payments'
-import { canDeletePaymentRecord, PAYMENT_METHOD_KEYS } from '~/utils/orderPayment'
+import { canDeletePaymentRecord, PAYMENT_FORM_KEYS, SIIGO_PAYMENT_METHODS } from '~/utils/orderPayment'
 
 const PAYMENT_DELETE_TRANSACTION_OPTIONS = {
   isolationLevel: 'Serializable' as const,
@@ -19,7 +19,7 @@ const amountSchema = z.number().positive('El importe debe ser mayor a cero.')
 export const createLocalOrderPaymentSchema = z.object({
   destination: z.literal('local'),
   requestId: z.string().uuid(),
-  paymentMethod: z.enum(PAYMENT_METHOD_KEYS as [string, ...string[]]),
+  paymentMethod: z.enum(PAYMENT_FORM_KEYS as [string, ...string[]]),
   amount: amountSchema,
   date: dateSchema,
   reference: z.string().trim().max(250).nullable().optional(),
@@ -29,11 +29,7 @@ export const createLocalOrderPaymentSchema = z.object({
 export const createOrderPaymentSchema = createLocalOrderPaymentSchema
 
 export function paymentMethodFromCfdi(cfdiCode: string) {
-  if (cfdiCode === '01') return 'efectivo'
-  if (cfdiCode === '02') return 'cheque'
-  if (cfdiCode === '03') return 'transferencia'
-  if (cfdiCode === '04' || cfdiCode === '28') return 'tarjeta'
-  return 'otro'
+  return SIIGO_PAYMENT_METHODS.find(method => method.cfdiCode === cfdiCode)?.key ?? 'otro'
 }
 
 export function paymentStatus(totalPaid: number, orderTotal: number) {

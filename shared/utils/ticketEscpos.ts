@@ -2,18 +2,12 @@ import ReceiptPrinterEncoder from '@point-of-sale/receipt-printer-encoder'
 import type { TicketOrder, TicketPrintOptions } from '../types/ticket'
 import { BUSINESS_INFO } from './businessInfo'
 import { formatDate } from './datetime'
+import { paymentMethodDisplayLabel } from './paymentMethods'
 
-// Local copies of the payment labels (app/utils/orderPayment.ts): shared code
-// cannot import from app/, and the builder also runs server-side.
+// Status labels used by the ticket builder, which also runs server-side.
 const PAYMENT_STATUS_LABELS: Record<string, string> = {
   pendiente_pago: 'Pendiente de pago',
   pago_recibido: 'Pago recibido'
-}
-
-const PAYMENT_METHOD_LABELS: Record<string, string> = {
-  efectivo: 'Efectivo',
-  transferencia: 'Transferencia',
-  tarjeta: 'Tarjeta'
 }
 
 function formatTaxLabel(tax: TicketOrder['taxBreakdown'][number]) {
@@ -112,7 +106,7 @@ export function buildTicketBytes(order: TicketOrder, options: TicketPrintOptions
       .newline()
       .line(`Pago: ${PAYMENT_STATUS_LABELS[order.paymentStatus] || order.paymentStatus}`)
     if (order.paymentMethod) {
-      encoder.line(`Método: ${PAYMENT_METHOD_LABELS[order.paymentMethod] || order.paymentMethod}`)
+      encoder.line(`Método: ${paymentMethodDisplayLabel(order.paymentMethod) || order.paymentMethod}`)
     }
   }
 

@@ -4,8 +4,8 @@ import type { DateValue } from '@internationalized/date'
 import * as z from 'zod'
 import type { FormSubmitEvent } from '@nuxt/ui'
 import type { CreateOrderPaymentInput, OrderPaymentContext } from '~/types/siigo-payments'
-import type { PaymentMethodKey } from '~/utils/orderPayment'
-import { PAYMENT_METHOD_KEYS, PAYMENT_METHODS } from '~/utils/orderPayment'
+import type { PaymentFormKey } from '~/utils/orderPayment'
+import { PAYMENT_FORM_KEYS, SIIGO_PAYMENT_METHODS } from '~/utils/orderPayment'
 import { mexicoToday } from '~/utils/datetime'
 
 const props = defineProps<{
@@ -20,7 +20,7 @@ const emit = defineEmits<{
 const open = defineModel<boolean>('open', { required: true })
 const requestId = shallowRef('')
 const schema = z.object({
-  paymentMethod: z.enum(PAYMENT_METHOD_KEYS as [PaymentMethodKey, ...PaymentMethodKey[]]),
+  paymentMethod: z.enum(PAYMENT_FORM_KEYS as [PaymentFormKey, ...PaymentFormKey[]]),
   amount: z.number().positive('Captura un importe mayor a cero.'),
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Captura una fecha válida.'),
   reference: z.string().max(250),
@@ -39,7 +39,7 @@ const paymentDate = computed<DateValue | undefined>({
   get: () => state.date ? parseDate(state.date) : undefined,
   set: (value) => { state.date = value?.toString() ?? '' }
 })
-const methodItems = PAYMENT_METHODS.map(method => ({ label: method.label, value: method.key }))
+const methodItems = SIIGO_PAYMENT_METHODS.map(method => ({ label: `${method.cfdiCode} - ${method.label}`, value: method.key }))
 
 watch(open, (isOpen) => {
   if (!isOpen) return

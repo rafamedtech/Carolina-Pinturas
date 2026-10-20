@@ -1,5 +1,5 @@
 import * as z from 'zod'
-import { PAYMENT_STATUS_KEYS, PAYMENT_METHOD_KEYS } from '~/utils/orderPayment'
+import { PAYMENT_STATUS_KEYS, ORDER_PAYMENT_METHOD_KEYS } from '~/utils/orderPayment'
 
 const dateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Usa una fecha con formato AAAA-MM-DD.')
 
@@ -41,11 +41,11 @@ const orderFieldsSchema = z.object({
   requiresInvoice: z.boolean().default(false),
   tags: z.array(z.string().trim().min(1).max(50)).max(20).default([]),
   paymentStatus: z.enum(PAYMENT_STATUS_KEYS as [string, ...string[]]).default('pendiente_pago'),
-  paymentMethod: z.enum(PAYMENT_METHOD_KEYS as [string, ...string[]]).nullable().optional(),
+  paymentMethod: z.enum(ORDER_PAYMENT_METHOD_KEYS as [string, ...string[]]).nullable().optional(),
   paymentDate: dateSchema.nullable().optional(),
   initialPayment: z.object({
     requestId: z.string().uuid(),
-    paymentMethod: z.enum(PAYMENT_METHOD_KEYS as [string, ...string[]]),
+    paymentMethod: z.enum(ORDER_PAYMENT_METHOD_KEYS as [string, ...string[]]),
     date: dateSchema
   }).optional(),
   ...discountFields,
