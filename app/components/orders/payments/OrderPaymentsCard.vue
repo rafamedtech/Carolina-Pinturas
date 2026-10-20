@@ -221,8 +221,21 @@ async function createPayment(input: CreateOrderPaymentInput) {
           <div>
             <div class="flex flex-wrap items-center gap-2">
               <p class="font-medium text-highlighted">
-                {{ paymentTitle(payment) }}
+                {{ formatDate(payment.paymentDate) }}
               </p>
+              <UTooltip
+                v-if="paymentHasHistoricalSiigoAction(payment)"
+                text="Asignar pago timbrado"
+              >
+                <UButton
+                  aria-label="Asignar pago timbrado"
+                  icon="i-lucide-link"
+                  color="neutral"
+                  variant="ghost"
+                  size="xs"
+                  @click="openHistoricalSiigoPayment(payment)"
+                />
+              </UTooltip>
               <UBadge
                 v-if="payment.provider === 'siigo'"
                 color="primary"
@@ -238,17 +251,10 @@ async function createPayment(input: CreateOrderPaymentInput) {
             </div>
             <div class="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted">
               <span>{{ paymentMethodLabel(payment.paymentMethod) }}</span>
-              <UButton
-                v-if="paymentHasHistoricalSiigoAction(payment)"
-                label="Asignar pago timbrado"
-                icon="i-lucide-link"
-                color="neutral"
-                variant="ghost"
-                size="xs"
-                @click="openHistoricalSiigoPayment(payment)"
-              />
               <span>
-                · {{ formatDate(payment.paymentDate) }}
+                <template v-if="payment.siigo || payment.reference">
+                  · {{ paymentTitle(payment) }}
+                </template>
                 <template v-if="payment.siigo || context.siigo.assignedInvoice">
                   · Factura {{ payment.siigo?.invoiceName || context.siigo.assignedInvoice?.name }}
                 </template>
