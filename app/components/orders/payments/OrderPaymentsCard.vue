@@ -227,7 +227,7 @@ async function createPayment(input: CreateOrderPaymentInput) {
                 v-if="payment.provider === 'siigo'"
                 color="primary"
                 variant="subtle"
-                label="Siigo"
+                :label="payment.externalStatus === 'synced' ? 'Timbrado' : 'Siigo'"
               />
               <UBadge
                 v-if="payment.provider === 'siigo' && payment.externalStatus !== 'synced'"
@@ -236,12 +236,24 @@ async function createPayment(input: CreateOrderPaymentInput) {
                 :label="payment.externalStatus === 'unknown' ? 'Por verificar' : 'No sincronizado'"
               />
             </div>
-            <p class="mt-1 text-sm text-muted">
-              {{ paymentMethodLabel(payment.paymentMethod) }} · {{ formatDate(payment.paymentDate) }}
-              <template v-if="payment.siigo || context.siigo.assignedInvoice">
-                · Factura {{ payment.siigo?.invoiceName || context.siigo.assignedInvoice?.name }}
-              </template>
-            </p>
+            <div class="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted">
+              <span>{{ paymentMethodLabel(payment.paymentMethod) }}</span>
+              <UButton
+                v-if="paymentHasHistoricalSiigoAction(payment)"
+                label="Asignar pago timbrado"
+                icon="i-lucide-link"
+                color="neutral"
+                variant="ghost"
+                size="xs"
+                @click="openHistoricalSiigoPayment(payment)"
+              />
+              <span>
+                · {{ formatDate(payment.paymentDate) }}
+                <template v-if="payment.siigo || context.siigo.assignedInvoice">
+                  · Factura {{ payment.siigo?.invoiceName || context.siigo.assignedInvoice?.name }}
+                </template>
+              </span>
+            </div>
             <p class="mt-1 text-xs text-dimmed">
               Registró {{ payment.createdBy.name }}
             </p>
@@ -254,15 +266,6 @@ async function createPayment(input: CreateOrderPaymentInput) {
               color="success"
               variant="subtle"
               :label="formatCurrency(payment.amount, payment.currencyCode)"
-            />
-            <UButton
-              v-if="paymentHasHistoricalSiigoAction(payment)"
-              label="Asignar pago timbrado"
-              icon="i-lucide-link"
-              color="neutral"
-              variant="ghost"
-              size="xs"
-              @click="openHistoricalSiigoPayment(payment)"
             />
             <UTooltip
               v-if="mayDeletePayments"
