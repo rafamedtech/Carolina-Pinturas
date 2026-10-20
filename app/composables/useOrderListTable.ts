@@ -8,7 +8,7 @@ import type { SortingState, VisibilityState } from '@tanstack/table-core'
 import type { SalesOrderListItem } from '~/types/orders'
 import { paymentStatusColor, paymentStatusLabel } from '~/utils/orderPayment'
 
-export function useOrderListTable(options: { returnTo: MaybeRefOrGetter<string>, igualacion?: boolean, billing?: MaybeRefOrGetter<boolean> }) {
+export function useOrderListTable(options: { returnTo: MaybeRefOrGetter<string>, igualacion?: boolean, billing?: MaybeRefOrGetter<boolean>, internal?: MaybeRefOrGetter<boolean> }) {
   const currency = new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' })
   const sorting = ref<SortingState>([])
   useTableQuery([tableQueryField('sort', sorting, tableQuerySorting)])
@@ -85,6 +85,23 @@ export function useOrderListTable(options: { returnTo: MaybeRefOrGetter<string>,
     )
   }
 
+  const tagsColumn: TableColumn<SalesOrderListItem> = {
+    id: 'tags',
+    accessorFn: row => (row.tags ?? []).join(', '),
+    header: sortableHeader('Etiquetas'),
+    cell: ({ row }) => {
+      const tags = row.original.tags ?? []
+      if (!tags.length) return h('span', { class: 'text-muted' }, '—')
+      return h('div', { class: 'flex max-w-xs flex-wrap gap-1' }, tags.map(tag => h(UBadge, {
+        key: tag,
+        color: 'neutral',
+        variant: 'subtle',
+        label: tag,
+        class: 'max-w-full whitespace-normal break-words'
+      })))
+    }
+  }
+
   const numberColumn: TableColumn<SalesOrderListItem> = options.igualacion
     ? {
         accessorKey: 'number',
@@ -132,7 +149,7 @@ export function useOrderListTable(options: { returnTo: MaybeRefOrGetter<string>,
     accessorFn: row => row.customer.name,
     header: sortableHeader('Cliente'),
     cell: ({ row }) => row.original.customer.name
-  }, {
+  }, ...(toValue(options.internal) ? [tagsColumn] : []), {
     id: 'rfc',
     accessorFn: row => row.customer.rfc || '',
     header: sortableHeader('RFC'),

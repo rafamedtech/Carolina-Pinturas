@@ -167,6 +167,10 @@ const csvColumns = computed<CsvColumn<SalesOrderListItem>[]>(() => {
     )
   }
 
+  if (isInternalCustomersView.value) {
+    columns.push({ key: 'tags', label: 'Etiquetas', value: row => (row.tags ?? []).join(', ') })
+  }
+
   columns.push(
     { key: 'status', label: 'Estado', value: row => row.status.label },
     { key: 'createdAt', label: 'Creado', value: row => formatDateTime(row.createdAt) },
@@ -282,6 +286,7 @@ const filterValues = useListFilterBindings({ paymentStatus: paymentStatusKey, pa
 const { columns, sorting, columnVisibility, selectedOrder, detailOpen, openOrder } = useOrderListTable({
   returnTo,
   igualacion: props.igualacion,
+  internal: isInternalCustomersView,
   billing: () => !props.igualacion && selectedTab.value === 'facturacion'
 })
 const listConfig = computed<ListLayoutConfig>(() => ({

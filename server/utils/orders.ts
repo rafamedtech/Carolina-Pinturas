@@ -355,6 +355,7 @@ function listItem(order: SalesOrder & {
     itemCount: order._count.items,
     paymentStatus: order.paymentStatus,
     paymentMethod: order.paymentMethod,
+    tags: order.tags,
     invoiceCreated: order.siigoInvoice?.status === 'created',
     ...(order.items
       ? {
