@@ -396,7 +396,7 @@ async function convertToPedido() {
               {{ formatDate(order.orderDate) }}
             </p>
             <div class="flex flex-wrap items-center gap-2">
-              <h1 class="text-xl font-semibold text-highlighted">
+              <h1 class="text-xl font-semibold text-primary">
                 {{ order.number }}
               </h1>
               <OrdersOrderStatusBadge class="hidden lg:inline-flex" :status="order.status" />
