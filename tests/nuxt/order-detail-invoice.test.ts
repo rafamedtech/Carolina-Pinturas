@@ -165,7 +165,7 @@ describe('OrderDetail · facturación', () => {
     // El botón queda en estado `loading` mientras se valida el contexto de
     // Siigo, así que hay que esperar a que se habilite antes de pulsarlo.
     await vi.waitFor(() => {
-      expect(wrapper?.text()).toContain('Asignar factura anterior')
+      expect(wrapper?.text()).toContain('Asignar factura')
       expect(contextChecks).toBe(1)
       expect(findInvoiceButton()?.attributes('disabled')).toBeUndefined()
     })
@@ -199,7 +199,7 @@ describe('OrderDetail · facturación', () => {
     const invoiceButton = wrapper.findAll('button')
       .find(button => button.text().trim() === 'Facturar')
     expect(invoiceButton?.attributes('disabled')).toBeDefined()
-    expect(wrapper.text()).toContain('Asignar factura anterior')
+    expect(wrapper.text()).toContain('Asignar factura')
   })
 
   it('permite abrir los pagos para seleccionar una factura existente', async () => {

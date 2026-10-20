@@ -57,7 +57,6 @@ const statusUnchanged = computed(() => selectedStatus.value === (order.value?.st
 // confirmado (or later) it becomes a regular order with delivery logistics.
 const isQuote = computed(() => order.value?.status.key === 'borrador')
 const isCounterSale = computed(() => Boolean(order.value?.isCounterSale))
-const documentLabel = computed(() => isQuote.value ? 'Cotización' : 'Pedido')
 const detailTitle = computed(() => isQuote.value ? 'Detalle de la cotización' : 'Detalle del pedido')
 
 // The document opens in a clean new tab (no controls); ?action triggers print /
@@ -394,7 +393,7 @@ async function convertToPedido() {
           <div class="[grid-area:info]">
             <p class="flex items-center gap-1.5 text-sm text-muted">
               <UIcon v-if="isQuote" name="i-lucide-file-text" class="size-4" />
-              {{ documentLabel }}
+              {{ formatDate(order.orderDate) }}
             </p>
             <div class="flex flex-wrap items-center gap-2">
               <h1 class="text-xl font-semibold text-highlighted">
@@ -416,9 +415,6 @@ async function convertToPedido() {
                 :label="order.invoiceCreated ? 'Facturado' : 'Sin facturar'"
               />
             </div>
-            <p class="mt-1 text-sm text-muted">
-              {{ formatDate(order.orderDate) }}
-            </p>
           </div>
           <div class="[grid-area:estados] flex flex-col items-end gap-2 lg:hidden">
             <OrdersOrderStatusBadge :status="order.status" />
@@ -449,7 +445,7 @@ async function convertToPedido() {
             />
             <UButton
               v-if="mayAssignHistoricalInvoice"
-              label="Asignar factura anterior"
+              label="Asignar factura"
               icon="i-lucide-link"
               color="neutral"
               variant="outline"

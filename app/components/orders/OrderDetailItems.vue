@@ -261,7 +261,7 @@ const columns: TableColumn<SalesOrderItem>[] = [{
   header: () => h('div', { class: 'text-right' }, 'Total'),
   cell: ({ row }) => h(
     'div',
-    { class: 'text-right font-medium' },
+    { class: 'text-right font-medium text-primary' },
     currency.value.format(row.original.total)
   )
 }]
@@ -372,7 +372,7 @@ const columns: TableColumn<SalesOrderItem>[] = [{
 
         <div class="flex items-end justify-between gap-4 border-t border-default pt-3">
           <span class="text-sm text-muted">Total</span>
-          <span class="text-base font-semibold text-highlighted">
+          <span class="text-base font-semibold text-primary">
             {{ currency.format(item.total) }}
           </span>
         </div>
