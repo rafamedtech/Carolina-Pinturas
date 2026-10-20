@@ -7,6 +7,7 @@ import type { CreateOrderPaymentInput, OrderPaymentContext } from '~/types/siigo
 import type { PaymentFormKey } from '~/utils/orderPayment'
 import { PAYMENT_FORM_KEYS, SIIGO_PAYMENT_METHODS } from '~/utils/orderPayment'
 import { mexicoToday } from '~/utils/datetime'
+import { orderMoney } from '#shared/utils/orderAmounts'
 
 const props = defineProps<{
   context: OrderPaymentContext
@@ -19,9 +20,12 @@ const emit = defineEmits<{
 
 const open = defineModel<boolean>('open', { required: true })
 const requestId = shallowRef('')
+const balance = computed(() => orderMoney(props.context.balance).toNumber())
 const schema = z.object({
   paymentMethod: z.enum(PAYMENT_FORM_KEYS as [PaymentFormKey, ...PaymentFormKey[]]),
-  amount: z.number().positive('Captura un importe mayor a cero.'),
+  amount: z.number().positive('Captura un importe mayor a cero.')
+    .refine(value => orderMoney(value).eq(value), 'El importe admite máximo dos decimales.')
+    .refine(value => value <= balance.value, 'El importe supera el saldo pendiente.'),
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Captura una fecha válida.'),
   reference: z.string().max(250),
   observations: z.string().max(2500)
@@ -45,7 +49,7 @@ watch(open, (isOpen) => {
   if (!isOpen) return
   requestId.value = crypto.randomUUID()
   state.paymentMethod = 'efectivo'
-  state.amount = props.context.balance
+  state.amount = balance.value
   state.date = mexicoToday()
   state.reference = ''
   state.observations = ''
@@ -92,8 +96,9 @@ function onSubmit(event: FormSubmitEvent<Schema>) {
           <UInputNumber
             v-model="state.amount"
             :min="0.01"
-            :max="context.balance"
+            :max="balance"
             :step="0.01"
+            :format-options="{ minimumFractionDigits: 2, maximumFractionDigits: 2 }"
             class="w-full"
           />
         </UFormField>

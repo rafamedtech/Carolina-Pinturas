@@ -3,6 +3,7 @@ import {
   assertOrderPaymentDeletionRole,
   assertPaymentFitsBalance,
   createOrderPaymentSchema,
+  orderPaymentTotals,
   paymentMethodFromCfdi,
   paymentStatus
 } from '../../server/utils/order-payments'
@@ -25,6 +26,25 @@ const orderInput = {
 }
 
 describe('pagos unificados de pedidos', () => {
+  it.each([
+    [758.505, [], { orderTotal: 758.51, paidTotal: 0, balance: 758.51 }],
+    [758.505, [100.1, 200.2], { orderTotal: 758.51, paidTotal: 300.3, balance: 458.21 }],
+    [0.3, [0.1, 0.2], { orderTotal: 0.3, paidTotal: 0.3, balance: 0 }],
+    [758.505, [758.5], { orderTotal: 758.51, paidTotal: 758.5, balance: 0.01 }],
+    [758.505, [758.51], { orderTotal: 758.51, paidTotal: 758.51, balance: 0 }],
+    [1.005, [], { orderTotal: 1.01, paidTotal: 0, balance: 1.01 }],
+    [10, [11], { orderTotal: 10, paidTotal: 11, balance: 0 }]
+  ])('calcula el saldo de %s en centavos sin residuos binarios', (total, amounts, expected) => {
+    expect(orderPaymentTotals(total, amounts.map(amount => ({ amount })))).toEqual(expected)
+    if (expected.balance > 0) {
+      expect(() => assertPaymentFitsBalance(expected.balance, expected.paidTotal, total)).not.toThrow()
+      expect(() => assertPaymentFitsBalance(expected.balance + 0.01, expected.paidTotal, total)).toThrow()
+      expect(paymentStatus(expected.paidTotal + expected.balance, total)).toBe('pago_recibido')
+      expect(createOrderPaymentSchema.safeParse({
+        destination: 'local', requestId, paymentMethod: 'efectivo', amount: expected.balance, date: '2026-10-20'
+      }).success).toBe(true)
+    }
+  })
   it('rechaza un día inexistente antes de persistir el pago', () => {
     expect(createOrderPaymentSchema.safeParse({
       destination: 'local', requestId, paymentMethod: 'efectivo', amount: 100, date: '2026-02-29'

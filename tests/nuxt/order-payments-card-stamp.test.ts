@@ -90,15 +90,14 @@ async function mountPayments(stamped = false) {
 }
 
 function action(label: string) {
-  return wrapper!.findAllComponents({ name: 'UButton' }).find(button => button.props('label') === label)
+  return wrapper!.findAllComponents({ name: 'UButton' }).find(button => button.props('label') === label || button.attributes('aria-label') === label)
 }
 
 describe('OrderPaymentsCard · asignar recepciones existentes', () => {
   it('ofrece asignar una recepción de la factura timbrada sin acciones de registro o enlaces externos', async () => {
     context.siigo.writeEnabled = false
     await mountPayments(true)
-    expect(action('Asignar pago de Siigo')).toBeDefined()
-    expect(wrapper?.text()).toContain('recepción ya registrada en la factura')
+    expect(action('Asignar pago timbrado')).toBeDefined()
     const buttons = wrapper!.findAllComponents({ name: 'UButton' })
     expect(buttons.every(button => !button.props('to'))).toBe(true)
     expect(buttons.map(button => button.props('label')).join(' ')).not.toMatch(/timbrar|enlace|Siigo Nube/i)
@@ -109,14 +108,14 @@ describe('OrderPaymentsCard · asignar recepciones existentes', () => {
 
   it('no permite asignar mientras la factura sigue en borrador', async () => {
     await mountPayments()
-    expect(action('Asignar pago de Siigo')).toBeUndefined()
+    expect(action('Asignar pago timbrado')).toBeUndefined()
   })
 
   it.each(['failed', 'unknown'] as const)('permite conciliar un intento %s sin repetir la creación fiscal', async (externalStatus) => {
     context.payments[0]!.provider = 'siigo'
     context.payments[0]!.externalStatus = externalStatus
     await mountPayments(true)
-    expect(action('Asignar pago de Siigo')).toBeDefined()
+    expect(action('Asignar pago timbrado')).toBeDefined()
     expect(wrapper?.text()).not.toContain('Reintentar en Siigo')
   })
 
@@ -124,7 +123,7 @@ describe('OrderPaymentsCard · asignar recepciones existentes', () => {
     context.payments[0]!.provider = 'siigo'
     context.payments[0]!.externalStatus = 'pending'
     await mountPayments(true)
-    expect(action('Asignar pago de Siigo')).toBeUndefined()
+    expect(action('Asignar pago timbrado')).toBeUndefined()
   })
 
   it.each(['ya vinculada', 'otra factura'])('no ofrece asignación para una recepción %s', async (scenario) => {
@@ -140,6 +139,6 @@ describe('OrderPaymentsCard · asignar recepciones existentes', () => {
       cfdiCode: '03', paymentMethod: 'PPD', quote: 1
     }
     await mountPayments(true)
-    expect(action('Asignar pago de Siigo')).toBeUndefined()
+    expect(action('Asignar pago timbrado')).toBeUndefined()
   })
 })

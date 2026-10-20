@@ -2,7 +2,7 @@ import type { OrderPaymentContext } from '~/types/siigo-payments'
 import { ORDER_LOGISTICS_ROLES } from '~/utils/roleAccess'
 import { requireRole } from '../../../../utils/auth'
 import { getOrder } from '../../../../utils/orders'
-import { orderPaymentView } from '../../../../utils/order-payments'
+import { orderPaymentTotals, orderPaymentView } from '../../../../utils/order-payments'
 import { usePrisma } from '../../../../utils/prisma'
 import { siigoRequest } from '../../../../utils/siigo'
 import { normalizeSiigoCustomer } from '../../../../utils/siigo-customers'
@@ -50,8 +50,7 @@ export default eventHandler(async (event): Promise<OrderPaymentContext> => {
     })
   ])
   const payments = persisted.map(orderPaymentView)
-  const paidTotal = payments.reduce((total, payment) => total + payment.amount, 0)
-  const orderBalance = Math.max(0, order.total - paidTotal)
+  const totals = orderPaymentTotals(order.total, payments)
   const baseSiigo: OrderPaymentContext['siigo'] = {
     available: false,
     writeEnabled: siigoFiscalWritesEnabled(),
@@ -110,9 +109,7 @@ export default eventHandler(async (event): Promise<OrderPaymentContext> => {
 
   return {
     requiresInvoice: order.requiresInvoice,
-    orderTotal: order.total,
-    paidTotal,
-    balance: orderBalance,
+    ...totals,
     payments,
     siigo: baseSiigo
   }

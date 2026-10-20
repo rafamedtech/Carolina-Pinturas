@@ -1,10 +1,12 @@
 // @vitest-environment nuxt
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { mountSuspended } from '@nuxt/test-utils/runtime'
+import { DOMWrapper } from '@vue/test-utils'
 import type { VueWrapper } from '@vue/test-utils'
 import OrderPaymentsModal from '~/components/orders/payments/OrderPaymentsModal.vue'
 import OrderPaymentSiigoModal from '~/components/orders/payments/OrderPaymentSiigoModal.vue'
 import type { OrderPayment, OrderPaymentContext } from '~/types/siigo-payments'
+import { createOrderPaymentSchema } from '../../server/utils/order-payments'
 
 const context: OrderPaymentContext = {
   requiresInvoice: true,
@@ -63,6 +65,38 @@ afterEach(() => {
 })
 
 describe('OrderPaymentsModal', () => {
+  it.each([
+    [758.505, 758.51],
+    [1.005, 1.01],
+    [0.09999999999999998, 0.1],
+    [0.01, 0.01]
+  ])('precarga el saldo %s a centavos y envía un pago válido de %s', async (balance, amount) => {
+    wrapper = await mountSuspended(OrderPaymentsModal, {
+      props: { open: true, context: { ...context, balance }, saving: false }
+    })
+    expect(wrapper.findComponent({ name: 'UInputNumber' }).props('modelValue')).toBe(amount)
+    expect(wrapper.findComponent({ name: 'UInputNumber' }).props('max')).toBe(amount)
+    expect(document.querySelector<HTMLInputElement>('input[role="spinbutton"]')?.value).toBe(amount.toFixed(2))
+    document.querySelector<HTMLFormElement>('#order-payment-form')!.requestSubmit()
+    await vi.waitFor(() => expect(wrapper?.emitted('submit')?.[0]?.[0]).toMatchObject({ amount }))
+    expect(createOrderPaymentSchema.safeParse(wrapper.emitted('submit')![0]![0]).success).toBe(true)
+  })
+
+  it.each([758.51, 758.5, 758.01, 100.1, 0.01])('conserva el importe manual %s al salir del campo y enviarlo', async (amount) => {
+    wrapper = await mountSuspended(OrderPaymentsModal, {
+      props: { open: true, context: { ...context, balance: 758.505 }, saving: false }
+    })
+    const input = document.querySelector<HTMLInputElement>('input[role="spinbutton"]')!
+    await vi.waitFor(() => expect(document.activeElement?.getAttribute('aria-label')).toBe('Close'))
+    const field = new DOMWrapper(input)
+    await field.setValue(String(amount))
+    await field.trigger('blur')
+    expect(input.value).toBe(amount.toFixed(2))
+    document.querySelector<HTMLFormElement>('#order-payment-form')!.requestSubmit()
+    await vi.waitFor(() => expect(wrapper?.emitted('submit')?.[0]?.[0]).toMatchObject({ amount }))
+    expect(createOrderPaymentSchema.safeParse(wrapper.emitted('submit')![0]![0]).success).toBe(true)
+  })
+
   it.each([
     ['tarjeta_credito', '04 - Tarjeta de crédito'],
     ['tarjeta_debito', '28 - Tarjeta de débito']

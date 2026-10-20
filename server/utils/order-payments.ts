@@ -28,6 +28,16 @@ export const createLocalOrderPaymentSchema = z.object({
 
 export const createOrderPaymentSchema = createLocalOrderPaymentSchema
 
+export function orderPaymentTotals(orderTotal: number, payments: readonly Pick<OrderPayment, 'amount'>[]) {
+  const total = orderMoney(orderTotal)
+  const paid = payments.reduce((sum, payment) => sum.plus(orderMoney(payment.amount)), orderMoney(0))
+  return {
+    orderTotal: total.toNumber(),
+    paidTotal: paid.toNumber(),
+    balance: Math.max(0, total.minus(paid).toNumber())
+  }
+}
+
 export function paymentMethodFromCfdi(cfdiCode: string) {
   return SIIGO_PAYMENT_METHODS.find(method => method.cfdiCode === cfdiCode)?.key ?? 'otro'
 }
