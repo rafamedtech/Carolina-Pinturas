@@ -3,8 +3,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { mockNuxtImport, mountSuspended, registerEndpoint } from '@nuxt/test-utils/runtime'
 import type { VueWrapper } from '@vue/test-utils'
 import OrderPaymentsCard from '~/components/orders/payments/OrderPaymentsCard.vue'
-import OrderSiigoInvoiceLinkModal from '~/components/orders/payments/OrderSiigoInvoiceLinkModal.vue'
-import { SIIGO_NUBE_DOCUMENTS_URL, siigoNubeInvoiceUrl, siigoNubePaymentUrl } from '~/utils/siigoNube'
 import type { OrderPaymentContext } from '~/types/siigo-payments'
 
 const { useAuthMock } = vi.hoisted(() => ({
@@ -73,7 +71,6 @@ beforeEach(() => {
   context.siigo.assignedInvoiceStamped = false
   context.siigo.assignedInvoice!.stamped = false
   context.siigo.assignedInvoice!.stampStatus = 'Draft'
-  context.siigo.invoiceNubeCode = 87200
   context.siigo.writeEnabled = true
   context.payments[0]!.provider = 'local'
   context.payments[0]!.externalStatus = 'not_applicable'
@@ -96,71 +93,53 @@ function action(label: string) {
   return wrapper!.findAllComponents({ name: 'UButton' }).find(button => button.props('label') === label)
 }
 
-describe('OrderPaymentsCard · registro en Siigo Nube', () => {
-  it('sin enlace guardado pide vincular la factura y no abre un registro vacío', async () => {
-    context.siigo.invoiceNubeCode = null
-    await mountPayments(true)
-    const button = action('Vincular factura para registrar pago')
-    expect(button?.props('to')).toBeUndefined()
-    expect(action('Registrar pago en Siigo Nube')).toBeUndefined()
-    await button!.trigger('click')
-    await vi.waitFor(() => expect(document.body.textContent).toContain('Guarda el enlace de FV-A-253 una sola vez'))
-    wrapper!.findComponent(OrderSiigoInvoiceLinkModal).vm.$emit('saved', 87200)
-    await vi.waitFor(() => expect(action('Registrar pago en Siigo Nube')?.props('to')).toBe(siigoNubePaymentUrl(87200)))
-  })
-
-  it('ofrece abrir directamente la factura vinculada', async () => {
-    await mountPayments(true)
-    expect(action('Abrir factura en Siigo Nube')?.props('to')).toBe(siigoNubeInvoiceUrl(87200))
-  })
-
-  it('deshabilita el registro y oculta la asignación mientras la factura sigue en borrador', async () => {
-    await mountPayments()
-    expect(action('Registrar pago en Siigo Nube')?.props('disabled')).toBe(true)
-    expect(wrapper?.text()).not.toContain('Asignar pago de Siigo')
-  })
-
-  it('abre el formulario de Siigo en otra pestaña, sin formulario de timbrado de la aplicación', async () => {
+describe('OrderPaymentsCard · asignar recepciones existentes', () => {
+  it('ofrece asignar una recepción de la factura timbrada sin acciones de registro o enlaces externos', async () => {
     context.siigo.writeEnabled = false
     await mountPayments(true)
-    const link = action('Registrar pago en Siigo Nube')
-    expect(link?.props('to')).toBe(siigoNubePaymentUrl(87200))
-    expect(link?.props('target')).toBe('_blank')
-    expect(link?.props('disabled')).toBe(false)
-    expect(wrapper?.text()).toContain('Asignar pago de Siigo')
-    expect(wrapper?.text()).toContain('el importe y la fecha de este pago')
-    expect(wrapper?.text()).not.toContain('Crear y timbrar')
+    expect(action('Asignar pago de Siigo')).toBeDefined()
+    expect(wrapper?.text()).toContain('recepción ya registrada en la factura')
+    const buttons = wrapper!.findAllComponents({ name: 'UButton' })
+    expect(buttons.every(button => !button.props('to'))).toBe(true)
+    expect(buttons.map(button => button.props('label')).join(' ')).not.toMatch(/timbrar|enlace|Siigo Nube/i)
     expect(wrapper?.findComponent({ name: 'OrderPaymentSiigoModal' }).exists()).toBe(false)
+    // El registro local de abonos sigue disponible y es independiente de Siigo.
+    expect(action('Agregar pago')).toBeDefined()
   })
 
-  it('un intento fallido sin recepción abre Siigo en lugar de repetir el POST fiscal', async () => {
-    context.payments[0]!.provider = 'siigo'
-    context.payments[0]!.externalStatus = 'failed'
-    await mountPayments(true)
-    expect(action('Registrar pago en Siigo Nube')?.props('to')).toBe(siigoNubePaymentUrl(87200))
-    expect(wrapper?.text()).not.toContain('Reintentar en Siigo')
+  it('no permite asignar mientras la factura sigue en borrador', async () => {
+    await mountPayments()
+    expect(action('Asignar pago de Siigo')).toBeUndefined()
   })
 
-  it.each(['pending', 'unknown'] as const)('ofrece revisar documentos para un resultado %s', async (externalStatus) => {
+  it.each(['failed', 'unknown'] as const)('permite conciliar un intento %s sin repetir la creación fiscal', async (externalStatus) => {
     context.payments[0]!.provider = 'siigo'
     context.payments[0]!.externalStatus = externalStatus
     await mountPayments(true)
-    expect(action('Revisar en Siigo Nube')?.props('to')).toBe(SIIGO_NUBE_DOCUMENTS_URL)
-    expect(action('Registrar pago en Siigo Nube')).toBeUndefined()
+    expect(action('Asignar pago de Siigo')).toBeDefined()
+    expect(wrapper?.text()).not.toContain('Reintentar en Siigo')
   })
 
-  it('una recepción existente se revisa en Siigo para evitar crear otra', async () => {
+  it('mantiene bloqueado un pago reservado en curso', async () => {
+    context.payments[0]!.provider = 'siigo'
+    context.payments[0]!.externalStatus = 'pending'
+    await mountPayments(true)
+    expect(action('Asignar pago de Siigo')).toBeUndefined()
+  })
+
+  it.each(['ya vinculada', 'otra factura'])('no ofrece asignación para una recepción %s', async (scenario) => {
     const payment = context.payments[0]!
     payment.provider = 'siigo'
     payment.externalStatus = 'failed'
     payment.siigo = {
-      voucherId: '497f6eca-6276-4993-bfeb-53cbbbba6f08', voucherName: 'RC-1-22',
-      invoiceId: context.siigo.assignedInvoice!.id, invoiceName: 'FV-A-253',
+      voucherId: scenario === 'ya vinculada' ? '497f6eca-6276-4993-bfeb-53cbbbba6f08' : null,
+      voucherName: null,
+      invoiceId: scenario === 'otra factura' ? 'e6403695-032f-4711-842b-dd7b95bcf008' : context.siigo.assignedInvoice!.id,
+      invoiceName: 'FV-A-253',
       documentTypeId: 69452, paymentTypeId: 3560, costCenterId: null,
       cfdiCode: '03', paymentMethod: 'PPD', quote: 1
     }
     await mountPayments(true)
-    expect(action('Revisar en Siigo Nube')?.props('to')).toBe(SIIGO_NUBE_DOCUMENTS_URL)
-    expect(wrapper?.text()).not.toContain('Timbrar recepción')
+    expect(action('Asignar pago de Siigo')).toBeUndefined()
   })
 })

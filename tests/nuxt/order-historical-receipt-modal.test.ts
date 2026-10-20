@@ -65,11 +65,10 @@ describe('OrderHistoricalReceiptModal', () => {
 
   it('oculta los resultados y acciones anteriores mientras vuelve a consultar al reabrir', async () => {
     wrapper = await mountSuspended(OrderHistoricalReceiptModal, {
-      props: { open: false, orderId: 'order-1', paymentId: 'payment-1',
-        siigoUrl: 'https://siigonube.siigo.mx/#/vouchers/844?invoicecode=87200' }
+      props: { open: false, orderId: 'order-1', paymentId: 'payment-1' }
     })
     await wrapper.setProps({ open: true })
-    await vi.waitFor(() => expect(document.body.textContent).toContain('Registrar pago en Siigo Nube'))
+    await vi.waitFor(() => expect(document.body.textContent).toContain('Sin pagos compatibles'))
     await wrapper.setProps({ open: false })
     receiptGate = new Promise<void>((resolve) => {
       releaseReceipts = resolve
@@ -80,43 +79,21 @@ describe('OrderHistoricalReceiptModal', () => {
     expect(document.body.textContent).not.toContain('Registrar pago en Siigo Nube')
     expect(document.body.querySelector('#historical-receipt-form')).toBeNull()
     releaseReceipts!()
-    await vi.waitFor(() => expect(document.body.textContent).toContain('Registrar pago en Siigo Nube'))
+    await vi.waitFor(() => expect(document.body.textContent).toContain('Sin pagos compatibles'))
   })
 
-  it('ofrece abrir Siigo Nube cuando no encuentra una recepción compatible', async () => {
-    wrapper = await mountSuspended(OrderHistoricalReceiptModal, {
-      props: {
-        open: false,
-        orderId: 'order-1',
-        paymentId: 'payment-1',
-        siigoUrl: 'https://siigonube.siigo.mx/#/vouchers/844?invoicecode=87200'
-      }
-    })
-    await wrapper.setProps({ open: true })
-
-    await vi.waitFor(() => {
-      expect(document.body.textContent).toContain('Sin pagos compatibles')
-      expect(document.body.textContent).toContain('Registrar pago en Siigo Nube')
-    })
-
-    const action = wrapper.findAllComponents({ name: 'UButton' })
-      .find(button => button.props('label') === 'Registrar pago en Siigo Nube')
-    expect(action?.props('to')).toBe('https://siigonube.siigo.mx/#/vouchers/844?invoicecode=87200')
-    expect(action?.props('target')).toBe('_blank')
-    expect(wrapper.emitted('createAndStamp')).toBeUndefined()
-  })
-
-  it('sin enlace solicita vincular la factura en lugar de abrir un pago vacío', async () => {
+  it('sin recepciones compatibles solo informa y permite cerrar, sin crear pagos ni guardar enlaces', async () => {
     wrapper = await mountSuspended(OrderHistoricalReceiptModal, {
       props: { open: false, orderId: 'order-1', paymentId: 'payment-1' }
     })
     await wrapper.setProps({ open: true })
-    await vi.waitFor(() => expect(document.body.textContent).toContain('Vincular factura para registrar pago'))
-    const action = wrapper.findAllComponents({ name: 'UButton' })
-      .find(button => button.props('label') === 'Vincular factura para registrar pago')!
-    expect(action.props('to')).toBeUndefined()
-    await action.trigger('click')
-    expect(wrapper.emitted('configureLink')).toHaveLength(1)
+    await vi.waitFor(() => expect(document.body.textContent).toContain('Sin pagos compatibles'))
+    expect(document.body.textContent).toContain('Registra primero la recepción en la factura correspondiente dentro de Siigo')
+    const buttons = wrapper.findAllComponents({ name: 'UButton' })
+    expect(buttons.some(button => button.props('label') === 'Cancelar')).toBe(true)
+    expect(buttons.every(button => !button.props('to'))).toBe(true)
+    expect(buttons.map(button => button.props('label')).join(' ')).not.toMatch(/registrar|timbrar|enlace|asignar pago/i)
+    expect(document.body.querySelector('#historical-receipt-form')).toBeNull()
   })
 
   it('muestra el pago aplicado a la factura en el selector', async () => {

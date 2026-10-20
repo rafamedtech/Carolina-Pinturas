@@ -6,7 +6,6 @@ import type {
   OrderPaymentContext
 } from '~/types/siigo-payments'
 import { canDeletePaymentRecord, paymentMethodLabel } from '~/utils/orderPayment'
-import { SIIGO_NUBE_DOCUMENTS_URL, siigoNubeInvoiceUrl, siigoNubePaymentUrl } from '~/utils/siigoNube'
 
 const props = defineProps<{
   orderId: string
@@ -23,8 +22,6 @@ const deleteOpen = shallowRef(false)
 const deletingPayment = shallowRef<OrderPayment | null>(null)
 const historicalOpen = shallowRef(false)
 const historicalPayment = shallowRef<OrderPayment | null>(null)
-const invoiceLinkOpen = shallowRef(false)
-const invoiceUrl = computed(() => siigoNubeInvoiceUrl(context.value?.siigo.invoiceNubeCode))
 const toast = useToast()
 const { user } = useAuth()
 const {
@@ -75,27 +72,12 @@ function openDeletePayment(payment: OrderPayment) {
   deleteOpen.value = true
 }
 
-function paymentInvoice(payment: OrderPayment) {
-  const assignedInvoice = context.value?.siigo.assignedInvoice
-  if (payment.siigo?.invoiceId && payment.siigo.invoiceId !== assignedInvoice?.id) return undefined
-  return assignedInvoice
-}
-
-function paymentHasSiigoAction(payment: OrderPayment) {
-  return Boolean(paymentInvoice(payment)
-    && ((payment.provider === 'local' && payment.externalStatus === 'not_applicable')
-      || ['failed', 'unknown', 'pending'].includes(payment.externalStatus)))
-}
-
-function paymentInvoiceIsStamped(payment: OrderPayment) {
-  return paymentInvoice(payment)?.stamped === true
-}
-
 function paymentHasHistoricalSiigoAction(payment: OrderPayment) {
   return Boolean(
     mayAssignHistoricalReceipts.value
     && context.value?.siigo.assignedInvoiceId
     && context.value.siigo.assignedInvoiceStamped
+    && (!payment.siigo?.invoiceId || payment.siigo.invoiceId === context.value.siigo.assignedInvoiceId)
     && !payment.siigo?.voucherId
     && (
       (payment.provider === 'local' && payment.externalStatus === 'not_applicable')
@@ -108,31 +90,6 @@ function openHistoricalSiigoPayment(payment: OrderPayment) {
   if (!paymentHasHistoricalSiigoAction(payment)) return
   historicalPayment.value = payment
   historicalOpen.value = true
-}
-
-function paymentNeedsSiigoReview(payment: OrderPayment) {
-  return Boolean(payment.siigo?.voucherId || ['pending', 'unknown'].includes(payment.externalStatus))
-}
-
-function paymentSiigoUrl(payment: OrderPayment) {
-  return paymentNeedsSiigoReview(payment)
-    ? SIIGO_NUBE_DOCUMENTS_URL
-    : siigoNubePaymentUrl(context.value?.siigo.invoiceNubeCode) ?? undefined
-}
-
-function configureInvoiceLink() {
-  historicalOpen.value = false
-  invoiceLinkOpen.value = true
-}
-
-function onInvoiceLinkSaved(code: number) {
-  if (context.value) {
-    context.value = {
-      ...context.value,
-      siigo: { ...context.value.siigo, invoiceNubeCode: code }
-    }
-  }
-  toast.add({ title: 'Enlace de factura guardado', color: 'success' })
 }
 
 async function onPaymentDeleted(paymentId: string) {
@@ -256,31 +213,9 @@ async function createPayment(input: CreateOrderPaymentInput) {
       </div>
 
       <p v-if="context.siigo.assignedInvoiceStamped" class="text-sm text-muted">
-        {{ invoiceUrl ? 'Siigo abrirá el registro de pago con la factura preseleccionada. Conserva el importe y la fecha de este pago.' : 'Vincula el enlace de la factura una sola vez para abrir sus pagos con la factura preseleccionada en Siigo Nube.' }}
-        Después usa «Asignar pago de Siigo» para vincularla aquí.
+        Usa «Asignar pago de Siigo» para vincular una recepción ya registrada en la factura de este pedido.
+        Deben coincidir el cliente, la fecha y el importe del pago local.
       </p>
-
-      <div v-if="context.siigo.assignedInvoice" class="flex flex-wrap gap-2">
-        <UButton
-          v-if="invoiceUrl"
-          label="Abrir factura en Siigo Nube"
-          :to="invoiceUrl"
-          target="_blank"
-          rel="noopener noreferrer"
-          icon="i-lucide-external-link"
-          color="neutral"
-          variant="outline"
-          size="xs"
-        />
-        <UButton
-          :label="invoiceUrl ? 'Cambiar enlace de factura' : 'Vincular factura de Siigo Nube'"
-          icon="i-lucide-link"
-          color="neutral"
-          variant="ghost"
-          size="xs"
-          @click="configureInvoiceLink"
-        />
-      </div>
 
       <ul v-if="context.payments.length" class="divide-y divide-default">
         <li
@@ -325,27 +260,6 @@ async function createPayment(input: CreateOrderPaymentInput) {
               variant="subtle"
               :label="formatCurrency(payment.amount, payment.currencyCode)"
             />
-            <UTooltip
-              v-if="paymentHasSiigoAction(payment)"
-              :text="paymentInvoiceIsStamped(payment)
-                ? paymentNeedsSiigoReview(payment) ? 'Verifica la recepción existente en Siigo Nube antes de registrar otra.' : invoiceUrl ? 'Abre Siigo Nube con esta factura preseleccionada.' : 'Guarda el enlace de la factura para abrir el registro de pago con su información.'
-                : 'La factura debe estar timbrada antes de registrar el pago en Siigo.'"
-            >
-              <span class="inline-flex">
-                <UButton
-                  :label="paymentNeedsSiigoReview(payment) ? 'Revisar en Siigo Nube' : invoiceUrl ? 'Registrar pago en Siigo Nube' : 'Vincular factura para registrar pago'"
-                  :to="paymentSiigoUrl(payment)"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  icon="i-lucide-external-link"
-                  color="neutral"
-                  variant="ghost"
-                  size="xs"
-                  :disabled="!paymentInvoiceIsStamped(payment)"
-                  @click="!paymentSiigoUrl(payment) && configureInvoiceLink()"
-                />
-              </span>
-            </UTooltip>
             <UButton
               v-if="paymentHasHistoricalSiigoAction(payment)"
               label="Asignar pago de Siigo"
@@ -387,15 +301,6 @@ async function createPayment(input: CreateOrderPaymentInput) {
         :saving="saving"
         @submit="createPayment"
       />
-      <OrdersPaymentsOrderSiigoInvoiceLinkModal
-        v-if="context.siigo.assignedInvoice"
-        v-model:open="invoiceLinkOpen"
-        :order-id="orderId"
-        :invoice-id="context.siigo.assignedInvoice.id"
-        :invoice-name="context.siigo.assignedInvoice.name"
-        :invoice-code="context.siigo.invoiceNubeCode"
-        @saved="onInvoiceLinkSaved"
-      />
       <OrdersPaymentsOrderPaymentDeleteModal
         v-if="deletingPayment"
         v-model:open="deleteOpen"
@@ -408,9 +313,6 @@ async function createPayment(input: CreateOrderPaymentInput) {
         v-model:open="historicalOpen"
         :order-id="orderId"
         :payment-id="historicalPayment.id"
-        :siigo-url="paymentSiigoUrl(historicalPayment)"
-        :review-siigo-first="paymentNeedsSiigoReview(historicalPayment)"
-        @configure-link="configureInvoiceLink"
         @assigned="onHistoricalPaymentAssigned"
       />
     </template>
