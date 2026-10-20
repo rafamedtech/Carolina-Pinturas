@@ -173,6 +173,10 @@ const csvColumns = computed<CsvColumn<SalesOrderListItem>[]>(() => {
     { key: 'updatedAt', label: 'Última actualización', value: row => formatDateTime(row.updatedAt) }
   )
 
+  if (selectedTab.value === 'facturacion') {
+    columns.push({ key: 'invoiceCreated', label: 'Estado de facturación', value: row => row.invoiceCreated ? 'Facturado' : 'Sin facturar' })
+  }
+
   return columns
 })
 
@@ -275,7 +279,11 @@ const newOrderItems = computed<DropdownMenuItem[][]>(() => [[
 ]])
 
 const filterValues = useListFilterBindings({ paymentStatus: paymentStatusKey, paymentMethod: paymentMethodKey, hideCancelled, hideQuotes })
-const { columns, sorting, columnVisibility, selectedOrder, detailOpen, openOrder } = useOrderListTable({ returnTo, igualacion: props.igualacion })
+const { columns, sorting, columnVisibility, selectedOrder, detailOpen, openOrder } = useOrderListTable({
+  returnTo,
+  igualacion: props.igualacion,
+  billing: () => !props.igualacion && selectedTab.value === 'facturacion'
+})
 const listConfig = computed<ListLayoutConfig>(() => ({
   id: props.igualacion ? 'igualaciones' : 'sales-orders', title: props.title,
   empty: props.igualacion ? 'No hay igualaciones para mostrar.' : 'No hay pedidos para mostrar.',

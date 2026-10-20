@@ -58,6 +58,7 @@ export interface SalesOrderListItem {
   itemCount: number
   paymentStatus: string
   paymentMethod: string | null
+  invoiceCreated?: boolean
   partidas?: { code: string, name: string, quantity: number, observations: string | null, isIgualacion: boolean }[]
   createdAt: string
   updatedAt: string

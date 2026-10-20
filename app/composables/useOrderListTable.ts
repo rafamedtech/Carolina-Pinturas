@@ -8,7 +8,7 @@ import type { SortingState, VisibilityState } from '@tanstack/table-core'
 import type { SalesOrderListItem } from '~/types/orders'
 import { paymentStatusColor, paymentStatusLabel } from '~/utils/orderPayment'
 
-export function useOrderListTable(options: { returnTo: MaybeRefOrGetter<string>, igualacion?: boolean }) {
+export function useOrderListTable(options: { returnTo: MaybeRefOrGetter<string>, igualacion?: boolean, billing?: MaybeRefOrGetter<boolean> }) {
   const currency = new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' })
   const sorting = ref<SortingState>([])
   useTableQuery([tableQueryField('sort', sorting, tableQuerySorting)])
@@ -60,6 +60,17 @@ export function useOrderListTable(options: { returnTo: MaybeRefOrGetter<string>,
     cell: ({ row }) => h(UBadge, {
       color: paymentStatusColor(row.original.paymentStatus),
       label: paymentStatusLabel(row.original.paymentStatus),
+      variant: 'subtle'
+    })
+  }
+
+  const invoiceStatusColumn: TableColumn<SalesOrderListItem> = {
+    id: 'invoiceCreated',
+    accessorFn: row => row.invoiceCreated ? 'Facturado' : 'Sin facturar',
+    header: sortableHeader('Estado de facturación'),
+    cell: ({ row }) => h(UBadge, {
+      color: row.original.invoiceCreated ? 'success' : 'warning',
+      label: row.original.invoiceCreated ? 'Facturado' : 'Sin facturar',
       variant: 'subtle'
     })
   }
@@ -134,7 +145,7 @@ export function useOrderListTable(options: { returnTo: MaybeRefOrGetter<string>,
     accessorFn: row => row.status.sortOrder,
     header: sortableHeader('Estado'),
     cell: ({ row }) => h(OrderStatusBadge, { status: row.original.status })
-  }, ...(options.igualacion ? [] : [totalColumn]), {
+  }, ...(toValue(options.billing) ? [invoiceStatusColumn] : []), ...(options.igualacion ? [] : [totalColumn]), {
     accessorKey: 'createdAt',
     header: sortableHeader('Creado'),
     cell: ({ row }) => formatDateTime(row.original.createdAt)

@@ -328,6 +328,7 @@ function assertStatusPermission(user: AppUser, statusKey: string) {
 }
 
 function listItem(order: SalesOrder & {
+  siigoInvoice?: { status: string } | null
   status: { key: string, label: string, color: string, sortOrder: number, isTerminal: boolean }
   _count: { items: number }
   items?: { productCodeSnapshot: string, productNameSnapshot: string, quantity: Prisma.Decimal, observations: string | null }[]
@@ -354,6 +355,7 @@ function listItem(order: SalesOrder & {
     itemCount: order._count.items,
     paymentStatus: order.paymentStatus,
     paymentMethod: order.paymentMethod,
+    invoiceCreated: order.siigoInvoice?.status === 'created',
     ...(order.items
       ? {
           partidas: order.items.map(item => ({
@@ -938,6 +940,7 @@ export async function listOrders(options: {
       where,
       include: {
         status: true,
+        siigoInvoice: { select: { status: true } },
         _count: { select: { items: true } },
         ...(isIgualacionesView
           ? {

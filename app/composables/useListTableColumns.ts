@@ -4,7 +4,7 @@ import { UButton } from '#components'
 
 export function useListTableColumns<T>() {
   function sortableHeader(label: string, align: 'left' | 'right' = 'left') {
-    return ({ column }: { column: Column<T, unknown> }) => {
+    const header = ({ column }: { column: Column<T, unknown> }) => {
       const direction = column.getIsSorted()
       const nextDirection = column.getNextSortingOrder()
       const directionLabel = direction === 'asc'
@@ -37,6 +37,7 @@ export function useListTableColumns<T>() {
         'onClick': () => column.toggleSorting()
       })
     }
+    return Object.assign(header, { columnLabel: label })
   }
 
   return { sortableHeader }

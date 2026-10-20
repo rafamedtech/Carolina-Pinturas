@@ -3,8 +3,9 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { mountSuspended } from '@nuxt/test-utils/runtime'
 import { defineComponent, h, ref } from 'vue'
 import type { VueWrapper } from '@vue/test-utils'
-import type { TableColumn } from '@nuxt/ui'
-import { UDashboardGroup } from '#components'
+import type { DropdownMenuItem, TableColumn } from '@nuxt/ui'
+import { UDashboardGroup, UDropdownMenu } from '#components'
+import { useListTableColumns } from '~/composables/useListTableColumns'
 import ListPage from '~/components/list/ListPage.vue'
 import ListToolbar from '~/components/list/ListToolbar.vue'
 import ListViews from '~/components/list/ListViews.vue'
@@ -110,6 +111,29 @@ describe('estructura compartida de listados', () => {
     wrapper.unmount()
     wrapper = await mountSuspended(CatalogTable, { props: { data: rows, columns, empty: 'Sin productos' } })
     expect(wrapper.findAll('tbody tr')).toHaveLength(53)
+  })
+
+  it('personaliza columnas con etiquetas legibles y conserva al menos una visible', async () => {
+    const { sortableHeader } = useListTableColumns<CatalogRecord>()
+    wrapper = await mountSuspended(CatalogTable, {
+      props: {
+        data: [{ id: '1', name: 'Azul' }], empty: 'Sin productos',
+        columns: [{ accessorKey: 'id', header: 'Clave' }, { accessorKey: 'name', header: sortableHeader('Nombre') }],
+        columnVisibility: { id: false }
+      }
+    })
+    // Vue Test Utils infers generic Nuxt UI components as DOM wrappers.
+    const dropdown = wrapper.findComponent(UDropdownMenu) as unknown as { props: (key: 'items') => DropdownMenuItem[] }
+    const menu = () => dropdown.props('items')
+    expect(menu()).toEqual(expect.arrayContaining([
+      expect.objectContaining({ label: 'Clave', checked: false }),
+      expect.objectContaining({ label: 'Nombre', checked: true, disabled: true })
+    ]))
+    const item = menu()[0] as { onUpdateChecked?: (checked: boolean) => void }
+    item.onUpdateChecked!(true)
+    await vi.waitFor(() => expect(wrapper!.findAll('th')).toHaveLength(2))
+    expect(wrapper.emitted('update:columnVisibility')?.[0]).toEqual([{ id: true }])
+    expect(menu()).toEqual(expect.arrayContaining([expect.objectContaining({ label: 'Nombre', disabled: false })]))
   })
 
   it('muestra rangos y totales, cambia de página y bloquea la navegación al cargar', async () => {

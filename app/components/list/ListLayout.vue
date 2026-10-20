@@ -26,6 +26,7 @@ const tab = defineModel<string>('tab', { default: 'all' })
 const page = defineModel<number>('page', { default: 1 })
 const sorting = defineModel<SortingState>('sorting', { default: () => [] })
 const columnVisibility = defineModel<VisibilityState>('columnVisibility', { default: () => ({}) })
+const listTable = useTemplateRef('listTable')
 const moreFiltersOpen = shallowRef(false)
 const pageSize = computed(() => props.config.pagination?.pageSize ?? 25)
 const tablePage = computed({
@@ -77,7 +78,7 @@ defineSlots<{
     <template #toolbar>
       <slot name="before" />
       <ListToolbar
-        v-if="config.search || config.dateFilter || config.filters?.length || config.create"
+        v-if="config.search || config.dateFilter || config.filters?.length || config.create || columns.length"
         v-model:search="search"
         :placeholder="config.search?.placeholder"
         :has-active-filters="hasActiveFilters"
@@ -95,8 +96,12 @@ defineSlots<{
             @click="moreFiltersOpen = true"
           />
         </template>
-        <template v-if="config.create" #actions>
-          <ListCreateButton :action="config.create" @create="emit('create')" />
+        <template #actions>
+          <ListColumnPicker
+            :columns="listTable?.getColumns() ?? []"
+            :class="{ 'hidden md:inline-flex': $slots.mobile }"
+          />
+          <ListCreateButton v-if="config.create" :action="config.create" @create="emit('create')" />
         </template>
       </ListToolbar>
     </template>
@@ -115,6 +120,7 @@ defineSlots<{
           <slot name="mobile" :rows="data" />
         </div>
         <ListTable
+          ref="listTable"
           :key="config.id"
           v-model:page="tablePage"
           v-model:sorting="sorting"
@@ -125,6 +131,7 @@ defineSlots<{
           :meta="meta"
           :empty="config.empty"
           :on-select="onSelect"
+          :show-column-picker="false"
           :class="{ 'hidden md:block': $slots.mobile }"
         />
       </slot>

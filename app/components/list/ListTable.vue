@@ -11,10 +11,13 @@ const props = withDefaults(defineProps<{
   meta?: TableMeta<T>
   onSelect?: (event: Event, row: TableRow<T>) => void
   pageSize?: number
-}>(), { pageSize: 25 })
+  showColumnPicker?: boolean
+}>(), { pageSize: 25, showColumnPicker: true })
 
 const sorting = defineModel<SortingState>('sorting', { default: () => [] })
 const columnVisibility = defineModel<VisibilityState>('columnVisibility', { default: () => ({}) })
+const table = useTemplateRef('table')
+defineExpose({ getColumns: () => table.value?.tableApi?.getAllLeafColumns() ?? [] })
 // Only full local catalogs opt in. Server-paginated lists pass their current rows.
 const page = defineModel<number>('page')
 const pagination = computed<PaginationState>({
@@ -37,8 +40,12 @@ const tableMeta = computed(() => props.meta ?? {})
 <template>
   <div class="min-w-0 shrink-0" :aria-busy="loading">
     <ListLoading v-if="loading" />
+    <div v-else-if="showColumnPicker" class="mb-3 flex justify-end">
+      <ListColumnPicker :columns="table?.tableApi?.getAllLeafColumns() ?? []" />
+    </div>
     <UTable
-      v-else
+      v-if="!loading"
+      ref="table"
       v-model:sorting="sorting"
       v-model:column-visibility="columnVisibility"
       v-model:pagination="pagination"

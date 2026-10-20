@@ -51,6 +51,23 @@ describe('listado de pedidos', () => {
     }))
   })
 
+  it.each([['created', true], ['failed', false], ['pending', false], [null, false]])('expone la facturación con estado %s', async (invoiceStatus, expected) => {
+    mocks.findMany.mockResolvedValue([{
+      id: 'order-1', folio: 1,
+      status: { key: 'entregado', label: 'Entregado', color: 'success', sortOrder: 1, isTerminal: true },
+      customerId: 'customer-1', customerNameSnapshot: 'Cliente', customerRfcSnapshot: null,
+      orderDate: new Date('2026-10-19T00:00:00Z'), promisedDate: null,
+      total: 100, _count: { items: 1 }, paymentStatus: 'pagado', paymentMethod: 'efectivo',
+      siigoInvoice: invoiceStatus ? { status: invoiceStatus } : null,
+      createdAt: new Date(), updatedAt: new Date()
+    }])
+    const result = await listOrders({ page: 1, pageSize: 25, view: 'facturacion' }, admin)
+    expect(result.results[0]?.invoiceCreated).toBe(expected)
+    expect(mocks.findMany).toHaveBeenCalledWith(expect.objectContaining({
+      include: expect.objectContaining({ siigoInvoice: { select: { status: true } } })
+    }))
+  })
+
   it('filtra pedidos por los clientes marcados para la vista interna', async () => {
     await listOrders({ page: 1, pageSize: 25, internalCustomers: true }, admin)
 
