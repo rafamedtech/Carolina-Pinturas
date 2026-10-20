@@ -45,7 +45,7 @@ export function normalizeProductList(input: unknown): SiigoListResponse<SiigoPro
 export function buildSiigoProductPayload(input: ProductInput, current?: SiigoProduct) {
   // Only writable fields, never spread an external response into a request.
   return {
-    ...Object.fromEntries(Object.entries(input).filter(([key]) => key !== 'composition')),
+    ...Object.fromEntries(Object.entries(input).filter(([key]) => key !== 'composition' && key !== 'availability')),
     type: 'Product',
     stock_control: false,
     taxes: input.taxes.map(({ id }) => ({ id })),
@@ -138,8 +138,8 @@ export function filterProducts(products: SiigoProduct[], query: ProductQuery) {
 }
 export async function listProducts(query: ProductQuery) {
   if (query.refresh === 'true') invalidateProductCaches()
-  const { all, refresh: _refresh, products_only: _productsOnly, simple_only: _simpleOnly, ...filters } = query
-  if (all === 'true' || query.products_only === 'true' || query.simple_only === 'true') {
+  const { all, refresh: _refresh, products_only: _productsOnly, simple_only: _simpleOnly, usage: _usage, ...filters } = query
+  if (all === 'true' || query.products_only === 'true' || query.simple_only === 'true' || query.usage) {
     const catalog = query.active === 'true' ? await getActiveProducts() : await cachedSiigoCatalog('all-products', () => collectSiigoCatalog(async (page, size) => normalizeProductList(await siigoRequest<unknown>('/v1/products', { query: { page: String(page), page_size: String(size) } }))))
     const results = filterProducts(catalog.results, query)
     return { results, pagination: { page: 1, page_size: results.length, total_results: results.length } }

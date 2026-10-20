@@ -74,6 +74,7 @@ export interface SiigoProduct {
   // App-owned data that Siigo does not provide.
   internal?: {
     image?: ProductImage | null
+    availability?: { purchase: boolean, sale: boolean, expense: boolean }
     composition?: Omit<ProductComposition, 'components'> & { components: Array<ProductComposition['components'][number] & { code?: string, name?: string, unit?: string | null }> }
     syncPending?: boolean
     pendingWriteId?: string

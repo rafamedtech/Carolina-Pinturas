@@ -45,9 +45,19 @@ describe('contrato de productos México', () => {
     const payload = buildSiigoProductPayload(composite)
     expect(payload).toMatchObject({ type: 'Product', stock_control: false })
     expect(payload).not.toHaveProperty('composition')
+    expect(payload).not.toHaveProperty('availability')
     expect(payload).not.toHaveProperty('components')
     expect(productInputSchema.safeParse({ ...input(), type: 'Service' }).success).toBe(false)
     expect(productInputSchema.safeParse({ ...input(), stock_control: true }).success).toBe(false)
+  })
+  it('conserva opciones independientes y permite componentes sin venta directa', () => {
+    const availability = { purchase: true, sale: false, expense: false }
+    const p = { ...normalizeSiigoProduct(external), internal: { availability } }
+    expect(productMutationInput(p).availability).toEqual(availability)
+    expect(productInputSchema.parse({ ...input(), availability }).availability).toEqual(availability)
+    expect(productInputSchema.parse({ ...input(), availability: undefined }).availability).toEqual({ purchase: true, sale: true, expense: true })
+    expect(productInputSchema.safeParse({ ...input(), availability: { purchase: 'false', sale: true, expense: true } }).success).toBe(false)
+    expect(productInputSchema.safeParse({ ...input(), availability: { purchase: false, sale: false, expense: false } }).success).toBe(true)
   })
   it('valida una receta con cantidades de base 0.25, 0.5 y 6; rechaza vacíos, repetidos y exceso de precisión', () => {
     for (const quantity of ['0.25', '0.5', '6']) expect(productInputSchema.safeParse({ ...input(), composition: { kind: 'composite', version: 1, components: [{ productId: id, quantity }] } }).success).toBe(true)

@@ -46,6 +46,14 @@ describe('formulario de productos', () => {
     expect(wrapper.emitted('submit')?.[0]?.[0]).toMatchObject({ type: 'Product', stock_control: false,
       composition: { kind: 'composite', version: 3, components: [{ productId: baseId, quantity: '6' }] }, prices: product.prices })
   })
+  it('envía las opciones de disponibilidad independientemente de la composición', async () => {
+    wrapper = await mountSuspended(ProductForm, { props: { product, context, saving: false, blocked: false } })
+    expect(wrapper.text()).toContain('Disponibilidad interna')
+    await wrapper.findAllComponents({ name: 'USwitch' }).find(component => component.props('label') === 'Venta directa')!.get('button').trigger('click')
+    await wrapper.find('form').trigger('submit')
+    await flushPromises()
+    expect(wrapper.emitted('submit')?.[0]?.[0]).toMatchObject({ availability: { purchase: true, sale: false, expense: true } })
+  })
   it('muestra campos, conserva monedas y bloquea envío mientras guarda', async () => {
     wrapper = await mountSuspended(ProductForm, { props: { product, context, saving: true, blocked: false } })
     expect(wrapper.text()).toContain('Información general')

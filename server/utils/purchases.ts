@@ -91,6 +91,7 @@ async function assertSimplePurchaseProducts(tx: Prisma.TransactionClient, ids: s
   await lockCompositions(tx)
   const products = await tx.siigoProduct.findMany({ where: { id: { in: ids } } })
   purchaseAssert(products.length === new Set(ids).size && products.every(p => p.internalKind === 'product' && (!p.type || p.type === 'Product')), 'Las compras y recepciones solo admiten productos simples.')
+  purchaseAssert(products.every(p => p.availableForPurchase !== false), 'Un producto no está disponible para compra.')
   await assertNoPendingProductWrites(tx, products)
 }
 export async function createPurchase(input: { requestId: string, draft: PurchaseDraft }, user: AppUser) {

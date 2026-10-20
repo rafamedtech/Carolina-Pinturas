@@ -62,6 +62,7 @@ export async function attachProductCompositions(tx: Tx, products: SiigoProduct[]
   return products.map((p) => {
     const local = byId.get(p.id)
     return { ...p, internal: { ...p.internal,
+      availability: { purchase: local?.availableForPurchase ?? true, sale: local?.availableForSale ?? true, expense: local?.availableForExpense ?? true },
       syncPending: writes.some(w => w.productId === p.id || w.code === p.code),
       pendingWriteId: writes.find(w => w.productId === p.id || w.code === p.code)?.id,
       inventory: local ? { tracked: local.internalKind === 'product' && Boolean(local.inventoryProduct?.enabled), available: local.internalKind === 'product' && local.inventoryProduct?.enabled ? local.inventoryBalances.reduce((sum, b) => sum.plus(b.quantity.toString()).minus(b.reserved.toString()), new Decimal(0)).toString() : null } : undefined,
@@ -80,6 +81,7 @@ export async function captureInventoryRecipes(tx: Tx, ids: string[], previous: A
     const p = byId.get(id)
     assert(p, 'El producto no existe en el catálogo local.')
     const old = previous.find(i => i.productId === id)
+    assert(old || p!.availableForSale !== false, `El producto ${p!.name} no está disponible para venta directa.`)
     if (old?.inventoryRecipe) {
       result.set(id, inventoryRecipeSchema.parse(old.inventoryRecipe))
       continue

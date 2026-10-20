@@ -4,7 +4,7 @@ import type { DateValue } from '@internationalized/date'
 import * as z from 'zod'
 import type { FormSubmitEvent } from '@nuxt/ui'
 import type { CreateExpenseInput, ExpenseRecord } from '~/types/expenses'
-import type { SiigoCustomer } from '~/types/siigo'
+import type { SiigoCustomer, SiigoProduct, SiigoListResponse } from '~/types/siigo'
 import type { ExpenseCategory, ExpenseCurrencyCode } from '~/utils/expense'
 import { EXPENSE_CATEGORIES, EXPENSE_CURRENCIES } from '~/utils/expense'
 import type { PaymentMethodKey } from '~/utils/orderPayment'
@@ -56,7 +56,23 @@ const supplierItems = computed(() => {
   return items
 })
 
+const { data: products, status: productStatus, error: productError } = useFetch<SiigoListResponse<SiigoProduct>>('/api/siigo/products', {
+  query: { all: 'true', products_only: 'true', usage: 'expense' }, server: false, lazy: true
+})
+const selectedProduct = computed({
+  get: () => state.productId ?? '',
+  set: (id: string) => { state.productId = id || null }
+})
+const expenseProducts = computed(() => {
+  const items = products.value?.results ?? []
+  const id = props.expense?.productId
+  return id && !items.some(p => p.id === id)
+    ? [{ id, name: props.expense!.description, code: '' }, ...items]
+    : items
+})
+
 const schema = z.object({
+  productId: z.uuid().nullish(),
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Selecciona una fecha válida.'),
   category: z.enum(EXPENSE_CATEGORIES as unknown as [ExpenseCategory, ...ExpenseCategory[]]),
   description: z.string().trim().min(3, 'Describe el gasto.').max(250, 'Usa 250 caracteres o menos.'),
@@ -75,6 +91,7 @@ function initialState(): Schema {
   if (props.expense) {
     const expense = props.expense
     return {
+      productId: expense.productId ?? null,
       date: expense.date,
       category: expense.category,
       description: expense.description,
@@ -87,6 +104,7 @@ function initialState(): Schema {
     }
   }
   return {
+    productId: null,
     date: mexicoToday(),
     category: 'Compra de materiales',
     description: '',
@@ -201,6 +219,29 @@ function onSubmit(event: FormSubmitEvent<Schema>) {
           </p>
           <p v-else-if="!props.suppliersLoading && !supplierItems.length" class="mt-2 text-sm text-muted">
             No hay clientes marcados como proveedor en Siigo y PostgreSQL.
+          </p>
+        </UFormField>
+
+        <UFormField
+          name="productId"
+          label="Producto"
+          hint="Opcional"
+          class="sm:col-span-2"
+        >
+          <ProductsProductSearch
+            v-model="selectedProduct"
+            :products="expenseProducts"
+            :loading="productStatus === 'pending'"
+            :disabled="Boolean(productError) || productStatus === 'pending'"
+          />
+          <UButton
+            v-if="state.productId"
+            label="Quitar producto"
+            variant="link"
+            @click="state.productId = null"
+          />
+          <p v-if="productError" class="mt-2 text-sm text-error">
+            No se pudo cargar el catálogo de productos.
           </p>
         </UFormField>
 

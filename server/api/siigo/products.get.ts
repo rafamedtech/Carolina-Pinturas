@@ -13,8 +13,9 @@ export default eventHandler(async (event) => {
   const catalog = await listProducts(parsed.data)
   await persistProductCatalog(usePrisma(), catalog.results)
   let results = await attachProductCompositions(usePrisma(), catalog.results)
-  if (parsed.data.products_only === 'true' || parsed.data.simple_only === 'true') {
-    results = results.filter(p => (!p.type || p.type === 'Product') && !p.internal?.syncPending && (parsed.data.simple_only !== 'true' || p.internal?.composition?.kind !== 'composite'))
+  if (parsed.data.products_only === 'true' || parsed.data.simple_only === 'true' || parsed.data.usage) {
+    results = results.filter(p => (!p.type || p.type === 'Product') && !p.internal?.syncPending && ((parsed.data.simple_only !== 'true' && parsed.data.usage !== 'purchase') || p.internal?.composition?.kind !== 'composite'))
+    if (parsed.data.usage) results = results.filter(p => p.internal?.availability?.[parsed.data.usage!] !== false)
     const total = results.length
     if (parsed.data.all !== 'true') results = results.slice((parsed.data.page - 1) * parsed.data.page_size, parsed.data.page * parsed.data.page_size)
     return { results, pagination: { page: parsed.data.all === 'true' ? 1 : parsed.data.page, page_size: parsed.data.all === 'true' ? total : parsed.data.page_size, total_results: total } }

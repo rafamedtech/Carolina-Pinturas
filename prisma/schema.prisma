@@ -66,6 +66,10 @@ model SiigoProduct {
   accountGroupName  String?   @map("account_group_name")
   type              String?   @db.VarChar(64)
   internalKind      String    @default("product") @map("internal_kind") @db.VarChar(16)
+  availableForPurchase Boolean @default(true) @map("available_for_purchase")
+  availableForSale Boolean @default(true) @map("available_for_sale")
+  availableForExpense Boolean @default(true) @map("available_for_expense")
+  expenses Expense[]
   compositionVersion Int      @default(1) @map("composition_version")
   stockControl      Boolean?  @map("stock_control")
   active            Boolean?
@@ -339,6 +343,9 @@ model SalesOrder {
 }
 
 model Expense {
+  productId String? @map("product_id") @db.Uuid
+  product SiigoProduct? @relation(fields: [productId], references: [id], onDelete: Restrict)
+
   id                   String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   expenseDate          DateTime @map("expense_date") @db.Date
   category             String   @db.VarChar(64)
@@ -365,6 +372,7 @@ model Expense {
   provider      SiigoCustomer @relation(fields: [providerId], references: [id], onDelete: Restrict)
   createdByUser AppUser?      @relation(fields: [createdByUserId], references: [userId], onDelete: SetNull)
 
+  @@index([productId])
   @@index([expenseDate, createdAt])
   @@index([category, expenseDate])
   @@index([providerId, expenseDate])

@@ -3,11 +3,27 @@ import type { ProductInput } from '#shared/schemas/product'
 import { productInputSchema } from '#shared/schemas/product'
 import type { SiigoProduct } from '~/types/siigo'
 import { productMutationInput } from '../../app/utils/siigoProductMutation'
-import { attachProductCompositions, validateComposition } from './product-compositions'
+import { assertNoPendingProductWrites, attachProductCompositions, lockCompositions, validateComposition } from './product-compositions'
 import { getProductDetail, listProducts, mutateProduct, validateProductReferences } from './siigo-products'
 import { upsertSiigoProduct, siigoJson } from './siigo-persistence'
 import { usePrisma } from './prisma'
-import type { ProductWrite } from '../../generated/prisma/client'
+import type { Prisma, ProductWrite } from '../../generated/prisma/client'
+
+async function persistInternalProduct(tx: Prisma.TransactionClient, input: ProductInput, product: SiigoProduct, isNew = false) {
+  await validateComposition(tx, input.composition, isNew ? undefined : product.id)
+  const previous = await tx.siigoProduct.findUnique({ where: { id: product.id }, select: { internalKind: true } })
+  await upsertSiigoProduct(tx, product)
+  await tx.siigoProduct.update({ where: { id: product.id }, data: {
+    internalKind: input.composition.kind,
+    availableForPurchase: input.availability.purchase,
+    availableForSale: input.availability.sale,
+    availableForExpense: input.availability.expense,
+    compositionVersion: { increment: 1 },
+    internalComponents: { deleteMany: {}, create: input.composition.components.map(c => ({ componentId: c.productId, quantity: c.quantity })) }
+  } })
+  if (input.composition.kind === 'composite') await tx.inventoryProduct.update({ where: { productId: product.id }, data: { enabled: false, version: { increment: 1 } } })
+  else if (previous?.internalKind === 'composite') await tx.inventoryProduct.update({ where: { productId: product.id }, data: { enabled: true, version: { increment: 1 } } })
+}
 
 async function finishWrite(write: ProductWrite, product: SiigoProduct) {
   const input = productInputSchema.parse(write.input)
@@ -16,16 +32,7 @@ async function finishWrite(write: ProductWrite, product: SiigoProduct) {
     // The persisted intent and local composition commit together.
     const locked = await tx.$queryRaw<Array<{ state: string }>>`SELECT state FROM product_writes WHERE id = ${write.id}::uuid FOR UPDATE`
     if (locked[0]?.state !== 'synced') {
-      await validateComposition(tx, input.composition, write.isNew ? undefined : write.productId ?? undefined)
-      const previous = await tx.siigoProduct.findUnique({ where: { id: product.id }, select: { internalKind: true } })
-      await upsertSiigoProduct(tx, product)
-      await tx.siigoProduct.update({ where: { id: product.id }, data: {
-        internalKind: input.composition.kind,
-        compositionVersion: { increment: 1 },
-        internalComponents: { deleteMany: {}, create: input.composition.components.map(c => ({ componentId: c.productId, quantity: c.quantity })) }
-      } })
-      if (input.composition.kind === 'composite') await tx.inventoryProduct.update({ where: { productId: product.id }, data: { enabled: false, version: { increment: 1 } } })
-      else if (previous?.internalKind === 'composite') await tx.inventoryProduct.update({ where: { productId: product.id }, data: { enabled: true, version: { increment: 1 } } })
+      await persistInternalProduct(tx, input, product, write.isNew)
       await tx.productWrite.update({ where: { id: write.id }, data: { state: 'synced', productId: product.id } })
     }
     return (await attachProductCompositions(tx, [product]))[0]!
@@ -36,6 +43,15 @@ export async function saveManagedProduct(input: ProductInput, id?: string) {
   const current = id ? await getProductDetail(id, true) : undefined
   if (current && current.type && current.type !== 'Product') throw createError({ statusCode: 422, statusMessage: 'Este tipo de producto se conserva solo para consulta histórica.' })
   if (current) await upsertSiigoProduct(db, current)
+  // Internal settings can be committed without rewriting commercial data in Siigo.
+  if (current && current.stock_control === false && canonical(productMutationInput(current)) === canonical(input)) {
+    return db.$transaction(async (tx) => {
+      await lockCompositions(tx, true)
+      await assertNoPendingProductWrites(tx, [current])
+      await persistInternalProduct(tx, input, current)
+      return (await attachProductCompositions(tx, [current]))[0]!
+    }, { timeout: 20000 })
+  }
   await validateProductReferences(input, current)
   const write = await db.$transaction(async (tx) => {
     await validateComposition(tx, input.composition, id)
@@ -57,7 +73,7 @@ export async function saveManagedProduct(input: ProductInput, id?: string) {
   }
 }
 const canonical = (input: ProductInput) => JSON.stringify({
-  ...input, composition: undefined,
+  ...input, composition: undefined, availability: undefined,
   taxes: input.taxes.map(t => t.id).sort((a, b) => a - b),
   prices: input.prices.map(p => ({ ...p, price_list: [...p.price_list].sort((a, b) => a.position - b.position) })).sort((a, b) => a.currency_code.localeCompare(b.currency_code))
 })

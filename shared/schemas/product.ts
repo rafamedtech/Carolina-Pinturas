@@ -22,12 +22,18 @@ const money = z.number().finite().positive('El precio debe ser positivo.').refin
   value => Math.abs(value * 100 - Math.round(value * 100)) < 0.000001,
   'Usa máximo dos decimales.'
 )
+export const productAvailabilitySchema = z.object({
+  purchase: z.boolean(), sale: z.boolean(), expense: z.boolean()
+})
+export type ProductAvailability = z.infer<typeof productAvailabilitySchema>
+
 export const productInputSchema = z.object({
   code: z.string().trim().min(1, 'Escribe el código.').max(30).regex(/^[A-Za-z0-9_-]+$/, 'Usa un código sin espacios.'),
   name: z.string().trim().min(1, 'Escribe el nombre.').max(100),
   account_group: z.number().int().positive('Selecciona una clasificación.'),
   type: z.literal('Product'),
   composition: productCompositionSchema.default({ kind: 'product', version: 1, components: [] }),
+  availability: productAvailabilitySchema.default({ purchase: true, sale: true, expense: true }),
   active: z.boolean(),
   stock_control: z.literal(false),
   tax_included: z.boolean(),
@@ -57,6 +63,7 @@ export const productQuerySchema = z.object({
   refresh: z.enum(['true', 'false']).optional(),
   active: z.enum(['true', 'false', 'all']).default('true'),
   products_only: z.enum(['true', 'false']).optional(),
+  usage: z.enum(['purchase', 'sale', 'expense']).optional(),
   simple_only: z.enum(['true', 'false']).optional(),
   page: z.coerce.number().int().min(1).max(10000).default(1),
   page_size: z.coerce.number().int().min(1).max(100).default(25),

@@ -4,7 +4,7 @@ import { canViewExpenseCategory } from '~/utils/expense'
 import { ORDER_LOGISTICS_ROLES } from '~/utils/roleAccess'
 import { siigoCustomerName } from '~/utils/siigoCustomer'
 import { requireRole } from '../../utils/auth'
-import { createExpenseSchema, expenseView } from '../../utils/expenses'
+import { createExpenseSchema, expenseView, validateExpenseProduct } from '../../utils/expenses'
 import { usePrisma } from '../../utils/prisma'
 import { getSiigoCustomerDetail } from '../../utils/siigo-customer-detail'
 import { siigoCustomerPersistenceState } from '../../utils/siigo-customers'
@@ -59,12 +59,15 @@ export default eventHandler(async (event): Promise<ExpenseRecord> => {
     throw createError({ statusCode: 422, statusMessage: 'El proveedor seleccionado está inactivo en Siigo.' })
   }
 
+  await validateExpenseProduct(parsed.data.productId)
+
   const providerName = siigoCustomerName(siigoProvider) || siigoProvider.rfc_id || siigoProvider.id
   const providerPayload = JSON.parse(
     JSON.stringify(siigoCustomerPersistenceState(siigoProvider))
   ) as Prisma.InputJsonValue
   const expense = await prisma.expense.create({
     data: {
+      productId: parsed.data.productId ?? null,
       expenseDate: new Date(`${parsed.data.date}T00:00:00.000Z`),
       category: parsed.data.category,
       description: parsed.data.description,

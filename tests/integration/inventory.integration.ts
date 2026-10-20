@@ -86,6 +86,8 @@ suite('inventario: PostgreSQL aislado, sin conexión Siigo', () => {
       // Apply the additive composition migration to a genuine previous schema.
       await setup.query('DROP TABLE product_components, product_writes; ALTER TABLE siigo_products DROP COLUMN internal_kind, DROP COLUMN composition_version; ALTER TABLE sales_order_items DROP COLUMN inventory_recipe;')
       await setup.query(readFileSync('supabase/migrations/20261018190553_internal_product_compositions.sql', 'utf8'))
+      await setup.query('ALTER TABLE expenses DROP COLUMN product_id; ALTER TABLE siigo_products DROP COLUMN available_for_purchase, DROP COLUMN available_for_sale, DROP COLUMN available_for_expense;')
+      await setup.query(readFileSync('supabase/migrations/20261020160134_internal_product_availability.sql', 'utf8'))
     } finally { await setup.end() }
     db = new PrismaClient({ adapter: new PrismaPg({ connectionString: target.toString(), max: 8 }) })
     mocks.db.mockReturnValue(db)
@@ -604,6 +606,30 @@ suite('inventario: PostgreSQL aislado, sin conexión Siigo', () => {
     await expect(entry(kit)).rejects.toThrow('simples')
     mocks.product.mockResolvedValue({ id: kit, code: 'KIT', name: 'Kit', type: 'Product', active: true })
     await expect(createPurchase({ requestId: randomUUID(), draft: { vatRate: 0, providerId: customer.id, date: today, currencyCode: 'MXN', notes: '', items: [{ productId: kit, quantity: 1, unitCost: 10 }] } }, user)).rejects.toThrow('simples')
+  })
+  it('guarda disponibilidad local, bloquea venta directa y permite consumir el componente dentro de un kit', async () => {
+    const base = await product()
+    await entry(base)
+    const local = await db.siigoProduct.findUniqueOrThrow({ where: { id: base } })
+    const remote: SiigoProduct = { id: base, code: local.code, name: local.name, type: 'Product', active: true, stock_control: false }
+    mocks.product.mockResolvedValue(remote)
+    const mutationCalls = mocks.mutation.mock.calls.length
+    const saved = await saveManagedProduct({ ...productMutationInput(remote), availability: { purchase: false, sale: false, expense: true } }, base)
+    expect(saved.internal?.availability).toEqual({ purchase: false, sale: false, expense: true })
+    expect(mocks.mutation.mock.calls.length).toBe(mutationCalls)
+    await persistProductCatalog(db, [remote])
+    expect((await attachProductCompositions(db, [remote]))[0]?.internal?.availability?.sale).toBe(false)
+    await expect(sale(base, 1)).rejects.toThrow('venta directa')
+    await expect(createPurchase({ requestId: randomUUID(), draft: { vatRate: 0, providerId: customer.id, date: today, currencyCode: 'MXN', notes: '', items: [{ productId: base, quantity: 1, unitCost: 10 }] } }, user)).rejects.toThrow('disponible para compra')
+    const kit = await composite([{ productId: base, quantity: '0.25' }])
+    const order = await sale(kit, 2)
+    expect((await balance(base)).reserved.toString()).toBe('0.5')
+    await transition(order.id, 'cancelado')
+    const { validateExpenseProduct } = await import('../../server/utils/expenses')
+    await expect(validateExpenseProduct(base)).resolves.toBeUndefined()
+    await db.siigoProduct.update({ where: { id: base }, data: { availableForExpense: false } })
+    await expect(validateExpenseProduct(base)).rejects.toThrow('disponible para gasto')
+    await expect(validateExpenseProduct(base, base)).resolves.toBeUndefined()
   })
   it('guarda el intento antes de Siigo y concilia un alta ambigua sin repetir la escritura externa', async () => {
     const base = await product()

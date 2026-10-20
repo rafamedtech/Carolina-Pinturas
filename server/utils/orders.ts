@@ -1015,7 +1015,8 @@ export async function updateOrderStatus(
     }
     if (order.statusKey === status.key) return
     if (order.statusKey === 'borrador' && !['borrador', 'cancelado'].includes(status.key)) {
-      const historicalLines = await tx.salesOrderItem.findMany({ where: { orderId: id }, select: { product: { select: { type: true } } } })
+      const historicalLines = await tx.salesOrderItem.findMany({ where: { orderId: id }, select: { product: { select: { type: true, availableForSale: true } } } })
+      if (historicalLines.some(i => !i.product.availableForSale)) throw createError({ statusCode: 422, statusMessage: 'Reemplaza los productos no disponibles para venta directa antes de convertir la cotización en venta.' })
       if (historicalLines.some(i => i.product.type !== null && i.product.type !== 'Product')) throw createError({ statusCode: 422, statusMessage: 'Reemplaza los combos y servicios históricos por productos antes de convertir la cotización en venta.' })
     }
 

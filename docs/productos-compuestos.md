@@ -37,3 +37,15 @@ Solo los administradores pueden guardar o conciliar productos. Las tablas nuevas
 La migración es `supabase/migrations/20261018190553_internal_product_compositions.sql`. Se aplica localmente con `supabase migration up --local`. No convierte tipos externos ni modifica pedidos históricos.
 
 Las pruebas de integración crean y eliminan únicamente una base temporal en PostgreSQL local y simulan la frontera Siigo. Cubren kits y fracciones, composición histórica, edición, faltantes, concurrencia, devoluciones, bloqueo de anidados, cambio de tipo, acceso directo, fallos externos y recuperación después de fallos locales. Las pruebas de contrato verifican que el payload de Siigo no incluya la composición interna. La verificación en Chrome utiliza la sesión autenticada del usuario sin crear productos de prueba en Siigo ni documentos fiscales.
+
+## Disponibilidad interna por operación
+
+Cada producto tiene opciones independientes de **Compra**, **Venta directa** y **Gasto** en su edición. La migración `20261020160134_internal_product_availability.sql` inicializa las tres en `true` para conservar el comportamiento de los productos existentes. Pueden desactivarse todas si el producto solo se usa como componente.
+
+Estas opciones se guardan en columnas locales de `siigo_products`; los snapshots y recargas de Siigo no las sobrescriben y nunca se envían en su payload. Si solo cambia información interna y el producto ya está configurado sin control de inventario externo, el guardado no realiza ninguna mutación en Siigo.
+
+Los selectores de ventas, compras y gastos consultan `usage=sale|purchase|expense`. Se filtra antes de paginar. Las compras siguen admitiendo únicamente productos simples. La edición administrativa y los selectores de composición e inventario conservan acceso a los productos independientemente de estas opciones.
+
+El servidor rechaza productos sin venta directa en partidas nuevas y al convertir una cotización en venta; una partida histórica existente puede conservarse al editar el pedido. La disponibilidad de venta del componente no afecta la receta del compuesto. Compras valida disponibilidad al crear, editar, confirmar y recibir. Gastos permite asociar opcionalmente un producto habilitado, conservando asociaciones históricas al editar. Esta asociación no registra movimientos de inventario.
+
+Aplicar la migración también en el entorno de despliegue antes de publicar este cambio.

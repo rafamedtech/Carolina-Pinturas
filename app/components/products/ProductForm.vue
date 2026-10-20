@@ -26,6 +26,7 @@ for (const field of ['unit', 'key'] as const) {
   >
     <fieldset :disabled="saving" class="space-y-5">
       <ProductsProductGeneralFields v-model="state" :context="context" />
+      <ProductsProductAvailabilityFields v-model="state.availability" />
       <ProductsProductCompositionFields v-model="state" :product-id="product?.id" />
       <ProductsProductPriceFields v-model="state" :context="context" />
       <div class="flex flex-wrap justify-end gap-3">

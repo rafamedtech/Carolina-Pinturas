@@ -21,6 +21,7 @@ const exchangeRateSchema = z.number()
   .refine(value => Number(value.toFixed(6)) === value, 'El tipo de cambio admite máximo seis decimales.')
 
 export const createExpenseSchema = z.object({
+  productId: z.uuid().nullish(),
   date: dateSchema,
   category: z.enum(EXPENSE_CATEGORIES as unknown as [ExpenseCategory, ...ExpenseCategory[]]),
   description: z.string().trim().min(3, 'Describe el gasto.').max(250),
@@ -51,6 +52,7 @@ function decimal(value: { toString(): string }) {
 export function expenseView(expense: Expense): ExpenseRecord {
   return {
     id: expense.id,
+    productId: expense.productId,
     purchasePaymentId: expense.purchasePaymentId,
     date: expense.expenseDate.toISOString().slice(0, 10),
     category: expense.category as ExpenseCategory,
@@ -70,4 +72,17 @@ export function expenseView(expense: Expense): ExpenseRecord {
     createdAt: expense.createdAt.toISOString(),
     updatedAt: expense.updatedAt.toISOString()
   }
+}
+
+export async function validateExpenseProduct(productId?: string | null, previousProductId?: string | null) {
+  if (!productId || productId === previousProductId) return
+  const { usePrisma } = await import('./prisma')
+  const { createError } = await import('h3')
+  const { assertNoPendingProductWrites } = await import('./product-compositions')
+  const db = usePrisma()
+  const product = await db.siigoProduct.findUnique({ where: { id: productId } })
+  if (!product || product.active === false || !product.availableForExpense || (product.type && product.type !== 'Product')) {
+    throw createError({ statusCode: 422, statusMessage: 'El producto no está disponible para gasto.' })
+  }
+  await assertNoPendingProductWrites(db, [product])
 }

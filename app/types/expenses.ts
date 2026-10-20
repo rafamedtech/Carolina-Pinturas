@@ -2,6 +2,7 @@ import type { PaymentMethodKey } from '~/utils/orderPayment'
 import type { ExpenseCategory, ExpenseCurrencyCode } from '~/utils/expense'
 
 export interface CreateExpenseInput {
+  productId?: string | null
   date: string
   category: ExpenseCategory
   description: string

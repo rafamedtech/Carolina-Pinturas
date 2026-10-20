@@ -140,6 +140,18 @@ function formatQuantity(value?: number) {
           </UBadge>
         </div>
 
+        <div v-if="isManaged" class="flex flex-wrap gap-2" aria-label="Disponibilidad interna">
+          <UBadge :color="product.internal?.availability?.purchase === false ? 'neutral' : 'success'" variant="subtle">
+            Compra: {{ product.internal?.availability?.purchase === false ? 'No' : 'Sí' }}
+          </UBadge>
+          <UBadge :color="product.internal?.availability?.sale === false ? 'neutral' : 'success'" variant="subtle">
+            Venta directa: {{ product.internal?.availability?.sale === false ? 'No' : 'Sí' }}
+          </UBadge>
+          <UBadge :color="product.internal?.availability?.expense === false ? 'neutral' : 'success'" variant="subtle">
+            Gasto: {{ product.internal?.availability?.expense === false ? 'No' : 'Sí' }}
+          </UBadge>
+        </div>
+
         <div class="grid gap-4 lg:grid-cols-3">
           <div class="flex flex-col gap-4 lg:col-span-2">
             <UCard v-if="product.internal?.composition?.kind === 'composite'">

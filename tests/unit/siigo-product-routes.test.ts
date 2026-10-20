@@ -111,3 +111,22 @@ describe('imágenes de producto', () => {
     await expect(removeImage(event({ id: '../x' }))).rejects.toMatchObject({ statusCode: 400 })
   })
 })
+
+describe('disponibilidad interna del catálogo', () => {
+  it.each(['purchase', 'sale', 'expense'] as const)('filtra %s antes de paginar y conserva el catálogo administrativo', async (usage) => {
+    const rows = [
+      { id, code: 'BASE', name: 'Base', type: 'Product', internal: { availability: { purchase: true, sale: false, expense: false } } },
+      { id: '00000000-0000-4000-8000-000000000002', code: 'KIT', name: 'Kit', type: 'Product', internal: { availability: { purchase: false, sale: true, expense: true }, composition: { kind: 'composite' } } }
+    ]
+    mocks.list.mockResolvedValue({ results: rows })
+    const result = await list(event({ query: { usage, page_size: '1' } }))
+    expect(result.results.map(p => p.code)).toEqual([usage === 'purchase' ? 'BASE' : 'KIT'])
+    expect(result.pagination?.total_results).toBe(1)
+    expect((await list(event({ query: { all: 'true' } }))).results).toHaveLength(2)
+  })
+  it('compra excluye compuestos incluso con disponibilidad habilitada', async () => {
+    mocks.list.mockResolvedValue({ results: [{ id, type: 'Product', internal: { availability: { purchase: true }, composition: { kind: 'composite' } } }] })
+    expect((await list(event({ query: { usage: 'purchase' } }))).results).toEqual([])
+    await expect(list(event({ query: { usage: 'inventado' } }))).rejects.toMatchObject({ statusCode: 400 })
+  })
+})
