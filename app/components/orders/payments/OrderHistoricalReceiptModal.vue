@@ -142,7 +142,7 @@ async function onSubmit(event: FormSubmitEvent<Schema>) {
 
       <p v-if="!loadingReceipts && !error && context && !context.receipts.length" class="mt-3 text-sm text-muted">
         Registra primero la recepción en la factura correspondiente dentro de Siigo.
-        Después vuelve a abrir «Asignar pago de Siigo» para vincularla aquí.
+        Después vuelve a abrir «Asignar pago timbrado» para vincularla aquí.
       </p>
 
       <UForm

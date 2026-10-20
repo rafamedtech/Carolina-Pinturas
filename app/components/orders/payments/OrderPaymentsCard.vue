@@ -213,7 +213,7 @@ async function createPayment(input: CreateOrderPaymentInput) {
       </div>
 
       <p v-if="context.siigo.assignedInvoiceStamped" class="text-sm text-muted">
-        Usa «Asignar pago de Siigo» para vincular una recepción ya registrada en la factura de este pedido.
+        Usa «Asignar pago timbrado» para vincular una recepción ya registrada en la factura de este pedido.
         Deben coincidir el cliente, la fecha y el importe del pago local.
       </p>
 
@@ -262,7 +262,7 @@ async function createPayment(input: CreateOrderPaymentInput) {
             />
             <UButton
               v-if="paymentHasHistoricalSiigoAction(payment)"
-              label="Asignar pago de Siigo"
+              label="Asignar pago timbrado"
               icon="i-lucide-link"
               color="neutral"
               variant="ghost"
