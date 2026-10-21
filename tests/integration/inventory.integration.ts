@@ -465,7 +465,7 @@ suite('inventario: PostgreSQL aislado, sin conexión Siigo', () => {
     await expect(command({ action: 'warehouse', id: a, version: w.version, code: w.code, name: w.name, address: '', active: false })).rejects.toThrow()
     await expect(command({ action: 'move', type: 'entrada', warehouseId: a, date: today, reason: 'Sin permiso', lines: [{ productId: id, quantity: '1' }] }, { ...user, role: 'vendedor' })).rejects.toThrow()
   })
-  it('permite cotizar antes de activar, bloquea confirmar y surtir, y después usa la receta original', async () => {
+  it('permite operar compuestos sin mover existencias antes de activar y después usa la receta original', async () => {
     const base = await product()
     await entry(base, '20')
     const kit = await composite([{ productId: base, quantity: '0.25' }])
@@ -478,18 +478,26 @@ suite('inventario: PostgreSQL aislado, sin conexión Siigo', () => {
       expect(quote.inventoryManaged).toBe(true)
       expect((await orderInventoryView(quote.id)).activationRequired).toBe(true)
       expect((await balance(base)).reserved.toString()).toBe('0')
-      const orderCount = await db.salesOrder.count()
       const paymentCount = await db.salesOrderPayment.count()
       for (const status of ['confirmado', 'surtido', 'en_camino', 'entregado']) {
-        await expect(sale(kit, 1, status)).rejects.toThrow('Activa el inventario interno')
-        await expect(transition(quote.id, status)).rejects.toThrow('Activa el inventario interno')
+        const created = await sale(kit, 1, status)
+        expect(created.status.key).toBe(status)
+        expect(created.inventoryManaged).toBe(true)
+        expect(await db.inventoryMovement.count({ where: { orderId: created.id } })).toBe(0)
+        expect(await db.inventoryReservation.count({ where: { orderId: created.id } })).toBe(0)
+        await transition(quote.id, status)
       }
-      await expect(sale(kit, 1, 'ingresado', true, randomUUID(), true)).rejects.toThrow('Activa el inventario interno')
-      expect(await db.salesOrder.count()).toBe(orderCount)
-      expect(await db.salesOrderPayment.count()).toBe(paymentCount)
-      expect((await db.salesOrder.findUniqueOrThrow({ where: { id: quote.id } })).statusKey).toBe('borrador')
+      const direct = await sale(kit, 1, 'ingresado', true, randomUUID(), true)
+      expect(direct.status.key).toBe('entregado')
+      expect(await db.salesOrderPayment.count()).toBe(paymentCount + 1)
+      expect(await db.inventoryMovement.count({ where: { orderId: direct.id } })).toBe(0)
+      expect(await db.inventoryReservation.count({ where: { orderId: direct.id } })).toBe(0)
+      expect((await db.salesOrder.findUniqueOrThrow({ where: { id: quote.id } })).statusKey).toBe('entregado')
       expect(await db.inventoryMovement.count({ where: { orderId: quote.id } })).toBe(0)
       expect(await db.inventoryReservation.count({ where: { orderId: quote.id } })).toBe(0)
+      expect((await balance(base)).quantity.toString()).toBe('20')
+      expect((await balance(base)).reserved.toString()).toBe('0')
+      await transition(quote.id, 'borrador')
 
       // Adding a compound to an older quotation also opts the order into tracking.
       const simpleQuote = await sale(base, 1, 'borrador')
@@ -498,7 +506,9 @@ suite('inventario: PostgreSQL aislado, sin conexión Siigo', () => {
       const snapshot: SiigoProduct = { id: kit, code: p.code, name: p.name, type: 'Product', prices: [{ currency_code: 'MXN', price_list: [{ position: 1, value: 10 }] }] }
       editedQuote = await updateOrder(simpleQuote.id, updateOrderSchema.parse({ customerId: customer.id, repartidorId: courier.id, warehouseId: a, version: simpleQuote.version, orderDate: today, lines: [{ productId: kit, quantity: 1 }] }), user, customer, new Map([[kit, snapshot]]), courier)
       expect(editedQuote.inventoryManaged).toBe(true)
-      await expect(transition(editedQuote.id, 'confirmado')).rejects.toThrow('Activa el inventario interno')
+      await transition(editedQuote.id, 'confirmado')
+      expect((await balance(base)).reserved.toString()).toBe('0')
+      await transition(editedQuote.id, 'borrador')
       await db.productComponent.update({ where: { productId_componentId: { productId: kit, componentId: base } }, data: { quantity: '6' } })
       await command({ action: 'activate', version: settings.version })
     } finally {
@@ -506,6 +516,8 @@ suite('inventario: PostgreSQL aislado, sin conexión Siigo', () => {
       if (!current.enabledAt) await db.inventorySettings.update({ where: { id: 1 }, data: { enabledAt: settings.enabledAt } })
     }
     expect((await orderInventoryView(quote.id)).activationRequired).toBe(false)
+    expect((await balance(base)).quantity.toString()).toBe('20')
+    expect((await balance(base)).reserved.toString()).toBe('0')
     await transition(quote.id, 'confirmado')
     expect((await balance(base)).reserved.toString()).toBe('0.5')
     await transition(editedQuote.id, 'confirmado')

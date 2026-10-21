@@ -48,7 +48,7 @@ function showKardex(row: InventoryStock) {
       <UAlert
         v-if="data.activationRequired"
         title="Inventario pendiente de activación"
-        description="Puedes guardar cotizaciones con productos compuestos. Activa el inventario interno antes de confirmar o surtir el pedido."
+        description="Puedes crear, confirmar y surtir pedidos con productos compuestos. Las existencias solo se reservarán o descontarán al operar el pedido con el inventario interno activado."
         color="warning"
       />
       <form v-if="mayAssign && !data.dispatched" class="flex flex-wrap items-end gap-3" @submit.prevent="assign">

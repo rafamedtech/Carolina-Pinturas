@@ -86,9 +86,11 @@ export async function syncOrderInventory(tx: Tx, orderId: string, user: AppUser,
     : inventoryRecipeSchema.parse(item.inventoryRecipe) }))
   const hasComposite = items.some(({ item, recipe }) => recipe.length > 1 || recipe[0]?.productId !== item.productId)
   if (!order.inventoryManaged && !hasComposite) return
-  // A quotation with components must keep its future inventory obligations,
+  // An order with components must keep its future inventory obligations,
   // even when it was captured before the global activation.
   if (!order.inventoryManaged) await tx.salesOrder.update({ where: { id: orderId }, data: { inventoryManaged: true } })
+  // Allow the full order flow before activation without touching stock or reservations.
+  if (!settings.enabledAt) return
   const dispatch = await tx.inventoryMovement.findUnique({ where: { originKey: `order:${orderId}:dispatch` } })
   if (dispatch) {
     inventoryAssert(!['borrador', 'ingresado', 'confirmado'].includes(order.statusKey), 'El pedido ya descontó inventario. Registra una devolución para regresar unidades.')
@@ -98,7 +100,6 @@ export async function syncOrderInventory(tx: Tx, orderId: string, user: AppUser,
   const outgoing = ['surtido', 'en_camino', 'entregado'].includes(order.statusKey)
   const prior = await tx.inventoryReservation.findMany({ where: { orderId } })
   const reserve = order.statusKey === 'confirmado' || (order.statusKey === 'en_espera' && prior.length > 0)
-  inventoryAssert(settings.enabledAt || (!outgoing && !reserve), 'Activa el inventario interno antes de confirmar o surtir pedidos con productos compuestos. Puedes guardar la cotización mientras tanto.')
   const wanted = new Map<string, Decimal>()
   if (outgoing || reserve) {
     const required = new Set<string>()

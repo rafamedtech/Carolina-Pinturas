@@ -16,13 +16,14 @@ afterEach(() => {
 })
 
 describe('inventario de una cotización con compuestos', () => {
-  it('avisa del bloqueo antes de activar y actualiza el aviso después de la activación', async () => {
+  it('avisa que se puede operar sin descontar antes de activar y actualiza el aviso después', async () => {
     wrapper = await mountSuspended(InventoryOrderStock, {
       props: { orderId: 'activation-quote', version: 1 },
       global: { stubs: { InventoryWarehousePicker: true, InventoryStockTable: true } }
     })
     expect(wrapper.text()).toContain('Inventario pendiente de activación')
-    expect(wrapper.text()).toContain('antes de confirmar o surtir')
+    expect(wrapper.text()).toContain('Puedes crear, confirmar y surtir pedidos con productos compuestos')
+    expect(wrapper.text()).toContain('Las existencias solo se reservarán o descontarán al operar el pedido con el inventario interno activado')
     expect(wrapper.text()).not.toContain('Histórico sin control interno')
     activationRequired = false
     await wrapper.setProps({ version: 2 })
