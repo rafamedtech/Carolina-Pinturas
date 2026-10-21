@@ -83,6 +83,13 @@ function formatQuantity(value?: number) {
         </template>
         <template #right>
           <template v-if="product && canManageProducts(user?.role) && isManaged">
+            <UButton
+              :to="{ path: '/productos/nuevo', query: { duplicar: productId, returnTo: backPath } }"
+              label="Duplicar"
+              icon="i-lucide-copy"
+              color="neutral"
+              variant="outline"
+            />
             <UButton :to="{ path: `/productos/${productId}/editar`, query: { returnTo: backPath } }" label="Editar" icon="i-lucide-pencil" />
             <ProductsProductStatusAction :product="product" @changed="refresh" />
           </template>

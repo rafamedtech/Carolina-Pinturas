@@ -36,9 +36,6 @@ function add() {
         <USelect v-model="kind" :items="[{ label: 'Producto', value: 'product' }, { label: 'Producto compuesto', value: 'composite' }]" class="w-full sm:max-w-sm" />
       </UFormField>
       <template v-if="kind === 'composite'">
-        <p class="text-sm text-muted">
-          Por cada unidad vendida se reservan y descuentan las cantidades indicadas de sus componentes. Captura unidades del producto base: por ejemplo, 0.25 o 6.
-        </p>
         <UAlert v-if="error" title="No se pudieron cargar los componentes." color="error">
           <template #actions>
             <UButton label="Reintentar" variant="outline" @click="refresh()" />

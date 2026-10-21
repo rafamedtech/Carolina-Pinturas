@@ -1,12 +1,20 @@
 import type { SiigoProduct } from '~/types/siigo'
 import type { ProductInput } from '~/types/siigo-products'
 
+export function productDuplicateInput(product: SiigoProduct): ProductInput {
+  const input = productMutationInput(product)
+  input.code = ''
+  input.additional_fields.barcode = ''
+  input.composition.version = 1
+  return input
+}
+
 export function productMutationInput(product?: SiigoProduct): ProductInput {
   return {
     code: product?.code ?? '', name: product?.name ?? '',
     account_group: Number(product?.account_group?.id ?? 0),
     type: 'Product',
-    availability: { purchase: product?.internal?.availability?.purchase ?? true, sale: product?.internal?.availability?.sale ?? true, expense: product?.internal?.availability?.expense ?? true },
+    availability: { purchase: product?.internal?.availability?.purchase ?? true, sale: product?.internal?.availability?.sale ?? true, expense: product?.internal?.availability?.expense ?? false },
     composition: { kind: product?.internal?.composition?.kind ?? 'product', version: product?.internal?.composition?.version ?? 1,
       components: (product?.internal?.composition?.components ?? []).map(c => ({ ...c })) },
     active: product?.active ?? true, stock_control: false,

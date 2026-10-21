@@ -33,7 +33,7 @@ export const productInputSchema = z.object({
   account_group: z.number().int().positive('Selecciona una clasificación.'),
   type: z.literal('Product'),
   composition: productCompositionSchema.default({ kind: 'product', version: 1, components: [] }),
-  availability: productAvailabilitySchema.default({ purchase: true, sale: true, expense: true }),
+  availability: productAvailabilitySchema.default({ purchase: true, sale: true, expense: false }),
   active: z.boolean(),
   stock_control: z.literal(false),
   tax_included: z.boolean(),

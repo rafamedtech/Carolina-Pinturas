@@ -4,23 +4,24 @@ import type { SiigoProduct } from '~/types/siigo'
 import type { ProductContext, ProductImage, ProductInput } from '~/types/siigo-products'
 import { canManageProducts } from '~/utils/roleAccess'
 
-const props = defineProps<{ productId?: string }>()
+const props = defineProps<{ productId?: string, duplicateFrom?: string }>()
 const { user } = useAuth()
 const allowed = computed(() => canManageProducts(user.value?.role))
-const title = computed(() => props.productId ? 'Editar producto' : 'Nuevo producto')
+const title = computed(() => props.productId ? 'Editar producto' : props.duplicateFrom ? 'Duplicar producto' : 'Nuevo producto')
 const route = useRoute()
 const returnTo = computed(() => tableReturnPath(route.query.returnTo, '/productos'))
-const back = computed(() => props.productId
-  ? { path: `/productos/${props.productId}`, query: { returnTo: returnTo.value } }
+const sourceId = computed(() => props.productId || props.duplicateFrom)
+const back = computed(() => sourceId.value
+  ? { path: `/productos/${sourceId.value}`, query: { returnTo: returnTo.value } }
   : returnTo.value)
 const { data: context, error: contextError } = await useFetch<ProductContext>('/api/siigo/products/context', { immediate: allowed.value })
 const product = ref<SiigoProduct>()
-const loading = shallowRef(Boolean(props.productId))
+const loading = shallowRef(Boolean(sourceId.value))
 const loadError = shallowRef('')
 const productImage = ref<ProductImage | null>(null)
-if (props.productId && allowed.value) {
+if (sourceId.value && allowed.value) {
   try {
-    product.value = await $fetch<SiigoProduct>(`/api/siigo/products/${encodeURIComponent(props.productId)}`, { headers: useRequestHeaders(['cookie']), query: { refresh: 'true' } })
+    product.value = await $fetch<SiigoProduct>(`/api/siigo/products/${encodeURIComponent(sourceId.value)}`, { headers: useRequestHeaders(['cookie']), query: { refresh: 'true' } })
     productImage.value = product.value.internal?.image ?? null
     if ((product.value.type || 'Product') !== 'Product') loadError.value = 'Este tipo de producto se conserva solo para consulta histórica.'
   } catch {
@@ -63,11 +64,18 @@ useSeoMeta({ title })
       <UAlert v-if="!allowed" title="Solo administradores pueden gestionar productos." color="warning" />
       <UAlert v-else-if="contextError || loadError" :title="loadError || 'No se pudieron cargar las opciones del producto.'" color="error" />
       <template v-else-if="context && !loading">
-        <UAlert v-if="product?.internal?.syncPending" title="Este producto tiene un guardado pendiente de conciliar." color="warning">
+        <UAlert v-if="productId && product?.internal?.syncPending" title="Este producto tiene un guardado pendiente de conciliar." color="warning">
           <template #actions>
             <UButton label="Consultar y conciliar guardado" :loading="checking" @click="recover" />
           </template>
         </UAlert>
+        <UAlert
+          v-if="duplicateFrom"
+          title="Revisa los datos de la copia e ingresa un código nuevo."
+          description="El producto se creará al guardar. La imagen y las existencias del producto original no se copian."
+          color="info"
+          variant="subtle"
+        />
         <UAlert v-if="errorMessage" :title="errorMessage" color="error" />
         <div v-if="ambiguous" class="space-y-3 rounded-lg border border-warning p-4">
           <UButton label="Consultar resultado en Siigo" :loading="checking" @click="recover" />
@@ -82,14 +90,16 @@ useSeoMeta({ title })
         <ProductsProductImageField
           v-if="productId && product"
           v-model:image="productImage"
+          class="ring-0"
           :product-id="productId"
           :product-name="product.name"
         />
         <ProductsProductForm
           :product="product"
+          :duplicate="Boolean(duplicateFrom)"
           :context="context"
           :saving="saving"
-          :blocked="ambiguous || Boolean(product?.internal?.syncPending)"
+          :blocked="ambiguous || Boolean(productId && product?.internal?.syncPending)"
           @submit="submit"
           @cancel="navigateTo(back)"
         />

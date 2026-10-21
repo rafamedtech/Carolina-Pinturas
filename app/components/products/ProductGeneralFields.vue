@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { ProductInput, ProductContext } from '~/types/siigo-products'
 
-const props = defineProps<{ context: ProductContext }>()
+const props = defineProps<{ context: ProductContext, hideSecondaryFields?: boolean }>()
 const model = defineModel<ProductInput>({ required: true })
 const selectedGroup = computed({
   get: () => model.value.account_group || undefined,
@@ -44,18 +44,16 @@ const groups = computed(() => {
       <UFormField label="Clave SAT" name="key" required>
         <ProductsSatPicker v-model="model.key" kind="key" label="Clave SAT" />
       </UFormField>
-      <UFormField label="Referencia" name="reference">
+      <!-- Ocultos temporalmente en edición; los valores se conservan en el modelo. -->
+      <UFormField v-if="!hideSecondaryFields" label="Referencia" name="reference">
         <UInput v-model="model.reference" maxlength="80" class="w-full" />
       </UFormField>
       <UFormField label="Marca" name="additional_fields.brand">
-        <UInput v-model="model.additional_fields.brand" maxlength="50" class="w-full" />
+        <ProductsProductBrandField v-model="model.additional_fields.brand" />
       </UFormField>
-      <UFormField label="Código de barras" name="additional_fields.barcode">
+      <UFormField v-if="!hideSecondaryFields" label="Código de barras" name="additional_fields.barcode">
         <UInput v-model="model.additional_fields.barcode" maxlength="50" class="w-full" />
       </UFormField>
-      <div class="flex flex-wrap items-center gap-4">
-        <USwitch v-model="model.active" label="Activo" />
-      </div>
       <UFormField label="Descripción" name="description" class="sm:col-span-2">
         <UTextarea v-model="model.description" maxlength="2500" class="w-full" />
       </UFormField>

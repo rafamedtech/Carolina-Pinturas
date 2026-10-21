@@ -55,7 +55,9 @@ describe('contrato de productos México', () => {
     const p = { ...normalizeSiigoProduct(external), internal: { availability } }
     expect(productMutationInput(p).availability).toEqual(availability)
     expect(productInputSchema.parse({ ...input(), availability }).availability).toEqual(availability)
-    expect(productInputSchema.parse({ ...input(), availability: undefined }).availability).toEqual({ purchase: true, sale: true, expense: true })
+    expect(productMutationInput().availability).toEqual({ purchase: true, sale: true, expense: false })
+    expect(productMutationInput({ ...p, internal: { availability: { ...availability, expense: true } } }).availability.expense).toBe(true)
+    expect(productInputSchema.parse({ ...input(), availability: undefined }).availability).toEqual({ purchase: true, sale: true, expense: false })
     expect(productInputSchema.safeParse({ ...input(), availability: { purchase: 'false', sale: true, expense: true } }).success).toBe(false)
     expect(productInputSchema.safeParse({ ...input(), availability: { purchase: false, sale: false, expense: false } }).success).toBe(true)
   })

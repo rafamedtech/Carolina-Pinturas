@@ -5,6 +5,7 @@ import { defineComponent, h } from 'vue'
 import { flushPromises, type VueWrapper } from '@vue/test-utils'
 import ProductForm from '~/components/products/ProductForm.vue'
 import SatPicker from '~/components/products/SatPicker.vue'
+import ProductBrandField from '~/components/products/ProductBrandField.vue'
 import { useProductMutation } from '~/composables/useProductMutation'
 import type { SiigoProduct } from '~/types/siigo'
 import { productMutationInput } from '~/utils/siigoProductMutation'
@@ -21,6 +22,11 @@ const context = {
   priceLists: [{ id: 1, name: 'Público', active: true }, { id: 2, name: 'Mayoreo', active: true }]
 }
 let wrapper: VueWrapper | undefined
+registerEndpoint('/api/siigo/products', () => ({ results: [
+  { ...product, additional_fields: { brand: 'MAX' } },
+  { ...product, additional_fields: { brand: 'max' } },
+  { ...product, additional_fields: { brand: 'AXALTA' } }
+] }))
 registerEndpoint('/api/siigo/products/sat', async () => {
   await new Promise(resolve => setTimeout(resolve, 10))
   return { results: [{ code: 'H87', name: 'Pieza' }], pagination: { page: 1, page_size: 25, total_results: 1 }, retrievedAt: '2026-09-15', source: 'https://example.com' }
@@ -32,6 +38,69 @@ afterEach(() => {
 })
 
 describe('formulario de productos', () => {
+  it.each(['Compra', 'Venta directa', 'Gasto'])('calcula Activo al encender y apagar %s sin mostrar un switch propio', async (label) => {
+    wrapper = await mountSuspended(ProductForm, { props: {
+      product: { ...product, active: true, internal: { availability: { purchase: false, sale: false, expense: false } } },
+      context, saving: false, blocked: false
+    } })
+    expect(wrapper.findAllComponents({ name: 'USwitch' }).some(component => component.props('label') === 'Activo')).toBe(false)
+    await wrapper.find('form').trigger('submit')
+    await flushPromises()
+    expect(wrapper.emitted('submit')?.at(-1)?.[0]).toMatchObject({ active: false })
+    const toggle = wrapper.findAllComponents({ name: 'USwitch' }).find(component => component.props('label') === label)!
+    await toggle.get('button').trigger('click')
+    await wrapper.find('form').trigger('submit')
+    await flushPromises()
+    expect(wrapper.emitted('submit')?.at(-1)?.[0]).toMatchObject({ active: true })
+    await toggle.get('button').trigger('click')
+    await wrapper.find('form').trigger('submit')
+    await flushPromises()
+    expect(wrapper.emitted('submit')?.at(-1)?.[0]).toMatchObject({ active: false })
+  })
+  it('busca marcas del catálogo sin duplicar mayúsculas y permite crear una nueva', async () => {
+    wrapper = await mountSuspended(ProductBrandField, { props: { modelValue: 'Marca actual' } })
+    const menu = wrapper.findComponent({ name: 'USelectMenu' })
+    await vi.waitFor(() => expect(menu.props('items')).toEqual(['AXALTA', 'Marca actual', 'MAX']))
+    await menu.vm.$emit('update:searchTerm', ' max ')
+    await flushPromises()
+    expect(menu.props('createItem')).toBe(false)
+    await menu.vm.$emit('update:modelValue', 'AXALTA')
+    expect(wrapper.emitted('update:modelValue')?.at(-1)).toEqual(['AXALTA'])
+    await menu.vm.$emit('update:searchTerm', ' Nueva marca ')
+    await flushPromises()
+    expect(menu.props('createItem')).toEqual({ when: 'always', position: 'bottom' })
+    await menu.vm.$emit('create', ' Nueva marca ')
+    await flushPromises()
+    expect(wrapper.emitted('update:modelValue')?.at(-1)).toEqual(['Nueva marca'])
+    expect(menu.props('items')).toContain('Nueva marca')
+    await menu.vm.$emit('update:searchTerm', 'x'.repeat(51))
+    await flushPromises()
+    expect(menu.props('createItem')).toBe(false)
+  })
+  it('duplica los datos en un alta que exige código nuevo y conserva el original', async () => {
+    const source: SiigoProduct = { ...product, additional_fields: { barcode: '123', brand: 'Marca' }, internal: {
+      composition: { kind: 'composite', version: 3, components: [{ productId: baseId, quantity: '0.25' }] },
+      availability: { purchase: false, sale: true, expense: false }
+    } }
+    const original = structuredClone(source)
+    wrapper = await mountSuspended(ProductForm, { props: { product: source, duplicate: true, context, saving: false, blocked: false } })
+    await flushPromises()
+    expect(wrapper.text()).toContain('Crear producto')
+    expect(wrapper.text()).not.toContain('Guardar cambios')
+    expect((wrapper.get('input[maxlength="30"]').element as HTMLInputElement).value).toBe('')
+    await wrapper.find('form').trigger('submit')
+    await flushPromises()
+    expect(wrapper.emitted('submit')).toBeUndefined()
+    await wrapper.get('input[maxlength="30"]').setValue('PIN2')
+    await wrapper.find('form').trigger('submit')
+    await flushPromises()
+    expect(wrapper.emitted('submit')?.[0]?.[0]).toMatchObject({ code: 'PIN2', name: 'Pintura', prices: product.prices,
+      additional_fields: { barcode: '', brand: 'Marca' },
+      composition: { kind: 'composite', version: 1, components: [{ productId: baseId, quantity: '0.25' }] },
+      availability: { purchase: false, sale: true, expense: false }
+    })
+    expect(source).toEqual(original)
+  })
   it('edita y envía una composición fraccionaria sin exponer servicios ni control Siigo', async () => {
     wrapper = await mountSuspended(ProductForm, { props: {
       product: { ...product, internal: { composition: { kind: 'composite', version: 3, components: [{ productId: baseId, quantity: '0.25' }] } } }, context, saving: false, blocked: false
@@ -48,11 +117,11 @@ describe('formulario de productos', () => {
   })
   it('envía las opciones de disponibilidad independientemente de la composición', async () => {
     wrapper = await mountSuspended(ProductForm, { props: { product, context, saving: false, blocked: false } })
-    expect(wrapper.text()).toContain('Disponibilidad interna')
+    expect(wrapper.text()).toContain('Disponibilidad del producto')
     await wrapper.findAllComponents({ name: 'USwitch' }).find(component => component.props('label') === 'Venta directa')!.get('button').trigger('click')
     await wrapper.find('form').trigger('submit')
     await flushPromises()
-    expect(wrapper.emitted('submit')?.[0]?.[0]).toMatchObject({ availability: { purchase: true, sale: false, expense: true } })
+    expect(wrapper.emitted('submit')?.[0]?.[0]).toMatchObject({ availability: { purchase: true, sale: false, expense: false } })
   })
   it('muestra campos, conserva monedas y bloquea envío mientras guarda', async () => {
     wrapper = await mountSuspended(ProductForm, { props: { product, context, saving: true, blocked: false } })
