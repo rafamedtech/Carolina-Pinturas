@@ -86,7 +86,7 @@ const historyModalOpen = shallowRef(false)
           />
         </div>
 
-        <OrdersOrderHistoryList :entries="entries" :collapse-after="3" />
+        <OrdersOrderHistoryList :entries="entries" :collapse-after="2" />
       </div>
     </div>
 

@@ -35,7 +35,7 @@ function showKardex(row: InventoryStock) {
 </script>
 
 <template>
-  <UCard>
+  <UCard v-if="data?.managed || loadError" class="shrink-0">
     <template #header>
       <div class="flex flex-wrap items-center justify-between gap-3">
         <h2 class="font-semibold text-primary">
