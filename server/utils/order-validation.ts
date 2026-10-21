@@ -122,6 +122,10 @@ export const updateOrderTagsSchema = z.object({
   version: z.number().int().positive()
 })
 
+export const deleteOrderItemSchema = z.object({
+  version: z.number().int().positive()
+})
+
 export const updateOrderItemPriceSchema = z.object({
   unitPrice: z.number().positive('El precio debe ser mayor a cero.').max(100_000_000),
   note: z.string().trim().max(1000).nullable().optional(),
@@ -153,6 +157,7 @@ export type UpdateOrderRemisionInput = z.output<typeof updateOrderRemisionSchema
 export type UpdateOrderRepartidorInput = z.output<typeof updateOrderRepartidorSchema>
 export type RequireOrderInvoiceInput = z.output<typeof requireOrderInvoiceSchema>
 export type UpdateOrderTagsInput = z.output<typeof updateOrderTagsSchema>
+export type DeleteOrderItemInput = z.output<typeof deleteOrderItemSchema>
 export type UpdateOrderItemPriceInput = z.output<typeof updateOrderItemPriceSchema>
 export type UpdateOrderItemQuantityInput = z.output<typeof updateOrderItemQuantitySchema>
 export type UpdateOrderItemObservationsInput = z.output<typeof updateOrderItemObservationsSchema>

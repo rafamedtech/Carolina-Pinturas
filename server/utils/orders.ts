@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { inventoryRequest, inventorySettings, syncOrderInventory, assertOrderInventoryEditable } from './inventory'
+import { paymentStatus } from './order-payments'
 import { captureInventoryRecipes } from './product-compositions'
 import { inventoryRecipeSchema } from '#shared/schemas/product'
 import Decimal from 'decimal.js'
@@ -9,6 +10,7 @@ import type { AppUser, SiigoCustomer, SiigoProduct } from '~/types/siigo'
 import type { SalesOrderDetail, SalesOrderListItem } from '~/types/orders'
 import type {
   CreateOrderInput,
+  DeleteOrderItemInput,
   UpdateOrderInput,
   RequireOrderInvoiceInput,
   UpdateOrderRemisionInput,
@@ -1123,13 +1125,19 @@ export async function updateOrderRepartidor(
         id,
         AND: [orderVisibilityFilter(user)]
       },
-      select: { version: true }
+      select: { version: true, statusKey: true }
     }),
     prisma.repartidor.findUnique({ where: { id: input.repartidorId } })
   ])
 
   if (!order) {
     throw createError({ statusCode: 404, statusMessage: 'No se encontró el pedido.' })
+  }
+  if (order.statusKey === 'entregado') {
+    throw createError({
+      statusCode: 409,
+      statusMessage: 'No se puede cambiar el repartidor de un pedido entregado.'
+    })
   }
   if (!repartidor) {
     throw createError({ statusCode: 422, statusMessage: 'El repartidor seleccionado no está disponible.' })
@@ -1142,7 +1150,7 @@ export async function updateOrderRepartidor(
   }
 
   const result = await prisma.salesOrder.updateMany({
-    where: { id, version: input.version },
+    where: { id, version: input.version, statusKey: { not: 'entregado' } },
     data: {
       repartidorId: repartidor.id,
       repartidorNombreSnapshot: repartidor.nombre,
@@ -1268,6 +1276,87 @@ export async function updateOrderTags(
   return getOrder(id, user)
 }
 
+export async function deleteOrderItem(
+  orderId: string,
+  itemId: string,
+  input: DeleteOrderItemInput,
+  user: AppUser
+) {
+  if (user.role !== 'admin') {
+    throw createError({ statusCode: 403, statusMessage: 'Solo un administrador puede eliminar partidas.' })
+  }
+
+  return usePrisma().$transaction(async (tx) => {
+    await tx.$queryRaw`SELECT id FROM sales_orders WHERE id = ${orderId}::uuid FOR UPDATE`
+    const order = await tx.salesOrder.findFirst({
+      where: { id: orderId, AND: [orderVisibilityFilter(user)] },
+      include: { items: true, siigoInvoice: true }
+    })
+    if (!order) {
+      throw createError({ statusCode: 404, statusMessage: 'No se encontró el pedido.' })
+    }
+    if (['en_camino', 'entregado'].includes(order.statusKey)) {
+      throw createError({
+        statusCode: 409,
+        statusMessage: 'No se pueden eliminar partidas de un pedido en camino o entregado.'
+      })
+    }
+    if (order.siigoInvoice && order.siigoInvoice.status !== 'failed') {
+      throw createError({
+        statusCode: 409,
+        statusMessage: 'No se pueden eliminar partidas de un pedido facturado o con una solicitud de factura en proceso.'
+      })
+    }
+    if (order.version !== input.version) {
+      throw createError({ statusCode: 409, statusMessage: 'El pedido cambió desde que lo abriste. Actualiza la página e intenta de nuevo.' })
+    }
+    if (!order.items.some(item => item.id === itemId)) {
+      throw createError({ statusCode: 404, statusMessage: 'No se encontró la partida.' })
+    }
+    if (order.items.length <= 1) {
+      throw createError({ statusCode: 409, statusMessage: 'El pedido debe conservar al menos una partida.' })
+    }
+
+    const remaining = order.items.filter(item => item.id !== itemId)
+    const totals = orderTotals(remaining.map(item => ({
+      subtotal: item.subtotal.toString(),
+      discountAmount: item.discountAmount.toString(),
+      taxAmount: item.taxAmount.toString(),
+      total: item.total.toString()
+    })), order.discountType, order.discountValue.toString())
+    const payments = await tx.salesOrderPayment.aggregate({ where: { orderId }, _sum: { amount: true } })
+    const result = await tx.salesOrder.updateMany({
+      where: {
+        id: orderId,
+        version: input.version,
+        statusKey: { notIn: ['en_camino', 'entregado'] },
+        OR: [{ siigoInvoice: null }, { siigoInvoice: { status: 'failed' } }]
+      },
+      data: {
+        subtotal: totals.subtotal.toString(),
+        discountAmount: totals.discountAmount.toString(),
+        discountTotal: totals.discountTotal.toString(),
+        taxTotal: totals.taxTotal.toString(),
+        total: totals.total.toString(),
+        paymentStatus: paymentStatus(Number(payments._sum.amount?.toString() || 0), totals.total.toNumber()),
+        updatedByEmail: user.email,
+        version: { increment: 1 }
+      }
+    })
+    if (result.count !== 1) {
+      throw createError({ statusCode: 409, statusMessage: 'El pedido cambió o fue facturado mientras se actualizaba. Recarga e intenta de nuevo.' })
+    }
+    await tx.salesOrderItem.delete({ where: { id: itemId } })
+
+    await inventorySettings(tx)
+    const dispatch = await tx.inventoryMovement.findUnique({ where: { originKey: `order:${orderId}:dispatch` } })
+    // Las salidas ya registradas se conservan; la devolución física se captura por separado.
+    if (!dispatch) await syncOrderInventory(tx, orderId, user)
+
+    return { id: itemId }
+  }, ORDER_WRITE_TRANSACTION_OPTIONS)
+}
+
 export async function updateOrderItemPrice(
   orderId: string,
   itemId: string,
@@ -1276,7 +1365,7 @@ export async function updateOrderItemPrice(
 ) {
   const prisma = usePrisma()
 
-  if (!canManageOrderLogistics(user.role)) {
+  if (user.role !== 'admin') {
     throw createError({
       statusCode: 403,
       statusMessage: 'No tienes permiso para modificar el precio de esta partida.'
@@ -1397,7 +1486,7 @@ export async function updateOrderItemQuantity(
 ) {
   const prisma = usePrisma()
 
-  if (!canManageOrderLogistics(user.role)) {
+  if (user.role !== 'admin') {
     throw createError({
       statusCode: 403,
       statusMessage: 'No tienes permiso para modificar la cantidad de esta partida.'

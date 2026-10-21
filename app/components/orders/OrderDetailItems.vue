@@ -10,11 +10,15 @@ const props = withDefaults(defineProps<{
   orderId: string
   version: number
   editable?: boolean
+  deletable?: boolean
+  inventoryDispatched?: boolean
+  amountsEditable?: boolean
   quantityEditable?: boolean
-}>(), { quantityEditable: true })
+}>(), { amountsEditable: true, quantityEditable: true, inventoryDispatched: false })
 
 const emit = defineEmits<{
   updated: [order: SalesOrderDetail]
+  deleted: [itemId: string]
 }>()
 
 const UButton = resolveComponent('UButton')
@@ -24,6 +28,15 @@ const currency = computed(() => new Intl.NumberFormat('es-MX', {
   style: 'currency',
   currency: props.currencyCode
 }))
+
+const deleteOpen = shallowRef(false)
+const deletingItem = shallowRef<SalesOrderItem | null>(null)
+
+function openDelete(item: SalesOrderItem) {
+  if (!props.deletable || props.items.length <= 1) return
+  deletingItem.value = item
+  deleteOpen.value = true
+}
 
 const editOpen = shallowRef(false)
 const editingItem = shallowRef<SalesOrderItem | null>(null)
@@ -43,6 +56,7 @@ const savingObservations = shallowRef(false)
 const observationsError = shallowRef('')
 
 function openEdit(item: SalesOrderItem) {
+  if (!props.editable || !props.amountsEditable) return
   editingItem.value = item
   editPrice.value = item.unitPrice
   editNote.value = ''
@@ -51,7 +65,7 @@ function openEdit(item: SalesOrderItem) {
 }
 
 async function submitPriceEdit() {
-  if (!editingItem.value || savingPrice.value) return
+  if (!props.editable || !props.amountsEditable || !editingItem.value || savingPrice.value) return
   savingPrice.value = true
   priceError.value = ''
 
@@ -83,6 +97,7 @@ async function submitPriceEdit() {
 }
 
 function openQuantityEdit(item: SalesOrderItem) {
+  if (!props.editable || !props.amountsEditable || !props.quantityEditable) return
   quantityEditingItem.value = item
   editQuantity.value = item.quantity
   quantityError.value = ''
@@ -99,7 +114,7 @@ const canSaveQuantity = computed(() =>
 )
 
 async function submitQuantityEdit() {
-  if (!quantityEditingItem.value || !canSaveQuantity.value || savingQuantity.value) return
+  if (!props.editable || !props.amountsEditable || !props.quantityEditable || !quantityEditingItem.value || !canSaveQuantity.value || savingQuantity.value) return
   savingQuantity.value = true
   quantityError.value = ''
 
@@ -215,7 +230,7 @@ const columns: TableColumn<SalesOrderItem>[] = [{
   header: () => h('div', { class: 'text-right' }, 'Cantidad'),
   cell: ({ row }) => h('div', { class: 'flex items-center justify-end gap-1' }, [
     h('span', String(row.original.quantity)),
-    props.editable && props.quantityEditable !== false
+    props.editable && props.amountsEditable && props.quantityEditable !== false
       ? h(UButton, {
           'icon': 'i-lucide-pencil',
           'color': 'neutral',
@@ -235,7 +250,7 @@ const columns: TableColumn<SalesOrderItem>[] = [{
   header: () => h('div', { class: 'text-right' }, 'Precio unitario'),
   cell: ({ row }) => h('div', { class: 'flex items-center justify-end gap-1' }, [
     h('span', currency.value.format(row.original.unitPrice)),
-    props.editable
+    props.editable && props.amountsEditable
       ? h(UButton, {
           'icon': 'i-lucide-pencil',
           'color': 'neutral',
@@ -264,6 +279,21 @@ const columns: TableColumn<SalesOrderItem>[] = [{
     { class: 'text-right font-medium text-primary' },
     currency.value.format(row.original.total)
   )
+}, {
+  id: 'actions',
+  header: '',
+  cell: ({ row }) => props.deletable
+    ? h(UButton, {
+        'icon': 'i-lucide-trash-2',
+        'color': 'error',
+        'variant': 'ghost',
+        'size': 'xs',
+        'disabled': props.items.length <= 1,
+        'title': props.items.length <= 1 ? 'El pedido debe conservar al menos una partida.' : 'Eliminar partida',
+        'aria-label': `Eliminar partida de ${row.original.name}`,
+        'onClick': () => openDelete(row.original)
+      })
+    : null
 }]
 </script>
 
@@ -298,6 +328,17 @@ const columns: TableColumn<SalesOrderItem>[] = [{
 
           <div class="flex shrink-0 items-center gap-1">
             <UButton
+              v-if="deletable"
+              icon="i-lucide-trash-2"
+              color="error"
+              variant="ghost"
+              size="sm"
+              :disabled="items.length <= 1"
+              :title="items.length <= 1 ? 'El pedido debe conservar al menos una partida.' : 'Eliminar partida'"
+              :aria-label="`Eliminar partida de ${item.name}`"
+              @click="openDelete(item)"
+            />
+            <UButton
               v-if="item.priceHistory.length"
               icon="i-lucide-history"
               color="neutral"
@@ -319,7 +360,7 @@ const columns: TableColumn<SalesOrderItem>[] = [{
                 {{ item.quantity }} {{ item.unit.name || item.unit.code || '' }}
               </p>
               <UButton
-                v-if="editable && quantityEditable !== false"
+                v-if="editable && amountsEditable && quantityEditable !== false"
                 icon="i-lucide-pencil"
                 color="neutral"
                 variant="ghost"
@@ -338,7 +379,7 @@ const columns: TableColumn<SalesOrderItem>[] = [{
                 {{ currency.format(item.unitPrice) }}
               </p>
               <UButton
-                v-if="editable"
+                v-if="editable && amountsEditable"
                 icon="i-lucide-pencil"
                 color="neutral"
                 variant="ghost"
@@ -400,6 +441,16 @@ const columns: TableColumn<SalesOrderItem>[] = [{
         <OrdersOrderItemComposition :item="row.original" />
       </template>
     </UTable>
+
+    <OrdersOrderItemDeleteModal
+      v-if="deletable && deletingItem"
+      v-model:open="deleteOpen"
+      :order-id="orderId"
+      :item="deletingItem"
+      :version="version"
+      :inventory-dispatched="inventoryDispatched"
+      @deleted="emit('deleted', $event)"
+    />
 
     <UModal v-model:open="editOpen" title="Editar precio">
       <template #body>

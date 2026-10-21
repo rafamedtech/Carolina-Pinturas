@@ -67,6 +67,35 @@ afterEach(() => {
 })
 
 describe('OrderDetailItems', () => {
+  it('ofrece eliminar en las vistas móvil y de escritorio solo con permiso', async () => {
+    wrapper = await mountSuspended(OrderDetailItems, {
+      props: { items: [item, { ...item, id: 'item-2' }], currencyCode: 'MXN', orderId: 'order-1', version: 1, deletable: true }
+    })
+    const buttons = wrapper.findAll('button[aria-label="Eliminar partida de Pintura blanca"]')
+    expect(buttons).toHaveLength(4)
+    expect(buttons.every(button => button.attributes('disabled') === undefined)).toBe(true)
+    await wrapper.setProps({ deletable: false })
+    expect(wrapper.findAll('button[aria-label="Eliminar partida de Pintura blanca"]')).toHaveLength(0)
+  })
+
+  it('deshabilita la eliminación de la última partida', async () => {
+    wrapper = await mountSuspended(OrderDetailItems, {
+      props: { items: [item], currencyCode: 'MXN', orderId: 'order-1', version: 1, deletable: true }
+    })
+    const buttons = wrapper.findAll('button[aria-label="Eliminar partida de Pintura blanca"]')
+    expect(buttons).toHaveLength(2)
+    expect(buttons.every(button => button.attributes('disabled') !== undefined)).toBe(true)
+  })
+
+  it('sin permiso de importes oculta cantidad y precio, conservando las observaciones', async () => {
+    wrapper = await mountSuspended(OrderDetailItems, {
+      props: { items: [item], currencyCode: 'MXN', orderId: 'order-1', version: 1, editable: true, amountsEditable: false }
+    })
+    expect(wrapper.findAll('button[aria-label="Editar cantidad de Pintura blanca"]')).toHaveLength(0)
+    expect(wrapper.findAll('button[aria-label="Editar precio de Pintura blanca"]')).toHaveLength(0)
+    expect(wrapper.findAll('button[aria-label="Editar observaciones de Pintura blanca"]').length).toBeGreaterThan(0)
+  })
+
   it('después del surtido bloquea cantidades y conserva edición de precios y notas', async () => {
     wrapper = await mountSuspended(OrderDetailItems, {
       props: { items: [item], currencyCode: 'MXN', orderId: 'order-1', version: 1, editable: true, quantityEditable: false }

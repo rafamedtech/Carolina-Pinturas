@@ -88,6 +88,15 @@ const mayEditOrder = computed(() =>
   Boolean(user.value && canCreateOrders(user.value.role) && !isQuote.value)
 )
 const orderIsDelivered = computed(() => order.value?.status.key === 'entregado')
+const mayChangeRepartidor = computed(() => mayManageLogistics.value && !orderIsDelivered.value)
+const mayEditItemAmounts = computed(() => user.value?.role === 'admin')
+const mayDeleteOrderItems = computed(() => Boolean(
+  order.value
+  && !isQuote.value
+  && mayEditItemAmounts.value
+  && !order.value.invoiceCreated
+  && !['en_camino', 'entregado'].includes(order.value.status.key)
+))
 const documentOptions = computed<DropdownMenuItem[][]>(() => {
   const documentActions: DropdownMenuItem[] = [
     { label: 'Ver documento', icon: 'i-lucide-eye', onSelect: () => openCotizacion() },
@@ -159,7 +168,7 @@ const savingChanges = computed(() =>
   savingRepartidor.value || savingStatus.value
 )
 const hasChanges = computed(() =>
-  (mayManageLogistics.value && !repartidorUnchanged.value)
+  (mayChangeRepartidor.value && !repartidorUnchanged.value)
   || !statusUnchanged.value
 )
 
@@ -194,7 +203,7 @@ const repartidorOptions = computed(() => repartidores.value.map(repartidor => ({
 
 async function updateRepartidor() {
   if (
-    !mayManageLogistics.value
+    !mayChangeRepartidor.value
     || !order.value
     || repartidorUnchanged.value
     || !selectedRepartidor.value
@@ -616,7 +625,7 @@ async function convertToPedido() {
                 </dt>
                 <dd class="mt-1">
                   <USelect
-                    v-if="mayManageLogistics"
+                    v-if="mayChangeRepartidor"
                     v-model="selectedRepartidor"
                     :items="repartidorOptions"
                     value-key="value"
@@ -674,8 +683,12 @@ async function convertToPedido() {
             :order-id="order.id"
             :version="order.version"
             :editable="!isQuote && mayManageLogistics"
+            :amounts-editable="mayEditItemAmounts"
+            :deletable="mayDeleteOrderItems"
+            :inventory-dispatched="Boolean(order.inventoryDispatched)"
             :quantity-editable="!order.inventoryDispatched"
             @updated="order = $event"
+            @deleted="refresh()"
           />
 
           <div class="[grid-area:totales] grid items-start gap-4 lg:grid-cols-2">
