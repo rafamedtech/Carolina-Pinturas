@@ -14,13 +14,16 @@ const pageSize = 25
 const router = useRouter()
 
 const { user } = useAuth()
-const filters = ref<Record<string, string>>({ active: 'true' })
+const productTab = shallowRef('all')
+const productTabs = ['all', 'purchase', 'sale', 'expense', 'composite', 'inactive']
+const filters = ref<Record<string, string>>({ active: 'all' })
 const dateFilterKeys = ['created_start', 'created_end', 'updated_start', 'updated_end'] as const
 const { returnTo } = useTableQuery([
   tableQueryField('search', filter, tableQueryText()),
   {
     read: (query) => {
-      const value: Record<string, string> = { active: tableQueryText('true', ['true', 'false', 'all']).parse(query.active) }
+      productTab.value = tableQueryText(query.active === 'false' ? 'inactive' : 'all', productTabs).parse(query.tab)
+      const value: Record<string, string> = { active: productTab.value === 'inactive' ? 'false' : productTab.value === 'all' ? 'all' : 'true' }
       for (const key of dateFilterKeys) {
         const date = tableQueryDate.parse(query[key])
         if (date) value[key] = date
@@ -28,12 +31,13 @@ const { returnTo } = useTableQuery([
       if (JSON.stringify(filters.value) !== JSON.stringify(value)) filters.value = value
     },
     write: () => ({
-      active: filters.value.active === 'true' ? undefined : filters.value.active,
+      tab: productTab.value === 'all' ? undefined : productTab.value,
+      active: undefined,
       ...Object.fromEntries(dateFilterKeys.map(key => [key, filters.value[key] || undefined]))
     })
   },
   tableQueryField('page', page, tableQueryPage)
-], { page, resetOn: [filter, filters] })
+], { page, resetOn: [filter, filters, productTab] })
 const { data, status, error, refresh } = useProductManagementCatalog(filters)
 function applyFilters(value: Record<string, string>) {
   filters.value = Object.fromEntries(Object.entries(value).filter(([, entry]) => Boolean(entry)))
@@ -48,9 +52,14 @@ onMounted(() => {
 const loading = computed(() => isHydrated.value && status.value === 'pending')
 
 // Apply the exclusion before search, pagination, totals and CSV export.
-const catalog = computed(() => (data.value?.results ?? []).filter(product =>
-  product.account_group?.name?.trim().replace(/\s+/g, ' ').toLocaleLowerCase('es-MX') !== 'servicios gravados'
-))
+const catalog = computed(() => (data.value?.results ?? []).filter((product) => {
+  if (product.account_group?.name?.trim().replace(/\s+/g, ' ').toLocaleLowerCase('es-MX') === 'servicios gravados') return false
+  if (productTab.value === 'all') return true
+  if (productTab.value === 'inactive') return product.active === false
+  if (product.active === false) return false
+  if (productTab.value === 'composite') return product.internal?.composition?.kind === 'composite'
+  return product.internal?.availability?.[productTab.value as 'purchase' | 'sale' | 'expense'] === true
+}))
 const normalizedFilter = computed(() => filter.value.trim().toLocaleLowerCase())
 const filteredProducts = computed(() => {
   if (!normalizedFilter.value) return catalog.value
@@ -115,7 +124,8 @@ const csvColumns: CsvColumn<SiigoProduct>[] = [
 
 const columns: TableColumn<SiigoProduct>[] = [{
   accessorKey: 'code',
-  header: 'Código'
+  header: 'Código',
+  cell: ({ row }) => h('span', { class: 'text-primary' }, row.original.code)
 }, {
   accessorKey: 'name',
   header: 'Producto'
@@ -134,7 +144,7 @@ const columns: TableColumn<SiigoProduct>[] = [{
 }, {
   id: 'price',
   header: 'Precio',
-  cell: ({ row }) => h('span', { class: 'text-primary' }, formatProductPrice(row.original))
+  cell: ({ row }) => h('span', { class: 'text-primary font-semibold' }, formatProductPrice(row.original))
 }]
 
 const message = computed(() => error.value?.data?.statusMessage || 'No fue posible cargar el catálogo.')
@@ -143,7 +153,10 @@ const totalProducts = computed(() => filteredProducts.value.length)
 function openProduct(_: Event, row: TableRow<SiigoProduct>) {
   router.push({ path: `/productos/${encodeURIComponent(row.original.id)}`, query: { returnTo: returnTo.value } })
 }
-const productTab = computed({ get: () => filters.value.active || 'true', set: (active: string) => applyFilters({ ...filters.value, active }) })
+function selectProductTab(tab: string) {
+  productTab.value = tab
+  applyFilters({ ...filters.value, active: tab === 'inactive' ? 'false' : tab === 'all' ? 'all' : 'true' })
+}
 const createdRange = computed<OrderDateRange | null>({
   get: () => {
     try {
@@ -163,7 +176,14 @@ const filterValues = computed<ListFilterValues>({
 const listConfig = computed<ListLayoutConfig>(() => ({
   id: 'products', title: 'Productos', empty: 'No hay productos para mostrar.',
   search: { placeholder: 'Buscar en todos los productos' }, dateFilter: { subject: 'productos creados' },
-  tabs: [{ label: 'Activos', value: 'true' }, { label: 'Inactivos', value: 'false' }, { label: 'Todos', value: 'all' }], defaultTab: 'true',
+  tabs: [
+    { label: 'Todos', value: 'all' },
+    { label: 'Compra', value: 'purchase' },
+    { label: 'Venta directa', value: 'sale' },
+    { label: 'Gasto', value: 'expense' },
+    { label: 'Compuestos', value: 'composite' },
+    { label: 'Inactivos', value: 'inactive' }
+  ], defaultTab: 'all',
   filters: [
     { key: 'created_start', label: 'Creado desde', type: 'date', defaultValue: '' },
     { key: 'created_end', label: 'Creado hasta', type: 'date', defaultValue: '' },
@@ -180,8 +200,8 @@ const listConfig = computed<ListLayoutConfig>(() => ({
     v-model:search="filter"
     v-model:date-range="createdRange"
     v-model:filters="filterValues"
-    v-model:tab="productTab"
     v-model:page="page"
+    :tab="productTab"
     :config="listConfig"
     :data="products"
     :columns="columns"
@@ -190,6 +210,7 @@ const listConfig = computed<ListLayoutConfig>(() => ({
     error-title="Catálogo no disponible"
     :error-message="message"
     :total-results="totalProducts"
+    @update:tab="selectProductTab"
     @refresh="reload"
     @select="openProduct"
   >
