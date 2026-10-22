@@ -30,13 +30,12 @@ const generalFields = computed(() => {
   const item = product.value
   if (!item) return []
   return [
-    { label: 'Tipo', value: item.internal?.composition?.kind === 'composite' ? 'Producto compuesto' : item.type === 'Product' || !item.type ? 'Producto' : item.type },
     { label: 'Creado', value: formatMexicoDateTime(item.metadata?.created) },
     { label: 'Última actualización', value: formatMexicoDateTime(item.metadata?.last_updated) },
-    { label: 'Descripción', value: item.description, multiline: true },
-    { label: 'Marca', value: item.additional_fields?.brand },
     { label: 'Grupo', value: item.account_group?.name },
-    { label: 'Inventario interno', value: item.internal?.composition?.kind === 'composite' ? 'Control por componentes' : item.internal?.inventory?.tracked ? 'Controlado' : 'Sin control' }
+    { label: 'Tipo', value: item.internal?.composition?.kind === 'composite' ? 'Producto compuesto' : item.type === 'Product' || !item.type ? 'Producto' : item.type },
+    { label: 'Marca', value: item.additional_fields?.brand },
+    { label: 'Control de inventario', value: item.internal?.composition?.kind === 'composite' ? 'Control por componentes' : item.internal?.inventory?.tracked ? 'Controlado' : 'Sin control' }
   ]
 })
 const fiscalFields = computed(() => {
@@ -115,7 +114,6 @@ function formatQuantity(value?: number) {
         icon="i-lucide-plug-zap"
       />
 
-      <InventoryProductStock v-if="product?.internal?.composition?.kind !== 'composite'" :product-id="productId" />
       <template v-if="product">
         <UAlert
           v-if="product.internal?.syncPending"
@@ -135,7 +133,7 @@ function formatQuantity(value?: number) {
             <p class="text-sm text-muted">
               {{ product.code }}
             </p>
-            <h1 class="text-xl font-semibold text-highlighted break-words">
+            <h1 class="text-xl font-semibold text-primary break-words">
               {{ product.name }}
             </h1>
             <p v-if="product.reference" class="mt-1 text-sm text-muted">
@@ -148,14 +146,14 @@ function formatQuantity(value?: number) {
         </div>
 
         <div v-if="isManaged" class="flex flex-wrap gap-2" aria-label="Disponibilidad interna">
-          <UBadge :color="product.internal?.availability?.purchase === false ? 'neutral' : 'success'" variant="subtle">
-            Compra: {{ product.internal?.availability?.purchase === false ? 'No' : 'Sí' }}
+          <UBadge :color="product.internal?.availability?.purchase === false ? 'neutral' : 'success'" variant="subtle" :aria-label="`Compra: ${product.internal?.availability?.purchase === false ? 'No' : 'Sí'}`">
+            Compra
           </UBadge>
-          <UBadge :color="product.internal?.availability?.sale === false ? 'neutral' : 'success'" variant="subtle">
-            Venta directa: {{ product.internal?.availability?.sale === false ? 'No' : 'Sí' }}
+          <UBadge :color="product.internal?.availability?.sale === false ? 'neutral' : 'success'" variant="subtle" :aria-label="`Venta directa: ${product.internal?.availability?.sale === false ? 'No' : 'Sí'}`">
+            Venta directa
           </UBadge>
-          <UBadge :color="product.internal?.availability?.expense === false ? 'neutral' : 'success'" variant="subtle">
-            Gasto: {{ product.internal?.availability?.expense === false ? 'No' : 'Sí' }}
+          <UBadge :color="product.internal?.availability?.expense === false ? 'neutral' : 'success'" variant="subtle" :aria-label="`Gasto: ${product.internal?.availability?.expense === false ? 'No' : 'Sí'}`">
+            Gasto
           </UBadge>
         </div>
 
@@ -163,7 +161,7 @@ function formatQuantity(value?: number) {
           <div class="flex flex-col gap-4 lg:col-span-2">
             <UCard v-if="product.internal?.composition?.kind === 'composite'">
               <template #header>
-                <h2 class="font-semibold">
+                <h2 class="font-semibold text-primary">
                   Componentes por unidad
                 </h2>
               </template>
@@ -179,7 +177,7 @@ function formatQuantity(value?: number) {
             </UCard>
             <UCard>
               <template #header>
-                <h2 class="font-semibold text-highlighted">
+                <h2 class="font-semibold text-primary">
                   Información general
                 </h2>
               </template>
@@ -192,7 +190,7 @@ function formatQuantity(value?: number) {
                   <dt class="text-sm text-muted">
                     {{ field.label }}
                   </dt>
-                  <dd class="mt-1 font-medium break-words" :class="{ 'whitespace-pre-wrap': field.multiline }">
+                  <dd class="mt-1 font-medium break-words">
                     {{ field.value || '—' }}
                   </dd>
                 </div>
@@ -201,7 +199,7 @@ function formatQuantity(value?: number) {
 
             <UCard>
               <template #header>
-                <h2 class="font-semibold text-highlighted">
+                <h2 class="font-semibold text-primary">
                   Listas de precios
                 </h2>
               </template>
@@ -223,7 +221,7 @@ function formatQuantity(value?: number) {
 
             <UCard v-if="product.components?.length">
               <template #header>
-                <h2 class="font-semibold text-highlighted">
+                <h2 class="font-semibold text-primary">
                   Componentes
                 </h2>
               </template>
@@ -256,7 +254,7 @@ function formatQuantity(value?: number) {
 
             <UCard>
               <template #header>
-                <h2 class="font-semibold text-highlighted">
+                <h2 class="font-semibold text-primary">
                   Datos fiscales
                 </h2>
               </template>
@@ -271,6 +269,7 @@ function formatQuantity(value?: number) {
                 </div>
               </dl>
             </UCard>
+            <InventoryProductStock v-if="product.internal?.composition?.kind !== 'composite'" :product-id="productId" />
           </div>
         </div>
       </template>
