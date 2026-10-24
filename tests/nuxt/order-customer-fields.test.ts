@@ -160,18 +160,19 @@ describe('OrderCustomerFields', () => {
     expect(tagSelect?.props('disabled')).toBe(false)
     expect(tagSelect?.props('modelValue')).toEqual(['urgente'])
     expect(mounted.findComponent(OrderCustomerCreateModal).exists()).toBe(false)
-    expect(mounted.text()).not.toContain('Usar MOSTRADOR .')
+    expect(mounted.text()).not.toContain('Cambiar a Mostrador')
   })
 
   it('selecciona al cliente MOSTRADOR . desde la acción de cliente genérico', async () => {
     const mounted = await mountFields()
     const button = mounted.findAll('button')
-      .find(item => item.text().includes('Usar MOSTRADOR .'))
+      .find(item => item.text().includes('Cambiar a Mostrador'))
 
     expect(button).toBeTruthy()
     await button!.trigger('click')
 
     expect(mounted.emitted('update:customerId')).toEqual([['mostrador-id']])
+    expect(mounted.emitted('counterCustomerSelected')).toEqual([[counterCustomer]])
   })
 
   it('permite encontrar un cliente por su nombre comercial cuando la razón social viene vacía', async () => {

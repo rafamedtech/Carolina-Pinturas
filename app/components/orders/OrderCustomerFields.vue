@@ -32,6 +32,7 @@ const props = withDefaults(defineProps<{
 
 const emit = defineEmits<{
   customerCreated: [customer: SiigoCustomer]
+  counterCustomerSelected: [customer: SiigoCustomer]
 }>()
 
 const customerId = defineModel<string>('customerId', { required: true })
@@ -133,7 +134,9 @@ function onCustomerCreated(customer: SiigoCustomer) {
 }
 
 function selectCounterCustomer() {
-  if (counterCustomer.value) customerId.value = counterCustomer.value.id
+  if (!counterCustomer.value) return
+  customerId.value = counterCustomer.value.id
+  emit('counterCustomerSelected', counterCustomer.value)
 }
 </script>
 
@@ -185,9 +188,9 @@ function selectCounterCustomer() {
         <template v-if="!props.counterSale" #hint>
           <UButton
             v-if="counterCustomer && !props.lockOrderFields"
-            :label="`Usar ${COUNTER_CUSTOMER_NAME}`"
-            color="neutral"
-            variant="link"
+            label="Cambiar a Mostrador"
+            color="primary"
+            variant="subtle"
             size="xs"
             :disabled="loading || disabled"
             @click="selectCounterCustomer"

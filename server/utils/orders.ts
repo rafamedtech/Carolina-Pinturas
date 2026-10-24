@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { inventoryRequest, inventorySettings, syncOrderInventory, assertOrderInventoryEditable } from './inventory'
-import { paymentStatus } from './order-payments'
+import { orderPaymentTotals, paymentStatus } from './order-payments'
 import { captureInventoryRecipes } from './product-compositions'
 import { inventoryRecipeSchema } from '#shared/schemas/product'
 import Decimal from 'decimal.js'
@@ -330,6 +330,7 @@ function assertStatusPermission(user: AppUser, statusKey: string) {
 }
 
 function listItem(order: SalesOrder & {
+  payments?: { amount: Prisma.Decimal }[]
   siigoInvoice?: { status: string } | null
   status: { key: string, label: string, color: string, sortOrder: number, isTerminal: boolean }
   _count: { items: number }
@@ -354,6 +355,7 @@ function listItem(order: SalesOrder & {
     orderDate: dateOnly(order.orderDate) || '',
     promisedDate: dateOnly(order.promisedDate),
     total: number(order.total),
+    ...(order.payments ? { balance: orderPaymentTotals(number(order.total), order.payments.map(payment => ({ amount: number(payment.amount) }))).balance } : {}),
     itemCount: order._count.items,
     paymentStatus: order.paymentStatus,
     paymentMethod: order.paymentMethod,
@@ -944,6 +946,7 @@ export async function listOrders(options: {
       include: {
         status: true,
         siigoInvoice: { select: { status: true } },
+        ...(options.view === 'pendiente_pago' ? { payments: { select: { amount: true } } } : {}),
         _count: { select: { items: true } },
         ...(isIgualacionesView
           ? {

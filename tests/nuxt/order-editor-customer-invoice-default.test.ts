@@ -4,6 +4,8 @@ import { mockNuxtImport, mountSuspended, registerEndpoint } from '@nuxt/test-uti
 import type { VueWrapper } from '@vue/test-utils'
 import OrderEditor from '~/components/orders/OrderEditor.vue'
 import OrderCustomerFields from '~/components/orders/OrderCustomerFields.vue'
+import OrderProductPicker from '~/components/orders/OrderProductPicker.vue'
+import NewOrderPage from '~/pages/ventas/nuevo-pedido.vue'
 import type { SiigoCustomer } from '~/types/siigo'
 
 const { useAuthMock } = vi.hoisted(() => ({
@@ -56,7 +58,10 @@ registerEndpoint('/api/siigo/products', () => ({
   pagination: { page: 1, page_size: 0, total_results: 0 }
 }))
 registerEndpoint('/api/orders/statuses', () => [])
-registerEndpoint('/api/repartidores', () => [])
+registerEndpoint('/api/repartidores', () => [
+  { id: 'delivery-driver', nombre: 'Repartidor', esMostrador: false, activo: true },
+  { id: 'counter-driver', nombre: 'MOSTRADOR', esMostrador: true, activo: true }
+])
 registerEndpoint('/api/orders/tags', () => [])
 
 let storedQuoteTotal = 38800.08
@@ -83,6 +88,39 @@ afterEach(() => {
 })
 
 describe('OrderEditor · preferencia de factura del cliente', () => {
+  it('cambia de domicilio a mostrador conservando las partidas y asignando el destino mostrador', async () => {
+    wrapper = await mountSuspended(NewOrderPage, {
+      route: '/ventas/nuevo-pedido?tipo=domicilio&returnTo=/ventas&vista=lista'
+    })
+    const editor = wrapper.findComponent(OrderEditor)
+    const fields = wrapper.findComponent(OrderCustomerFields)
+    await vi.waitFor(() => expect(fields.props('repartidores')).toHaveLength(2))
+
+    fields.vm.$emit('update:repartidorId', 'delivery-driver')
+    fields.vm.$emit('update:observations', 'Conservar esta nota')
+    wrapper.findComponent(OrderProductPicker).vm.$emit('add', {
+      id: 'paint-product', code: 'PINTURA', name: 'Pintura de prueba', unit: 'Pieza'
+    }, 2)
+    const customer = { ...regularCustomer, name: ['MOSTRADOR', '.'] }
+    fields.vm.$emit('update:customerId', customer.id)
+    fields.vm.$emit('counterCustomerSelected', customer)
+
+    await vi.waitFor(() => {
+      expect(editor.props('saleType')).toBe('counter')
+      expect(fields.props('counterSale')).toBe(true)
+      expect(fields.props('repartidorId')).toBe('counter-driver')
+    })
+    expect(fields.props('customers')).toEqual([customer])
+    expect(fields.props('customerId')).toBe(customer.id)
+    expect(fields.props('observations')).toBe('Conservar esta nota')
+    expect(wrapper.text()).toContain('Venta mostrador')
+    expect(wrapper.text()).toContain('Pintura de prueba')
+    expect(fields.props('showPaymentSelectors')).toBe(true)
+    expect(useRouter().currentRoute.value.query).toMatchObject({
+      tipo: 'mostrador', returnTo: '/ventas', vista: 'lista'
+    })
+  })
+
   it('actualiza Requiere factura al seleccionar un cliente en un pedido nuevo', async () => {
     wrapper = await mountSuspended(OrderEditor, {
       props: { mode: 'order', saleType: 'delivery' }

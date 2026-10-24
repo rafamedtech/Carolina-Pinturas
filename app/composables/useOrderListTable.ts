@@ -8,7 +8,7 @@ import type { SortingState, VisibilityState } from '@tanstack/table-core'
 import type { SalesOrderListItem } from '~/types/orders'
 import { paymentStatusColor, paymentStatusLabel } from '~/utils/orderPayment'
 
-export function useOrderListTable(options: { returnTo: MaybeRefOrGetter<string>, igualacion?: boolean, billing?: MaybeRefOrGetter<boolean>, internal?: MaybeRefOrGetter<boolean> }) {
+export function useOrderListTable(options: { returnTo: MaybeRefOrGetter<string>, igualacion?: boolean, billing?: MaybeRefOrGetter<boolean>, internal?: MaybeRefOrGetter<boolean>, pendingPayment?: MaybeRefOrGetter<boolean> }) {
   const currency = new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' })
   const sorting = ref<SortingState>([])
   useTableQuery([tableQueryField('sort', sorting, tableQuerySorting)])
@@ -16,6 +16,7 @@ export function useOrderListTable(options: { returnTo: MaybeRefOrGetter<string>,
     promisedDate: false,
     rfc: false,
     itemCount: false,
+    pendingPaymentTotal: false,
     createdAt: false,
     updatedAt: false
   })
@@ -82,6 +83,16 @@ export function useOrderListTable(options: { returnTo: MaybeRefOrGetter<string>,
       'div',
       { class: 'text-right font-medium' },
       currency.format(row.original.total)
+    )
+  }
+
+  const balanceColumn: TableColumn<SalesOrderListItem> = {
+    accessorKey: 'balance',
+    header: sortableHeader('Saldo pendiente', 'right'),
+    cell: ({ row }) => h(
+      'div',
+      { class: 'text-right font-medium' },
+      row.original.balance == null ? '—' : currency.format(row.original.balance)
     )
   }
 
@@ -162,7 +173,11 @@ export function useOrderListTable(options: { returnTo: MaybeRefOrGetter<string>,
     accessorFn: row => row.status.sortOrder,
     header: sortableHeader('Estado'),
     cell: ({ row }) => h(OrderStatusBadge, { status: row.original.status })
-  }, ...(toValue(options.billing) ? [invoiceStatusColumn] : []), ...(options.igualacion ? [] : [totalColumn]), {
+  }, ...(toValue(options.billing) ? [invoiceStatusColumn] : []), ...(options.igualacion
+    ? []
+    : toValue(options.pendingPayment)
+      ? [balanceColumn, { ...totalColumn, id: 'pendingPaymentTotal' }]
+      : [totalColumn]), {
     accessorKey: 'createdAt',
     header: sortableHeader('Creado'),
     cell: ({ row }) => formatDateTime(row.original.createdAt)

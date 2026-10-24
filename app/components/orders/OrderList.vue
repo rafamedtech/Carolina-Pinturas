@@ -43,6 +43,7 @@ function selectionFromQuery(query: typeof route.query) {
 }
 const filter = shallowRef('')
 const selectedTab = shallowRef(selectionFromQuery(route.query))
+const isPendingPaymentView = computed(() => !props.igualacion && selectedTab.value === 'pendiente_pago')
 const isInternalCustomersView = computed(() => !props.igualacion && selectedTab.value === 'internos')
 const selectedStatus = computed(() =>
   props.igualacion && selectedTab.value !== 'all' && !IGUALACION_VIEW_KEYS.includes(selectedTab.value)
@@ -61,6 +62,10 @@ const paymentStatusKey = shallowRef('all')
 const paymentMethodKey = shallowRef('all')
 const hideCancelled = shallowRef(false)
 const hideQuotes = shallowRef(false)
+const hideOrderQueryBoolean = {
+  parse: (value: unknown) => value == null ? isPendingPaymentView.value : tableQueryBoolean.parse(value),
+  serialize: (value: boolean) => value ? 'true' : isPendingPaymentView.value ? 'false' : undefined
+}
 const dateRange = shallowRef<OrderDateRange | null>(null)
 const page = shallowRef(1)
 const pageSize = 25
@@ -80,11 +85,18 @@ const { returnTo } = useTableQuery([
   },
   tableQueryField('payment_status', paymentStatusKey, tableQueryText('all')),
   tableQueryField('payment_method', paymentMethodKey, tableQueryText('all')),
-  tableQueryField('hide_cancelled', hideCancelled, tableQueryBoolean),
-  tableQueryField('hide_quotes', hideQuotes, tableQueryBoolean),
+  tableQueryField('hide_cancelled', hideCancelled, hideOrderQueryBoolean),
+  tableQueryField('hide_quotes', hideQuotes, hideOrderQueryBoolean),
   tableQueryRange(dateRange),
   tableQueryField('page', page, tableQueryPage)
 ], { page, resetOn: [filter, selectedTab, paymentStatusKey, paymentMethodKey, hideCancelled, hideQuotes, dateRange] })
+
+watch(isPendingPaymentView, (isPending) => {
+  if (isPending) {
+    hideCancelled.value = true
+    hideQuotes.value = true
+  }
+}, { flush: 'sync' })
 
 watch(canViewInternal, (canView) => {
   if (!canView && selectedTab.value === 'internos') selectedTab.value = 'all'
@@ -163,7 +175,9 @@ const csvColumns = computed<CsvColumn<SalesOrderListItem>[]>(() => {
   } else {
     columns.push(
       { key: 'paymentStatus', label: 'Estado de pago', value: row => paymentStatusLabel(row.paymentStatus) },
-      { key: 'total', label: 'Total', value: row => row.total }
+      isPendingPaymentView.value
+        ? { key: 'balance', label: 'Saldo pendiente', value: row => row.balance ?? '' }
+        : { key: 'total', label: 'Total', value: row => row.total }
     )
   }
 
@@ -287,6 +301,7 @@ const { columns, sorting, columnVisibility, selectedOrder, detailOpen, openOrder
   returnTo,
   igualacion: props.igualacion,
   internal: isInternalCustomersView,
+  pendingPayment: isPendingPaymentView,
   billing: () => !props.igualacion && selectedTab.value === 'facturacion'
 })
 const listConfig = computed<ListLayoutConfig>(() => ({

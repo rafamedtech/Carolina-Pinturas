@@ -469,6 +469,20 @@ function onCustomerCreated(customer: SiigoCustomer) {
   state.customerId = customer.id
 }
 
+async function onCounterCustomerSelected(customer: SiigoCustomer) {
+  if (isEditing.value || isQuoteMode.value || props.saleType !== 'delivery') return
+
+  // Reutiliza el cliente ya cargado al cambiar de flujo sin reiniciar las partidas.
+  counterCustomer.value = customer
+  const failure = await router.push({
+    path: route.path,
+    query: { ...route.query, tipo: 'mostrador' }
+  })
+  if (failure) return
+
+  state.repartidorId = repartidores.value.find(repartidor => repartidor.esMostrador)?.id || ''
+}
+
 async function addSelectedProduct(product: SiigoProduct, quantity: number) {
   let unit = siigoProductUnitParts(product)
 
@@ -689,6 +703,7 @@ function submitReview(intent: OrderReviewSubmissionIntent) {
             :quote-mode="isQuoteMode"
             :counter-sale="props.saleType === 'counter'"
             @customer-created="onCustomerCreated"
+            @counter-customer-selected="onCounterCustomerSelected"
           />
 
           <OrdersOrderProductPicker

@@ -81,6 +81,31 @@ describe('listado de pedidos', () => {
   })
 
   it.each([
+    [[], 100.30],
+    [[20.10, 30.10], 50.10],
+    [[100.30], 0],
+    [[120], 0]
+  ])('calcula el saldo pendiente con los abonos %j', async (amounts, expectedBalance) => {
+    mocks.findMany.mockResolvedValue([{
+      id: 'order-1', folio: 1,
+      status: { key: 'entregado', label: 'Entregado', color: 'success', sortOrder: 1, isTerminal: true },
+      customerId: 'customer-1', customerNameSnapshot: 'Cliente', customerRfcSnapshot: null,
+      orderDate: new Date('2026-10-19T00:00:00Z'), promisedDate: null,
+      total: 100.30, _count: { items: 1 }, paymentStatus: 'abonado', paymentMethod: 'efectivo',
+      payments: amounts.map(amount => ({ amount })),
+      createdAt: new Date(), updatedAt: new Date()
+    }])
+
+    const result = await listOrders({ page: 1, pageSize: 25, view: 'pendiente_pago' }, admin)
+
+    expect(result.results[0]?.balance).toBe(expectedBalance)
+    expect(result.results[0]?.total).toBe(100.30)
+    expect(mocks.findMany).toHaveBeenCalledWith(expect.objectContaining({
+      include: expect.objectContaining({ payments: { select: { amount: true } } })
+    }))
+  })
+
+  it.each([
     ['cotizacion', { statusKey: 'borrador' }],
     ['pendiente_pago', { paymentStatus: { in: ['pendiente_pago', 'abonado'] } }],
     ['entregado', { statusKey: 'entregado' }],

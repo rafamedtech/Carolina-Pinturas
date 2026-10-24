@@ -56,6 +56,7 @@ export interface SalesOrderListItem {
   promisedDate: string | null
   total: number
   itemCount: number
+  balance?: number
   paymentStatus: string
   paymentMethod: string | null
   tags?: string[]
