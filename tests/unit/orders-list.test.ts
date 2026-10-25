@@ -80,6 +80,40 @@ describe('listado de pedidos', () => {
     }))
   })
 
+  it.each([true, false])('expone el repartidor y la fecha real de entrega (historial: %s)', async (hasHistory) => {
+    mocks.findMany.mockResolvedValue([{
+      id: 'order-1', folio: 1,
+      status: { key: 'entregado', label: 'Entregado', color: 'success', sortOrder: 1, isTerminal: true },
+      customerId: 'customer-1', customerNameSnapshot: 'Cliente', customerRfcSnapshot: null,
+      orderDate: new Date('2026-10-19T00:00:00Z'), promisedDate: null,
+      repartidorNombreSnapshot: 'Juan',
+      statusHistory: hasHistory
+        ? [
+            { toStatusKey: 'entregado', changedAt: new Date('2026-10-20T18:30:00Z') },
+            { toStatusKey: 'entregado', changedAt: new Date('2026-10-21T19:00:00Z') },
+            { toStatusKey: 'confirmado', changedAt: new Date('2026-10-22T20:00:00Z') }
+          ]
+        : [],
+      total: 100, _count: { items: 1 }, paymentStatus: 'pagado', paymentMethod: 'efectivo',
+      createdAt: new Date('2026-10-19T18:00:00Z'), updatedAt: new Date('2026-10-23T20:00:00Z')
+    }])
+
+    const result = await listOrders({ page: 1, pageSize: 25, view: 'entregado' }, admin)
+
+    expect(result.results[0]?.repartidorName).toBe('Juan')
+    expect(result.results[0]?.deliveredAt).toBe(hasHistory ? '2026-10-21T19:00:00.000Z' : null)
+    expect(mocks.findMany).toHaveBeenCalledWith(expect.objectContaining({
+      include: expect.objectContaining({
+        statusHistory: {
+          where: { toStatusKey: 'entregado' },
+          orderBy: { changedAt: 'desc' },
+          take: 1,
+          select: { toStatusKey: true, changedAt: true }
+        }
+      })
+    }))
+  })
+
   it.each([
     [[], 100.30],
     [[20.10, 30.10], 50.10],

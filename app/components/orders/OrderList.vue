@@ -44,6 +44,7 @@ function selectionFromQuery(query: typeof route.query) {
 const filter = shallowRef('')
 const selectedTab = shallowRef(selectionFromQuery(route.query))
 const isPendingPaymentView = computed(() => !props.igualacion && selectedTab.value === 'pendiente_pago')
+const isDeliveredView = computed(() => !props.igualacion && selectedTab.value === 'entregado')
 const isInternalCustomersView = computed(() => !props.igualacion && selectedTab.value === 'internos')
 const selectedStatus = computed(() =>
   props.igualacion && selectedTab.value !== 'all' && !IGUALACION_VIEW_KEYS.includes(selectedTab.value)
@@ -185,8 +186,16 @@ const csvColumns = computed<CsvColumn<SalesOrderListItem>[]>(() => {
     columns.push({ key: 'tags', label: 'Etiquetas', value: row => (row.tags ?? []).join(', ') })
   }
 
+  if (isDeliveredView.value) {
+    columns.push(
+      { key: 'repartidorName', label: 'Repartidor', value: row => row.repartidorName || 'Sin asignar' },
+      { key: 'deliveredAt', label: 'Fecha de entrega', value: row => formatDate(row.deliveredAt) }
+    )
+  } else {
+    columns.push({ key: 'status', label: 'Estado', value: row => row.status.label })
+  }
+
   columns.push(
-    { key: 'status', label: 'Estado', value: row => row.status.label },
     { key: 'createdAt', label: 'Creado', value: row => formatDateTime(row.createdAt) },
     { key: 'updatedAt', label: 'Última actualización', value: row => formatDateTime(row.updatedAt) }
   )
@@ -302,6 +311,7 @@ const { columns, sorting, columnVisibility, selectedOrder, detailOpen, openOrder
   igualacion: props.igualacion,
   internal: isInternalCustomersView,
   pendingPayment: isPendingPaymentView,
+  delivered: isDeliveredView,
   billing: () => !props.igualacion && selectedTab.value === 'facturacion'
 })
 const listConfig = computed<ListLayoutConfig>(() => ({

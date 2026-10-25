@@ -334,6 +334,7 @@ function listItem(order: SalesOrder & {
   siigoInvoice?: { status: string } | null
   status: { key: string, label: string, color: string, sortOrder: number, isTerminal: boolean }
   _count: { items: number }
+  statusHistory?: { toStatusKey: string, changedAt: Date }[]
   items?: { productCodeSnapshot: string, productNameSnapshot: string, quantity: Prisma.Decimal, observations: string | null }[]
 }): SalesOrderListItem {
   return {
@@ -354,6 +355,11 @@ function listItem(order: SalesOrder & {
     },
     orderDate: dateOnly(order.orderDate) || '',
     promisedDate: dateOnly(order.promisedDate),
+    repartidorName: order.repartidorNombreSnapshot,
+    deliveredAt: order.statusHistory
+      ?.filter(entry => entry.toStatusKey === 'entregado')
+      .reduce<Date | null>((latest, entry) => !latest || entry.changedAt > latest ? entry.changedAt : latest, null)
+      ?.toISOString() ?? null,
     total: number(order.total),
     ...(order.payments ? { balance: orderPaymentTotals(number(order.total), order.payments.map(payment => ({ amount: number(payment.amount) }))).balance } : {}),
     itemCount: order._count.items,
@@ -946,6 +952,16 @@ export async function listOrders(options: {
       include: {
         status: true,
         siigoInvoice: { select: { status: true } },
+        ...(options.view === 'entregado'
+          ? {
+              statusHistory: {
+                where: { toStatusKey: 'entregado' },
+                orderBy: { changedAt: 'desc' as const },
+                take: 1,
+                select: { toStatusKey: true, changedAt: true }
+              }
+            }
+          : {}),
         ...(options.view === 'pendiente_pago' ? { payments: { select: { amount: true } } } : {}),
         _count: { select: { items: true } },
         ...(isIgualacionesView

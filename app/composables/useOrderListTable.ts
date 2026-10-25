@@ -8,7 +8,7 @@ import type { SortingState, VisibilityState } from '@tanstack/table-core'
 import type { SalesOrderListItem } from '~/types/orders'
 import { paymentStatusColor, paymentStatusLabel } from '~/utils/orderPayment'
 
-export function useOrderListTable(options: { returnTo: MaybeRefOrGetter<string>, igualacion?: boolean, billing?: MaybeRefOrGetter<boolean>, internal?: MaybeRefOrGetter<boolean>, pendingPayment?: MaybeRefOrGetter<boolean> }) {
+export function useOrderListTable(options: { returnTo: MaybeRefOrGetter<string>, igualacion?: boolean, billing?: MaybeRefOrGetter<boolean>, internal?: MaybeRefOrGetter<boolean>, pendingPayment?: MaybeRefOrGetter<boolean>, delivered?: MaybeRefOrGetter<boolean> }) {
   const currency = new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' })
   const sorting = ref<SortingState>([])
   useTableQuery([tableQueryField('sort', sorting, tableQuerySorting)])
@@ -84,6 +84,23 @@ export function useOrderListTable(options: { returnTo: MaybeRefOrGetter<string>,
       { class: 'text-right font-medium' },
       currency.format(row.original.total)
     )
+  }
+
+  const deliveryColumns: TableColumn<SalesOrderListItem>[] = [{
+    accessorKey: 'repartidorName',
+    header: sortableHeader('Repartidor'),
+    cell: ({ row }) => row.original.repartidorName || 'Sin asignar'
+  }, {
+    accessorKey: 'deliveredAt',
+    header: sortableHeader('Fecha de entrega'),
+    cell: ({ row }) => formatDate(row.original.deliveredAt)
+  }]
+
+  const statusColumn: TableColumn<SalesOrderListItem> = {
+    id: 'status',
+    accessorFn: row => row.status.sortOrder,
+    header: sortableHeader('Estado'),
+    cell: ({ row }) => h(OrderStatusBadge, { status: row.original.status })
   }
 
   const balanceColumn: TableColumn<SalesOrderListItem> = {
@@ -168,12 +185,9 @@ export function useOrderListTable(options: { returnTo: MaybeRefOrGetter<string>,
   }, {
     accessorKey: 'itemCount',
     header: sortableHeader('Partidas')
-  }, ...(options.igualacion ? [igualacionColumn] : [paymentStatusColumn]), {
-    id: 'status',
-    accessorFn: row => row.status.sortOrder,
-    header: sortableHeader('Estado'),
-    cell: ({ row }) => h(OrderStatusBadge, { status: row.original.status })
-  }, ...(toValue(options.billing) ? [invoiceStatusColumn] : []), ...(options.igualacion
+  }, ...(options.igualacion ? [igualacionColumn] : [paymentStatusColumn]),
+  ...(toValue(options.delivered) ? deliveryColumns : [statusColumn]),
+  ...(toValue(options.billing) ? [invoiceStatusColumn] : []), ...(options.igualacion
     ? []
     : toValue(options.pendingPayment)
       ? [balanceColumn, { ...totalColumn, id: 'pendingPaymentTotal' }]

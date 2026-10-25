@@ -54,6 +54,8 @@ export interface SalesOrderListItem {
   }
   orderDate: string
   promisedDate: string | null
+  repartidorName?: string | null
+  deliveredAt?: string | null
   total: number
   itemCount: number
   balance?: number
