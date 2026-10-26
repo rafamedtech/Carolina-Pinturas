@@ -702,6 +702,7 @@ function submitReview(intent: OrderReviewSubmissionIntent) {
             :show-payment-selectors="props.saleType !== 'delivery'"
             :quote-mode="isQuoteMode"
             :counter-sale="props.saleType === 'counter'"
+            :show-customer-balance="isDeliverySale && !isQuoteMode"
             @customer-created="onCustomerCreated"
             @counter-customer-selected="onCounterCustomerSelected"
           />

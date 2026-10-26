@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { parseDate } from '@internationalized/date'
 import type { DateValue } from '@internationalized/date'
+import type { CustomerBalanceSummary } from '#shared/types/customerBalance'
 import type { OrderStatus, Repartidor } from '~/types/orders'
 import type { SiigoCustomer } from '~/types/siigo'
 import { PAYMENT_STATUSES, PAYMENT_METHODS, ORDER_PAYMENT_METHODS } from '~/utils/orderPayment'
@@ -20,6 +21,7 @@ const props = withDefaults(defineProps<{
   showPaymentSelectors?: boolean
   quoteMode?: boolean
   counterSale?: boolean
+  showCustomerBalance?: boolean
 }>(), {
   repartidorRequired: false,
   lockOrderFields: false,
@@ -27,7 +29,8 @@ const props = withDefaults(defineProps<{
   showPayment: true,
   showPaymentSelectors: true,
   quoteMode: false,
-  counterSale: false
+  counterSale: false,
+  showCustomerBalance: false
 })
 
 const emit = defineEmits<{
@@ -36,6 +39,12 @@ const emit = defineEmits<{
 }>()
 
 const customerId = defineModel<string>('customerId', { required: true })
+const customerBalance = shallowRef<CustomerBalanceSummary | null>(null)
+const customerBalanceColor = computed(() => {
+  if (!props.showCustomerBalance || customerBalance.value?.customerId !== customerId.value) return undefined
+  const colors = { current: 'success', recent: 'warning', overdue: 'error' } as const
+  return colors[customerBalance.value.status]
+})
 const statusKey = defineModel<string>('statusKey', { required: true })
 const repartidorId = defineModel<string>('repartidorId', { required: true })
 const orderDate = defineModel<string>('orderDate', { required: true })
@@ -153,8 +162,18 @@ function selectCounterCustomer() {
         name="customerId"
         label="Cliente"
         required
+        :ui="{ label: 'inline-flex items-center after:order-1' }"
         class="sm:col-span-2"
       >
+        <template #label>
+          Cliente
+          <OrdersOrderCustomerBalance
+            v-if="props.showCustomerBalance && customerId"
+            :customer-id="customerId"
+            class="order-2 ml-2"
+            @change="customerBalance = $event"
+          />
+        </template>
         <div
           v-if="props.counterSale"
           class="flex min-h-9 items-center rounded-md border border-default bg-elevated/50 px-3 py-2 font-medium text-highlighted"
@@ -173,6 +192,8 @@ function selectCounterCustomer() {
           v-model="customerId"
           v-model:search-term="customerSearchTerm"
           :items="customerOptions"
+          :color="customerBalanceColor"
+          :highlight="Boolean(customerBalanceColor)"
           value-key="value"
           :loading="loading"
           :disabled="disabled || props.lockOrderFields"
@@ -189,6 +210,7 @@ function selectCounterCustomer() {
           <UButton
             v-if="counterCustomer && !props.lockOrderFields"
             label="Cambiar a Mostrador"
+            icon="i-lucide-arrow-left-right"
             color="primary"
             variant="subtle"
             size="xs"

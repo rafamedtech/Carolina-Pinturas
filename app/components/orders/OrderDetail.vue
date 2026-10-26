@@ -88,6 +88,7 @@ const mayEditOrder = computed(() =>
   Boolean(user.value && canCreateOrders(user.value.role) && !isQuote.value)
 )
 const orderIsDelivered = computed(() => order.value?.status.key === 'entregado')
+const mayChangeStatus = computed(() => !isQuote.value && (!orderIsDelivered.value || user.value?.role === 'admin'))
 const mayChangeRepartidor = computed(() => mayManageLogistics.value && !orderIsDelivered.value)
 const mayEditItemAmounts = computed(() => user.value?.role === 'admin')
 const mayDeleteOrderItems = computed(() => Boolean(
@@ -169,7 +170,7 @@ const savingChanges = computed(() =>
 )
 const hasChanges = computed(() =>
   (mayChangeRepartidor.value && !repartidorUnchanged.value)
-  || !statusUnchanged.value
+  || (mayChangeStatus.value && !statusUnchanged.value)
 )
 
 const currency = computed(() => new Intl.NumberFormat('es-MX', {
@@ -241,7 +242,7 @@ async function updateRepartidor() {
 }
 
 async function updateStatus() {
-  if (!order.value || selectedStatus.value === order.value.status.key) return
+  if (!order.value || !mayChangeStatus.value || selectedStatus.value === order.value.status.key) return
   savingStatus.value = true
 
   try {
@@ -639,6 +640,14 @@ async function convertToPedido() {
                 </dd>
               </div>
             </dl>
+            <div v-if="order.observations" class="mt-4 border-t border-default pt-4">
+              <p class="text-sm text-muted">
+                Observaciones
+              </p>
+              <p class="mt-1 whitespace-pre-wrap break-words">
+                {{ order.observations }}
+              </p>
+            </div>
             <div v-if="order.tags.length" class="mt-4 border-t border-default pt-4">
               <p class="text-sm text-muted">
                 Etiquetas
@@ -654,14 +663,6 @@ async function convertToPedido() {
                 />
               </div>
             </div>
-            <div v-if="order.observations" class="mt-4 border-t border-default pt-4">
-              <p class="text-sm text-muted">
-                Observaciones
-              </p>
-              <p class="mt-1 whitespace-pre-wrap break-words">
-                {{ order.observations }}
-              </p>
-            </div>
           </UCard>
 
           <div class="[grid-area:seguimiento] grid gap-4">
@@ -673,6 +674,7 @@ async function convertToPedido() {
               :saving="savingStatus"
               :entries="order.statusHistory"
               :editable="!isQuote"
+              :disabled="!mayChangeStatus"
             />
           </div>
 

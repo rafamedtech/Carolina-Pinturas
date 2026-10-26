@@ -1020,6 +1020,12 @@ export async function updateOrderStatus(
     if (!order) {
       throw createError({ statusCode: 404, statusMessage: 'No se encontró el pedido.' })
     }
+    if (order.statusKey === 'entregado' && user.role !== 'admin') {
+      throw createError({
+        statusCode: 403,
+        statusMessage: 'Solo un administrador puede cambiar el estado de un pedido entregado.'
+      })
+    }
     if (!status) {
       throw createError({ statusCode: 422, statusMessage: 'El estado seleccionado no está disponible.' })
     }

@@ -7,6 +7,7 @@ const props = defineProps<{
   saving: boolean
   entries: readonly SalesOrderStatusHistoryItem[]
   editable?: boolean
+  disabled?: boolean
 }>()
 
 const statusKey = defineModel<string>('statusKey', { required: true })
@@ -35,7 +36,7 @@ const historyModalOpen = shallowRef(false)
             v-model="statusKey"
             :items="statusOptions"
             value-key="value"
-            :disabled="saving"
+            :disabled="saving || disabled"
             class="w-full"
           />
         </UFormField>
@@ -43,7 +44,7 @@ const historyModalOpen = shallowRef(false)
         <UFormField label="Nota del cambio" class="hidden flex-1 sm:block">
           <UInput
             v-model="note"
-            :disabled="saving"
+            :disabled="saving || disabled"
             placeholder="Opcional"
             class="w-full"
           />
@@ -56,12 +57,13 @@ const historyModalOpen = shallowRef(false)
               color="neutral"
               variant="ghost"
               :aria-label="note ? 'Editar nota del cambio' : 'Agregar nota del cambio'"
+              :disabled="saving || disabled"
             />
             <template #content>
               <UTextarea
                 v-model="note"
                 :rows="3"
-                :disabled="saving"
+                :disabled="saving || disabled"
                 placeholder="Nota del cambio (opcional)"
                 class="m-3 w-72"
                 :ui="{ base: 'resize-none' }"

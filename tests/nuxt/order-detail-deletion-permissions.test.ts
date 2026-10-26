@@ -4,6 +4,7 @@ import { mockNuxtImport, mountSuspended, registerEndpoint } from '@nuxt/test-uti
 import type { VueWrapper } from '@vue/test-utils'
 import OrderDetail from '~/components/orders/OrderDetail.vue'
 import OrderDetailItems from '~/components/orders/OrderDetailItems.vue'
+import OrderStatusPanel from '~/components/orders/OrderStatusPanel.vue'
 import type { UserRole } from '~/types/siigo'
 import type { SalesOrderDetail } from '~/types/orders'
 
@@ -108,5 +109,29 @@ describe('OrderDetail · permisos para eliminar partidas', () => {
     })
     await vi.waitFor(() => expect(wrapper?.findComponent(OrderDetailItems).exists()).toBe(true))
     expect(wrapper.findComponent(OrderDetailItems).props('deletable')).toBe(deletable)
+  })
+})
+
+describe('OrderDetail · estado después de la entrega', () => {
+  it.each([
+    ['admin', 'entregado', false],
+    ['mostrador', 'entregado', true],
+    ['vendedor', 'entregado', true],
+    ['repartidor', 'entregado', true],
+    ['igualaciones', 'entregado', true],
+    ['mostrador', 'en_camino', false],
+    ['repartidor', 'en_camino', false]
+  ] as const)('selector para %s en %s: deshabilitado=%s', async (role, statusKey, disabled) => {
+    authRole.value = role
+    currentOrder = { ...baseOrder, status: { ...baseOrder.status, key: statusKey } }
+    wrapper = await mountSuspended(OrderDetail, {
+      props: { orderId: 'order-invoice' },
+      global: { stubs: { OrdersSiigoOrderSiigoInvoiceCard: true } }
+    })
+    await vi.waitFor(() => expect(wrapper?.findComponent(OrderStatusPanel).exists()).toBe(true))
+    const panel = wrapper.findComponent(OrderStatusPanel)
+    expect(panel.props('editable')).toBe(true)
+    expect(panel.props('disabled')).toBe(disabled)
+    expect(panel.find('[role="combobox"]').attributes('disabled') !== undefined).toBe(disabled)
   })
 })
