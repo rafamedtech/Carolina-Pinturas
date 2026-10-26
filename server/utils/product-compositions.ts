@@ -93,7 +93,10 @@ export async function captureInventoryRecipes(tx: Tx, ids: string[], previous: A
     }
     assert(p!.internalComponents.length, 'El producto compuesto no tiene componentes.')
     const components = p!.internalComponents
-    assert(components.every(c => c.component.internalKind === 'product' && (!c.component.type || c.component.type === 'Product') && c.component.active !== false && c.component.inventoryProduct?.enabled), 'Revisa los componentes: deben ser productos simples, activos y con control interno.')
+    // Siigo can deactivate a component after a kit has been configured (for
+    // example, a legacy SKU). Keep consuming that component's internal stock.
+    // Active components are still required when defining/changing a composition.
+    assert(components.every(c => c.component.internalKind === 'product' && (!c.component.type || c.component.type === 'Product') && c.component.inventoryProduct?.enabled), 'Revisa los componentes: deben ser productos simples y con control interno.')
     await assertNoPendingProductWrites(tx, components.map(c => c.component))
     result.set(id, components.map(c => ({ productId: c.componentId, quantity: c.quantity.toString(), code: c.component.code, name: c.component.name, unit: c.component.unitName ?? c.component.unitCode })))
   }

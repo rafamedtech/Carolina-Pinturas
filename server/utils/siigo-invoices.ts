@@ -1,5 +1,5 @@
 import Decimal from 'decimal.js'
-import { orderMoney as money, orderLineAmounts } from '#shared/utils/orderAmounts'
+import { orderMoney as money, orderDiscount } from '#shared/utils/orderAmounts'
 import * as z from 'zod'
 import type { SiigoCustomer, SiigoProduct } from '~/types/siigo'
 import type {
@@ -452,22 +452,41 @@ export function buildSiigoInvoiceDraftPayload(options: {
     // Siigo vuelve a calcular los impuestos enviados en `taxes`, por lo que la
     // factura debe recibir el valor unitario de la base antes de impuestos.
     const taxRates = (product.taxes || []).map(tax => Number(tax.percentage) || 0)
-    const price = line.taxIncluded === undefined
-      ? money(new Decimal(line.subtotal).div(quantity))
-      : orderLineAmounts(quantity, listedPrice, taxRates, line.taxIncluded).price
+    const taxRate = taxRates.reduce((sum, rate) => sum.plus(rate), new Decimal(0)).div(100)
+    // Siigo México documents up to 6 decimals for price in invalid_amount
+    // (checked 2026-10-26), despite the create-invoice table saying two:
+    // https://developers.siigo.com/docs/siigoapimexico/codigos-de-error
+    // Keep that precision until quantity is multiplied: rounding the unit base
+    // to cents first changes e.g. 5 × $45 (IVA 8%) from $225 to $225.02.
+    // Legacy snapshots keep their stored pre-tax subtotal.
+    const price = (line.taxIncluded === undefined
+      ? new Decimal(line.subtotal).div(quantity)
+      : line.taxIncluded ? listedPrice.div(taxRate.plus(1)) : listedPrice
+    ).toDecimalPlaces(6, Decimal.ROUND_HALF_UP)
     const discount = invoiceDiscount({
       line,
       orderDiscount: new Decimal(options.order.discountAmount),
       linesTotal,
       discountType: options.documentType.discount_type,
-      taxRate: taxRates.reduce((sum, rate) => sum.plus(rate), new Decimal(0)).div(100)
+      taxRate
     })
-    const amounts = orderLineAmounts(
-      quantity, price, taxRates, false,
+    // Do not use orderLineAmounts here: its input is a customer-facing price
+    // rounded to cents, whereas the API receives a six-decimal tax base.
+    const rawSubtotal = quantity.mul(price)
+    const subtotal = money(rawSubtotal)
+    const discountAmount = orderDiscount(
+      subtotal,
       options.documentType.discount_type === 'Value' ? 'monto' : 'porcentaje',
       discount ?? 0
     )
-    invoiceTotal = invoiceTotal.plus(amounts.total)
+    // Taxes also use the precise base. For 5 × $45 with IVA 16%, the
+    // base is 193.965515: rounding it first would turn IVA 31.03 into 31.04.
+    const taxableBase = options.documentType.discount_type === 'Value'
+      ? Decimal.max(0, rawSubtotal.minus(discountAmount))
+      : rawSubtotal.mul(new Decimal(1).minus(new Decimal(discount ?? 0).div(100)))
+    const taxAmount = taxRates.reduce((sum, rate) =>
+      sum.plus(money(taxableBase.mul(rate).div(100))), new Decimal(0))
+    invoiceTotal = invoiceTotal.plus(money(taxableBase)).plus(taxAmount)
     const taxes = (product.taxes || []).flatMap((tax) => {
       const id = number(tax.id)
       return id && Number.isInteger(id) ? [{ id }] : []

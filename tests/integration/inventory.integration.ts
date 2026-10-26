@@ -619,6 +619,19 @@ suite('inventario: PostgreSQL aislado, sin conexión Siigo', () => {
     mocks.product.mockResolvedValue({ id: kit, code: 'KIT', name: 'Kit', type: 'Product', active: true })
     await expect(createPurchase({ requestId: randomUUID(), draft: { vatRate: 0, providerId: customer.id, date: today, currencyCode: 'MXN', notes: '', items: [{ productId: kit, quantity: 1, unitCost: 10 }] } }, user)).rejects.toThrow('simples')
   })
+  it('guarda pedidos con componentes desactivados después de configurar el kit y conserva su consumo', async () => {
+    const base = await product()
+    await entry(base)
+    const kit = await composite([{ productId: base, quantity: '0.5' }])
+    await db.siigoProduct.update({ where: { id: base }, data: { active: false } })
+
+    const order = await sale(kit, 2)
+    expect(order.items[0]?.inventoryRecipe).toEqual([expect.objectContaining({ productId: base, quantity: '0.5' })])
+    expect((await balance(base)).reserved.toString()).toBe('1')
+    await transition(order.id, 'surtido')
+    expect((await balance(base)).quantity.toString()).toBe('9')
+    expect((await balance(base)).reserved.toString()).toBe('0')
+  })
   it('guarda disponibilidad local, bloquea venta directa y permite consumir el componente dentro de un kit', async () => {
     const base = await product()
     await entry(base)
