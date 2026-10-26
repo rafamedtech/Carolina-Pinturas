@@ -16,14 +16,20 @@ const router = useRouter()
 const { user } = useAuth()
 const productTab = shallowRef('all')
 const productTabs = ['all', 'purchase', 'sale', 'expense', 'composite', 'inactive']
-const filters = ref<Record<string, string>>({ active: 'all' })
-const dateFilterKeys = ['created_start', 'created_end', 'updated_start', 'updated_end'] as const
+const filters = ref<Record<string, string>>({})
+const showInactive = shallowRef(false)
+const hideComposite = shallowRef(false)
+const hideOutOfStock = shallowRef(false)
+const dateFilterKeys = ['created_start', 'created_end'] as const
 const { returnTo } = useTableQuery([
   tableQueryField('search', filter, tableQueryText()),
   {
     read: (query) => {
       productTab.value = tableQueryText(query.active === 'false' ? 'inactive' : 'all', productTabs).parse(query.tab)
-      const value: Record<string, string> = { active: productTab.value === 'inactive' ? 'false' : productTab.value === 'all' ? 'all' : 'true' }
+      showInactive.value = query.show_inactive === 'true'
+      hideComposite.value = query.hide_composite === 'true'
+      hideOutOfStock.value = query.hide_out_of_stock === 'true'
+      const value: Record<string, string> = {}
       for (const key of dateFilterKeys) {
         const date = tableQueryDate.parse(query[key])
         if (date) value[key] = date
@@ -33,12 +39,21 @@ const { returnTo } = useTableQuery([
     write: () => ({
       tab: productTab.value === 'all' ? undefined : productTab.value,
       active: undefined,
+      show_inactive: showInactive.value ? 'true' : undefined,
+      hide_composite: hideComposite.value ? 'true' : undefined,
+      hide_out_of_stock: hideOutOfStock.value ? 'true' : undefined,
+      updated_start: undefined,
+      updated_end: undefined,
       ...Object.fromEntries(dateFilterKeys.map(key => [key, filters.value[key] || undefined]))
     })
   },
   tableQueryField('page', page, tableQueryPage)
-], { page, resetOn: [filter, filters, productTab] })
-const { data, status, error, refresh } = useProductManagementCatalog(filters)
+], { page, resetOn: [filter, filters, productTab, showInactive, hideComposite, hideOutOfStock] })
+const catalogFilters = computed(() => ({
+  ...filters.value,
+  active: productTab.value === 'inactive' ? 'false' : showInactive.value ? 'all' : 'true'
+}))
+const { data, status, error, refresh } = useProductManagementCatalog(catalogFilters)
 function applyFilters(value: Record<string, string>) {
   filters.value = Object.fromEntries(Object.entries(value).filter(([, entry]) => Boolean(entry)))
   page.value = 1
@@ -54,9 +69,13 @@ const loading = computed(() => isHydrated.value && status.value === 'pending')
 // Apply the exclusion before search, pagination, totals and CSV export.
 const catalog = computed(() => (data.value?.results ?? []).filter((product) => {
   if (product.account_group?.name?.trim().replace(/\s+/g, ' ').toLocaleLowerCase('es-MX') === 'servicios gravados') return false
-  if (productTab.value === 'all') return true
+  if (hideComposite.value && product.internal?.composition?.kind === 'composite') return false
+  // Unknown stock (including composites) is not a confirmed zero balance.
+  const available = product.internal?.inventory?.available
+  if (hideOutOfStock.value && available != null && Number(available) <= 0) return false
   if (productTab.value === 'inactive') return product.active === false
-  if (product.active === false) return false
+  if (!showInactive.value && product.active === false) return false
+  if (productTab.value === 'all') return true
   if (productTab.value === 'composite') return product.internal?.composition?.kind === 'composite'
   return product.internal?.availability?.[productTab.value as 'purchase' | 'sale' | 'expense'] === true
 }))
@@ -155,7 +174,7 @@ function openProduct(_: Event, row: TableRow<SiigoProduct>) {
 }
 function selectProductTab(tab: string) {
   productTab.value = tab
-  applyFilters({ ...filters.value, active: tab === 'inactive' ? 'false' : tab === 'all' ? 'all' : 'true' })
+  page.value = 1
 }
 const createdRange = computed<OrderDateRange | null>({
   get: () => {
@@ -170,8 +189,17 @@ const createdRange = computed<OrderDateRange | null>({
   set: value => applyFilters({ ...filters.value, created_start: value?.start?.toString() || '', created_end: value?.end?.toString() || '' })
 })
 const filterValues = computed<ListFilterValues>({
-  get: () => Object.fromEntries(dateFilterKeys.map(key => [key, filters.value[key] || ''])),
-  set: value => applyFilters({ ...filters.value, ...Object.fromEntries(Object.entries(value).filter((entry): entry is [string, string] => typeof entry[1] === 'string')) })
+  get: () => ({
+    show_inactive: showInactive.value,
+    hide_composite: hideComposite.value,
+    hide_out_of_stock: hideOutOfStock.value
+  }),
+  set: (value) => {
+    showInactive.value = value.show_inactive === true
+    hideComposite.value = value.hide_composite === true
+    hideOutOfStock.value = value.hide_out_of_stock === true
+    page.value = 1
+  }
 })
 const listConfig = computed<ListLayoutConfig>(() => ({
   id: 'products', title: 'Productos', empty: 'No hay productos para mostrar.',
@@ -185,10 +213,9 @@ const listConfig = computed<ListLayoutConfig>(() => ({
     { label: 'Inactivos', value: 'inactive' }
   ], defaultTab: 'all',
   filters: [
-    { key: 'created_start', label: 'Creado desde', type: 'date', defaultValue: '' },
-    { key: 'created_end', label: 'Creado hasta', type: 'date', defaultValue: '' },
-    { key: 'updated_start', label: 'Actualizado desde', type: 'date', defaultValue: '' },
-    { key: 'updated_end', label: 'Actualizado hasta', type: 'date', defaultValue: '' }
+    { key: 'show_inactive', label: 'Mostrar inactivos', type: 'checkbox', defaultValue: false },
+    { key: 'hide_composite', label: 'Ocultar compuestos', type: 'checkbox', defaultValue: false },
+    { key: 'hide_out_of_stock', label: 'Ocultar sin existencias', type: 'checkbox', defaultValue: false }
   ],
   create: canManageProducts(user.value?.role) ? { label: 'Nuevo producto', to: { path: '/productos/nuevo', query: { returnTo: returnTo.value } } } : undefined,
   pagination: { mode: 'external', label: 'productos', pageSize }
