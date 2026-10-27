@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createError } from 'h3'
 import { readFileSync } from 'node:fs'
 import { productInputSchema, productQuerySchema } from '../../shared/schemas/product'
-import { productMutationInput } from '../../app/utils/siigoProductMutation'
+import { productDuplicateInput, productMutationInput } from '../../app/utils/siigoProductMutation'
 import { canManageProducts } from '../../app/utils/roleAccess'
 import { buildSiigoProductPayload, filterProducts, getActiveProducts, getProductDetail, listProducts, mutateProduct, normalizeProductList, normalizeProductOptions, normalizeSiigoProduct } from '../../server/utils/siigo-products'
 import { clearSiigoCatalogCache } from '../../server/utils/siigo-catalog'
@@ -40,6 +40,16 @@ beforeEach(() => {
 })
 
 describe('contrato de productos México', () => {
+  it.each([undefined, {}, { code: '' }, '', '   '])('usa H87 al editar y duplicar con unidad vacía %j', (unit) => {
+    const product = { ...normalizeSiigoProduct(external), unit }
+    expect(productMutationInput(product).unit).toBe('H87')
+    expect(productDuplicateInput(product).unit).toBe('H87')
+  })
+  it.each(['LTR', { code: 'LTR', name: 'Litro' }])('conserva una unidad SAT configurada al editar y duplicar %j', (unit) => {
+    const product = { ...normalizeSiigoProduct(external), unit }
+    expect(productMutationInput(product).unit).toBe('LTR')
+    expect(productDuplicateInput(product).unit).toBe('LTR')
+  })
   it('escribe simples y compuestos exclusivamente como Product sin control de inventario en Siigo', () => {
     const composite = { ...input(), composition: { kind: 'composite' as const, version: 1, components: [{ productId: id, quantity: '0.25' }] } }
     const payload = buildSiigoProductPayload(composite)

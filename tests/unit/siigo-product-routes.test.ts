@@ -96,7 +96,26 @@ describe('autorización y frontera HTTP de productos', () => {
     await create(event({ body }))
     await update(event({ id, body }))
     await active(event({ id, body: { active: false } }))
-    expect(mocks.mutate.mock.calls).toEqual([[body], [body, id], [{ ...body, active: false }, id]])
+    expect(mocks.mutate.mock.calls).toEqual([[body], [body, id], [{ ...body, active: false, availability: { purchase: false, sale: false, expense: false } }, id]])
+  })
+  it('desactivar desde la acción superior desmarca las tres disponibilidades', async () => {
+    mocks.detail.mockResolvedValue({
+      id, ...body, account_group: { id: 10 }, key: { code: '31211500' }, unit: { code: 'H87' },
+      internal: { availability: { purchase: true, sale: true, expense: true } }
+    })
+    await active(event({ id, body: { active: false } }))
+    expect(mocks.mutate).toHaveBeenCalledWith({
+      ...body, active: false, availability: { purchase: false, sale: false, expense: false }
+    }, id)
+  })
+  it('activar conserva las disponibilidades configuradas', async () => {
+    const availability = { purchase: false, sale: true, expense: true }
+    mocks.detail.mockResolvedValue({
+      id, ...body, active: false, account_group: { id: 10 }, key: { code: '31211500' }, unit: { code: 'H87' },
+      internal: { availability }
+    })
+    await active(event({ id, body: { active: true } }))
+    expect(mocks.mutate).toHaveBeenCalledWith({ ...body, active: true, availability }, id)
   })
   it('rechaza UUID, entrada y filtros inválidos antes de Siigo', async () => {
     await expect(update(event({ id: '../../auth', body }))).rejects.toMatchObject({ statusCode: 400 })

@@ -32,7 +32,7 @@ for (const field of ['unit', 'key'] as const) {
       <ProductsProductGeneralFields
         v-model="state"
         :context="context"
-        :hide-secondary-fields="Boolean(product && !duplicate)"
+        hide-secondary-fields
       />
       <div class="grid grid-cols-1 gap-5 lg:grid-cols-2">
         <ProductsProductAvailabilityFields v-model="state.availability" class="min-w-0" />

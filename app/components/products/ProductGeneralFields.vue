@@ -44,7 +44,7 @@ const groups = computed(() => {
       <UFormField label="Clave SAT" name="key" required>
         <ProductsSatPicker v-model="model.key" kind="key" label="Clave SAT" />
       </UFormField>
-      <!-- Ocultos temporalmente en edición; los valores se conservan en el modelo. -->
+      <!-- Los campos ocultos conservan sus valores en el modelo. -->
       <UFormField v-if="!hideSecondaryFields" label="Referencia" name="reference">
         <UInput v-model="model.reference" maxlength="80" class="w-full" />
       </UFormField>

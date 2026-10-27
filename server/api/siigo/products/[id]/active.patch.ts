@@ -13,5 +13,8 @@ export default eventHandler(async (event) => {
   const parsed = z.object({ active: z.boolean() }).strict().safeParse(await readBody(event))
   if (!id.success || !parsed.success) throw createError({ statusCode: 400, statusMessage: 'Identificador o estado inválido.' })
   const product = (await attachProductCompositions(usePrisma(), [await getProductDetail(id.data, true)]))[0]!
-  return saveManagedProduct({ ...productMutationInput(product), active: parsed.data.active }, id.data)
+  const input = productMutationInput(product)
+  input.active = parsed.data.active
+  if (!input.active) input.availability = { purchase: false, sale: false, expense: false }
+  return saveManagedProduct(input, id.data)
 })

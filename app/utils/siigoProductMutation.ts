@@ -19,9 +19,7 @@ export function productMutationInput(product?: SiigoProduct): ProductInput {
       components: (product?.internal?.composition?.components ?? []).map(c => ({ ...c })) },
     active: product?.active ?? true, stock_control: false,
     tax_included: product?.tax_included ?? false,
-    unit: product
-      ? (typeof product.unit === 'string' ? product.unit : product.unit?.code ?? '')
-      : 'H87',
+    unit: (typeof product?.unit === 'string' ? product.unit : product?.unit?.code)?.trim() || 'H87',
     key: product?.key?.code ?? '',
     reference: product?.reference ?? '', description: product?.description ?? '',
     additional_fields: { barcode: product?.additional_fields?.barcode ?? '', brand: product?.additional_fields?.brand ?? '' },

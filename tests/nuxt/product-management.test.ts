@@ -38,6 +38,21 @@ afterEach(() => {
 })
 
 describe('formulario de productos', () => {
+  it.each([false, true])('usa H87 y oculta referencia y código de barras al editar o duplicar (duplicar: %s)', async (duplicate) => {
+    wrapper = await mountSuspended(ProductForm, { props: {
+      product: { ...product, unit: {}, reference: 'Referencia original', additional_fields: { barcode: '123', brand: 'Marca' } },
+      duplicate, context, saving: false, blocked: false
+    } })
+    expect(wrapper.text()).not.toContain('Referencia')
+    expect(wrapper.text()).not.toContain('Código de barras')
+    expect(wrapper.findAllComponents(SatPicker).find(picker => picker.props('kind') === 'unit')?.props('modelValue')).toBe('H87')
+    if (duplicate) await wrapper.get('input[maxlength="30"]').setValue('PIN2')
+    await wrapper.find('form').trigger('submit')
+    await flushPromises()
+    expect(wrapper.emitted('submit')?.[0]?.[0]).toMatchObject({
+      unit: 'H87', reference: 'Referencia original', additional_fields: { barcode: duplicate ? '' : '123', brand: 'Marca' }
+    })
+  })
   it.each(['Compra', 'Venta directa', 'Gasto'])('calcula Activo al encender y apagar %s sin mostrar un switch propio', async (label) => {
     wrapper = await mountSuspended(ProductForm, { props: {
       product: { ...product, active: true, internal: { availability: { purchase: false, sale: false, expense: false } } },
