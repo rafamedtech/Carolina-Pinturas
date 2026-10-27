@@ -25,12 +25,12 @@ const components = computed(() => {
     />
     <template #content>
       <div class="space-y-2 text-xs">
-        <p class="font-semibold">
+        <p class="font-semibold text-primary">
           Composición del producto
         </p>
         <ul class="space-y-1">
           <li v-for="component in components" :key="component.productId">
-            {{ component.code }} · {{ component.name }}: {{ component.quantity }} {{ component.unit }} por unidad
+            {{ component.quantity }} - {{ component.name }}
           </li>
         </ul>
       </div>
