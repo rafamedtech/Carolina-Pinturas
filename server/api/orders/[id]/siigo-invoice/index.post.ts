@@ -4,6 +4,7 @@ import { ORDER_LOGISTICS_ROLES } from '~/utils/roleAccess'
 import { requireRole } from '../../../../utils/auth'
 import { getOrder } from '../../../../utils/orders'
 import { usePrisma } from '../../../../utils/prisma'
+import { syncInvoiceProducts } from '../../../../utils/siigo-product-sync'
 import { siigoRequest } from '../../../../utils/siigo'
 import type { SiigoCustomerApiResponse } from '../../../../utils/siigo-customers'
 import { normalizeSiigoCustomer } from '../../../../utils/siigo-customers'
@@ -16,7 +17,6 @@ import {
   normalizeCreatedInvoice,
   normalizeInvoiceCostCenters,
   normalizeInvoiceDocumentTypes,
-  normalizeInvoiceProduct,
   normalizeInvoicePaymentTypes,
   normalizeSiigoSellers,
   normalizeSiigoWarehouses,
@@ -159,17 +159,14 @@ export default eventHandler(async (event): Promise<OrderSiigoInvoice> => {
   }
 
   // Reconsultar cliente, productos y catálogos justo antes de la mutación fiscal.
-  const productIds = [...new Set(order.items.map(item => item.productId))]
-  const [customerResponse, documents, users, paymentTypes, costCenters, warehouses, ...freshProducts] = await Promise.all([
+  const [customerResponse, documents, users, paymentTypes, costCenters, warehouses, freshProducts] = await Promise.all([
     siigoRequest<unknown>(`/v1/customers/${encodeURIComponent(order.customer.id)}`),
     siigoRequest<unknown>('/v1/document-types', { query: { type: 'FV' } }),
     siigoRequest<unknown>('/v1/users'),
     siigoRequest<unknown>('/v1/payment-types', { query: { document_type: 'FV' } }),
     siigoRequest<unknown>('/v1/cost-centers'),
     siigoRequest<unknown>('/v1/warehouses'),
-    ...productIds.map(productId =>
-      siigoRequest<unknown>(`/v1/products/${encodeURIComponent(productId)}`)
-    )
+    syncInvoiceProducts(usePrisma(), order.items)
   ])
   const customer = normalizeSiigoCustomer(customerResponse as SiigoCustomerApiResponse)
   const customerRfc = (customer.rfc_id || customer.identification || '').toUpperCase()
@@ -186,8 +183,7 @@ export default eventHandler(async (event): Promise<OrderSiigoInvoice> => {
       statusMessage: `Completa la información del cliente antes de facturar: ${missingCustomerFields.join(', ')}.`
     })
   }
-  const normalizedProducts = freshProducts.map(normalizeInvoiceProduct)
-  const productsByCode = new Map(normalizedProducts.map(product => [product.code, product]))
+  const productsByCode = new Map(freshProducts.map(product => [product.code, product]))
   const references = assertInvoiceReferences({
     input: parsed.data,
     documentTypes: normalizeInvoiceDocumentTypes(documents),

@@ -1,15 +1,16 @@
 # Carolina Pinturas — panel Siigo
 
 Panel interno construido con Nuxt UI. Siigo México sigue siendo la fuente de
-productos y clientes, mientras que los pedidos internos y sus snapshots
-históricos se guardan en PostgreSQL/Supabase mediante Prisma.
+productos y clientes. Los productos se consultan desde PostgreSQL y se sincronizan
+con Siigo al pulsar Actualizar, al validar una factura o al crearlos/modificarlos.
+Los pedidos internos y sus snapshots históricos se guardan mediante Prisma.
 
 ## Incluido en esta primera base
 
 - Acceso con Supabase Auth para los tres roles: `admin`, `mostrador` y `vendedor`.
 - Sesiones SSR renovables mediante cookies, sin exponer credenciales de Siigo al navegador.
 - Navegación responsive para inicio, productos, clientes y ventas.
-- Rutas de servidor protegidas para leer productos y clientes directamente de Siigo.
+- Rutas de servidor protegidas para leer productos desde PostgreSQL y clientes desde Siigo.
 - Pedidos internos persistidos en PostgreSQL con partidas, totales e historial de estados.
 - Snapshot completo del cliente y de cada producto usado en el pedido, incluyendo el payload JSON original de Siigo.
 - Resumen y tablas sin datos simulados: cuando Siigo no está configurado, la interfaz muestra un estado de conexión explícito.
@@ -95,8 +96,10 @@ La aplicación usa el contrato de Siigo API México: `https://api.siigo.mx`, OAu
 
 Siigo México no expone un recurso de pedidos. Crear o cambiar un pedido solo
 modifica PostgreSQL; no crea facturas, notas de venta ni remisiones en Siigo.
-Al guardar un pedido, el servidor vuelve a consultar el cliente y cada producto
-seleccionado para no confiar en datos enviados por el navegador.
+Al guardar un pedido, el servidor consulta el cliente en Siigo y los productos
+en PostgreSQL; no confía en datos enviados por el navegador. Al pulsar Facturar
+se validan en Siigo y se sincronizan localmente los productos del pedido, y se
+revalidan antes de enviar la factura.
 
 ### Modelo de pedidos
 

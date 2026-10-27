@@ -12,7 +12,7 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock('../../server/utils/prisma', () => ({ usePrisma: () => mocks.db }))
 vi.mock('../../server/utils/siigo-customer-detail', () => ({ getSiigoCustomerDetail: mocks.supplier }))
-vi.mock('../../server/utils/siigo-products', () => ({ getProductDetail: mocks.product }))
+vi.mock('../../server/utils/stored-products', () => ({ getStoredProduct: mocks.product }))
 vi.mock('../../server/utils/siigo-persistence', () => ({ upsertSiigoProduct: mocks.snapshot }))
 
 const { mutatePurchase } = await import('../../server/utils/purchases')

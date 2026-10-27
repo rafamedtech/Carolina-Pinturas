@@ -11,7 +11,7 @@ const { PrismaPg } = createRequire(import.meta.url)('@prisma/adapter-pg') as typ
 const mocks = vi.hoisted(() => ({ getPrisma: vi.fn(), supplier: vi.fn(), product: vi.fn() }))
 vi.mock('../../server/utils/prisma', () => ({ usePrisma: mocks.getPrisma }))
 vi.mock('../../server/utils/siigo-customer-detail', () => ({ getSiigoCustomerDetail: mocks.supplier }))
-vi.mock('../../server/utils/siigo-products', () => ({ getProductDetail: mocks.product }))
+vi.mock('../../server/utils/stored-products', () => ({ getStoredProduct: mocks.product }))
 const { createPurchase, mutatePurchase, getPurchase, purchaseView } = await import('../../server/utils/purchases')
 // Opt-in only, an isolated local database; never read DATABASE_URL or real Siigo credentials.
 const url = process.env.PURCHASE_TEST_DATABASE_URL

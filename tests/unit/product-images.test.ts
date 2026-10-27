@@ -10,7 +10,7 @@ const mocks = vi.hoisted(() => ({
 }))
 vi.mock('@supabase/supabase-js', () => ({ createClient: mocks.createClient }))
 vi.mock('../../server/utils/prisma', () => ({ usePrisma: () => ({ productImage: { findUnique: mocks.findUnique, upsert: mocks.upsert, delete: mocks.delete } }) }))
-vi.mock('../../server/utils/siigo-products', () => ({ getProductDetail: mocks.detail }))
+vi.mock('../../server/utils/stored-products', () => ({ getStoredProduct: mocks.detail }))
 vi.mock('#app/nuxt', async importOriginal => ({ ...(await importOriginal<object>()), useRuntimeConfig: () => mocks.config }))
 vi.stubGlobal('createError', createError)
 
@@ -63,7 +63,7 @@ describe('almacenamiento de imágenes de producto', () => {
     expect(mocks.remove).toHaveBeenCalledWith([`${id}/anterior.jpg`])
     expect(result).toEqual({ url: `https://demo.supabase.co/storage/v1/object/public/product-images/${path}`, updatedAt: updatedAt.toISOString() })
   })
-  it('no sube si el producto no existe en Siigo', async () => {
+  it('no sube si el producto no existe en PostgreSQL', async () => {
     mocks.detail.mockRejectedValue(createError({ statusCode: 404 }))
     await expect(saveProductImage(event, id, png, user)).rejects.toMatchObject({ statusCode: 404 })
     expect(mocks.upload).not.toHaveBeenCalled()

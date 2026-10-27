@@ -27,7 +27,7 @@ export async function persistProductCatalog(db: PrismaClient, products: SiigoPro
       )
       ON CONFLICT (id) DO UPDATE SET
         code = EXCLUDED.code, name = EXCLUDED.name, type = EXCLUDED.type, active = EXCLUDED.active,
-        unit_code = EXCLUDED.unit_code, unit_name = EXCLUDED.unit_name,
+        unit_code = COALESCE(EXCLUDED.unit_code, siigo_products.unit_code), unit_name = COALESCE(EXCLUDED.unit_name, siigo_products.unit_name),
         reference = EXCLUDED.reference, barcode = EXCLUDED.barcode,
         raw_payload = EXCLUDED.raw_payload, synced_at = EXCLUDED.synced_at, updated_at = EXCLUDED.updated_at
     `)

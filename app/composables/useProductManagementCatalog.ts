@@ -3,7 +3,7 @@ import type { SiigoListResponse, SiigoProduct } from '~/types/siigo'
 export function useProductManagementCatalog(filters: Ref<Record<string, string>>) {
   const query = computed(() => ({ ...filters.value, all: 'true' }))
   const request = useFetch<SiigoListResponse<SiigoProduct>>('/api/siigo/products', {
-    key: 'product-management-catalog', query, server: false, lazy: true, immediate: false
+    key: 'product-management-catalog', query, server: false, lazy: true
   })
   const refreshing = shallowRef(false)
   const refreshError = shallowRef<{ data: { statusMessage: string } }>()
@@ -15,9 +15,8 @@ export function useProductManagementCatalog(filters: Ref<Record<string, string>>
     refreshing.value = true
     refreshError.value = undefined
     try {
-      request.data.value = await $fetch<SiigoListResponse<SiigoProduct>>('/api/siigo/products', { query: { ...query.value, refresh: 'true' } })
-      request.error.value = undefined
-      await refreshNuxtData('products-catalog-request')
+      await $fetch<SiigoListResponse<SiigoProduct>>('/api/siigo/products', { query: { ...query.value, refresh: 'true' } })
+      await Promise.all([request.refresh(), refreshNuxtData(['products-catalog-request', 'product-brand-options'])])
     } catch (error: unknown) {
       refreshError.value = { data: { statusMessage: (error as { data?: { statusMessage?: string } }).data?.statusMessage || 'No se pudo actualizar el catálogo.' } }
     } finally {

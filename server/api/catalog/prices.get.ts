@@ -1,6 +1,7 @@
 import type { SiigoProduct } from '~/types/siigo'
 import type { CatalogPrice } from '~/types/catalog'
-import { getActiveProducts } from '../../utils/siigo-products'
+import { getStoredProducts } from '../../utils/stored-products'
+import { usePrisma } from '../../utils/prisma'
 
 function productPrice(product: SiigoProduct) {
   const price = product.prices?.find(entry => entry.price_list?.some(item => item.position === 1)) ?? product.prices?.[0]
@@ -14,16 +15,10 @@ function productPrice(product: SiigoProduct) {
   }
 }
 
-async function getProducts() {
-  const catalog = await getActiveProducts()
-
-  return catalog.results
-}
-
 export default eventHandler(async (event) => {
   setResponseHeader(event, 'Cache-Control', 'no-store, max-age=0')
 
-  const products = await getProducts()
+  const products = await getStoredProducts(usePrisma())
   const catalog: CatalogPrice[] = products
     .filter(product => product.active !== false)
     .map(product => ({

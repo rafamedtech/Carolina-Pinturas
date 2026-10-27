@@ -59,9 +59,6 @@ function applyFilters(value: Record<string, string>) {
   page.value = 1
 }
 
-onMounted(() => {
-  void reload()
-})
 const loading = computed(() => status.value === 'idle' || status.value === 'pending')
 
 // Apply the exclusion before search, pagination, totals and CSV export.
@@ -90,29 +87,6 @@ const products = computed(() => {
   return filteredProducts.value.slice(offset, offset + pageSize)
 })
 
-// El listado masivo de Siigo no trae el nombre de la unidad (`unit: {}`);
-// solo el detalle por producto lo incluye. Se resuelve por página visible.
-const unitsById = reactive(new Map<string, string>())
-watch(products, async (rows, _, onCleanup) => {
-  let cancelled = false
-  onCleanup(() => {
-    cancelled = true
-  })
-  const pending = rows.filter(row => !unitsById.has(row.id))
-  // Four workers maximum; server deduplicates concurrent detail requests.
-  await Promise.all(Array.from({ length: Math.min(4, pending.length) }, async () => {
-    while (pending.length && !cancelled) {
-      const row = pending.shift()!
-      const detail = await $fetch<SiigoProduct>(`/api/siigo/products/${encodeURIComponent(row.id)}`).catch(() => null)
-      if (!cancelled && detail) unitsById.set(row.id, siigoProductUnit(detail) || '—')
-    }
-  }))
-}, { immediate: true })
-async function reload() {
-  unitsById.clear()
-  await refresh()
-}
-
 function formatProductPrice(product: SiigoProduct) {
   const priceList = product.prices?.find(price => price.price_list?.some(item => item.position === 1)) ?? product.prices?.[0]
   const value = priceList?.price_list?.find(item => item.position === 1)?.value
@@ -132,7 +106,7 @@ function formatProductPrice(product: SiigoProduct) {
 const csvColumns: CsvColumn<SiigoProduct>[] = [
   { key: 'code', label: 'Código' },
   { key: 'name', label: 'Producto' },
-  { key: 'unit', label: 'Unidad', value: row => unitsById.get(row.id) ?? '' },
+  { key: 'unit', label: 'Unidad', value: row => siigoProductUnit(row) },
   { key: 'brand', label: 'Marca', value: row => row.additional_fields?.brand || '' },
   { key: 'account_group', label: 'Grupo', value: row => row.account_group?.name || '' },
   { key: 'inventory', label: 'Disponible interno', value: row => row.internal?.composition?.kind === 'composite' ? 'Según componentes' : row.internal?.inventory?.available ?? '' },
@@ -236,7 +210,7 @@ const listConfig = computed<ListLayoutConfig>(() => ({
     :error-message="message"
     :total-results="totalProducts"
     @update:tab="selectProductTab"
-    @refresh="reload"
+    @refresh="refresh"
     @select="openProduct"
   >
     <template #actions>
@@ -252,7 +226,7 @@ const listConfig = computed<ListLayoutConfig>(() => ({
         :products="products"
         :return-to="returnTo"
         :loading="false"
-        :unit-for="(product) => unitsById.get(product.id) ?? '…'"
+        :unit-for="(product) => siigoProductUnit(product) || '—'"
         :price-for="formatProductPrice"
       />
     </template>

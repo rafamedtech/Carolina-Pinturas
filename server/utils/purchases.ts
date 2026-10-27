@@ -11,7 +11,7 @@ import { usePrisma } from './prisma'
 import { receiveInventory, voidReceiptInventory } from './inventory'
 import { refreshProductCosts } from './product-costs'
 import { getSiigoCustomerDetail } from './siigo-customer-detail'
-import { getProductDetail } from './siigo-products'
+import { getStoredProduct } from './stored-products'
 import { upsertSiigoProduct } from './siigo-persistence'
 import { assertNoPendingProductWrites, lockCompositions } from './product-compositions'
 import { purchaseAssert, purchaseBalance, purchaseLineTotal, purchaseOrderStatus, assertReceipt } from './purchase-domain'
@@ -62,10 +62,10 @@ async function prepareDraft(draft: PurchaseDraft) {
   const provider = await getSiigoCustomerDetail(draft.providerId)
   const local = await usePrisma().siigoCustomer.findUnique({ where: { id: draft.providerId } })
   purchaseAssert(local?.isSupplier && local.active !== false && provider.active !== false && provider.type?.toLowerCase() === 'supplier', 'Selecciona un proveedor activo clasificado como Supplier en Siigo.')
-  // Sequential fresh reads keep Siigo requests bounded, outside the DB transaction.
+  // Read the trusted local catalog; Siigo is synchronized explicitly.
   const products: SiigoProduct[] = []
   for (const item of draft.items) {
-    const product = await getProductDetail(item.productId, true)
+    const product = await getStoredProduct(usePrisma(), item.productId)
     purchaseAssert(product.active !== false, `Producto inactivo: ${product.name}.`)
     products.push(product)
   }

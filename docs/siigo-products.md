@@ -6,6 +6,16 @@ Administradores crean y actualizan productos simples y compuestos, incluyendo pr
 
 Las mutaciones usan `siigoRequest` exclusivamente en servidor. Ante timeout o respuesta inválida posterior al envío, no se reintenta ni se anuncia éxito: la interfaz ofrece consultar el resultado por ID o código antes de iniciar otra edición. No existe garantía de idempotencia de Siigo para productos.
 
+## Lectura local y sincronización explícita (26/10/2026)
+
+El catálogo, sus filtros, detalles, marcas, precios y selectores se sirven desde `siigo_products` en PostgreSQL. Abrir Productos, cambiar filtros y guardar pedidos o compras no consulta productos en Siigo. La carga inicial usa `useFetch` con estado reactivo y termina al obtener los datos locales; no llama al manejador de Actualizar ni hace consultas adicionales por cada fila.
+
+- **Actualizar** solicita `refresh=true`, descarga el catálogo completo de Siigo (incluidos inactivos), lo persiste y vuelve a consultar PostgreSQL. Los productos ausentes se desactivan localmente después de una descarga completa exitosa, conservando referencias históricas. No se desactivan productos cuya copia local se haya actualizado mientras la sincronización estaba en curso.
+- **Facturar** valida y sincroniza solo los IDs de las partidas con un máximo de cuatro consultas simultáneas. Si un producto falta, está inactivo o cambió de código/tipo, se bloquea la factura. La comprobación automática al abrir un pedido no sincroniza productos. Antes de enviar la factura se repite la validación en servidor.
+- **Crear, modificar y conciliar** conservan el flujo de escritura en Siigo y el guardado del snapshot en PostgreSQL. Las lecturas locales no intentan una sincronización implícita si falta un producto; se informa que hay que pulsar Actualizar.
+
+La actualización conserva una unidad local conocida cuando el listado masivo de Siigo devuelve `unit: {}`. Las composiciones, disponibilidad por uso e inventario interno siguen siendo datos propios y no se sobrescriben al sincronizar.
+
 ## Catálogos SAT
 
 `server/assets/sat/catalog.json` contiene 52,513 claves y 2,418 unidades, publicadas por Siigo México. Cada catálogo conserva URL de fuente y SHA-256 del XLSX/XLSM original; `retrievedAt` es fecha de descarga, no fecha de publicación ni certificación de vigencia del SAT. Nitro empaqueta el archivo como asset de servidor; el navegador recibe páginas de 25 coincidencias.
@@ -25,7 +35,7 @@ Para reproducir desde descargas previas, pasar `--source-dir` con `siigo-claves.
 
 Las decisiones del 18/10/2026 sustituyen la edición de servicios/bienes de consumo: se conservan para consulta histórica y quedan fuera de nuevas ventas. Los componentes externos de un `Combo` nunca se convierten automáticamente en una composición interna.
 - El archivo `unidades de medida.xlsx` enlazado en la web de Siigo solo trae 1,089 registros y omite `H87`. Se usa `Unidades de medida SAT.xlsm`, enlazado en el blueprint México: contiene `H87` (Pieza) y 2,418 registros.
-- `key` puede llegar como texto; se normaliza a `{ code }`. Unidades vacías del listado se enriquecen desde detalles con un máximo de cuatro consultas simultáneas y caché compartida.
+- `key` puede llegar como texto; se normaliza a `{ code }`. Las unidades conocidas se conservan en PostgreSQL; las lecturas normales ya no enriquecen filas consultando detalles remotos.
 - Listas de precios usan `position` para escribir, no el `id` del catálogo.
 - El formulario no expone `model`, `tariff`, `tax_classification` ni `tax_consumption_value`; se conservan desde una lectura vigente y se incluyen solo cuando existen. No se envían cantidades, bodegas, metadatos ni componentes.
 
@@ -39,6 +49,6 @@ Siigo México no expone imagen de producto (verificado contra listado y detalle 
 
 - Archivo en el bucket público `product-images` de Supabase Storage, ruta `{productId}/{uuid}.{ext}`. Cada subida usa ruta nueva, así la URL pública es inmutable y cacheable; la anterior se borra tras guardar.
 - Registro en `public.product_images` (Prisma `ProductImage`), llave = ID de Siigo. El detalle (`GET /api/siigo/products/:id`) la agrega en `internal.image`.
-- Solo `PRODUCT_MANAGEMENT_ROLES` sube (`PUT /api/siigo/products/:id/image`, multipart campo `image`) o quita (`DELETE`). El servidor valida la firma del archivo (JPG, PNG, WebP), máximo 2 MB, y que el producto exista en Siigo.
+- Solo `PRODUCT_MANAGEMENT_ROLES` sube (`PUT /api/siigo/products/:id/image`, multipart campo `image`) o quita (`DELETE`). El servidor valida la firma del archivo (JPG, PNG, WebP), máximo 2 MB, y que el producto exista en el catálogo de PostgreSQL.
 - Storage no tiene políticas para `anon`/`authenticated`: escribe solo el servidor con `NUXT_SUPABASE_SECRET_KEY` (llave `sb_secret_`, nunca `NUXT_PUBLIC_*`) después de `requireRole`.
 - Se sube desde la edición del producto; en el detalle solo se muestra si existe. Un producto nuevo recibe imagen después de crearse.

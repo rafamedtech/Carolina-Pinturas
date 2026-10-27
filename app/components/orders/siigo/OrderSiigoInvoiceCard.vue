@@ -18,6 +18,7 @@ const open = defineModel<boolean>('open', { default: false })
 const checking = defineModel<boolean>('checking', { default: false })
 const saving = shallowRef(false)
 const toast = useToast()
+const validateProducts = shallowRef(false)
 const {
   data: context,
   error: contextError,
@@ -28,10 +29,13 @@ const {
     lazy: true,
     server: false,
     key: `order-siigo-invoice-${props.orderId}`,
-    immediate: false
+    immediate: false,
+    query: { validate_products: computed(() => validateProducts.value ? 'true' : undefined) },
+    watch: false
   }
 )
 
+const hasExistingInvoice = computed(() => context.value?.invoice?.status === 'created')
 const catalogsReady = computed(() => Boolean(
   context.value?.documentTypes.length
   && context.value?.sellers.length
@@ -64,16 +68,20 @@ onMounted(checkInvoice)
 watch(open, async (shouldOpen) => {
   if (!shouldOpen || checking.value) return
 
-  // A pedido that was just marked for invoicing needs catalogs, but there was
-  // no existing invoice to reconcile when the page-level check ran.
-  if (context.value?.requiresInvoice === false) {
-    checking.value = true
-    try {
-      await refresh()
-      emit('checked')
-    } finally {
-      checking.value = false
-    }
+  if (hasExistingInvoice.value) {
+    open.value = false
+    return
+  }
+
+  // The Facturar action explicitly validates only this order's products.
+  checking.value = true
+  validateProducts.value = true
+  try {
+    await refresh()
+    emit('checked')
+  } finally {
+    validateProducts.value = false
+    checking.value = false
   }
 
   if (contextError.value) {
@@ -87,7 +95,7 @@ watch(open, async (shouldOpen) => {
     return
   }
 
-  if (context.value?.invoice?.status === 'created') {
+  if (hasExistingInvoice.value) {
     open.value = false
     return
   }
@@ -115,7 +123,7 @@ watch(open, async (shouldOpen) => {
 })
 
 async function createInvoice(input: CreateOrderSiigoInvoiceInput) {
-  if (saving.value) return
+  if (saving.value || checking.value) return
   saving.value = true
 
   try {
@@ -150,7 +158,7 @@ async function createInvoice(input: CreateOrderSiigoInvoiceInput) {
 
 <template>
   <OrdersSiigoOrderSiigoInvoiceModal
-    v-if="context && catalogsReady"
+    v-if="context && catalogsReady && !checking"
     v-model:open="open"
     :context="context"
     :saving="saving"

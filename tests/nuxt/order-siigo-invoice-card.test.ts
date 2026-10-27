@@ -1,6 +1,7 @@
 // @vitest-environment nuxt
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { mountSuspended, registerEndpoint } from '@nuxt/test-utils/runtime'
+import { getQuery } from 'h3'
 import type { VueWrapper } from '@vue/test-utils'
 import OrderSiigoInvoiceCard from '~/components/orders/siigo/OrderSiigoInvoiceCard.vue'
 import OrderSiigoInvoiceModal from '~/components/orders/siigo/OrderSiigoInvoiceModal.vue'
@@ -10,6 +11,7 @@ import type { SiigoCustomer } from '~/types/siigo'
 const invoiceId = '63f918c2-ca65-4edc-a7db-66bcdd5159fb'
 let existingChecks = 0
 let missingChecks = 0
+let productValidations = 0
 let wrapper: VueWrapper | null = null
 
 const readyCustomer: SiigoCustomer = {
@@ -83,8 +85,9 @@ registerEndpoint('/api/orders/existing-invoice/siigo-invoice/context', () => {
   })
 })
 
-registerEndpoint('/api/orders/missing-invoice/siigo-invoice/context', () => {
+registerEndpoint('/api/orders/missing-invoice/siigo-invoice/context', (event) => {
   missingChecks++
+  if (getQuery(event).validate_products === 'true') productValidations++
   return context({
     status: 'failed',
     siigoInvoiceId: null,
@@ -115,6 +118,7 @@ afterEach(() => {
   wrapper = null
   existingChecks = 0
   missingChecks = 0
+  productValidations = 0
   document.body.innerHTML = ''
   clearNuxtData()
 })
@@ -141,6 +145,7 @@ describe('OrderSiigoInvoiceCard', () => {
 
     await vi.waitFor(() => expect(wrapper?.emitted('checked')).toHaveLength(1))
     expect(missingChecks).toBe(1)
+    expect(productValidations).toBe(0)
     await wrapper.setProps({ open: true })
 
     await vi.waitFor(() => {
@@ -149,7 +154,8 @@ describe('OrderSiigoInvoiceCard', () => {
     expect(document.body.textContent).toContain('Condición de pago')
     expect(document.body.textContent).toContain('Forma de pago CFDI')
     expect(document.body.textContent).toContain('Método de pago CFDI')
-    expect(wrapper.emitted('checked')).toHaveLength(1)
+    expect(wrapper.emitted('checked')).toHaveLength(2)
+    expect(productValidations).toBe(1)
     const invoiceModal = wrapper.findComponent(OrderSiigoInvoiceModal)
     const invoiceFields = new Map(invoiceModal.findAllComponents({ name: 'UFormField' }).map(field => [
       field.props('name'),

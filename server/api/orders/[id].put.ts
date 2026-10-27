@@ -5,7 +5,7 @@ import { updateOrderSchema } from '../../utils/order-validation'
 import { updateOrder } from '../../utils/orders'
 import { usePrisma } from '../../utils/prisma'
 import { siigoRequest } from '../../utils/siigo'
-import { normalizeSiigoProduct } from '../../utils/siigo-products'
+import { getStoredProducts } from '../../utils/stored-products'
 
 export default eventHandler(async (event) => {
   const user = await requireRole(event, ORDER_ENTRY_ROLES)
@@ -26,14 +26,12 @@ export default eventHandler(async (event) => {
 
   const productIds = [...new Set(parsed.data.lines.map(line => line.productId))]
   const repartidorId = parsed.data.repartidorId
-  const [customer, repartidor, ...products] = await Promise.all([
+  const [customer, repartidor, products] = await Promise.all([
     siigoRequest<SiigoCustomer>(`/v1/customers/${encodeURIComponent(parsed.data.customerId)}`),
     repartidorId
       ? usePrisma().repartidor.findUnique({ where: { id: repartidorId } })
       : Promise.resolve(null),
-    ...productIds.map(productId =>
-      siigoRequest<unknown>(`/v1/products/${encodeURIComponent(productId)}`).then(normalizeSiigoProduct)
-    )
+    getStoredProducts(usePrisma(), productIds)
   ])
   const productsById = new Map(products.map(product => [product.id, product]))
 

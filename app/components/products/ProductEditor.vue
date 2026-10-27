@@ -17,7 +17,7 @@ const back = computed(() => sourceId.value
 const { data: context, error: contextError } = useFetch<ProductContext>('/api/siigo/products/context', { lazy: true, server: false, immediate: allowed.value })
 const { data: product, status: productStatus, error: productError } = useFetch<SiigoProduct>(
   () => `/api/siigo/products/${encodeURIComponent(sourceId.value || '')}`,
-  { lazy: true, server: false, immediate: Boolean(sourceId.value && allowed.value), query: { refresh: 'true' } }
+  { lazy: true, server: false, immediate: Boolean(sourceId.value && allowed.value) }
 )
 const loading = computed(() => Boolean(sourceId.value) && (productStatus.value === 'idle' || productStatus.value === 'pending'))
 const loadError = computed(() => {

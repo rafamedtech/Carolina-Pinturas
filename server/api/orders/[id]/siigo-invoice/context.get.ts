@@ -13,6 +13,7 @@ import {
   normalizeSiigoWarehouses,
   siigoInvoiceWritesEnabled
 } from '../../../../utils/siigo-invoices'
+import { syncInvoiceProducts } from '../../../../utils/siigo-product-sync'
 import { siigoRequest } from '../../../../utils/siigo'
 import { verifyPersistedSiigoInvoice } from '../../../../utils/siigo-invoice-reconciliation'
 
@@ -137,6 +138,10 @@ export default eventHandler(async (event): Promise<OrderSiigoInvoiceContext> => 
       costCenters: [],
       warehouses: []
     }
+  }
+
+  if (getQuery(event).validate_products === 'true') {
+    await syncInvoiceProducts(prisma, order.items)
   }
 
   const customer = await getSiigoCustomerDetail(order.customer.id)

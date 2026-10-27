@@ -4,7 +4,7 @@ import { createError, type H3Event } from 'h3'
 import type { AppUser } from '~/types/siigo'
 import type { ProductImage } from '~/types/siigo-products'
 import { usePrisma } from './prisma'
-import { getProductDetail } from './siigo-products'
+import { getStoredProduct } from './stored-products'
 
 export const PRODUCT_IMAGE_BUCKET = 'product-images'
 export const PRODUCT_IMAGE_MAX_BYTES = 2 * 1024 * 1024
@@ -53,8 +53,8 @@ export async function getProductImage(productId: string, event?: H3Event): Promi
 
 export async function saveProductImage(event: H3Event, productId: string, bytes: Uint8Array | undefined, user: AppUser) {
   const contentType = validateProductImage(bytes)
-  // Rejects ids that do not exist in Siigo, so no orphan images are stored.
-  await getProductDetail(productId)
+  // Reject unknown local products before storing an image.
+  await getStoredProduct(usePrisma(), productId)
   const storage = useStorage(event)
   const prisma = usePrisma()
   const previous = await prisma.productImage.findUnique({ where: { productId }, select: { storagePath: true } })

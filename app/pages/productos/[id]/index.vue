@@ -10,8 +10,23 @@ const backPath = computed(() => tableReturnPath(route.query.returnTo, '/producto
 const productId = computed(() => String(route.params.id))
 const { data: product, status, error, refresh } = useLazyFetch<SiigoProduct>(
   () => `/api/siigo/products/${encodeURIComponent(productId.value)}`,
-  { lazy: true, server: false, key: () => `siigo-product-${productId.value}`, query: { refresh: 'true' } }
+  { lazy: true, server: false, key: () => `siigo-product-${productId.value}` }
 )
+
+const syncing = shallowRef(false)
+const toast = useToast()
+async function syncProduct() {
+  if (syncing.value) return
+  syncing.value = true
+  try {
+    await $fetch(`/api/siigo/products/${encodeURIComponent(productId.value)}`, { query: { refresh: 'true' } })
+    await Promise.all([refresh(), refreshNuxtData(['products-catalog-request', 'product-management-catalog', 'product-brand-options'])])
+  } catch (error) {
+    toast.add({ title: 'No se pudo actualizar el producto desde Siigo', description: (error as { data?: { statusMessage?: string } }).data?.statusMessage, color: 'error' })
+  } finally {
+    syncing.value = false
+  }
+}
 
 const MANAGED_TYPES = ['Product']
 
@@ -97,8 +112,8 @@ function formatQuantity(value?: number) {
             icon="i-lucide-refresh-cw"
             color="neutral"
             variant="outline"
-            :loading="['idle', 'pending'].includes(status)"
-            @click="() => refresh()"
+            :loading="syncing || ['idle', 'pending'].includes(status)"
+            @click="syncProduct"
           />
         </template>
       </UDashboardNavbar>

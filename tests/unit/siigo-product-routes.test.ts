@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createError } from 'h3'
 import { productMutationInput } from '../../app/utils/siigoProductMutation'
 
-const mocks = vi.hoisted(() => ({ role: 'admin', mutate: vi.fn(), list: vi.fn(), detail: vi.fn(), context: vi.fn(), sat: vi.fn(), image: vi.fn(), saveImage: vi.fn(), deleteImage: vi.fn() }))
+const mocks = vi.hoisted(() => ({ role: 'admin', mutate: vi.fn(), list: vi.fn(), detail: vi.fn(), context: vi.fn(), sat: vi.fn(), image: vi.fn(), saveImage: vi.fn(), deleteImage: vi.fn(), localList: vi.fn(), localDetail: vi.fn(), persist: vi.fn(), persistDetail: vi.fn(), archiveMissing: vi.fn() }))
 vi.mock('../../server/utils/auth', () => ({
   requireRole: async (_event: unknown, roles: readonly string[]) => {
     if (!roles.includes(mocks.role)) throw createError({ statusCode: 403 })
@@ -11,8 +11,10 @@ vi.mock('../../server/utils/auth', () => ({
 }))
 vi.mock('../../server/utils/siigo-products', () => ({ mutateProduct: mocks.mutate, listProducts: mocks.list, getProductDetail: mocks.detail, getProductContext: mocks.context }))
 vi.mock('../../server/utils/managed-products', () => ({ saveManagedProduct: mocks.mutate, recoverProductWrite: vi.fn() }))
-vi.mock('../../server/utils/prisma', () => ({ usePrisma: () => ({}) }))
-vi.mock('../../server/utils/product-catalog-persistence', () => ({ persistProductCatalog: vi.fn() }))
+vi.mock('../../server/utils/prisma', () => ({ usePrisma: () => ({ siigoProduct: { updateMany: mocks.archiveMissing } }) }))
+vi.mock('../../server/utils/stored-products', () => ({ listStoredProducts: mocks.localList, getStoredProduct: mocks.localDetail }))
+vi.mock('../../server/utils/siigo-persistence', () => ({ upsertSiigoProduct: mocks.persistDetail }))
+vi.mock('../../server/utils/product-catalog-persistence', () => ({ persistProductCatalog: mocks.persist }))
 vi.mock('../../server/utils/product-compositions', () => ({ attachProductCompositions: async (_db: unknown, products: unknown[]) => products }))
 vi.mock('../../server/utils/siigo-product-sat', () => ({ getProductSatCatalog: mocks.sat, searchProductSat: vi.fn() }))
 vi.mock('../../server/utils/product-images', () => ({ getProductImage: mocks.image, saveProductImage: mocks.saveImage, deleteProductImage: mocks.deleteImage }))
@@ -42,12 +44,14 @@ beforeEach(() => {
   mocks.role = 'admin'
   mocks.mutate.mockResolvedValue({ id, ...body })
   mocks.list.mockResolvedValue({ results: [] })
+  mocks.localList.mockResolvedValue([])
+  mocks.localDetail.mockResolvedValue({ id, ...body, account_group: { id: 10 }, key: { code: '31211500' }, unit: { code: 'H87' } })
   mocks.detail.mockResolvedValue({ id, ...body, account_group: { id: 10 }, key: { code: '31211500' }, unit: { code: 'H87' } })
 })
 
 describe('autorización y frontera HTTP de productos', () => {
   it('excluye combos y servicios de nuevas ventas sin perder el catálogo histórico', async () => {
-    mocks.list.mockResolvedValue({ results: [{ id, type: 'Product' }, { id: 'combo', type: 'Combo' }, { id: 'service', type: 'Service' }, { id: 'pending', type: 'Product', internal: { syncPending: true } }, { id: 'composite', type: 'Product', internal: { composition: { kind: 'composite' } } }] })
+    mocks.localList.mockResolvedValue([{ id, type: 'Product' }, { id: 'combo', type: 'Combo' }, { id: 'service', type: 'Service' }, { id: 'pending', type: 'Product', internal: { syncPending: true } }, { id: 'composite', type: 'Product', internal: { composition: { kind: 'composite' } } }])
     const saleCatalog = await list(event({ query: { all: 'true', products_only: 'true' } }))
     expect(saleCatalog.results.map(p => p.id)).toEqual([id, 'composite'])
     const purchaseCatalog = await list(event({ query: { all: 'true', simple_only: 'true' } }))
@@ -68,8 +72,25 @@ describe('autorización y frontera HTTP de productos', () => {
     mocks.role = role
     await list(event({ query: {} }))
     await detail(event({ id, query: {} }))
-    expect(mocks.list).toHaveBeenCalledWith(expect.objectContaining({ active: 'true' }))
-    expect(mocks.detail).toHaveBeenCalledWith(id, false)
+    expect(mocks.localList).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ active: 'true' }))
+    expect(mocks.list).not.toHaveBeenCalled()
+    expect(mocks.localDetail).toHaveBeenCalledWith(expect.anything(), id)
+    expect(mocks.detail).not.toHaveBeenCalled()
+  })
+  it('solo Actualizar sincroniza todo el catálogo, incluidos inactivos, y luego responde desde PostgreSQL', async () => {
+    mocks.list.mockResolvedValue({ results: [{ id, code: 'REMOTO', name: 'Remoto' }] })
+    mocks.localList.mockResolvedValue([{ id, code: 'LOCAL', name: 'Local' }])
+    const result = await list(event({ query: { all: 'true', active: 'false', refresh: 'true' } }))
+    expect(mocks.list).toHaveBeenCalledWith({ all: 'true', refresh: 'true', active: 'all', page: 1, page_size: 100 })
+    expect(mocks.persist).toHaveBeenCalledWith(expect.anything(), [{ id, code: 'REMOTO', name: 'Remoto' }])
+    expect(result.results[0]?.code).toBe('LOCAL')
+    expect(mocks.archiveMissing).toHaveBeenCalledWith(expect.objectContaining({ data: { active: false } }))
+  })
+  it('no oculta fallos de sincronización ni desactiva productos después de un fallo de Siigo', async () => {
+    mocks.list.mockRejectedValueOnce(createError({ statusCode: 502 }))
+    await expect(list(event({ query: { refresh: 'true' } }))).rejects.toMatchObject({ statusCode: 502 })
+    expect(mocks.persist).not.toHaveBeenCalled()
+    expect(mocks.archiveMissing).not.toHaveBeenCalled()
   })
   it('admin puede crear, editar y activar', async () => {
     await create(event({ body }))
@@ -89,13 +110,14 @@ describe('autorización y frontera HTTP de productos', () => {
   it('refresh de detalle fuerza lectura fresca', async () => {
     await detail(event({ id, query: { refresh: 'true' } }))
     expect(mocks.detail).toHaveBeenCalledWith(id, true)
+    expect(mocks.persistDetail).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ id }))
   })
 })
 
 describe('imágenes de producto', () => {
   const image = { url: 'https://example.supabase.co/storage/v1/object/public/product-images/a.png', updatedAt: '2026-09-15T00:00:00.000Z' }
   it('detalle agrega la imagen local sin mezclarla con Siigo', async () => {
-    mocks.detail.mockResolvedValue({ id, code: 'PIN1', name: 'Pintura' })
+    mocks.localDetail.mockResolvedValue({ id, code: 'PIN1', name: 'Pintura' })
     mocks.image.mockResolvedValue(image)
     await expect(detail(event({ id, query: {} }))).resolves.toEqual({ id, code: 'PIN1', name: 'Pintura', internal: { image } })
   })
@@ -118,14 +140,14 @@ describe('disponibilidad interna del catálogo', () => {
       { id, code: 'BASE', name: 'Base', type: 'Product', internal: { availability: { purchase: true, sale: false, expense: false } } },
       { id: '00000000-0000-4000-8000-000000000002', code: 'KIT', name: 'Kit', type: 'Product', internal: { availability: { purchase: false, sale: true, expense: true }, composition: { kind: 'composite' } } }
     ]
-    mocks.list.mockResolvedValue({ results: rows })
+    mocks.localList.mockResolvedValue(rows)
     const result = await list(event({ query: { usage, page_size: '1' } }))
     expect(result.results.map(p => p.code)).toEqual([usage === 'purchase' ? 'BASE' : 'KIT'])
     expect(result.pagination?.total_results).toBe(1)
     expect((await list(event({ query: { all: 'true' } }))).results).toHaveLength(2)
   })
   it('compra excluye compuestos incluso con disponibilidad habilitada', async () => {
-    mocks.list.mockResolvedValue({ results: [{ id, type: 'Product', internal: { availability: { purchase: true }, composition: { kind: 'composite' } } }] })
+    mocks.localList.mockResolvedValue([{ id, type: 'Product', internal: { availability: { purchase: true }, composition: { kind: 'composite' } } }])
     expect((await list(event({ query: { usage: 'purchase' } }))).results).toEqual([])
     await expect(list(event({ query: { usage: 'inventado' } }))).rejects.toMatchObject({ statusCode: 400 })
   })
