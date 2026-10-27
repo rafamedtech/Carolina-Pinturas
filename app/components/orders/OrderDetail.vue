@@ -552,7 +552,6 @@ async function convertToPedido() {
           </div>
         </div>
 
-        <InventoryOrderStock :order-id="order.id" :version="order.version" @saved="() => refresh()" />
         <div
           class="grid gap-4 [grid-template-areas:'cliente'_'items'_'totales'_'seguimiento'] lg:grid-cols-2 lg:[grid-template-areas:'cliente_seguimiento'_'items_items'_'totales_totales']"
         >
