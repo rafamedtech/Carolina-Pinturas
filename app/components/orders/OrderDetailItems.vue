@@ -317,13 +317,10 @@ const columns: TableColumn<SalesOrderItem>[] = [{
             <p class="text-xs font-medium uppercase tracking-wide text-muted">
               {{ item.code }}
             </p>
-            <h3 class="font-semibold text-highlighted">
+            <h3 class="font-semibold text-primary">
               {{ item.name }}
             </h3>
             <OrdersOrderItemComposition :item="item" />
-            <p class="text-sm text-muted">
-              Unidad: {{ item.unit.name || item.unit.code || '—' }}
-            </p>
           </div>
 
           <div class="flex shrink-0 items-center gap-1">
@@ -391,31 +388,34 @@ const columns: TableColumn<SalesOrderItem>[] = [{
           </div>
         </div>
 
-        <div v-if="item.observations || editable">
-          <p class="text-sm text-muted">
-            Observaciones
-          </p>
-          <div class="flex items-start gap-1">
-            <p :class="item.observations ? 'whitespace-pre-wrap text-sm' : 'text-sm text-muted'">
-              {{ item.observations || '—' }}
+        <div class="grid grid-cols-[minmax(0,1fr)_auto] gap-4">
+          <div v-if="item.observations || editable" class="min-w-0">
+            <p class="text-sm text-muted">
+              Observaciones
             </p>
-            <UButton
-              v-if="editable"
-              icon="i-lucide-pencil"
-              color="neutral"
-              variant="ghost"
-              size="xs"
-              :aria-label="`Editar observaciones de ${item.name}`"
-              @click="openObservationsEdit(item)"
-            />
+            <div class="flex items-start gap-1">
+              <p :class="item.observations ? 'min-w-0 whitespace-pre-wrap break-words text-sm' : 'text-sm text-muted'">
+                {{ item.observations || '—' }}
+              </p>
+              <UButton
+                v-if="editable"
+                icon="i-lucide-pencil"
+                color="neutral"
+                variant="ghost"
+                size="xs"
+                :aria-label="`Editar observaciones de ${item.name}`"
+                @click="openObservationsEdit(item)"
+              />
+            </div>
           </div>
-        </div>
-
-        <div class="flex items-end justify-between gap-4 border-t border-default pt-3">
-          <span class="text-sm text-muted">Total</span>
-          <span class="text-base font-semibold text-primary">
-            {{ currency.format(item.total) }}
-          </span>
+          <div class="col-start-2 text-right">
+            <p class="text-sm text-muted">
+              Total
+            </p>
+            <p class="text-base font-semibold text-primary">
+              {{ currency.format(item.total) }}
+            </p>
+          </div>
         </div>
       </UCard>
 
