@@ -1,7 +1,15 @@
 import { describe, expect, it } from 'vitest'
-import { orderPaymentStatusColor, orderPaymentStatusLabel } from '../../app/utils/orderPayment'
+import { orderHasPaymentStatus, orderPaymentStatusColor, orderPaymentStatusLabel } from '../../app/utils/orderPayment'
 
 describe('estado de pago compartido entre tabla y detalle', () => {
+  it.each([
+    ['borrador', false],
+    ['cancelado', false],
+    ['ingresado', true],
+    ['entregado', true]
+  ] as const)('determina si corresponde mostrar estado de pago para %s', (status, expected) => {
+    expect(orderHasPaymentStatus(status)).toBe(expected)
+  })
   it.each([
     ['pendiente_pago', 'Pago pendiente', 'warning'],
     ['abonado', 'Abonado', 'info'],

@@ -6,7 +6,7 @@ import { formatDate, formatDateTime } from '~/utils/datetime'
 import type { TableColumn } from '@nuxt/ui'
 import type { SortingState, VisibilityState } from '@tanstack/table-core'
 import type { SalesOrderListItem } from '~/types/orders'
-import { orderPaymentStatusColor, orderPaymentStatusLabel } from '~/utils/orderPayment'
+import { orderHasPaymentStatus, orderPaymentStatusColor, orderPaymentStatusLabel } from '~/utils/orderPayment'
 
 export function useOrderListTable(options: { returnTo: MaybeRefOrGetter<string>, igualacion?: boolean, billing?: MaybeRefOrGetter<boolean>, internal?: MaybeRefOrGetter<boolean>, pendingPayment?: MaybeRefOrGetter<boolean>, delivered?: MaybeRefOrGetter<boolean> }) {
   const currency = new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' })
@@ -56,13 +56,16 @@ export function useOrderListTable(options: { returnTo: MaybeRefOrGetter<string>,
 
   const paymentStatusColumn: TableColumn<SalesOrderListItem> = {
     id: 'paymentStatus',
-    accessorFn: row => orderPaymentStatusLabel(row.paymentStatus),
+    accessorFn: row => orderHasPaymentStatus(row.status.key) ? orderPaymentStatusLabel(row.paymentStatus) : '—',
     header: sortableHeader('Estado de pago'),
-    cell: ({ row }) => h(UBadge, {
-      color: orderPaymentStatusColor(row.original.paymentStatus, row.original.orderDate),
-      label: orderPaymentStatusLabel(row.original.paymentStatus),
-      variant: 'subtle'
-    })
+    cell: ({ row }) => {
+      if (!orderHasPaymentStatus(row.original.status.key)) return h('span', { class: 'text-muted' }, '—')
+      return h(UBadge, {
+        color: orderPaymentStatusColor(row.original.paymentStatus, row.original.orderDate),
+        label: orderPaymentStatusLabel(row.original.paymentStatus),
+        variant: 'subtle'
+      })
+    }
   }
 
   const invoiceStatusColumn: TableColumn<SalesOrderListItem> = {

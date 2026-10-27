@@ -141,7 +141,7 @@ describe('listado de pedidos', () => {
 
   it.each([
     ['cotizacion', { statusKey: 'borrador' }],
-    ['pendiente_pago', { paymentStatus: { in: ['pendiente_pago', 'abonado'] } }],
+    ['pendiente_pago', { paymentStatus: { in: ['pendiente_pago', 'abonado'] }, statusKey: { notIn: ['borrador', 'cancelado'] } }],
     ['entregado', { statusKey: 'entregado' }],
     ['facturacion', { requiresInvoice: true }],
     ['cancelado', { statusKey: 'cancelado' }]
@@ -153,6 +153,19 @@ describe('listado de pedidos', () => {
         AND: expect.arrayContaining([expectedFilter])
       })
     }))
+  })
+
+  it.each(['pendiente_pago', 'abonado', 'pago_recibido'])('excluye cotizaciones y cancelados del filtro %s y sus totales', async (paymentStatus) => {
+    await listOrders({ page: 1, pageSize: 25, paymentStatus }, admin)
+    const where = expect.objectContaining({
+      AND: expect.arrayContaining([{
+        paymentStatus,
+        statusKey: { notIn: ['borrador', 'cancelado'] }
+      }])
+    })
+    expect(mocks.findMany).toHaveBeenCalledWith(expect.objectContaining({ where }))
+    expect(mocks.count).toHaveBeenCalledWith(expect.objectContaining({ where }))
+    expect(mocks.aggregate).toHaveBeenCalledWith(expect.objectContaining({ where }))
   })
 
   it('separa los pedidos de mostrador de los de vendedor', async () => {

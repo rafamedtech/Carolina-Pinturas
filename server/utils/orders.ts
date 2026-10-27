@@ -855,7 +855,7 @@ export async function listOrders(options: {
       }
     : {}
   const paymentStatusFilter: Prisma.SalesOrderWhereInput = options.paymentStatus
-    ? { paymentStatus: options.paymentStatus }
+    ? { paymentStatus: options.paymentStatus, statusKey: { notIn: ['borrador', 'cancelado'] } }
     : {}
   const paymentMethodFilter: Prisma.SalesOrderWhereInput = options.paymentMethod
     ? { paymentMethod: options.paymentMethod }
@@ -901,7 +901,7 @@ export async function listOrders(options: {
           customer: { isInternalOrderCustomer: false }
         }
       case 'pendiente_pago':
-        return { paymentStatus: { in: ['pendiente_pago', 'abonado'] } }
+        return { paymentStatus: { in: ['pendiente_pago', 'abonado'] }, statusKey: { notIn: ['borrador', 'cancelado'] } }
       case 'entregado':
         return { statusKey: 'entregado' }
       case 'facturacion':

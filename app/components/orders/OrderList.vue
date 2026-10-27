@@ -4,7 +4,7 @@ import type { ListLayoutConfig } from '~/types/list'
 import { tableQueryField, tableQueryText, tableQueryPage, tableQueryRange, tableQueryBoolean } from '~/utils/tableQuery'
 import type { OrderDateRange, OrderStatus, SalesOrderListItem, SalesOrderListResponse } from '~/types/orders'
 import type { CsvColumn } from '~/utils/csv'
-import { ORDER_PAYMENT_METHODS, paymentStatusLabel } from '~/utils/orderPayment'
+import { ORDER_PAYMENT_METHODS, orderHasPaymentStatus, orderPaymentStatusLabel } from '~/utils/orderPayment'
 import { canCreateOrders } from '~/utils/roleAccess'
 
 const props = withDefaults(defineProps<{
@@ -173,7 +173,7 @@ const csvColumns = computed<CsvColumn<SalesOrderListItem>[]>(() => {
     })
   } else {
     columns.push(
-      { key: 'paymentStatus', label: 'Estado de pago', value: row => paymentStatusLabel(row.paymentStatus) },
+      { key: 'paymentStatus', label: 'Estado de pago', value: row => orderHasPaymentStatus(row.status.key) ? orderPaymentStatusLabel(row.paymentStatus) : '—' },
       isPendingPaymentView.value
         ? { key: 'balance', label: 'Saldo pendiente', value: row => row.balance ?? '' }
         : { key: 'total', label: 'Total', value: row => row.total }

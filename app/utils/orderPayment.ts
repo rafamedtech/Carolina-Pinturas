@@ -48,6 +48,10 @@ export function orderPaymentStatusLabel(key: string | null | undefined) {
   return key === 'pendiente_pago' ? 'Pago pendiente' : paymentStatusLabel(key)
 }
 
+export function orderHasPaymentStatus(statusKey: string) {
+  return statusKey !== 'borrador' && statusKey !== 'cancelado'
+}
+
 export function orderPaymentStatusColor(key: string | null | undefined, orderDate: string, today = mexicoToday()) {
   const hasPendingBalance = key === 'pendiente_pago' || key === 'abonado'
   if (hasPendingBalance && parseDate(orderDate).add({ days: 7 }).compare(parseDate(today)) < 0) return 'error'
