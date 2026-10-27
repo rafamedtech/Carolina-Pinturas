@@ -1,5 +1,7 @@
 import { SIIGO_PAYMENT_METHODS, paymentMethodDisplayLabel } from '~~/shared/utils/paymentMethods'
 import type { PaymentFormKey } from '~~/shared/utils/paymentMethods'
+import { parseDate } from '@internationalized/date'
+import { mexicoToday } from '~/utils/datetime'
 
 export { PAYMENT_FORM_KEYS, SIIGO_PAYMENT_METHODS, paymentMethodCfdiCode } from '~~/shared/utils/paymentMethods'
 export type { PaymentFormKey } from '~~/shared/utils/paymentMethods'
@@ -40,6 +42,16 @@ export function paymentStatusLabel(key: string | null | undefined) {
 
 export function paymentStatusColor(key: string | null | undefined) {
   return PAYMENT_STATUSES.find(status => status.key === key)?.color ?? 'neutral'
+}
+
+export function orderPaymentStatusLabel(key: string | null | undefined) {
+  return key === 'pendiente_pago' ? 'Pago pendiente' : paymentStatusLabel(key)
+}
+
+export function orderPaymentStatusColor(key: string | null | undefined, orderDate: string, today = mexicoToday()) {
+  const hasPendingBalance = key === 'pendiente_pago' || key === 'abonado'
+  if (hasPendingBalance && parseDate(orderDate).add({ days: 7 }).compare(parseDate(today)) < 0) return 'error'
+  return paymentStatusColor(key)
 }
 
 export function paymentMethodLabel(key: string | null | undefined) {

@@ -3,6 +3,9 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { mockNuxtImport, mountSuspended, registerEndpoint } from '@nuxt/test-utils/runtime'
 import { defineEventHandler, readBody } from 'h3'
 import type { VueWrapper } from '@vue/test-utils'
+import { UButton, UDropdownMenu } from '#components'
+import type { UserRole } from '~/types/siigo'
+import type { DropdownMenuItem } from '@nuxt/ui'
 import OrderDetail from '~/components/orders/OrderDetail.vue'
 import type { SalesOrderDetail } from '~/types/orders'
 
@@ -12,7 +15,7 @@ const { useAuthMock } = vi.hoisted(() => ({
       id: 'admin-1',
       name: 'Administrador',
       email: 'admin@example.com',
-      role: 'admin' as const,
+      role: 'admin' as UserRole,
       repartidorId: null
     }
     return {
@@ -127,13 +130,53 @@ afterEach(() => {
   contextChecks = 0
   document.body.innerHTML = ''
   clearNuxtData()
+  vi.useRealTimers()
 })
 
 function findInvoiceButton() {
   return wrapper?.findAll('button').find(button => button.text().trim() === 'Facturar')
 }
 
+function dropdownMenus(): VueWrapper[] {
+  // Vue Test Utils infiere DOMWrapper para este componente genérico de Nuxt UI.
+  return wrapper?.findAllComponents(UDropdownMenu) as unknown as VueWrapper[] ?? []
+}
+
+function menuItems(menu?: VueWrapper): DropdownMenuItem[] {
+  return (menu?.props() as { items?: DropdownMenuItem[][] } | undefined)?.items?.flat() ?? []
+}
+
 describe('OrderDetail · facturación', () => {
+  it('agrupa asignar factura e impresora en Admin y las retira de Opciones', async () => {
+    wrapper = await mountSuspended(OrderDetail, { props: { orderId: 'order-invoice' } })
+    await vi.waitFor(() => expect(wrapper?.text()).toContain('Admin'))
+    const menus = dropdownMenus()
+    const admin = menus.find(menu => menu.findAllComponents(UButton).some(button => button.props('label') === 'Admin'))
+    const options = menus.find(menu => menu.findAllComponents(UButton).some(button => button.props('label') === 'Opciones'))
+    const adminItems = menuItems(admin)
+    expect(adminItems).toEqual(expect.arrayContaining([
+      expect.objectContaining({ label: 'Asignar factura', icon: 'i-lucide-link' }),
+      expect.objectContaining({ label: 'Impresora de tickets…', icon: 'i-lucide-printer' })
+    ]))
+    expect(menuItems(options)).not.toEqual(expect.arrayContaining([
+      expect.objectContaining({ label: 'Impresora de tickets…' })
+    ]))
+    expect(wrapper.findAllComponents(UButton).some(button => button.props('label') === 'Asignar factura')).toBe(false)
+  })
+
+  it.each(['mostrador', 'vendedor', 'repartidor', 'igualaciones'] as UserRole[])('oculta Admin para el rol %s', async (role) => {
+    const session = useAuthMock()
+    session.user.value.role = role
+    useAuthMock.mockReturnValueOnce(session)
+    wrapper = await mountSuspended(OrderDetail, { props: { orderId: 'order-invoice' } })
+    await vi.waitFor(() => expect(wrapper?.text()).toContain(baseOrder.number))
+    expect(wrapper.findAllComponents(UButton).some(button => button.props('label') === 'Admin')).toBe(false)
+    expect(dropdownMenus().flatMap(menuItems)).not.toEqual(expect.arrayContaining([
+      expect.objectContaining({ label: 'Asignar factura' }),
+      expect.objectContaining({ label: 'Impresora de tickets…' })
+    ]))
+  })
+
   it('muestra las etiquetas del pedido únicamente cuando existen', async () => {
     currentOrder = { ...baseOrder, tags: ['urgente', 'mayoreo'] }
     wrapper = await mountSuspended(OrderDetail, {
@@ -152,7 +195,8 @@ describe('OrderDetail · facturación', () => {
     })
   })
 
-  it('valida al entrar y marca el pedido sin volver a consultar Siigo al pulsar Facturar', async () => {
+  it('conserva Facturar sin mostrar badges de facturación y sin volver a consultar Siigo al pulsarlo', async () => {
+    currentOrder = { ...baseOrder, requiresInvoice: true }
     wrapper = await mountSuspended(OrderDetail, {
       props: { orderId: 'order-invoice' },
       global: {
@@ -165,7 +209,7 @@ describe('OrderDetail · facturación', () => {
     // El botón queda en estado `loading` mientras se valida el contexto de
     // Siigo, así que hay que esperar a que se habilite antes de pulsarlo.
     await vi.waitFor(() => {
-      expect(wrapper?.text()).toContain('Asignar factura')
+      expect(wrapper?.text()).toContain('Admin')
       expect(contextChecks).toBe(1)
       expect(findInvoiceButton()?.attributes('disabled')).toBeUndefined()
     })
@@ -178,13 +222,13 @@ describe('OrderDetail · facturación', () => {
     await invoiceButton.trigger('click')
 
     await vi.waitFor(() => {
-      expect(receivedBody).toEqual({ version: 1 })
-      expect(wrapper?.text()).toContain('Sin facturar')
+      expect(receivedBody).toBeUndefined()
+      expect(wrapper?.text()).not.toContain('Sin facturar')
       expect(contextChecks).toBe(1)
     })
   })
 
-  it('deshabilita Facturar cuando la factura validada ya existe', async () => {
+  it('muestra Facturado en verde con check cuando la factura ya existe', async () => {
     currentOrder = { ...baseOrder, requiresInvoice: true, invoiceCreated: true }
     wrapper = await mountSuspended(OrderDetail, {
       props: { orderId: 'order-invoice' },
@@ -197,14 +241,25 @@ describe('OrderDetail · facturación', () => {
 
     await vi.waitFor(() => expect(contextChecks).toBe(1))
     const invoiceButton = wrapper.findAll('button')
-      .find(button => button.text().trim() === 'Facturar')
+      .find(button => button.text().trim() === 'Facturado')
+    expect(invoiceButton).toBeDefined()
     expect(invoiceButton?.attributes('disabled')).toBeDefined()
-    expect(wrapper.text()).toContain('Asignar factura')
+    expect(invoiceButton?.classes().join(' ')).toContain('bg-success')
+    expect(wrapper.findAllComponents(UButton).find(button => button.props('label') === 'Facturado')?.props('icon')).toBe('i-lucide-check')
+    expect(wrapper.text()).not.toContain('Sin facturar')
+    expect(wrapper.findAllComponents({ name: 'UBadge' }).some(badge => badge.text() === 'Facturado')).toBe(false)
+    expect(wrapper.text()).toContain('Admin')
   })
 
-  it('permite abrir los pagos para seleccionar una factura existente', async () => {
+  it.each([
+    { status: 'pendiente_pago', label: 'Pago pendiente', color: 'warning' },
+    { status: 'abonado', label: 'Abonado', color: 'info' },
+    { status: 'pago_recibido', label: 'Pago recibido', color: 'success' }
+  ] as const)('muestra $label con color $color en el botón de pagos sin badge duplicado', async ({ status, label, color }) => {
+    vi.setSystemTime(new Date('2026-08-25T18:00:00Z'))
     currentOrder = {
       ...baseOrder,
+      paymentStatus: status,
       requiresInvoice: true,
       invoiceCreated: false
     }
@@ -218,11 +273,34 @@ describe('OrderDetail · facturación', () => {
     })
 
     await vi.waitFor(() => {
-      expect(wrapper?.text()).toContain('Pagos')
+      expect(wrapper?.text()).toContain(label)
     })
 
     const paymentsButton = wrapper.findAll('button')
-      .find(button => button.text().trim() === 'Pagos')
+      .find(button => button.text().trim() === label)
+    expect(paymentsButton).toBeDefined()
     expect(paymentsButton?.attributes('disabled')).toBeUndefined()
+    expect(wrapper.findAllComponents(UButton).find(button => button.props('label') === label)?.props('color')).toBe(color)
+    expect(wrapper.findAllComponents({ name: 'UBadge' }).some(badge => ['Pendiente de pago', 'Abonado', 'Pago recibido'].includes(badge.text()))).toBe(false)
+    await paymentsButton?.trigger('click')
+    await vi.waitFor(() => expect(document.body.textContent).toContain(`Pagos · ${baseOrder.number}`))
+  })
+
+  it.each([
+    { status: 'pendiente_pago', date: '2026-08-20', color: 'warning' },
+    { status: 'abonado', date: '2026-08-20', color: 'info' },
+    { status: 'pendiente_pago', date: '2026-08-19', color: 'warning' },
+    { status: 'abonado', date: '2026-08-19', color: 'info' },
+    { status: 'pendiente_pago', date: '2026-08-18', color: 'error' },
+    { status: 'abonado', date: '2026-08-18', color: 'error' },
+    { status: 'pago_recibido', date: '2026-08-18', color: 'success' }
+  ] as const)('usa $color para $status con fecha $date al superar siete días de calendario', async ({ status, date, color }) => {
+    // En UTC ya es 27; en México sigue siendo el día 26.
+    vi.setSystemTime(new Date('2026-08-27T02:00:00Z'))
+    currentOrder = { ...baseOrder, orderDate: date, paymentStatus: status }
+    wrapper = await mountSuspended(OrderDetail, { props: { orderId: 'order-invoice' } })
+    await vi.waitFor(() => expect(wrapper?.text()).toContain(baseOrder.number))
+    const button = wrapper.findAllComponents(UButton).find(button => button.props('icon') === 'i-lucide-hand-coins')
+    expect(button?.props('color')).toBe(color)
   })
 })

@@ -8,8 +8,8 @@ import {
   editableOrderStatusKeys
 } from '~/utils/roleAccess'
 import {
-  paymentStatusColor,
-  paymentStatusLabel
+  orderPaymentStatusColor,
+  orderPaymentStatusLabel
 } from '~/utils/orderPayment'
 import { orderListReturnPath } from '~/utils/orderNavigation'
 
@@ -121,8 +121,7 @@ const documentOptions = computed<DropdownMenuItem[][]>(() => {
 
   if (!isQuote.value) {
     groups.push([
-      { label: 'Imprimir ticket', icon: 'i-lucide-receipt', onSelect: () => { if (order.value) printTicket(order.value) } },
-      { label: 'Impresora de tickets…', icon: 'i-lucide-settings-2', onSelect: () => { printerSettingsOpen.value = true } }
+      { label: 'Imprimir ticket', icon: 'i-lucide-receipt', onSelect: () => { if (order.value) printTicket(order.value) } }
     ])
   }
 
@@ -139,6 +138,10 @@ const documentOptions = computed<DropdownMenuItem[][]>(() => {
 })
 
 const mayManagePayment = mayManageLogistics
+const paymentButtonColor = computed(() => {
+  if (!order.value) return 'neutral'
+  return orderPaymentStatusColor(order.value.paymentStatus, order.value.orderDate)
+})
 const mayAssignHistoricalInvoice = computed(() =>
   Boolean(user.value?.role === 'admin' && !isQuote.value)
 )
@@ -148,6 +151,19 @@ const mayEditQuote = computed(() =>
 const invoiceActionBusy = computed(() =>
   markingInvoiceRequired.value || checkingSiigoInvoice.value
 )
+const adminOptions = computed<DropdownMenuItem[][]>(() => [[
+  {
+    label: 'Asignar factura',
+    icon: 'i-lucide-link',
+    disabled: invoiceActionBusy.value,
+    onSelect: () => { historicalInvoiceOpen.value = true }
+  },
+  {
+    label: 'Impresora de tickets…',
+    icon: 'i-lucide-printer',
+    onSelect: () => { printerSettingsOpen.value = true }
+  }
+]])
 const availableStatuses = computed(() => {
   if (!user.value) return []
 
@@ -411,64 +427,28 @@ async function convertToPedido() {
                 {{ order.number }}
               </h1>
               <OrdersOrderStatusBadge class="hidden lg:inline-flex" :status="order.status" />
-              <UBadge
-                v-if="!isQuote"
-                class="hidden lg:inline-flex"
-                :color="paymentStatusColor(order.paymentStatus)"
-                variant="subtle"
-                :label="paymentStatusLabel(order.paymentStatus)"
-              />
-              <UBadge
-                v-if="!isQuote && order.requiresInvoice"
-                class="hidden lg:inline-flex"
-                :color="order.invoiceCreated ? 'success' : 'warning'"
-                variant="subtle"
-                :label="order.invoiceCreated ? 'Facturado' : 'Sin facturar'"
-              />
             </div>
           </div>
           <div class="[grid-area:estados] flex flex-col items-end gap-2 lg:hidden">
             <OrdersOrderStatusBadge :status="order.status" />
-            <div v-if="!isQuote" class="flex flex-wrap justify-end gap-2">
-              <UBadge
-                :color="paymentStatusColor(order.paymentStatus)"
-                variant="subtle"
-                :label="paymentStatusLabel(order.paymentStatus)"
-              />
-              <UBadge
-                v-if="order.requiresInvoice"
-                :color="order.invoiceCreated ? 'success' : 'warning'"
-                variant="subtle"
-                :label="order.invoiceCreated ? 'Facturado' : 'Sin facturar'"
-              />
-            </div>
           </div>
           <div class="[grid-area:acciones] flex flex-wrap items-center gap-4 lg:justify-end">
             <UButton
               v-if="!isQuote && mayManagePayment && order.requiresInvoice"
-              label="Facturar"
-              icon="i-lucide-file-plus-2"
-              color="neutral"
-              variant="outline"
+              :label="order.invoiceCreated ? 'Facturado' : 'Facturar'"
+              :icon="order.invoiceCreated ? 'i-lucide-check' : 'i-lucide-file-plus-2'"
+              :color="order.invoiceCreated ? 'success' : 'neutral'"
+              :variant="order.invoiceCreated ? 'solid' : 'outline'"
               :loading="invoiceActionBusy"
               :disabled="invoiceActionBusy || order.invoiceCreated"
               @click="startInvoiceFlow"
             />
             <UButton
-              v-if="mayAssignHistoricalInvoice"
-              label="Asignar factura"
-              icon="i-lucide-link"
-              color="neutral"
-              variant="outline"
-              :disabled="invoiceActionBusy"
-              @click="historicalInvoiceOpen = true"
-            />
-            <UButton
               v-if="!isQuote && mayManagePayment"
-              label="Pagos"
+              :label="orderPaymentStatusLabel(order.paymentStatus)"
               icon="i-lucide-hand-coins"
-              color="neutral"
-              variant="outline"
+              :color="paymentButtonColor"
+              variant="subtle"
               @click="paymentsOpen = true"
             />
             <UDropdownMenu :items="documentOptions">
@@ -480,7 +460,16 @@ async function convertToPedido() {
                 variant="outline"
               />
             </UDropdownMenu>
-            <OrdersPrinterSettingsModal v-model:open="printerSettingsOpen" />
+            <UDropdownMenu v-if="mayAssignHistoricalInvoice" :items="adminOptions">
+              <UButton
+                label="Admin"
+                icon="i-lucide-shield-user"
+                trailing-icon="i-lucide-chevron-down"
+                color="neutral"
+                variant="outline"
+              />
+            </UDropdownMenu>
+            <OrdersPrinterSettingsModal v-if="user?.role === 'admin'" v-model:open="printerSettingsOpen" />
             <OrdersOrderCancelModal
               v-if="mayCancelOrder"
               v-model:open="cancelOrderOpen"
@@ -543,7 +532,7 @@ async function convertToPedido() {
             />
             <UButton
               v-if="!isQuote"
-              label="Guardar cambios"
+              label="Guardar"
               icon="i-lucide-save"
               :loading="savingChanges"
               :disabled="savingChanges || !hasChanges"

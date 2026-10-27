@@ -1,10 +1,9 @@
-import type { SiigoCustomer } from '~/types/siigo'
 import { ORDER_ENTRY_ROLES } from '~/utils/roleAccess'
 import { requireRole } from '../../utils/auth'
 import { updateOrderSchema } from '../../utils/order-validation'
 import { updateOrder } from '../../utils/orders'
 import { usePrisma } from '../../utils/prisma'
-import { siigoRequest } from '../../utils/siigo'
+import { getSiigoOrderCustomer } from '../../utils/siigo-order-customer'
 import { getStoredProducts } from '../../utils/stored-products'
 
 export default eventHandler(async (event) => {
@@ -27,7 +26,7 @@ export default eventHandler(async (event) => {
   const productIds = [...new Set(parsed.data.lines.map(line => line.productId))]
   const repartidorId = parsed.data.repartidorId
   const [customer, repartidor, products] = await Promise.all([
-    siigoRequest<SiigoCustomer>(`/v1/customers/${encodeURIComponent(parsed.data.customerId)}`),
+    getSiigoOrderCustomer(parsed.data.customerId),
     repartidorId
       ? usePrisma().repartidor.findUnique({ where: { id: repartidorId } })
       : Promise.resolve(null),

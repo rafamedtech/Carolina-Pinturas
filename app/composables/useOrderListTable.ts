@@ -6,7 +6,7 @@ import { formatDate, formatDateTime } from '~/utils/datetime'
 import type { TableColumn } from '@nuxt/ui'
 import type { SortingState, VisibilityState } from '@tanstack/table-core'
 import type { SalesOrderListItem } from '~/types/orders'
-import { paymentStatusColor, paymentStatusLabel } from '~/utils/orderPayment'
+import { orderPaymentStatusColor, orderPaymentStatusLabel } from '~/utils/orderPayment'
 
 export function useOrderListTable(options: { returnTo: MaybeRefOrGetter<string>, igualacion?: boolean, billing?: MaybeRefOrGetter<boolean>, internal?: MaybeRefOrGetter<boolean>, pendingPayment?: MaybeRefOrGetter<boolean>, delivered?: MaybeRefOrGetter<boolean> }) {
   const currency = new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' })
@@ -56,11 +56,11 @@ export function useOrderListTable(options: { returnTo: MaybeRefOrGetter<string>,
 
   const paymentStatusColumn: TableColumn<SalesOrderListItem> = {
     id: 'paymentStatus',
-    accessorFn: row => paymentStatusLabel(row.paymentStatus),
+    accessorFn: row => orderPaymentStatusLabel(row.paymentStatus),
     header: sortableHeader('Estado de pago'),
     cell: ({ row }) => h(UBadge, {
-      color: paymentStatusColor(row.original.paymentStatus),
-      label: paymentStatusLabel(row.original.paymentStatus),
+      color: orderPaymentStatusColor(row.original.paymentStatus, row.original.orderDate),
+      label: orderPaymentStatusLabel(row.original.paymentStatus),
       variant: 'subtle'
     })
   }
