@@ -438,7 +438,7 @@ async function convertToPedido() {
               :label="order.invoiceCreated ? 'Facturado' : 'Facturar'"
               :icon="order.invoiceCreated ? 'i-lucide-check' : 'i-lucide-file-plus-2'"
               :color="order.invoiceCreated ? 'success' : 'neutral'"
-              :variant="order.invoiceCreated ? 'solid' : 'subtle'"
+              variant="subtle"
               :loading="invoiceActionBusy"
               :disabled="invoiceActionBusy || order.invoiceCreated"
               @click="startInvoiceFlow"
