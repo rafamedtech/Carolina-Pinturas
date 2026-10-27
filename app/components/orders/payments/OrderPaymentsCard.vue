@@ -32,6 +32,7 @@ const {
 } = useFetch<OrderPaymentContext>(
   () => `/api/orders/${encodeURIComponent(props.orderId)}/payments/context`,
   {
+    server: false,
     key: `order-payments-${props.orderId}`,
     lazy: true
   }

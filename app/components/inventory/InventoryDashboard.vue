@@ -33,12 +33,12 @@ const { returnTo } = useTableQuery([
   tableQueryField('page', pageNumber, tableQueryPage)
 ], { page: pageNumber, resetOn: [tab, search, warehouse, type, from, to, productId, low] })
 const requestFetch = useRequestFetch()
-const { data: warehouseData, refresh: refreshWarehouses, error: warehouseError } = await useAsyncData('inventory-warehouses', async () => ({ results: await fetchAllPages<InventoryWarehouse>('/api/inventory/warehouses', {}, 100, requestFetch) }))
-const { data: settings, refresh: refreshSettings } = await useFetch<InventorySettings>('/api/inventory/settings')
+const { data: warehouseData, refresh: refreshWarehouses, error: warehouseError } = useAsyncData('inventory-warehouses', async () => ({ results: await fetchAllPages<InventoryWarehouse>('/api/inventory/warehouses', {}, 100, requestFetch) }), { lazy: true, server: false })
+const { data: settings, refresh: refreshSettings } = useFetch<InventorySettings>('/api/inventory/settings', { lazy: true, server: false })
 type Row = InventoryStock | InventoryMovement | InventoryCount | InventoryProduct | { orderId: string, productId: string, quantity: string, order: { folio: number }, product: { code: string, name: string }, warehouse: { name: string } }
 const resource = computed(() => tab.value === 'warehouses' ? 'products' : tab.value)
 const endpoint = computed(() => `/api/inventory/${resource.value}`)
-const { data: result, error: loadError, status, refresh } = await useFetch<InventoryPage<Row>>(endpoint, { query })
+const { data: result, error: loadError, status, refresh } = useFetch<InventoryPage<Row>>(endpoint, { lazy: true, server: false, query })
 const stockRows = computed(() => (result.value?.results ?? []) as InventoryStock[])
 const movementRows = computed(() => (result.value?.results ?? []) as InventoryMovement[])
 const countRows = computed(() => (result.value?.results ?? []) as InventoryCount[])
@@ -158,7 +158,7 @@ const reservationColumns: TableColumn<Extract<Row, { orderId: string }>>[] = [
     :config="listConfig"
     :data="result?.results ?? []"
     :columns="[]"
-    :loading="status === 'pending'"
+    :loading="['idle', 'pending'].includes(status)"
     :error="Boolean(loadError || warehouseError)"
     :error-message="loadError?.data?.statusMessage || (warehouseError ? 'No se pudieron cargar los almacenes.' : undefined)"
     :total-results="result?.pagination?.totalResults"

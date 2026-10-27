@@ -11,11 +11,6 @@ const paymentMethod = shallowRef('all')
 const dateRange = shallowRef<OrderDateRange | null>(null)
 const page = shallowRef(1)
 const pageSize = 25
-const isHydrated = shallowRef(false)
-
-onMounted(() => {
-  isHydrated.value = true
-})
 
 const { returnTo } = useTableQuery([
   tableQueryField('search', filter, tableQueryText()),
@@ -37,7 +32,8 @@ const {
   status,
   error,
   refresh
-} = await useFetch<PaymentListResponse>('/api/payments', {
+} = useFetch<PaymentListResponse>('/api/payments', {
+  server: false,
   lazy: true,
   query: {
     page,
@@ -62,7 +58,7 @@ const {
 const errorMessage = computed(() =>
   error.value?.data?.statusMessage || 'No fue posible cargar los pagos.'
 )
-const loading = computed(() => isHydrated.value && status.value === 'pending')
+const loading = computed(() => status.value === 'idle' || status.value === 'pending')
 
 const csvColumns: CsvColumn<PaymentListItem>[] = [
   { key: 'order', label: 'Pedido', value: row => row.order.number },

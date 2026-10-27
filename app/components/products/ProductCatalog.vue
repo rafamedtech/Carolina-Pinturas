@@ -59,12 +59,10 @@ function applyFilters(value: Record<string, string>) {
   page.value = 1
 }
 
-const isHydrated = shallowRef(false)
 onMounted(() => {
-  isHydrated.value = true
   void reload()
 })
-const loading = computed(() => isHydrated.value && status.value === 'pending')
+const loading = computed(() => status.value === 'idle' || status.value === 'pending')
 
 // Apply the exclusion before search, pagination, totals and CSV export.
 const catalog = computed(() => (data.value?.results ?? []).filter((product) => {

@@ -30,7 +30,7 @@ const {
   refresh
 } = useFetch<HistoricalSiigoInvoiceContext>(
   () => `/api/orders/${encodeURIComponent(props.orderId)}/siigo-invoice/legacy-context`,
-  { immediate: false }
+  { lazy: true, server: false, immediate: false }
 )
 const schema = z.object({
   invoiceId: z.string().uuid('Selecciona una factura.'),

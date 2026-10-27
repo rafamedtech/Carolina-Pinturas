@@ -12,7 +12,7 @@ const requestFetch = useRequestFetch()
 // Keep setup synchronous so opening the modal never waits for the catalogue.
 const { data: products, status, error, refresh } = useAsyncData('inventory-movement-products', () =>
   fetchAllPages<InventoryProduct>('/api/inventory/products', { controlledOnly: 'true' }, 100, requestFetch),
-{ lazy: true, immediate: !props.source }
+{ server: false, lazy: true, immediate: !props.source }
 )
 const loadingProducts = computed(() => !props.source && status.value === 'pending')
 const enabledProducts = computed(() => (products.value ?? []).filter(p => p.enabled))

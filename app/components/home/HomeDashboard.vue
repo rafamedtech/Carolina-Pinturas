@@ -37,7 +37,7 @@ const periodProgress = computed(() => {
       </template>
     </UAlert>
 
-    <template v-if="status === 'pending' && !data">
+    <template v-if="['idle', 'pending'].includes(status) && !data">
       <UPageGrid class="gap-4 lg:grid-cols-3">
         <USkeleton class="h-52 rounded-lg lg:col-span-2" />
         <USkeleton class="h-52 rounded-lg" />

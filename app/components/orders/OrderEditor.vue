@@ -31,6 +31,7 @@ const {
 } = useFetch<SalesOrderDetail>(
   () => `/api/orders/${encodeURIComponent(props.orderId || '')}`,
   {
+    server: false,
     key: `edit-order-${props.orderId || 'new'}`,
     lazy: true,
     immediate: isEditing.value
@@ -225,6 +226,7 @@ const {
   status: counterCustomerStatus,
   error: counterCustomerError
 } = useFetch<SiigoCustomer | null>('/api/orders/counter-customer', {
+  lazy: true,
   key: 'counter-customer-request',
   immediate: isCounterSale.value,
   server: false,
@@ -240,6 +242,7 @@ const {
   status: statusStatus,
   error: statusError
 } = useFetch<OrderStatus[]>('/api/orders/statuses', {
+  server: false,
   key: 'order-statuses',
   lazy: true,
   default: () => []
@@ -250,6 +253,7 @@ const {
   error: repartidorError
 } = useRepartidoresCatalog()
 const { data: tagOptions } = useFetch<string[]>('/api/orders/tags', {
+  server: false,
   key: 'order-tags',
   lazy: true,
   default: () => []

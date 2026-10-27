@@ -7,7 +7,7 @@ const props = defineProps<{ productId?: string }>()
 const model = defineModel<ProductInput>({ required: true })
 const selected = ref('')
 const requestFetch = useRequestFetch()
-const { data, status, error, refresh } = useAsyncData('product-composition-candidates', () => fetchAllPages<InventoryProduct>('/api/inventory/products', { controlledOnly: 'true' }, 100, requestFetch), { lazy: true })
+const { data, status, error, refresh } = useAsyncData('product-composition-candidates', () => fetchAllPages<InventoryProduct>('/api/inventory/products', { controlledOnly: 'true' }, 100, requestFetch), { server: false, lazy: true })
 const candidates = computed(() => (data.value ?? []).filter(p => p.id !== props.productId && !model.value.composition.components.some(c => c.productId === p.id)))
 const byId = computed(() => new Map((data.value ?? []).map(p => [p.id, p])))
 const kind = computed({

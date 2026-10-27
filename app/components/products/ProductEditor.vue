@@ -14,22 +14,21 @@ const sourceId = computed(() => props.productId || props.duplicateFrom)
 const back = computed(() => sourceId.value
   ? { path: `/productos/${sourceId.value}`, query: { returnTo: returnTo.value } }
   : returnTo.value)
-const { data: context, error: contextError } = await useFetch<ProductContext>('/api/siigo/products/context', { immediate: allowed.value })
-const product = ref<SiigoProduct>()
-const loading = shallowRef(Boolean(sourceId.value))
-const loadError = shallowRef('')
+const { data: context, error: contextError } = useFetch<ProductContext>('/api/siigo/products/context', { lazy: true, server: false, immediate: allowed.value })
+const { data: product, status: productStatus, error: productError } = useFetch<SiigoProduct>(
+  () => `/api/siigo/products/${encodeURIComponent(sourceId.value || '')}`,
+  { lazy: true, server: false, immediate: Boolean(sourceId.value && allowed.value), query: { refresh: 'true' } }
+)
+const loading = computed(() => Boolean(sourceId.value) && (productStatus.value === 'idle' || productStatus.value === 'pending'))
+const loadError = computed(() => {
+  if (productError.value) return 'No se pudo cargar el producto. Actualiza la página para reintentar.'
+  if (product.value && (product.value.type || 'Product') !== 'Product') return 'Este tipo de producto se conserva solo para consulta histórica.'
+  return ''
+})
 const productImage = ref<ProductImage | null>(null)
-if (sourceId.value && allowed.value) {
-  try {
-    product.value = await $fetch<SiigoProduct>(`/api/siigo/products/${encodeURIComponent(sourceId.value)}`, { headers: useRequestHeaders(['cookie']), query: { refresh: 'true' } })
-    productImage.value = product.value.internal?.image ?? null
-    if ((product.value.type || 'Product') !== 'Product') loadError.value = 'Este tipo de producto se conserva solo para consulta histórica.'
-  } catch {
-    loadError.value = 'No se pudo cargar el producto. Actualiza la página para reintentar.'
-  } finally {
-    loading.value = false
-  }
-}
+watch(product, (value) => {
+  productImage.value = value?.internal?.image ?? null
+}, { immediate: true })
 const { saving, errorMessage, ambiguous, checking, lookupResults, save, check } = useProductMutation()
 async function recover() {
   const saved = await check(props.productId, product.value?.internal?.pendingWriteId)

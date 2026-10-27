@@ -4,7 +4,7 @@ import type { InventoryStock, InventoryPage } from '#shared/types/inventory'
 
 const props = defineProps<{ productId: string }>()
 const requestFetch = useRequestFetch()
-const { data: stocks, error, status } = await useAsyncData(
+const { data: stocks, error, status } = useAsyncData(
   () => `product-warehouse-stocks-${props.productId}`,
   async () => {
     const productId = props.productId
@@ -20,7 +20,7 @@ const { data: stocks, error, status } = await useAsyncData(
       page++
     } while (page <= totalPages)
     return rows
-  }
+  }, { lazy: true, server: false }
 )
 const selectedWarehouseId = shallowRef<string | null>(null)
 const modalOpen = shallowRef(false)
@@ -59,7 +59,7 @@ function showKardex(row: InventoryStock) {
 
     <UAlert v-if="error" title="No se pudo cargar el inventario interno." color="error" />
     <div
-      v-else-if="status === 'pending'"
+      v-else-if="['idle', 'pending'].includes(status)"
       class="space-y-4"
       role="status"
       aria-busy="true"

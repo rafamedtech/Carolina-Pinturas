@@ -4,7 +4,7 @@ import type { PriceCatalogResponse } from '~/types/catalog'
 export function usePriceCatalog() {
   const query = shallowRef('')
   useTableQuery([tableQueryField('search', query, tableQueryText())])
-  const { data, error, status, refresh } = useFetch<PriceCatalogResponse>('/api/catalog/prices')
+  const { data, error, status, refresh } = useFetch<PriceCatalogResponse>('/api/catalog/prices', { lazy: true, server: false })
 
   useEventListener('focus', async () => {
     await refresh()

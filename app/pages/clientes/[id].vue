@@ -21,7 +21,7 @@ const catalogKey = isSupplierContext
 const customerId = computed(() => String(route.params.id))
 const { data: customer, status, error, refresh } = useLazyFetch<SiigoCustomer>(
   () => `/api/siigo/customers/${encodeURIComponent(customerId.value)}`,
-  { key: () => `siigo-customer-${customerId.value}` }
+  { lazy: true, server: false, key: () => `siigo-customer-${customerId.value}` }
 )
 
 const fullName = computed(() => customer.value?.name?.filter(Boolean).join(' ') || entityLabel)
@@ -227,7 +227,7 @@ useSeoMeta({ title: () => fullName.value })
             icon="i-lucide-refresh-cw"
             color="neutral"
             variant="outline"
-            :loading="status === 'pending'"
+            :loading="['idle', 'pending'].includes(status)"
             @click="() => refresh()"
           />
         </template>
@@ -440,7 +440,7 @@ useSeoMeta({ title: () => fullName.value })
       </template>
 
       <div
-        v-else-if="status === 'pending'"
+        v-else-if="['idle', 'pending'].includes(status)"
         class="flex flex-col gap-6"
         role="status"
         aria-busy="true"

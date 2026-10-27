@@ -5,7 +5,7 @@ const props = defineProps<{ orderId: string, version: number }>()
 const emit = defineEmits<{ saved: [] }>()
 const { user } = useAuth()
 const mayAssign = computed(() => ['admin', 'mostrador', 'vendedor'].includes(user.value?.role ?? ''))
-const { data, error: loadError, refresh } = await useFetch<OrderInventoryView>(() => `/api/orders/${props.orderId}/inventory`, { watch: [() => props.version] })
+const { data, error: loadError, refresh } = useFetch<OrderInventoryView>(() => `/api/orders/${props.orderId}/inventory`, { lazy: true, server: false, watch: [() => props.version] })
 const selected = shallowRef('')
 watch(data, (value) => {
   selected.value = value?.warehouseId ?? ''

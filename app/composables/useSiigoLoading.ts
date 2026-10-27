@@ -1,8 +1,8 @@
 import type { Ref } from 'vue'
 import type { AsyncDataRequestStatus } from '#app'
 
-// Estado global compartido: número de fetches de Siigo en curso. El overlay
-// de carga a pantalla completa se muestra mientras el contador sea > 0.
+// Estado global compartido: número de fetches de Siigo en curso para el
+// indicador de actividad, que permite seguir usando la página.
 export function useSiigoLoading() {
   const count = useState('siigo-loading-count', () => 0)
 

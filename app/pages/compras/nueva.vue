@@ -7,7 +7,9 @@ useSeoMeta({ title: 'Nueva compra' })
 definePageMeta({ key: route => route.fullPath })
 const route = useRoute()
 const sourceId = typeof route.query.duplicar === 'string' ? route.query.duplicar : ''
-const { data: source, error: sourceError } = await useFetch<PurchaseView>(`/api/purchases/${encodeURIComponent(sourceId)}`, {
+const { data: source, error: sourceError, status: sourceStatus } = useFetch<PurchaseView>(`/api/purchases/${encodeURIComponent(sourceId)}`, {
+  lazy: true,
+  server: false,
   immediate: Boolean(sourceId)
 })
 const returnTo = computed(() => tableReturnPath(route.query.returnTo, '/compras', ['/compras', '/compras/cuentas-por-pagar']))
@@ -74,6 +76,7 @@ async function save(draft: PurchaseDraft) {
         variant="subtle"
         icon="i-lucide-copy"
       />
+      <ListLoading v-if="sourceId && ['idle', 'pending'].includes(sourceStatus)" />
       <PurchasesPurchaseDraftForm
         v-if="!sourceId || source"
         :copy-from="source ?? undefined"

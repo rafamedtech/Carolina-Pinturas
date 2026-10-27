@@ -16,7 +16,7 @@ const paperWidth = computed<TicketPaperWidth>(() =>
 
 const { data: order, status, error } = useLazyFetch<SalesOrderDetail>(
   () => `/api/orders/${encodeURIComponent(orderId.value)}`,
-  { key: () => `sales-order-ticket-${orderId.value}` }
+  { lazy: true, server: false, key: () => `sales-order-ticket-${orderId.value}` }
 )
 
 const isQuote = computed(() => order.value?.status.key === 'borrador')
@@ -84,7 +84,7 @@ watch([status, order], () => {
       icon="i-lucide-database-zap"
     />
 
-    <p v-else-if="status === 'pending'" class="mt-10 text-center text-sm text-muted">
+    <p v-else-if="['idle', 'pending'].includes(status)" class="mt-10 text-center text-sm text-muted">
       Cargando ticket…
     </p>
 

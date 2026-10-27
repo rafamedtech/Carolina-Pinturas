@@ -10,7 +10,7 @@ const backPath = computed(() => tableReturnPath(route.query.returnTo, '/producto
 const productId = computed(() => String(route.params.id))
 const { data: product, status, error, refresh } = useLazyFetch<SiigoProduct>(
   () => `/api/siigo/products/${encodeURIComponent(productId.value)}`,
-  { key: () => `siigo-product-${productId.value}`, query: { refresh: 'true' } }
+  { lazy: true, server: false, key: () => `siigo-product-${productId.value}`, query: { refresh: 'true' } }
 )
 
 const MANAGED_TYPES = ['Product']
@@ -97,7 +97,7 @@ function formatQuantity(value?: number) {
             icon="i-lucide-refresh-cw"
             color="neutral"
             variant="outline"
-            :loading="status === 'pending'"
+            :loading="['idle', 'pending'].includes(status)"
             @click="() => refresh()"
           />
         </template>
@@ -275,7 +275,7 @@ function formatQuantity(value?: number) {
       </template>
 
       <div
-        v-else-if="status === 'pending'"
+        v-else-if="['idle', 'pending'].includes(status)"
         class="flex flex-col gap-6"
         role="status"
         aria-busy="true"

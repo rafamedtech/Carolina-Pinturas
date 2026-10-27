@@ -6,7 +6,7 @@ import Decimal from 'decimal.js'
 import type { PurchaseView } from '~/types/purchases'
 import { formatDate } from '~/utils/datetime'
 
-const { data, error, status: requestStatus, refresh } = await useFetch<{ results: PurchaseView[] }>('/api/purchases')
+const { data, error, status: requestStatus, refresh } = useFetch<{ results: PurchaseView[] }>('/api/purchases', { lazy: true, server: false })
 const page = shallowRef(1)
 const status = shallowRef('all')
 const search = shallowRef('')
@@ -58,7 +58,7 @@ const listConfig = computed<ListLayoutConfig>(() => ({
     :config="listConfig"
     :data="rows"
     :columns="columns"
-    :loading="requestStatus === 'pending'"
+    :loading="['idle', 'pending'].includes(requestStatus)"
     :error="Boolean(error)"
     error-title="No se pudieron cargar las cuentas por pagar."
     @refresh="refresh()"

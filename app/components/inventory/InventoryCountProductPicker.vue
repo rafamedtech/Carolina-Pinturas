@@ -6,8 +6,8 @@ const props = defineProps<{ excludedIds: string[], busy: boolean }>()
 const emit = defineEmits<{ add: [productId: string] }>()
 const selected = shallowRef('')
 const requestFetch = useRequestFetch()
-const { data, status, error, refresh } = await useAsyncData('inventory-count-products', () =>
-  fetchAllPages<InventoryProduct>('/api/inventory/products', { controlledOnly: 'true' }, 100, requestFetch)
+const { data, status, error, refresh } = useAsyncData('inventory-count-products', () =>
+  fetchAllPages<InventoryProduct>('/api/inventory/products', { controlledOnly: 'true' }, 100, requestFetch), { lazy: true, server: false }
 )
 const products = computed(() => (data.value ?? []).filter(p => !props.excludedIds.includes(p.id)))
 function add() {
@@ -27,7 +27,7 @@ watch(() => props.excludedIds, (ids) => {
           v-model="selected"
           :products="products"
           aria-label="Producto para contar"
-          :loading="status === 'pending'"
+          :loading="['idle', 'pending'].includes(status)"
           :disabled="busy || Boolean(error)"
         />
       </UFormField>

@@ -13,11 +13,6 @@ import { formatDate, mexicoToday } from '~/utils/datetime'
 const UBadge = resolveComponent('UBadge')
 const NuxtLink = resolveComponent('NuxtLink')
 const sorting = ref<SortingState>([])
-const isHydrated = shallowRef(false)
-
-onMounted(() => {
-  isHydrated.value = true
-})
 
 const page = shallowRef(1)
 const pageSize = 25
@@ -45,11 +40,12 @@ const query = computed(() => ({
   dateFrom: dateRange.value?.start && dateRange.value?.end ? dateRange.value.start.toString() : undefined,
   dateTo: dateRange.value?.start && dateRange.value?.end ? dateRange.value.end.toString() : undefined
 }))
-const { data, error, status: requestStatus, refresh } = await useFetch<{ results: PurchaseView[] }>('/api/purchases', {
+const { data, error, status: requestStatus, refresh } = useFetch<{ results: PurchaseView[] }>('/api/purchases', {
+  server: false,
   lazy: true,
   query
 })
-const loading = computed(() => requestStatus.value === 'idle' || (isHydrated.value && requestStatus.value === 'pending'))
+const loading = computed(() => requestStatus.value === 'idle' || requestStatus.value === 'pending')
 const purchases = computed(() => [...(data.value?.results ?? [])])
 
 function nextInvoiceDueDate(order: PurchaseView): string | undefined {

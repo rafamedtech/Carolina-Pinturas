@@ -71,12 +71,7 @@ const dateRange = shallowRef<OrderDateRange | null>(null)
 const page = shallowRef(1)
 const pageSize = 25
 const canCreate = computed(() => Boolean(user.value && canCreateOrders(user.value.role)))
-const isHydrated = shallowRef(false)
 const customerManagerOpen = shallowRef(false)
-
-onMounted(() => {
-  isHydrated.value = true
-})
 
 const { returnTo } = useTableQuery([
   tableQueryField('search', filter, tableQueryText()),
@@ -116,7 +111,8 @@ const {
   status,
   error,
   refresh
-} = await useFetch<SalesOrderListResponse>('/api/orders', {
+} = useFetch<SalesOrderListResponse>('/api/orders', {
+  server: false,
   lazy: true,
   query: {
     page,
@@ -144,7 +140,9 @@ const {
     }
   })
 })
-const { data: statuses } = await useFetch<OrderStatus[]>('/api/orders/statuses', {
+const { data: statuses } = useFetch<OrderStatus[]>('/api/orders/statuses', {
+  lazy: true,
+  server: false,
   key: 'order-statuses',
   default: () => []
 })
@@ -152,7 +150,7 @@ const { data: statuses } = await useFetch<OrderStatus[]>('/api/orders/statuses',
 const errorMessage = computed(() =>
   error.value?.data?.statusMessage || 'No fue posible cargar los pedidos.'
 )
-const loading = computed(() => isHydrated.value && status.value === 'pending')
+const loading = computed(() => status.value === 'idle' || status.value === 'pending')
 
 const csvColumns = computed<CsvColumn<SalesOrderListItem>[]>(() => {
   const columns: CsvColumn<SalesOrderListItem>[] = [

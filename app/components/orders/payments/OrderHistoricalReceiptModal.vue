@@ -25,7 +25,7 @@ const {
   refresh
 } = useFetch<HistoricalSiigoReceiptContext>(
   () => `/api/orders/${encodeURIComponent(props.orderId)}/payments/${encodeURIComponent(props.paymentId)}/siigo-receipt/legacy-context`,
-  { immediate: false }
+  { lazy: true, server: false, immediate: false }
 )
 const schema = z.object({
   voucherId: z.string().uuid('Selecciona una recepción.'),

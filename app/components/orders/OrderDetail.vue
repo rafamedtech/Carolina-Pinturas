@@ -33,9 +33,10 @@ const {
   refresh
 } = useFetch<SalesOrderDetail>(
   () => `/api/orders/${encodeURIComponent(props.orderId)}`,
-  { key: `sales-order-${props.orderId}`, lazy: true }
+  { server: false, key: `sales-order-${props.orderId}`, lazy: true }
 )
 const { data: statuses } = useFetch<OrderStatus[]>('/api/orders/statuses', {
+  server: false,
   key: 'order-statuses',
   lazy: true,
   default: () => []
@@ -379,7 +380,7 @@ async function convertToPedido() {
             variant="outline"
             aria-label="Actualizar"
             :ui="{ label: 'hidden sm:inline' }"
-            :loading="status === 'pending'"
+            :loading="['idle', 'pending'].includes(status)"
             @click="() => refresh()"
           />
         </template>
@@ -740,7 +741,7 @@ async function convertToPedido() {
       </template>
 
       <div
-        v-else-if="status === 'pending'"
+        v-else-if="['idle', 'pending'].includes(status)"
         class="flex flex-col gap-6"
         role="status"
         aria-busy="true"

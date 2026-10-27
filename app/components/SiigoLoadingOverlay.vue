@@ -13,12 +13,12 @@ const { isLoading } = useSiigoLoading()
       >
         <div
           v-if="isLoading"
-          class="fixed inset-0 z-[100] flex flex-col items-center justify-center gap-4 bg-default/80 backdrop-blur-sm"
+          class="pointer-events-none fixed right-4 bottom-4 z-[100] flex items-center gap-3 rounded-lg border border-default bg-default px-4 py-3 shadow-lg"
           role="status"
           aria-live="polite"
           aria-busy="true"
         >
-          <UIcon name="i-lucide-loader-circle" class="size-10 animate-spin text-primary" />
+          <UIcon name="i-lucide-loader-circle" class="size-5 shrink-0 animate-spin text-primary" />
           <p class="text-sm font-medium text-muted">
             Cargando información de Siigo…
           </p>

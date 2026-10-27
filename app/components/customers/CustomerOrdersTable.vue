@@ -20,7 +20,8 @@ const {
   status,
   error,
   refresh
-} = await useFetch<SalesOrderListResponse>('/api/orders', {
+} = useFetch<SalesOrderListResponse>('/api/orders', {
+  server: false,
   lazy: true,
   query: {
     customer_id: computed(() => props.customerId),
@@ -39,7 +40,7 @@ const {
   })
 })
 
-const loading = computed(() => status.value === 'pending')
+const loading = computed(() => ['idle', 'pending'].includes(status.value))
 const errorMessage = computed(() =>
   error.value?.data?.statusMessage || 'No fue posible cargar los pedidos del cliente.'
 )

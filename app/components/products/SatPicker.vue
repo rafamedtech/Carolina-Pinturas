@@ -12,6 +12,7 @@ watch(debouncedSearch, () => {
   page.value = 1
 })
 const { data, status, error, refresh } = useFetch<SatSearchResponse>('/api/siigo/products/sat', {
+  lazy: true,
   query: computed(() => ({ kind: props.kind, q: debouncedSearch.value, page: page.value })),
   immediate: false, server: false
 })

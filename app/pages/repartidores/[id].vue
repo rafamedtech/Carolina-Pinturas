@@ -11,7 +11,7 @@ const backPath = computed(() => tableReturnPath(route.query.returnTo, '/repartid
 const repartidorId = computed(() => String(route.params.id))
 const { data: repartidor, status, error, refresh } = useLazyFetch<RepartidorDetail>(
   () => `/api/repartidores/${encodeURIComponent(repartidorId.value)}`,
-  { key: () => `repartidor-${repartidorId.value}` }
+  { lazy: true, server: false, key: () => `repartidor-${repartidorId.value}` }
 )
 
 const currency = new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' })
@@ -62,7 +62,7 @@ const deliveryConfig: ListLayoutConfig = { id: 'driver-deliveries', title: 'Pedi
             icon="i-lucide-refresh-cw"
             color="neutral"
             variant="outline"
-            :loading="status === 'pending'"
+            :loading="['idle', 'pending'].includes(status)"
             @click="() => refresh()"
           />
         </template>
@@ -102,14 +102,14 @@ const deliveryConfig: ListLayoutConfig = { id: 'driver-deliveries', title: 'Pedi
           :config="deliveryConfig"
           :data="repartidor.deliveredOrders"
           :columns="columns"
-          :loading="status === 'pending'"
+          :loading="['idle', 'pending'].includes(status)"
           embedded
           @select="openOrder"
           @refresh="refresh()"
         />
       </template>
 
-      <ListLoading v-else-if="status === 'pending'" />
+      <ListLoading v-else-if="['idle', 'pending'].includes(status)" />
     </template>
   </UDashboardPanel>
 </template>

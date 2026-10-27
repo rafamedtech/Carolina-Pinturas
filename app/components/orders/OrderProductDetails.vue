@@ -7,7 +7,7 @@ const props = defineProps<{
 
 const { data: fetchedProduct, error } = useLazyFetch<SiigoProduct>(
   () => `/api/siigo/products/${encodeURIComponent(props.product.id)}`,
-  { key: `order-product-detail-${props.product.id}` }
+  { lazy: true, server: false, key: `order-product-detail-${props.product.id}` }
 )
 
 const product = computed(() => fetchedProduct.value ?? props.product)

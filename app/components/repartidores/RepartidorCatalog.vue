@@ -15,11 +15,7 @@ const { returnTo } = useTableQuery([
 const router = useRouter()
 const { data, status, error, refresh, addToCatalog } = useRepartidoresCatalog({ all: true })
 
-const isHydrated = shallowRef(false)
-onMounted(() => {
-  isHydrated.value = true
-})
-const loading = computed(() => isHydrated.value && status.value === 'pending')
+const loading = computed(() => status.value === 'idle' || status.value === 'pending')
 
 const repartidores = computed(() => {
   const value = filter.value.trim().toLowerCase()

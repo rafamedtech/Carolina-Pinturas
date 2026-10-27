@@ -25,6 +25,8 @@ const {
 } = useFetch<OrderSiigoInvoiceContext>(
   () => `/api/orders/${encodeURIComponent(props.orderId)}/siigo-invoice/context`,
   {
+    lazy: true,
+    server: false,
     key: `order-siigo-invoice-${props.orderId}`,
     immediate: false
   }

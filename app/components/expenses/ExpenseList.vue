@@ -17,17 +17,12 @@ const category = shallowRef('all')
 const dateRange = shallowRef<OrderDateRange | null>(null)
 const page = shallowRef(1)
 const pageSize = 25
-const isHydrated = shallowRef(false)
 const modalOpen = shallowRef(false)
 const saving = shallowRef(false)
 const deleting = shallowRef(false)
 const selectedExpense = shallowRef<ExpenseRecord | null>(null)
 const submitError = shallowRef('')
 const toast = useToast()
-
-onMounted(() => {
-  isHydrated.value = true
-})
 
 useTableQuery([
   tableQueryField('search', filter, tableQueryText()),
@@ -54,7 +49,8 @@ const {
   status: expenseStatus,
   error: expenseError,
   refresh: refreshExpenses
-} = await useFetch<ExpenseListResponse>('/api/expenses', {
+} = useFetch<ExpenseListResponse>('/api/expenses', {
+  server: false,
   lazy: true,
   query: {
     page,
@@ -89,7 +85,7 @@ const suppliersErrorMessage = computed(() => supplierError.value
 const expenseErrorMessage = computed(() =>
   expenseError.value?.data?.statusMessage || 'No fue posible cargar los gastos.'
 )
-const loading = computed(() => isHydrated.value && expenseStatus.value === 'pending')
+const loading = computed(() => expenseStatus.value === 'idle' || expenseStatus.value === 'pending')
 
 const csvColumns: CsvColumn<ExpenseRecord>[] = [
   { key: 'date', label: 'Fecha', value: row => formatDate(row.date) },

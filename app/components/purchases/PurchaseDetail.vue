@@ -7,7 +7,7 @@ import { purchaseDateLabel, purchaseMoney, purchaseQuantity, purchaseStatus, rec
 const route = useRoute()
 const backPath = computed(() => tableReturnPath(route.query.returnTo, '/compras', ['/compras', '/compras/cuentas-por-pagar']))
 const props = defineProps<{ id: string }>()
-const { data: order, error: loadError, refresh, status: loadStatus } = await useFetch<PurchaseView>(`/api/purchases/${props.id}`)
+const { data: order, error: loadError, refresh, status: loadStatus } = useFetch<PurchaseView>(`/api/purchases/${props.id}`, { lazy: true, server: false })
 const { busy, error, run } = usePurchaseAction(() => order.value!, (value) => {
   order.value = value
 })
@@ -114,6 +114,7 @@ const timeline = computed(() => [...(order.value?.events ?? [])].reverse())
     </template>
 
     <template #body>
+      <ListLoading v-if="!order && ['idle', 'pending'].includes(loadStatus)" />
       <UAlert
         v-if="loadError"
         title="No se pudo cargar la compra."

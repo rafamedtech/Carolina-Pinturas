@@ -3,7 +3,7 @@ interface ConnectionStatus {
   configured: boolean
 }
 
-const { data, status, refresh } = await useFetch<ConnectionStatus>('/api/siigo/status', { lazy: true })
+const { data, status, refresh } = useFetch<ConnectionStatus>('/api/siigo/status', { server: false, lazy: true })
 
 useSeoMeta({ title: 'Configuración' })
 </script>

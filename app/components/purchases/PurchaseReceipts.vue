@@ -7,7 +7,8 @@ import { purchaseDateLabel, purchaseQuantity, receiptStatus } from '~/utils/purc
 const props = defineProps<{ order: PurchaseView }>()
 const emit = defineEmits<{ saved: [order: PurchaseView] }>()
 const { busy, error, run } = usePurchaseAction(() => props.order, value => emit('saved', value))
-const { data: inventorySettings } = await useFetch<InventorySettings>('/api/inventory/settings')
+const { data: inventorySettings, status: inventoryStatus, error: inventoryError } = useFetch<InventorySettings>('/api/inventory/settings', { lazy: true, server: false })
+const inventoryLoading = computed(() => inventoryStatus.value === 'idle' || inventoryStatus.value === 'pending')
 const warehouseId = shallowRef('')
 const date = shallowRef(mexicoToday())
 const quantities = reactive<Record<string, number>>({})
@@ -111,7 +112,10 @@ async function voidReceipt(reason: string) {
           </li>
         </ul>
         <div class="flex flex-col-reverse gap-2 sm:flex-row sm:items-center sm:justify-between">
-          <p class="flex items-center gap-1.5 text-xs text-muted">
+          <p v-if="inventoryLoading || inventoryError" class="text-xs text-muted" role="status">
+            {{ inventoryError ? 'No se pudo cargar la configuración de inventario. Recarga la página para reintentar.' : 'Cargando configuración de inventario…' }}
+          </p>
+          <p v-else class="flex items-center gap-1.5 text-xs text-muted">
             <UIcon name="i-lucide-info" class="size-4 shrink-0" />
             {{ inventorySettings?.enabledAt ? 'Esta recepción agrega unidades al almacén interno seleccionado.' : 'El inventario interno todavía no está activado. Esta recepción conservará su comportamiento histórico.' }}
           </p>
@@ -130,7 +134,7 @@ async function voidReceipt(reason: string) {
               icon="i-lucide-package-check"
               class="flex-1 justify-center sm:flex-none"
               :loading="busy"
-              :disabled="!hasQuantities || Boolean(inventorySettings?.enabledAt && !warehouseId)"
+              :disabled="inventoryLoading || Boolean(inventoryError) || !hasQuantities || Boolean(inventorySettings?.enabledAt && !warehouseId)"
             />
           </div>
         </div>

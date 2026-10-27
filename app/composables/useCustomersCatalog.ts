@@ -8,6 +8,8 @@ export function useCustomersCatalog(options: {
   // Siigo es la fuente de verdad. El servidor agrega únicamente las preferencias
   // internas del cliente que pertenecen a la aplicación.
   const { data, status, error } = useFetch<SiigoListResponse<SiigoCustomer>>('/api/siigo/customers', {
+    lazy: true,
+    server: false,
     key: options.customerType
       ? `customers-catalog-request-${options.customerType.toLowerCase()}`
       : 'customers-catalog-request',

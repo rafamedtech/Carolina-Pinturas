@@ -39,7 +39,7 @@ function showProductDetails(product: CatalogPrice) {
     <PricesPriceList
       v-else
       :products="products"
-      :loading="status === 'pending'"
+      :loading="['idle', 'pending'].includes(status)"
       :query="query"
       @select-product="showProductDetails"
     />

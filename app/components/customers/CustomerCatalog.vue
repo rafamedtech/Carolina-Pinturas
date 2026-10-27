@@ -33,7 +33,7 @@ const {
 
 const singularLower = computed(() => props.singularLabel.toLowerCase())
 const pluralLower = computed(() => props.title.toLowerCase())
-const loading = computed(() => status.value === 'pending')
+const loading = computed(() => ['idle', 'pending'].includes(status.value))
 const records = computed(() => {
   const value = filter.value.trim().toLowerCase()
   const customers = data.value?.results || []
