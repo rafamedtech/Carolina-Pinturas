@@ -317,10 +317,12 @@ const columns: TableColumn<SalesOrderItem>[] = [{
             <p class="text-xs font-medium uppercase tracking-wide text-muted">
               {{ item.code }}
             </p>
-            <h3 class="font-semibold text-primary">
-              {{ item.name }}
-            </h3>
-            <OrdersOrderItemComposition :item="item" />
+            <div class="flex items-center gap-1">
+              <h3 class="font-semibold text-primary">
+                {{ item.name }}
+              </h3>
+              <OrdersOrderItemComposition :item="item" />
+            </div>
           </div>
 
           <div class="flex shrink-0 items-center gap-1">
@@ -437,8 +439,10 @@ const columns: TableColumn<SalesOrderItem>[] = [{
       class="hidden md:block"
     >
       <template #name-cell="{ row }">
-        <span>{{ row.original.name }}</span>
-        <OrdersOrderItemComposition :item="row.original" />
+        <div class="flex items-center gap-1">
+          <span>{{ row.original.name }}</span>
+          <OrdersOrderItemComposition :item="row.original" />
+        </div>
       </template>
     </UTable>
 
