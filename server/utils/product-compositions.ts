@@ -3,6 +3,7 @@ import Decimal from 'decimal.js'
 import { Prisma } from '../../generated/prisma/client'
 import type { SiigoProduct } from '~/types/siigo'
 import { inventoryRecipeSchema, type InventoryRecipe, type ProductComposition } from '#shared/schemas/product'
+import { productUnitLabel } from './product-unit'
 
 type Tx = Prisma.TransactionClient
 const assert = (value: unknown, message: string) => {
@@ -88,7 +89,7 @@ export async function captureInventoryRecipes(tx: Tx, ids: string[], previous: A
     }
     // A legacy order has no internal composition: preserve its original direct consumption.
     if (old || p!.internalKind === 'product') {
-      result.set(id, [{ productId: id, quantity: '1', code: p!.code, name: p!.name, unit: p!.unitName ?? p!.unitCode }])
+      result.set(id, [{ productId: id, quantity: '1', code: p!.code, name: p!.name, unit: productUnitLabel(p!) }])
       continue
     }
     assert(p!.internalComponents.length, 'El producto compuesto no tiene componentes.')
@@ -98,7 +99,7 @@ export async function captureInventoryRecipes(tx: Tx, ids: string[], previous: A
     // Active components are still required when defining/changing a composition.
     assert(components.every(c => c.component.internalKind === 'product' && (!c.component.type || c.component.type === 'Product') && c.component.inventoryProduct?.enabled), 'Revisa los componentes: deben ser productos simples y con control interno.')
     await assertNoPendingProductWrites(tx, components.map(c => c.component))
-    result.set(id, components.map(c => ({ productId: c.componentId, quantity: c.quantity.toString(), code: c.component.code, name: c.component.name, unit: c.component.unitName ?? c.component.unitCode })))
+    result.set(id, components.map(c => ({ productId: c.componentId, quantity: c.quantity.toString(), code: c.component.code, name: c.component.name, unit: productUnitLabel(c.component) })))
   }
   return result
 }

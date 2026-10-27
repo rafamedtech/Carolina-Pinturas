@@ -26,6 +26,12 @@ function fixture(overrides = {}) {
 }
 
 describe('recetas de inventario de kits existentes', () => {
+  it('recupera la unidad del payload cuando faltan las columnas del catálogo', async () => {
+    const { tx } = fixture({ unitName: null, unitCode: null, rawPayload: { unit: { code: 'H87', name: 'Pieza' } } })
+    const recipes = await captureInventoryRecipes(tx, [kitId])
+    expect(recipes.get(kitId)?.[0]?.unit).toBe('Pieza')
+  })
+
   it('conserva el componente inactivo y su consumo al guardar el pedido', async () => {
     const { tx } = fixture()
     const recipes = await captureInventoryRecipes(tx, [kitId])

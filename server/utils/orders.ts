@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto'
 import { inventoryRequest, inventorySettings, syncOrderInventory, assertOrderInventoryEditable } from './inventory'
 import { orderPaymentTotals, paymentStatus } from './order-payments'
 import { captureInventoryRecipes } from './product-compositions'
+import { fillOrderRecipeUnits } from './order-recipe-units'
 import { inventoryRecipeSchema } from '#shared/schemas/product'
 import Decimal from 'decimal.js'
 import { orderLineAmounts as lineAmounts, orderAmounts as orderTotals, orderMoney } from '#shared/utils/orderAmounts'
@@ -824,7 +825,9 @@ export async function getOrder(id: string, user: AppUser) {
     throw createError({ statusCode: 404, statusMessage: 'No se encontró el pedido.' })
   }
 
-  return detail(order)
+  const result = detail(order)
+  await fillOrderRecipeUnits(usePrisma(), result.items)
+  return result
 }
 
 export async function listOrders(options: {

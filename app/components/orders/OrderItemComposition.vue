@@ -30,7 +30,7 @@ const components = computed(() => {
         </p>
         <ul class="space-y-1">
           <li v-for="component in components" :key="component.productId">
-            {{ component.quantity }} {{ component.unit }} - {{ component.name }}
+            {{ component.quantity }} {{ component.unit || 'Sin unidad' }} - {{ component.name }}
           </li>
         </ul>
       </div>

@@ -6,6 +6,16 @@ import {
 } from '../../server/utils/siigo-persistence'
 
 describe('persistencia de snapshots de Siigo', () => {
+  it('conserva la unidad cuando Siigo devuelve su código como texto', async () => {
+    const upsert = vi.fn().mockResolvedValue(undefined)
+    const tx = { siigoProduct: { upsert } } as unknown as Parameters<typeof upsertSiigoProduct>[0]
+    await upsertSiigoProduct(tx, { id: 'product', code: 'P', name: 'Producto', unit: 'H87' })
+    expect(upsert).toHaveBeenCalledWith(expect.objectContaining({
+      create: expect.objectContaining({ unitCode: 'H87' }),
+      update: expect.objectContaining({ unitCode: 'H87' })
+    }))
+  })
+
   it('sincroniza el producto 02022 con una sola escritura anidada', async () => {
     const upsert = vi.fn().mockResolvedValue(undefined)
     const tx = { siigoProduct: { upsert } } as unknown as Parameters<typeof upsertSiigoProduct>[0]

@@ -133,7 +133,7 @@ export async function upsertSiigoProduct(tx: SnapshotClient, product: SiigoProdu
     stockControl: product.stock_control ?? null,
     active: product.active ?? null,
     taxIncluded: product.tax_included ?? null,
-    unitCode: unit?.code || null,
+    unitCode: (typeof product.unit === 'string' ? product.unit : unit?.code) || null,
     unitName: unit?.name || null,
     keyCode: product.key?.code || null,
     keyName: product.key?.name || null,
