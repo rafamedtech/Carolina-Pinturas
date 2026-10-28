@@ -289,3 +289,65 @@ describe('guardado local condicionado a la confirmación de Siigo', () => {
     expect(mocks.persist).not.toHaveBeenCalled()
   })
 })
+
+describe('confirmación independiente del estado de un producto existente', () => {
+  const remote = { ...product, code: 'IW301-0.5LT', active: false, unit: {}, stock_control: true }
+  const localStatus = vi.fn()
+  const input = { ...productMutationInput(remote), active: false }
+  beforeEach(() => {
+    localStatus.mockReset()
+    mocks.current.mockResolvedValue(remote)
+    mocks.transaction.mockImplementation(async callback => callback({
+      $queryRaw: vi.fn().mockResolvedValue([{ state: 'pending' }]),
+      siigoProduct: { updateMany: localStatus },
+      productWrite: {
+        findFirst: vi.fn().mockResolvedValue(null),
+        create: vi.fn().mockImplementation(async ({ data }) => ({ id: operationId, ...data })),
+        update: mocks.update
+      }
+    }))
+  })
+  it('sincroniza el producto que ya está inactivo en Siigo sin PUT ni validación comercial/composición', async () => {
+    expect(await saveManagedProduct(input, remote.id, undefined, { statusOnly: true })).toMatchObject(remote)
+    expect(mocks.mutate).not.toHaveBeenCalled()
+    expect(mocks.validate).not.toHaveBeenCalled()
+    expect(mocks.persist).toHaveBeenCalledWith(expect.anything(), remote)
+    expect(localStatus).toHaveBeenCalledWith(expect.objectContaining({ data: {
+      availableForPurchase: false, availableForSale: false, availableForExpense: false, compositionVersion: { increment: 1 }
+    } }))
+    expect(mocks.update).toHaveBeenCalledWith({ where: { id: operationId }, data: { state: 'synced', productId: remote.id } })
+  })
+  it('confirmar el estado no depende de validar datos comerciales históricos ajenos a la acción', async () => {
+    expect(await saveManagedProduct({ ...input, key: '', code: 'HISTORICO/1', composition: { kind: 'composite', version: 20, components: [] } }, remote.id, undefined, { statusOnly: true })).toMatchObject({ active: false })
+    expect(mocks.mutate).not.toHaveBeenCalled()
+    expect(mocks.validate).not.toHaveBeenCalled()
+  })
+  it('si todavía está activo, envía solo la intención de estado y confirma por ID', async () => {
+    mocks.current.mockResolvedValueOnce({ ...remote, active: true }).mockResolvedValueOnce(remote)
+    mocks.mutate.mockResolvedValue(remote)
+    expect(await saveManagedProduct(input, remote.id, undefined, { statusOnly: true })).toMatchObject({ active: false })
+    expect(mocks.mutate).toHaveBeenCalledWith({ active: false }, remote.id)
+    expect(mocks.current).toHaveBeenCalledTimes(2)
+  })
+  it('rechaza guardar localmente si Siigo todavía no confirma el estado', async () => {
+    mocks.current.mockResolvedValue({ ...remote, active: true })
+    mocks.mutate.mockResolvedValue({ ...remote, active: true })
+    await expect(saveManagedProduct(input, remote.id, undefined, { statusOnly: true })).rejects.toMatchObject({ data: { retryable: true } })
+    expect(mocks.persist).not.toHaveBeenCalled()
+    expect(localStatus).not.toHaveBeenCalled()
+  })
+  it('recupera un intento de estado comprobando active aunque hayan cambiado otros datos comerciales', async () => {
+    mocks.findWrite.mockResolvedValue({ id: operationId, productId: remote.id, isNew: false, state: 'unknown', code: remote.code,
+      updatedAt: new Date('2026-01-01'), input: { ...input, statusOnly: true } })
+    mocks.current.mockResolvedValue({ ...remote, name: 'Nombre vigente distinto' })
+    expect(await reviewProductWrite(operationId)).toMatchObject({ status: 'synced', product: { active: false } })
+    expect(mocks.mutate).not.toHaveBeenCalled()
+    expect(mocks.validate).not.toHaveBeenCalled()
+  })
+  it('al confirmar activo conserva las preferencias internas y la composición existentes', async () => {
+    mocks.current.mockResolvedValue({ ...remote, active: true })
+    expect(await saveManagedProduct({ ...input, active: true }, remote.id, undefined, { statusOnly: true })).toMatchObject({ active: true })
+    expect(localStatus).not.toHaveBeenCalled()
+    expect(mocks.validate).not.toHaveBeenCalled()
+  })
+})

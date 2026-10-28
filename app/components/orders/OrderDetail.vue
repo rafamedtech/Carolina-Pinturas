@@ -109,7 +109,7 @@ const documentOptions = computed<DropdownMenuItem[][]>(() => {
     documentActions.unshift({
       label: 'Editar pedido',
       icon: 'i-lucide-pencil',
-      disabled: orderIsDelivered.value,
+      disabled: orderIsDelivered.value && user.value?.role !== 'admin',
       to: {
         path: `/ventas/${order.value.id}/editar`,
         query: { returnTo: backPath.value }

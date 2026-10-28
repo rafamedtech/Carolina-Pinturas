@@ -135,3 +135,25 @@ describe('OrderDetail · estado después de la entrega', () => {
     expect(panel.find('[role="combobox"]').attributes('disabled') !== undefined).toBe(disabled)
   })
 })
+
+describe('OrderDetail · edición después de la entrega', () => {
+  it.each([
+    ['admin', 'entregado', false],
+    ['mostrador', 'entregado', true],
+    ['vendedor', 'entregado', true],
+    ['repartidor', 'entregado', true],
+    ['mostrador', 'confirmado', false]
+  ] as const)('editar para %s en %s: deshabilitado=%s', async (role, statusKey, disabled) => {
+    authRole.value = role
+    currentOrder = { ...baseOrder, status: { ...baseOrder.status, key: statusKey } }
+    wrapper = await mountSuspended(OrderDetail, {
+      props: { orderId: 'order-invoice' },
+      global: { stubs: { OrdersSiigoOrderSiigoInvoiceCard: true } }
+    })
+    await vi.waitFor(() => expect(wrapper?.findComponent(OrderDetailItems).exists()).toBe(true))
+    const actions = wrapper.findAllComponents({ name: 'UDropdownMenu' })
+      .flatMap(menu => menu.props('items').flat())
+    const edit = actions.find(action => action.label === 'Editar pedido')
+    expect(edit).toMatchObject({ disabled, to: { path: '/ventas/order-invoice/editar' } })
+  })
+})

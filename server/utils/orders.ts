@@ -682,10 +682,10 @@ export async function updateOrder(
   if (!existing) {
     throw createError({ statusCode: 404, statusMessage: 'No se encontró el pedido.' })
   }
-  if (existing.statusKey === 'entregado') {
+  if (existing.statusKey === 'entregado' && user.role !== 'admin') {
     throw createError({
-      statusCode: 409,
-      statusMessage: 'Los pedidos entregados no se pueden editar.'
+      statusCode: 403,
+      statusMessage: 'Solo un administrador puede editar un pedido entregado.'
     })
   }
   if (existing.statusKey !== 'borrador' && !repartidor) {
@@ -746,7 +746,11 @@ export async function updateOrder(
     const previousItems = await tx.salesOrderItem.findMany({ where: { orderId: id }, select: { productId: true, inventoryRecipe: true } })
     const recipes = await captureInventoryRecipes(tx, input.lines.map(l => l.productId), previousItems)
     const result = await tx.salesOrder.updateMany({
-      where: { id, version: input.version, statusKey: { not: 'entregado' } },
+      where: {
+        id,
+        version: input.version,
+        ...(user.role !== 'admin' ? { statusKey: { not: 'entregado' } } : {})
+      },
       data: {
         ...(input.warehouseId !== undefined ? { warehouseId: input.warehouseId } : {}),
         customerId: customer.id,

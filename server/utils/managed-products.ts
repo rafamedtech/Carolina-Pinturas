@@ -29,7 +29,9 @@ async function persistInternalProduct(tx: Prisma.TransactionClient, input: Produ
 }
 
 async function finishWrite(write: ProductWrite, product: SiigoProduct) {
-  const input = productInputSchema.parse(write.input)
+  const statusInput = productStatusIntent(write.input)
+  const input = statusInput ? undefined : productInputSchema.parse(write.input)
+  if (statusInput && product.active !== statusInput.active) throw createError({ statusCode: 409, statusMessage: 'Siigo todavía no confirma el estado solicitado.' })
   const db = usePrisma()
   return db.$transaction(async (tx) => {
     // The persisted intent and local composition commit together.
@@ -37,15 +39,29 @@ async function finishWrite(write: ProductWrite, product: SiigoProduct) {
     const locked = await tx.$queryRaw<Array<{ state: string }>>`SELECT state FROM product_writes WHERE id = ${write.id}::uuid FOR UPDATE`
     if (!locked[0] || locked[0].state === 'failed') throw createError({ statusCode: 409, statusMessage: 'Este intento ya se cerró. Recarga el producto antes de guardar.' })
     if (locked[0]?.state !== 'synced') {
-      await persistInternalProduct(tx, input, product, write.isNew)
+      if (statusInput) {
+        // Status confirmation must not rebuild recipes or validate unrelated
+        // commercial fields of an existing Siigo product.
+        await upsertSiigoProduct(tx, product)
+        if (!statusInput.active) await tx.siigoProduct.updateMany({
+          where: { id: product.id, OR: [{ availableForPurchase: true }, { availableForSale: true }, { availableForExpense: true }] },
+          data: { availableForPurchase: false, availableForSale: false, availableForExpense: false, compositionVersion: { increment: 1 } }
+        })
+      } else await persistInternalProduct(tx, input!, product, write.isNew)
       await tx.productWrite.update({ where: { id: write.id }, data: { state: 'synced', productId: product.id } })
     }
     return (await attachProductCompositions(tx, [product]))[0]!
   }, { timeout: 20000 })
 }
-export async function saveManagedProduct(input: ProductInput, id?: string, replacesWriteId?: string) {
+interface ProductSaveOptions { statusOnly?: boolean }
+function productStatusIntent(input: ProductWrite['input']) {
+  if (!input || typeof input !== 'object' || Array.isArray(input) || input.statusOnly !== true || typeof input.active !== 'boolean') return undefined
+  return { active: input.active }
+}
+
+export async function saveManagedProduct(input: ProductInput, id?: string, replacesWriteId?: string, options: ProductSaveOptions = {}) {
   try {
-    return await performProductSave(input, id, replacesWriteId)
+    return await performProductSave(input, id, replacesWriteId, options)
   } catch (error: unknown) {
     const failure = error as { statusCode?: number, statusMessage?: string, data?: { ambiguous?: boolean } }
     if (failure.data?.ambiguous !== undefined) throw error
@@ -56,8 +72,10 @@ export async function saveManagedProduct(input: ProductInput, id?: string, repla
   }
 }
 
-async function performProductSave(input: ProductInput, id?: string, replacesWriteId?: string) {
+async function performProductSave(input: ProductInput, id: string | undefined, replacesWriteId: string | undefined, options: ProductSaveOptions) {
   const db = usePrisma()
+  if (options.statusOnly && !id) throw createError({ statusCode: 400, statusMessage: 'El cambio de estado requiere un producto existente.' })
+  const matchesRequested = (product: SiigoProduct) => options.statusOnly ? product.active === input.active : matchesProductInput(product, input)
   let targetId = id
   // A manual retry of a creation must locate a possibly created product before
   // sending another POST. A product's code is unique in Siigo México.
@@ -76,12 +94,12 @@ async function performProductSave(input: ProductInput, id?: string, replacesWrit
   if (current && current.id !== targetId) throw createError({ statusCode: 502, statusMessage: 'Siigo devolvió otro identificador de producto.' })
   if (current && current.type && current.type !== 'Product') throw createError({ statusCode: 422, statusMessage: 'Este tipo de producto se conserva solo para consulta histórica.' })
   if (!id && current && !matchesProductInput(current, input)) throw createError({ statusCode: 409, statusMessage: 'El código ya existe en Siigo con datos distintos. Abre ese producto para modificarlo.' })
-  await validateProductReferences(input, current)
+  if (!options.statusOnly) await validateProductReferences(input, current)
   const write = await db.$transaction(async (tx) => {
     await lockCompositions(tx, true)
     // Reserve the operation only. The product and its internal settings remain
     // untouched until Siigo confirms the complete commercial input.
-    await validateComposition(tx, input.composition, id)
+    if (!options.statusOnly) await validateComposition(tx, input.composition, id)
     if (replacesWriteId) {
       const previous = await tx.productWrite.findUniqueOrThrow({ where: { id: replacesWriteId } })
       const locked = await tx.$queryRaw<Array<{ state: string, updatedAt: Date }>>`SELECT state, updated_at AS "updatedAt" FROM product_writes WHERE id = ${replacesWriteId}::uuid FOR UPDATE`
@@ -92,7 +110,7 @@ async function performProductSave(input: ProductInput, id?: string, replacesWrit
     }
     const pending = await tx.productWrite.findFirst({ where: { state: { in: ['pending', 'unknown'] }, OR: [{ code: input.code }, ...(targetId ? [{ productId: targetId }] : [])] } })
     if (pending) throw createError({ statusCode: 409, statusMessage: 'Hay otro guardado en curso. Comprueba su resultado antes de volver a guardar.', data: { ambiguous: true, operationId: pending.id } })
-    return tx.productWrite.create({ data: { productId: targetId, isNew: !id, code: input.code, input: siigoJson(input) } })
+    return tx.productWrite.create({ data: { productId: targetId, isNew: !id, code: input.code, input: siigoJson({ ...input, ...(options.statusOnly ? { statusOnly: true } : {}) }) } })
   }, { timeout: 20000 })
   let remoteProductId = targetId
   let stage = 'siigo'
@@ -100,12 +118,12 @@ async function performProductSave(input: ProductInput, id?: string, replacesWrit
     let confirmed = current
     // A previous response may have been lost after Siigo applied the change.
     // The fresh preflight read confirms it without repeating the remote write.
-    if (!confirmed || !matchesProductInput(confirmed, input)) {
-      const response = await mutateProduct(input, targetId)
+    if (!confirmed || !matchesRequested(confirmed)) {
+      const response = await mutateProduct(options.statusOnly ? { active: input.active } : input, targetId)
       if (targetId && response.id !== targetId) throw createError({ statusCode: 502, statusMessage: 'Siigo devolvió otro identificador de producto.' })
       remoteProductId = response.id
       confirmed = await getProductDetail(response.id, true)
-      if (confirmed.id !== response.id || !matchesProductInput(confirmed, input)) {
+      if (confirmed.id !== response.id || !matchesRequested(confirmed)) {
         throw createError({ statusCode: 502, statusMessage: 'Siigo todavía no confirma todos los cambios enviados.' })
       }
     }
@@ -114,7 +132,7 @@ async function performProductSave(input: ProductInput, id?: string, replacesWrit
   } catch (error: unknown) {
     const failure = error as { code?: string, statusCode?: number, statusMessage?: string, data?: { cause?: { statusCode: number, message: string } } }
     const cause = { stage, code: failure.code, ...failure.data?.cause,
-      ...(!failure.data?.cause ? { statusCode: failure.statusCode, message: failure.statusMessage } : {}) }
+      ...(!failure.data?.cause ? { statusCode: failure.statusCode, message: failure.statusMessage || (stage === 'local' ? 'No se pudo completar el guardado local del producto.' : 'Siigo no pudo confirmar el producto.') } : {}) }
     console.error('[managed-products] save failed', { operationId: write.id, productId: remoteProductId, ...cause })
     let retryable = false
     try {
@@ -162,7 +180,7 @@ async function inspectProductWrite(write: ProductWrite) {
   if (write.productId && product.id !== write.productId) throw createError({ statusCode: 502, statusMessage: 'Siigo devolvió otro identificador de producto.' })
   const expected = commercialSnapshot(input)
   const actual = observedSnapshot(product)
-  const differences = (Object.keys(expected) as Array<keyof typeof expected>).filter(key => JSON.stringify(expected[key]) !== JSON.stringify(actual[key]))
+  const differences = (Object.keys(expected) as Array<keyof typeof expected>).filter(key => (!productStatusIntent(write.input) || key === 'active') && JSON.stringify(expected[key]) !== JSON.stringify(actual[key]))
     .map(field => ({ field, expected: expected[field], actual: actual[field] }))
   return { input, product, differences }
 }
@@ -240,7 +258,7 @@ export async function retryProductWrite(id: string) {
   if (inspected.product && !inspected.differences.length) return finishWrite(write, inspected.product)
   if (!inspected.product) throw createError({ statusCode: 409, statusMessage: 'No se encontró el producto para volver a enviar los cambios.' })
   // Closing the old intent and reserving its replacement happen in one transaction.
-  return saveManagedProduct(inspected.input, write.productId, id)
+  return saveManagedProduct(inspected.input, write.productId, id, { statusOnly: Boolean(productStatusIntent(write.input)) })
 }
 
 /** Explicitly close an old edit without replaying it or applying its internal settings. */

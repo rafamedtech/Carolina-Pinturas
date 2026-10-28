@@ -135,6 +135,10 @@ describe('contrato de productos México', () => {
     expect(productInputSchema.safeParse({ ...input(), prices: [{ currency_code: 'MXN', price_list: [{ position: 13, value: 10 }] }] }).success).toBe(false)
     expect(productInputSchema.safeParse({ ...input(), prices: [input().prices[0], input().prices[0]] }).success).toBe(false)
   })
+  it('acepta el código real de Siigo IW301-0.5LT sin rechazar su punto decimal', () => {
+    expect(productInputSchema.safeParse({ ...input(), code: 'IW301-0.5LT' }).success).toBe(true)
+    expect(productInputSchema.safeParse({ ...input(), code: 'IW 301' }).success).toBe(false)
+  })
   it('permite código alfanumérico con guion documentado', () => {
     expect(productInputSchema.safeParse({ ...input(), code: 'Item-1' }).success).toBe(true)
     expect(productInputSchema.safeParse({ ...input(), code: 'Item 1' }).success).toBe(false)

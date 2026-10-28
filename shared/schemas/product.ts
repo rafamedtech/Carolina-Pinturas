@@ -28,7 +28,7 @@ export const productAvailabilitySchema = z.object({
 export type ProductAvailability = z.infer<typeof productAvailabilitySchema>
 
 export const productInputSchema = z.object({
-  code: z.string().trim().min(1, 'Escribe el código.').max(30).regex(/^[A-Za-z0-9_-]+$/, 'Usa un código sin espacios.'),
+  code: z.string().trim().min(1, 'Escribe el código.').max(30).regex(/^[A-Za-z0-9_.-]+$/, 'Usa letras, números, puntos, guiones o guiones bajos, sin espacios.'),
   name: z.string().trim().min(1, 'Escribe el nombre.').max(100),
   account_group: z.number().int().positive('Selecciona una clasificación.'),
   type: z.literal('Product'),

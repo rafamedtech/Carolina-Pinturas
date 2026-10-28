@@ -303,7 +303,8 @@ watch(
 
 const existingOrderStatusError = computed(() =>
   existingOrder.value?.status.key === 'entregado'
-    ? 'Los pedidos entregados no se pueden editar.'
+  && user.value?.role !== 'admin'
+    ? 'Solo un administrador puede editar un pedido entregado.'
     : ''
 )
 const catalogError = computed(() =>

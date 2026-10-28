@@ -16,5 +16,5 @@ export default eventHandler(async (event) => {
   const input = productMutationInput(product)
   input.active = parsed.data.active
   if (!input.active) input.availability = { purchase: false, sale: false, expense: false }
-  return saveManagedProduct(input, id.data)
+  return saveManagedProduct(input, id.data, undefined, { statusOnly: true })
 })
