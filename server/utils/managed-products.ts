@@ -1,4 +1,5 @@
 import { createError } from 'h3'
+import { isDeepStrictEqual } from 'node:util'
 import type { ProductInput } from '#shared/schemas/product'
 import { productInputSchema } from '#shared/schemas/product'
 import type { SiigoProduct } from '~/types/siigo'
@@ -71,7 +72,9 @@ export async function saveManagedProduct(input: ProductInput, id?: string, repla
     }
     const pending = await tx.productWrite.findFirst({ where: { state: { in: ['pending', 'unknown'] }, OR: [{ code: input.code }, ...(id ? [{ productId: id }] : [])] } })
     if (pending) throw createError({ statusCode: 409, statusMessage: 'Consulta el guardado pendiente antes de volver a guardar.', data: { ambiguous: true, operationId: pending.id } })
-    return tx.productWrite.create({ data: { productId: id, isNew: !id, code: input.code, input: siigoJson(input) } })
+    // Keep the pre-write commercial values in the intent, including the real
+    // stock_control value (the form always proposes false).
+    return tx.productWrite.create({ data: { productId: id, isNew: !id, code: input.code, input: siigoJson({ ...input, ...(current ? { previousCommercial: observedSnapshot(current) } : {}) }) } })
   }, { timeout: 20000 })
   let product: SiigoProduct | undefined
   try {
@@ -84,6 +87,20 @@ export async function saveManagedProduct(input: ProductInput, id?: string, repla
     const cause = { stage: product ? 'local' : 'siigo', code: failure.code, ...failure.data?.cause,
       ...(!failure.data?.cause ? { statusCode: failure.statusCode, message: failure.statusMessage } : {}) }
     console.error('[managed-products] save failed', { operationId: write.id, productId: id, ...cause })
+    // A completed failure followed by an unchanged remote read needs no manual
+    // reconciliation. Timeouts may still be running remotely: check those later.
+    if (!product && current && cause.statusCode !== 504) {
+      let restored: SiigoProduct | undefined
+      try {
+        const latest = await getProductDetail(current.id, true)
+        if (latest.id === current.id && JSON.stringify(observedSnapshot(latest)) === JSON.stringify(observedSnapshot(current))) {
+          restored = await closeUnchangedWrite(write, latest)
+        }
+      } catch { /* Keep the original failure and pending intent if verification fails. */ }
+      if (restored) throw createError({ statusCode: failure.statusCode || 502,
+        statusMessage: 'No se guardaron los cambios. Siigo conserva los valores anteriores y se restauró el formulario.',
+        data: { ambiguous: false, operationId: write.id, restoredProduct: restored, cause } })
+    }
     await db.productWrite.update({ where: { id: write.id }, data: { state: ambiguous ? 'unknown' : 'failed', ...(product && !id ? { productId: product.id } : {}) } }).catch(() => undefined)
     throw createError({ statusCode: ambiguous ? 502 : failure.statusCode, statusMessage: ambiguous ? 'El guardado necesita conciliación. Consulta el resultado antes de volver a guardar.' : failure.statusMessage,
       data: { ambiguous, operationId: write.id, productId: product?.id ?? id, code: input.code, cause } })
@@ -99,6 +116,20 @@ const commercialSnapshot = (input: ProductInput) => ({
   prices: input.prices.map(p => ({ currency_code: p.currency_code, price_list: p.price_list.map(item => ({ position: item.position, value: item.value })).sort((a, b) => a.position - b.position) })).sort((a, b) => a.currency_code.localeCompare(b.currency_code))
 })
 const canonical = (input: ProductInput) => JSON.stringify(commercialSnapshot(input))
+const observedSnapshot = (product: SiigoProduct) => ({ ...commercialSnapshot(productMutationInput(product)), type: product.type ?? 'Product', stock_control: product.stock_control })
+
+async function closeUnchangedWrite(write: ProductWrite, product: SiigoProduct) {
+  const db = usePrisma()
+  return db.$transaction(async (tx) => {
+    await lockCompositions(tx, true)
+    const locked = await tx.$queryRaw<Array<{ state: string }>>`SELECT state FROM product_writes WHERE id = ${write.id}::uuid FOR UPDATE`
+    if (!locked[0] || !['pending', 'unknown'].includes(locked[0].state)) throw createError({ statusCode: 409, statusMessage: 'El intento cambió. Comprueba su resultado.' })
+    await upsertSiigoProduct(tx, product)
+    await tx.productWrite.update({ where: { id: write.id }, data: { state: 'failed' } })
+    // Preserve the local composition and availability; do not apply the failed input.
+    return (await attachProductCompositions(tx, [product]))[0]!
+  }, { timeout: 20000 })
+}
 const PRODUCT_WRITE_WAIT_MS = 5 * 60_000
 async function inspectProductWrite(write: ProductWrite) {
   const input = productInputSchema.parse(write.input)
@@ -107,7 +138,7 @@ async function inspectProductWrite(write: ProductWrite) {
   const product = write.productId ? matches[0]! : await getProductDetail(matches[0]!.id, true)
   if (write.productId && product.id !== write.productId) throw createError({ statusCode: 502, statusMessage: 'Siigo devolvió otro identificador de producto.' })
   const expected = commercialSnapshot(input)
-  const actual = { ...commercialSnapshot(productMutationInput(product)), type: product.type ?? 'Product', stock_control: product.stock_control }
+  const actual = observedSnapshot(product)
   const differences = (Object.keys(expected) as Array<keyof typeof expected>).filter(key => JSON.stringify(expected[key]) !== JSON.stringify(actual[key]))
     .map(field => ({ field, expected: expected[field], actual: actual[field] }))
   return { input, product, differences }
@@ -158,6 +189,15 @@ export async function reviewProductWrite(id: string, followPending = true): Prom
   const local = write.productId ? await db.siigoProduct.findUnique({ where: { id: write.productId }, select: { compositionVersion: true } }) : null
   const currentCompositionVersion = local?.compositionVersion
   const canResolve = !write.isNew && Boolean(write.productId) && Date.now() >= Date.parse(availableAt)
+  const previousCommercial = (write.input as Record<string, unknown>).previousCommercial
+  if (canResolve && inspected.differences.length && previousCommercial
+    // JSONB does not preserve object key order; compare JSON values structurally.
+    && isDeepStrictEqual(JSON.parse(JSON.stringify(observedSnapshot(inspected.product))), previousCommercial)) {
+    try {
+      const product = await closeUnchangedWrite(write, inspected.product)
+      return { ...base, status: 'reverted', product, message: 'No se guardaron los cambios. Siigo conserva los valores anteriores y se restauró el formulario.' }
+    } catch { /* A concurrent resolution or local failure must keep the editor blocked. */ }
+  }
   if (inspected.differences.length) return { ...base, currentCompositionVersion, differences: inspected.differences, status: 'different', canRetry: canResolve, canDiscard: canResolve,
     message: 'Siigo conserva datos distintos. Revisa la comparación y elige cómo resolver los cambios pendientes.' }
   try {

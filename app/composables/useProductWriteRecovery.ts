@@ -41,7 +41,8 @@ export function useProductWriteRecovery(operation: MaybeRefOrGetter<string>) {
       if (current === generation) {
         checking.value = false
         if (automatic && attempts.value < 3 && (!review.value || ['unavailable', 'different', 'local_error'].includes(review.value.status))) {
-          const delay = attempts.value === 1 ? 15_000 : 45_000
+          const waitUntil = review.value?.status === 'different' ? Date.parse(review.value.availableAt) - Date.now() : 0
+          const delay = Math.max(attempts.value === 1 ? 15_000 : 45_000, waitUntil || 0)
           nextCheckAt.value = Date.now() + delay
           timer = setTimeout(() => void refresh(true), delay)
         }
@@ -60,6 +61,11 @@ export function useProductWriteRecovery(operation: MaybeRefOrGetter<string>) {
     } catch (error: unknown) {
       errorMessage.value = message(error)
       actionError.value = errorMessage.value
+      const restoredProduct = (error as { data?: { data?: { restoredProduct?: SiigoProduct } } }).data?.data?.restoredProduct
+      if (restoredProduct && review.value) {
+        review.value = { ...review.value, status: 'reverted', product: restoredProduct, canRetry: false, canDiscard: false }
+        return null
+      }
       const next = (error as { data?: { data?: { operationId?: string } } }).data?.data?.operationId
       if (next && next !== activeId.value) {
         generation++

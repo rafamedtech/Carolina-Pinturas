@@ -197,6 +197,26 @@ describe('formulario de productos', () => {
 })
 
 describe('guardado cliente sin duplicados', () => {
+  it('restaura el formulario y permite editar cuando el servidor confirma que Siigo no cambió', async () => {
+    wrapper = await mountSuspended(ProductEditor, { props: { productId: id } })
+    await vi.waitFor(() => expect(wrapper!.findComponent(ProductForm).exists()).toBe(true))
+    await wrapper.get('input[maxlength="100"]').setValue('Nombre que no se guardará')
+    const originalFetch = globalThis.$fetch
+    globalThis.$fetch = vi.fn().mockRejectedValue({ statusCode: 502, data: {
+      statusMessage: 'No se guardaron los cambios.',
+      data: { ambiguous: false, operationId: id, restoredProduct: product }
+    } }) as unknown as typeof $fetch
+    try {
+      wrapper.findComponent(ProductForm).vm.$emit('submit', { ...productMutationInput(product), name: 'Nombre que no se guardará' })
+      await flushPromises()
+      await vi.waitFor(() => expect((wrapper!.get('input[maxlength="100"]').element as HTMLInputElement).value).toBe(product.name))
+      expect(wrapper.findComponent(ProductForm).props('blocked')).toBe(false)
+      expect(wrapper.text()).toContain('No se guardaron los cambios. Se conservaron los valores anteriores de Siigo.')
+      expect(wrapper.text()).not.toContain('Guardado pendiente · Paso 1')
+      expect(wrapper.text()).not.toContain('Guardado confirmado')
+    } finally { globalThis.$fetch = originalFetch }
+  })
+
   it('muestra el intento recién fallido y permite acceder al desbloqueo sin recargar', async () => {
     wrapper = await mountSuspended(ProductEditor, { props: { productId: id } })
     await vi.waitFor(() => expect(wrapper!.findComponent(ProductForm).exists()).toBe(true))

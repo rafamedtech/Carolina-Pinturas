@@ -5,7 +5,7 @@ export type { ProductInput } from '#shared/schemas/product'
 
 export interface ProductWriteDifference { field: string, expected: unknown, actual: unknown }
 export interface ProductWriteReview {
-  status: 'synced' | 'different' | 'unavailable' | 'local_error' | 'closed' | 'missing'
+  status: 'synced' | 'different' | 'unavailable' | 'local_error' | 'closed' | 'missing' | 'reverted'
   operationId: string
   productId?: string
   input: ProductInput

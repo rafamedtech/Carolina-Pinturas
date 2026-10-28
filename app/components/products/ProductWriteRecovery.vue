@@ -5,6 +5,7 @@ import type { SiigoProduct } from '~/types/siigo'
 const props = defineProps<{ operationId: string, context: ProductContext, failureMessage?: string }>()
 const emit = defineEmits<{
   recovered: [product: SiigoProduct]
+  restored: [product: SiigoProduct]
   resolved: [result: { operationIds: string[], input?: ProductInput }]
 }>()
 const { review, checking, acting, errorMessage, nextCheckAt, refresh, retry, resolve } = useProductWriteRecovery(() => props.operationId)
@@ -15,7 +16,7 @@ const open = computed({ get: () => confirmation.value !== null, set: (value) => 
 const busy = computed(() => checking.value || acting.value)
 const heading = computed(() => review.value
   ? ({
-      synced: 'Guardado confirmado', different: 'Revisa los cambios pendientes', unavailable: 'Siigo no está disponible',
+      synced: 'Guardado confirmado', reverted: 'Cambios no guardados', different: 'Revisa los cambios pendientes', unavailable: 'Siigo no está disponible',
       local_error: 'Falta completar el guardado interno', closed: 'El intento anterior ya se cerró', missing: 'Revisa el producto en Siigo'
     }[review.value.status])
   : 'No se pudo comprobar el guardado')
@@ -27,6 +28,7 @@ const confirmationText = computed(() => confirmation.value === 'retry'
     : 'Se cerrará el intento anterior y se conservarán los datos actuales de Siigo. Los cambios de la columna «Cambios pendientes» no se aplicarán. El registro del intento se conserva.')
 watch(review, (value) => {
   if (value?.status === 'synced' && value.product) emit('recovered', value.product)
+  if (value?.status === 'reverted' && value.product) emit('restored', value.product)
 })
 async function confirm() {
   if (confirmation.value === 'retry') {

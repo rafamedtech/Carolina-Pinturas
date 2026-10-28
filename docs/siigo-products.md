@@ -58,3 +58,9 @@ Siigo México no expone imagen de producto (verificado contra listado y detalle 
 - Solo `PRODUCT_MANAGEMENT_ROLES` sube (`PUT /api/siigo/products/:id/image`, multipart campo `image`) o quita (`DELETE`). El servidor valida la firma del archivo (JPG, PNG, WebP), máximo 2 MB, y que el producto exista en el catálogo de PostgreSQL.
 - Storage no tiene políticas para `anon`/`authenticated`: escribe solo el servidor con `NUXT_SUPABASE_SECRET_KEY` (llave `sb_secret_`, nunca `NUXT_PUBLIC_*`) después de `requireRole`.
 - Se sube desde la edición del producto; en el detalle solo se muestra si existe. Un producto nuevo recibe imagen después de crearse.
+
+## Restauración de ediciones fallidas (28/10/2026)
+
+Cada intento nuevo de edición conserva en su JSON de entrada los valores comerciales anteriores (`previousCommercial`), incluido el control de inventario real de Siigo. Si la escritura falla y una consulta fresca por ID confirma que Siigo conserva esos mismos valores, se cierra el intento como fallido, se conserva la composición y disponibilidad interna anterior y se restaura el formulario. Se muestra «No se guardaron los cambios» y se permite editar de nuevo; no se anuncia éxito ni se repite el PUT.
+
+Tras un timeout se mantiene temporalmente el bloqueo porque Siigo todavía podría procesar la solicitud. La revisión vuelve a comprobar al concluir la espera de cinco minutos y restaura automáticamente si coincide con los valores anteriores. Si hay cambios parciales, otro identificador o no se puede consultar Siigo o completar el cierre local, se conserva la conciliación. Las altas y los intentos históricos sin snapshot previo mantienen su recuperación existente.

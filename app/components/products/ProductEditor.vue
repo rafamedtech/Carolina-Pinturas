@@ -3,6 +3,7 @@ import { tableReturnPath } from '~/utils/tableQuery'
 import type { SiigoProduct } from '~/types/siigo'
 import type { ProductContext, ProductImage, ProductInput } from '~/types/siigo-products'
 import { canManageProducts } from '~/utils/roleAccess'
+import { productMutationInput } from '~/utils/siigoProductMutation'
 
 const props = defineProps<{ productId?: string, duplicateFrom?: string }>()
 const { user } = useAuth()
@@ -29,7 +30,7 @@ const productImage = ref<ProductImage | null>(null)
 watch(product, (value) => {
   productImage.value = value?.internal?.image ?? null
 }, { immediate: true })
-const { saving, errorMessage, ambiguous, checking, operationId, save, check, clearPending } = useProductMutation()
+const { saving, errorMessage, ambiguous, checking, operationId, restoredProduct, save, check, clearPending } = useProductMutation()
 const discardedWriteIds = shallowRef<string[]>([])
 const formDraft = shallowRef<ProductInput>()
 const confirmedVersion = shallowRef<number>()
@@ -37,6 +38,13 @@ const resolutionNotice = shallowRef('')
 const pendingWriteId = computed(() => ambiguous.value && operationId.value ? operationId.value : product.value?.internal?.pendingWriteId)
 const hasPendingWrite = computed(() => Boolean(pendingWriteId.value && !discardedWriteIds.value.includes(pendingWriteId.value)
   && ((props.productId && product.value?.internal?.syncPending) || (ambiguous.value && operationId.value))))
+function restored(previous: SiigoProduct) {
+  discardedWriteIds.value = [...discardedWriteIds.value, pendingWriteId.value || '']
+  clearPending()
+  product.value = { ...previous, internal: { ...previous.internal, image: productImage.value } }
+  formDraft.value = productMutationInput(previous)
+  errorMessage.value = 'No se guardaron los cambios. Se conservaron los valores anteriores de Siigo.'
+}
 function resolved(result: { operationIds: string[], input?: ProductInput }) {
   discardedWriteIds.value = [...discardedWriteIds.value, ...result.operationIds, pendingWriteId.value || '']
   clearPending()
@@ -71,6 +79,7 @@ async function recover() {
 async function submit(input: ProductInput) {
   resolutionNotice.value = ''
   const saved = await save(input, props.productId)
+  if (restoredProduct.value) restored(restoredProduct.value)
   if (saved) {
     useToast().add({ title: props.productId ? 'Producto actualizado' : 'Producto creado', color: 'success' })
     await navigateTo({ path: `/productos/${encodeURIComponent(saved.id)}`, query: { returnTo: returnTo.value } })
@@ -105,6 +114,7 @@ useSeoMeta({ title })
           :failure-message="errorMessage"
           @recovered="recovered"
           @resolved="resolved"
+          @restored="restored"
         />
         <UAlert
           v-if="resolutionNotice"
