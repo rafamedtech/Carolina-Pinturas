@@ -132,6 +132,7 @@ function formatQuantity(value?: number) {
       <template v-if="product">
         <UAlert
           v-if="product.internal?.syncPending"
+          class="shrink-0"
           title="Guardado pendiente de conciliación"
           description="Este producto no está disponible para nuevas ventas hasta revisar su guardado desde Editar."
           color="warning"

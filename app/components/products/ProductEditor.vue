@@ -75,7 +75,12 @@ useSeoMeta({ title })
       <UAlert v-if="!allowed" title="Solo administradores pueden gestionar productos." color="warning" />
       <UAlert v-else-if="contextError || loadError" :title="loadError || 'No se pudieron cargar las opciones del producto.'" color="error" />
       <template v-else-if="context && !loading">
-        <UAlert v-if="hasPendingWrite" title="Este producto tiene un guardado pendiente de conciliar." color="warning">
+        <UAlert
+          v-if="hasPendingWrite"
+          class="shrink-0"
+          title="Este producto tiene un guardado pendiente de conciliar."
+          color="warning"
+        >
           <template #actions>
             <UButton
               label="Consultar y conciliar guardado"
