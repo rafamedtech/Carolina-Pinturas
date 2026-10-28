@@ -29,7 +29,7 @@ export function siigoErrorMessages(data: unknown, includeDetails = false): strin
   const messages = siigoErrorDetails(data)
     .map((error) => {
       const message = error.code === 'product_service'
-        ? 'El servicio de productos de Siigo no está disponible. Intenta más tarde.'
+        ? 'Siigo no pudo procesar el producto. Revisa sus datos y configuración antes de volver a intentar.'
         : error.message
       if (!includeDetails) return message
       return [

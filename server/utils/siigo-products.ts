@@ -7,6 +7,7 @@ import { productMutationInput } from '../../app/utils/siigoProductMutation'
 import { siigoRequest } from './siigo'
 import { cachedSiigoCatalog, collectSiigoCatalog, invalidateSiigoCatalog } from './siigo-catalog'
 import { getProductSatCatalog } from './siigo-product-sat'
+import { siigoErrorDetails } from './siigo-errors'
 
 const number = z.union([z.number(), z.string().trim().min(1)]).transform(Number).pipe(z.number().finite())
 const optionalNumber = number.nullish().transform(value => value ?? undefined)
@@ -47,7 +48,9 @@ export function buildSiigoProductPayload(input: ProductInput, current?: SiigoPro
   return {
     ...Object.fromEntries(Object.entries(input).filter(([key]) => key !== 'composition' && key !== 'availability')),
     type: 'Product',
-    stock_control: false,
+    // 28/10/2026: forcing false on an existing true product makes Siigo reject
+    // even an active-only update with the generic product_service error.
+    stock_control: current?.stock_control ?? false,
     taxes: input.taxes.map(({ id }) => ({ id })),
     prices: input.prices.map(group => ({ currency_code: group.currency_code, price_list: group.price_list.map(({ position, value }) => ({ position, value })) })),
     additional_fields: {
@@ -85,6 +88,7 @@ export async function validateProductReferences(input: ProductInput, current?: S
   const previous = current ? productMutationInput(current) : undefined
   const validOption = (items: ProductCatalogOption[], id: number) => items.some(item => item.id === id && item.active)
   const errors: string[] = []
+  if (input.stock_control !== (current?.stock_control ?? false)) errors.push('Conserva el control de inventario actual de Siigo. Los productos nuevos se crean sin control de inventario en Siigo.')
   if (input.account_group !== previous?.account_group && !validOption(context.accountGroups, input.account_group)) errors.push('Selecciona una clasificación activa.')
   for (const tax of input.taxes) {
     if (!previous?.taxes.some(item => item.id === tax.id) && !validOption(context.taxes, tax.id)) errors.push('Selecciona impuestos activos de Siigo.')
@@ -166,6 +170,7 @@ export async function mutateProduct(input: ProductInput | { active: boolean }, i
     return product
   } catch (error: unknown) {
     const status = (error as { statusCode?: number }).statusCode ?? 502
+    const remoteErrors = siigoErrorDetails((error as { data?: unknown }).data)
     // A failed preflight read cannot have changed the remote product.
     const ambiguous = writeAttempted && status >= 500
     invalidateProductCaches()
@@ -173,7 +178,8 @@ export async function mutateProduct(input: ProductInput | { active: boolean }, i
       statusCode: status,
       statusMessage: ambiguous ? 'No se pudo confirmar el guardado. Consulta el producto antes de volver a intentar.' : ((error as { statusMessage?: string }).statusMessage || 'Siigo rechazó los datos del producto.'),
       data: { ambiguous, productId: id, code: 'code' in input ? input.code : undefined,
-        cause: { statusCode: status, message: (error as { statusMessage?: string }).statusMessage || 'No se pudo completar la solicitud de producto.' } }
+        cause: { statusCode: status, message: (error as { statusMessage?: string }).statusMessage || 'No se pudo completar la solicitud de producto.',
+          ...(remoteErrors.length ? { code: remoteErrors[0]?.code, errors: remoteErrors } : {}) } }
     })
   }
 }

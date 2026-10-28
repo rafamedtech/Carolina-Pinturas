@@ -191,6 +191,14 @@ describe('guardado local condicionado a la confirmación de Siigo', () => {
     expect(mocks.update).toHaveBeenCalledWith({ where: { id: operationId }, data: { state: 'synced', productId: product.id } })
     expect(mocks.localUpdate).toHaveBeenCalledTimes(1)
   })
+  it('confirma ediciones de productos históricos sin exigir convertir stock_control a false', async () => {
+    const historic = { ...confirmed, stock_control: true }
+    mocks.current.mockReset().mockResolvedValueOnce(previous).mockResolvedValueOnce(historic)
+    mocks.mutate.mockResolvedValue(historic)
+    expect(await saveManagedProduct(productMutationInput(historic), product.id)).toMatchObject(historic)
+    expect(mocks.mutate).toHaveBeenCalledWith(expect.objectContaining({ stock_control: true }), product.id)
+    expect(mocks.update).toHaveBeenCalledWith({ where: { id: operationId }, data: { state: 'synced', productId: product.id } })
+  })
   it.each([400, 429, 502, 504])('un error remoto %s falla localmente sin modificar el producto ni bloquear el reintento', async (statusCode) => {
     mocks.mutate.mockRejectedValue(createError({ statusCode, data: { ambiguous: true } }))
     await expect(saveManagedProduct(input, product.id)).rejects.toMatchObject({ statusCode, data: { ambiguous: false, retryable: true } })

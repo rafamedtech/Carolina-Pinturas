@@ -2,7 +2,7 @@
 
 Decisiones confirmadas por el usuario el 18/10/2026:
 
-- Siigo conserva los datos comerciales y fiscales. Las altas y ediciones envían exclusivamente `type: Product`, `stock_control: false`, precios propios, impuestos, unidad y clave SAT. La composición interna no se envía a Siigo. El contrato de creación está documentado en [Siigo México](https://developers.siigo.com/docs/siigoapimexico/productos/1-create-product/).
+- Siigo conserva los datos comerciales y fiscales. Las altas envían exclusivamente `type: Product`, `stock_control: false`, precios propios, impuestos, unidad y clave SAT. Las ediciones conservan el `stock_control` vigente en Siigo para evitar convertir el inventario histórico al modificar datos comerciales o el estado. La composición interna no se envía a Siigo. El contrato de creación está documentado en [Siigo México](https://developers.siigo.com/docs/siigoapimexico/productos/1-create-product/).
 - PostgreSQL distingue `product` y `composite` mediante `siigo_products.internal_kind`. `product_components` referencia los productos simples que consume cada unidad vendida, con cantidad decimal positiva de hasta seis decimales. No hay anidación, auto-referencias, cantidades cero ni componentes duplicados.
 - Las cantidades se capturan en unidades del producto base: `0.25`, `0.5` y `6` significan esas cantidades del producto seleccionado. No se realizan conversiones de litros o de presentaciones.
 - Cada componente debe estar activo, ser un producto simple y tener control de inventario interno. El compuesto no tiene existencias, compras, entradas ni conteos propios.

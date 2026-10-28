@@ -4,6 +4,7 @@ import type { ProductInput } from '~/types/siigo-products'
 export function productDuplicateInput(product: SiigoProduct): ProductInput {
   const input = productMutationInput(product)
   input.code = ''
+  input.stock_control = false
   input.additional_fields.barcode = ''
   input.composition.version = 1
   return input
@@ -17,7 +18,7 @@ export function productMutationInput(product?: SiigoProduct): ProductInput {
     availability: { purchase: product?.internal?.availability?.purchase ?? true, sale: product?.internal?.availability?.sale ?? true, expense: product?.internal?.availability?.expense ?? false },
     composition: { kind: product?.internal?.composition?.kind ?? 'product', version: product?.internal?.composition?.version ?? 1,
       components: (product?.internal?.composition?.components ?? []).map(c => ({ ...c })) },
-    active: product?.active ?? true, stock_control: false,
+    active: product?.active ?? true, stock_control: product?.stock_control ?? false,
     tax_included: product?.tax_included ?? false,
     unit: (typeof product?.unit === 'string' ? product.unit : product?.unit?.code)?.trim() || 'H87',
     key: product?.key?.code ?? '',

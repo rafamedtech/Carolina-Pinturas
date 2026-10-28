@@ -62,6 +62,11 @@ describe('autorización y frontera HTTP de productos', () => {
     const history = await list(event({ query: { active: 'all' } }))
     expect(history.results).toHaveLength(5)
   })
+  it('desactiva conservando stock_control histórico y cambia solo la disponibilidad interna requerida', async () => {
+    mocks.detail.mockResolvedValue({ id, ...body, stock_control: true, account_group: { id: 10 }, key: { code: body.key }, unit: { code: body.unit } })
+    await active(event({ id, body: { active: false } }))
+    expect(mocks.mutate).toHaveBeenCalledWith(expect.objectContaining({ stock_control: true, active: false, availability: { purchase: false, sale: false, expense: false } }), id)
+  })
   it.each(['mostrador', 'vendedor', 'repartidor', 'igualaciones'])('rechaza escritura y catálogos de edición para %s', async (role) => {
     mocks.role = role
     for (const route of [create, update, active, recover, discard, review, retry, context, sat, uploadImage, removeImage]) {

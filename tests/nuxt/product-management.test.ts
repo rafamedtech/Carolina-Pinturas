@@ -43,6 +43,13 @@ afterEach(() => {
 })
 
 describe('formulario de productos', () => {
+  it.each([false, true])('conserva el control histórico de Siigo al editar y lo desactiva solo en copias nuevas (duplicar: %s)', async (duplicate) => {
+    wrapper = await mountSuspended(ProductForm, { props: { product: { ...product, stock_control: true }, duplicate, context, saving: false, blocked: false } })
+    if (duplicate) await wrapper.get('input[maxlength="30"]').setValue('PIN2')
+    await wrapper.find('form').trigger('submit')
+    await flushPromises()
+    expect(wrapper.emitted('submit')?.[0]?.[0]).toMatchObject({ stock_control: !duplicate })
+  })
   it('conserva correcciones no enviadas al confirmar el intento y actualiza solo su versión interna', async () => {
     wrapper = await mountSuspended(ProductForm, { props: { product, context, saving: false, blocked: true } })
     await wrapper.get('input[maxlength="100"]').setValue('Corrección todavía no enviada')

@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs'
 import { productInputSchema, productQuerySchema } from '../../shared/schemas/product'
 import { productDuplicateInput, productMutationInput } from '../../app/utils/siigoProductMutation'
 import { canManageProducts } from '../../app/utils/roleAccess'
-import { buildSiigoProductPayload, filterProducts, getActiveProducts, getProductDetail, listProducts, mutateProduct, normalizeProductList, normalizeProductOptions, normalizeSiigoProduct } from '../../server/utils/siigo-products'
+import { buildSiigoProductPayload, filterProducts, getActiveProducts, getProductDetail, listProducts, mutateProduct, normalizeProductList, normalizeProductOptions, normalizeSiigoProduct, validateProductReferences } from '../../server/utils/siigo-products'
 import { clearSiigoCatalogCache } from '../../server/utils/siigo-catalog'
 import { searchProductSat, type SatCatalog } from '../../server/utils/siigo-product-sat'
 
@@ -50,15 +50,17 @@ describe('contrato de productos México', () => {
     expect(productMutationInput(product).unit).toBe('LTR')
     expect(productDuplicateInput(product).unit).toBe('LTR')
   })
-  it('escribe simples y compuestos exclusivamente como Product sin control de inventario en Siigo', () => {
-    const composite = { ...input(), composition: { kind: 'composite' as const, version: 1, components: [{ productId: id, quantity: '0.25' }] } }
+  it('crea simples y compuestos como Product sin control de inventario y conserva el valor al editar', () => {
+    const composite = { ...input(), stock_control: false, composition: { kind: 'composite' as const, version: 1, components: [{ productId: id, quantity: '0.25' }] } }
     const payload = buildSiigoProductPayload(composite)
     expect(payload).toMatchObject({ type: 'Product', stock_control: false })
     expect(payload).not.toHaveProperty('composition')
     expect(payload).not.toHaveProperty('availability')
     expect(payload).not.toHaveProperty('components')
     expect(productInputSchema.safeParse({ ...input(), type: 'Service' }).success).toBe(false)
-    expect(productInputSchema.safeParse({ ...input(), stock_control: true }).success).toBe(false)
+    expect(productInputSchema.safeParse({ ...input(), stock_control: true }).success).toBe(true)
+    expect(buildSiigoProductPayload(input(), normalizeSiigoProduct(external)).stock_control).toBe(true)
+    expect(productDuplicateInput(normalizeSiigoProduct(external)).stock_control).toBe(false)
   })
   it('conserva opciones independientes y permite componentes sin venta directa', () => {
     const availability = { purchase: true, sale: false, expense: false }
@@ -99,6 +101,26 @@ describe('contrato de productos México', () => {
     expect(payload).toMatchObject({ name: 'Nuevo nombre', tax_classification: 'Taxed', tax_consumption_value: 0, additional_fields: { model: 'Serie X', tariff: '1234' }, prices: external.prices })
     for (const key of ['id', 'available_quantity', 'metadata', 'warehouses', 'components']) expect(payload).not.toHaveProperty(key)
   })
+  it.each([true, false])('al editar conserva stock_control=%s y rechaza cambiarlo desde el navegador', async (stock_control) => {
+    const current = normalizeSiigoProduct({ ...external, stock_control })
+    const editable = productMutationInput(current)
+    expect(editable.stock_control).toBe(stock_control)
+    await expect(validateProductReferences(editable, current)).resolves.toBeUndefined()
+    await expect(validateProductReferences({ ...editable, stock_control: !stock_control }, current)).rejects.toMatchObject({ statusCode: 422 })
+    expect(buildSiigoProductPayload({ ...editable, stock_control: !stock_control }, current).stock_control).toBe(stock_control)
+  })
+  it('rechaza activar el control de inventario de Siigo al crear un producto', async () => {
+    await expect(mutateProduct({ ...input(), stock_control: true })).rejects.toMatchObject({ statusCode: 422, data: { ambiguous: false } })
+    expect(mocks.request.mock.calls.some(([, options]) => options?.method === 'POST')).toBe(false)
+  })
+  it('preserva la configuración histórica del producto 2603S-1L-OLD al desactivar', async () => {
+    const historic = { ...external, code: '2603S-1L-OLD', key: '01010101', stock_control: true }
+    mocks.request.mockImplementation(async (_path, options) => options?.method === 'PUT' ? { ...historic, active: false } : historic)
+    const result = await mutateProduct({ active: false }, id)
+    expect(result).toMatchObject({ active: false, stock_control: true })
+    const put = mocks.request.mock.calls.find(([, options]) => options?.method === 'PUT')!
+    expect(put[1].body).toMatchObject({ active: false, stock_control: true, key: '01010101', code: historic.code, prices: historic.prices })
+  })
   it('valida datos mínimos y elimina propiedades inyectadas', () => {
     expect(productInputSchema.parse({ ...input(), available_quantity: 999 })).not.toHaveProperty('available_quantity')
     expect(productInputSchema.safeParse(productMutationInput()).success).toBe(false)
@@ -121,7 +143,7 @@ describe('contrato de productos México', () => {
 
 describe('mutaciones, caché y referencias', () => {
   it('crea tras validar catálogos y SAT', async () => {
-    await expect(mutateProduct(input())).resolves.toMatchObject({ id })
+    await expect(mutateProduct({ ...input(), stock_control: false })).resolves.toMatchObject({ id })
     expect(mocks.request).toHaveBeenCalledWith('/v1/products', expect.objectContaining({ method: 'POST', body: expect.objectContaining({ key: '31211500', account_group: 10 }) }))
   })
   it('edita tras consultar detalle vigente y conserva ambas monedas', async () => {
@@ -133,11 +155,12 @@ describe('mutaciones, caché y referencias', () => {
     await mutateProduct({ active: false }, id)
     const call = mocks.request.mock.calls.find(([, opts]) => opts?.method === 'PUT')!
     expect(call[1].body).toEqual({ ...buildSiigoProductPayload(input(), normalizeSiigoProduct(external)), active: false })
+    expect(call[1].body.stock_control).toBe(true)
   })
   it('permite conservar SAT histórico pero no asignarlo en alta', async () => {
     mocks.request.mockImplementationOnce(async () => ({ ...external, key: '99999999' }))
     await expect(mutateProduct({ ...input(), key: '99999999' }, id)).resolves.toMatchObject({ id })
-    await expect(mutateProduct({ ...input(), key: '99999999' })).rejects.toMatchObject({ statusCode: 422 })
+    await expect(mutateProduct({ ...input(), stock_control: false, key: '99999999' })).rejects.toMatchObject({ statusCode: 422 })
   })
   it('rechaza IDs de catálogo desconocidos antes de escribir', async () => {
     await expect(mutateProduct({ ...input(), account_group: 999 })).rejects.toMatchObject({ statusCode: 422 })
@@ -160,6 +183,21 @@ describe('mutaciones, caché y referencias', () => {
     })
     await expect(mutateProduct({ active: false }, id)).rejects.toMatchObject({ statusCode: 504, data: { ambiguous: true } })
     expect(mocks.request.mock.calls.filter(([, opts]) => opts?.method === 'PUT')).toHaveLength(1)
+  })
+  it('conserva el código y detalle de product_service sin copiar credenciales al error público', async () => {
+    mocks.request.mockImplementation(async (_path, options) => {
+      if (options?.method === 'PUT') throw createError({ statusCode: 502, statusMessage: 'Siigo no pudo procesar el producto.', data: {
+        errors: [{ code: 'product_service', message: 'The Products service is currently unavailable. Please try in a few minutes' }], Authorization: 'secret-token'
+      } })
+      return external
+    })
+    try {
+      await mutateProduct({ active: false }, id)
+      expect.unreachable('Debe fallar la actualización')
+    } catch (error) {
+      expect(error).toMatchObject({ data: { cause: { code: 'product_service', errors: [{ code: 'product_service' }] } } })
+      expect(JSON.stringify(error)).not.toContain('secret-token')
+    }
   })
   it('respuesta inválida después de escritura se considera ambigua', async () => {
     mocks.request.mockImplementation(async (_path, opts) => opts?.method === 'PUT' ? {} : external)

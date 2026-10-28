@@ -2,7 +2,7 @@
 
 ## Alcance y permisos
 
-Administradores crean y actualizan productos simples y compuestos, incluyendo precios, impuestos, datos SAT y estado. Ambos se escriben en Siigo como `Product` con `stock_control: false`. La composición se administra exclusivamente en PostgreSQL. Los roles de captura conservan consultas. Pedidos nuevos rechazan productos inactivos y tipos históricos (`Combo`, `Service`, `ConsumerGood`); los pedidos anteriores conservan sus referencias. No hay borrado. Consulta [Productos compuestos](./productos-compuestos.md) para las reglas de inventario y conciliación.
+Administradores crean y actualizan productos simples y compuestos, incluyendo precios, impuestos, datos SAT y estado. Las altas se escriben en Siigo como `Product` con `stock_control: false`. Al editar o activar/desactivar un producto existente se conserva su `stock_control` vigente; no se convierte el control de inventario histórico. La composición se administra exclusivamente en PostgreSQL. Los roles de captura conservan consultas. Pedidos nuevos rechazan productos inactivos y tipos históricos (`Combo`, `Service`, `ConsumerGood`); los pedidos anteriores conservan sus referencias. No hay borrado. Consulta [Productos compuestos](./productos-compuestos.md) para las reglas de inventario y conciliación.
 
 Las mutaciones usan `siigoRequest` exclusivamente en servidor. El guardado exige confirmación de los valores comerciales de Siigo antes de aplicar el producto y sus opciones internas en PostgreSQL. Ante un fallo no se anuncia éxito ni se repite automáticamente la escritura: se conserva el formulario y se permite volver a guardar manualmente. El siguiente intento consulta primero Siigo por ID o, para altas previamente fallidas, por código, para evitar repetir una operación ya aplicada. No existe garantía de idempotencia de Siigo para productos.
 
@@ -45,7 +45,7 @@ Pruebas unitarias y de rutas cubren validación, permisos, filtros, SAT, normali
 
 ## Indisponibilidad del servicio de productos (27/10/2026)
 
-Se observó una actualización rechazada con `The Products service is currently unavailable. Please try in a few minutes`, mientras la consulta por ID seguía disponible y conservaba los datos anteriores. La respuesta de una consulta posterior confirmó `status: 503` y código `product_service`. La causa procede del servicio externo de productos; una lectura exitosa anterior no confirma que las actualizaciones estén disponibles. No repetir automáticamente el PUT ni cerrar el intento como exitoso si los datos no coinciden.
+Se observó una actualización rechazada con `The Products service is currently unavailable. Please try in a few minutes`, mientras la consulta por ID seguía disponible y conservaba los datos anteriores. La respuesta de una consulta posterior confirmó `status: 503` y código `product_service`. Este mensaje genérico identifica un rechazo del servicio de productos, pero no demuestra por sí solo una caída global. El diagnóstico del 28/10/2026 confirmó que también aparece al intentar desactivar el control de inventario de un producto existente. No repetir automáticamente el PUT ni cerrar el intento como exitoso si los datos no coinciden.
 
 El servidor conserva la causa controlada del fallo (etapa Siigo o persistencia local y código), sin registrar credenciales ni el payload completo. La conciliación compara campos comerciales normalizados con orden estable e informa de los campos diferentes. La interfaz traduce la indisponibilidad, conserva la causa al consultar el resultado y permite revisar el intento recién fallido sin recargar ni perder las correcciones capturadas.
 
@@ -72,3 +72,9 @@ Si falla la escritura, la comprobación o la transacción local, el intento se m
 El reintento consulta primero Siigo: si el cambio anterior ya se aplicó, completa solo el guardado local. Para un alta fallida se localiza el producto por su ID conocido o por código exacto antes de considerar otro POST; si existe con datos distintos, se exige abrirlo para editarlo. Las escrituras siguen teniendo un único envío por acción explícita, incluidos los timeouts.
 
 Se conserva el bloqueo únicamente mientras otra operación está en curso o cuando la base de datos no puede cerrar la reserva. Los registros históricos `pending`/`unknown` conservan la recuperación existente; las operaciones nuevas que fallan y pueden cerrarse no entran en conciliación ni dejan bloqueado el producto.
+
+## Rechazo al modificar el control de inventario histórico (28/10/2026)
+
+El producto `3beb3dfb-dfe7-4f34-bde0-0e55a782f93d` (`2603S-1L-OLD`) tenía `stock_control: true`. La aplicación forzaba `false` en todas las ediciones, incluida la desactivación, y Siigo devolvía `product_service`. La desactivación real autorizada del producto, con el mismo código, nombre, precio, impuestos y clave SAT histórica `01010101`, funcionó conservando `stock_control: true`. Una consulta posterior por ID confirmó `active: false`, y la actualización explícita del detalle sincronizó el estado inactivo en PostgreSQL y Chrome.
+
+El formulario ahora conserva el booleano original y el servidor valida que coincida con una lectura vigente. El constructor también preserva ese valor en las actualizaciones, aunque el navegador intente cambiarlo. Las altas y duplicados siguen usando `false`; la composición y el inventario interno no se modifican por esta corrección. Se conservan código y detalles controlados de los errores externos sin incluir credenciales, y `product_service` ya no se presenta como prueba de indisponibilidad general.

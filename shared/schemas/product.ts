@@ -35,7 +35,9 @@ export const productInputSchema = z.object({
   composition: productCompositionSchema.default({ kind: 'product', version: 1, components: [] }),
   availability: productAvailabilitySchema.default({ purchase: true, sale: true, expense: false }),
   active: z.boolean(),
-  stock_control: z.literal(false),
+  // Existing Siigo products may have inventory control enabled. Editing their
+  // commercial data must preserve it; the server enforces that invariant.
+  stock_control: z.boolean(),
   tax_included: z.boolean(),
   unit: z.string().trim().min(1, 'Selecciona una unidad SAT.').max(10),
   key: z.string().regex(/^\d{8}$/, 'Selecciona una clave SAT de ocho dígitos.'),
