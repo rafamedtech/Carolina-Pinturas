@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createError } from 'h3'
 import { productMutationInput } from '../../app/utils/siigoProductMutation'
 
-const mocks = vi.hoisted(() => ({ role: 'admin', discard: vi.fn(), mutate: vi.fn(), list: vi.fn(), detail: vi.fn(), context: vi.fn(), sat: vi.fn(), image: vi.fn(), saveImage: vi.fn(), deleteImage: vi.fn(), localList: vi.fn(), localDetail: vi.fn(), persist: vi.fn(), persistDetail: vi.fn(), archiveMissing: vi.fn() }))
+const mocks = vi.hoisted(() => ({ role: 'admin', review: vi.fn(), retry: vi.fn(), discard: vi.fn(), mutate: vi.fn(), list: vi.fn(), detail: vi.fn(), context: vi.fn(), sat: vi.fn(), image: vi.fn(), saveImage: vi.fn(), deleteImage: vi.fn(), localList: vi.fn(), localDetail: vi.fn(), persist: vi.fn(), persistDetail: vi.fn(), archiveMissing: vi.fn() }))
 vi.mock('../../server/utils/auth', () => ({
   requireRole: async (_event: unknown, roles: readonly string[]) => {
     if (!roles.includes(mocks.role)) throw createError({ statusCode: 403 })
@@ -10,7 +10,7 @@ vi.mock('../../server/utils/auth', () => ({
   }
 }))
 vi.mock('../../server/utils/siigo-products', () => ({ mutateProduct: mocks.mutate, listProducts: mocks.list, getProductDetail: mocks.detail, getProductContext: mocks.context }))
-vi.mock('../../server/utils/managed-products', () => ({ saveManagedProduct: mocks.mutate, recoverProductWrite: vi.fn(), discardProductWrite: mocks.discard }))
+vi.mock('../../server/utils/managed-products', () => ({ saveManagedProduct: mocks.mutate, recoverProductWrite: vi.fn(), discardProductWrite: mocks.discard, reviewProductWrite: mocks.review, retryProductWrite: mocks.retry }))
 vi.mock('../../server/utils/prisma', () => ({ usePrisma: () => ({ siigoProduct: { updateMany: mocks.archiveMissing } }) }))
 vi.mock('../../server/utils/stored-products', () => ({ listStoredProducts: mocks.localList, getStoredProduct: mocks.localDetail }))
 vi.mock('../../server/utils/siigo-persistence', () => ({ upsertSiigoProduct: mocks.persistDetail }))
@@ -30,6 +30,8 @@ const update = (await import('../../server/api/siigo/products/[id].put')).defaul
 const active = (await import('../../server/api/siigo/products/[id]/active.patch')).default
 const recover = (await import('../../server/api/siigo/products/recover.post')).default
 const discard = (await import('../../server/api/siigo/products/discard-write.post')).default
+const review = (await import('../../server/api/siigo/products/write-review.post')).default
+const retry = (await import('../../server/api/siigo/products/retry-write.post')).default
 const list = (await import('../../server/api/siigo/products.get')).default
 const detail = (await import('../../server/api/siigo/products/[id].get')).default
 const context = (await import('../../server/api/siigo/products/context.get')).default
@@ -62,7 +64,7 @@ describe('autorización y frontera HTTP de productos', () => {
   })
   it.each(['mostrador', 'vendedor', 'repartidor', 'igualaciones'])('rechaza escritura y catálogos de edición para %s', async (role) => {
     mocks.role = role
-    for (const route of [create, update, active, recover, discard, context, sat, uploadImage, removeImage]) {
+    for (const route of [create, update, active, recover, discard, review, retry, context, sat, uploadImage, removeImage]) {
       await expect(route(event({ id, body, query: { kind: 'unit' } }))).rejects.toMatchObject({ statusCode: 403 })
     }
     expect(mocks.saveImage).not.toHaveBeenCalled()
@@ -98,6 +100,15 @@ describe('autorización y frontera HTTP de productos', () => {
     expect(mocks.discard).toHaveBeenCalledWith(id, id)
     await expect(discard(event({ body: { operationId: id, productId: '../auth' } }))).rejects.toMatchObject({ statusCode: 400 })
     expect(mocks.discard).toHaveBeenCalledTimes(1)
+  })
+  it('autoriza y valida la revisión y el reenvío explícito por id del intento', async () => {
+    await review(event({ body: { operationId: id } }))
+    await retry(event({ body: { operationId: id } }))
+    expect(mocks.review).toHaveBeenCalledWith(id)
+    expect(mocks.retry).toHaveBeenCalledWith(id)
+    await expect(review(event({ body: { operationId: '../bad' } }))).rejects.toMatchObject({ statusCode: 400 })
+    await expect(retry(event({ body: { operationId: '../bad' } }))).rejects.toMatchObject({ statusCode: 400 })
+    expect(mocks.retry).toHaveBeenCalledTimes(1)
   })
   it('admin puede crear, editar y activar', async () => {
     await create(event({ body }))

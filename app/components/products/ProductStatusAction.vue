@@ -15,13 +15,26 @@ async function confirm() {
 </script>
 
 <template>
-  <UModal v-model:open="open" :title="`${label} producto`" :description="`${product.code} · ${product.name}`">
+  <UButton
+    v-if="product.internal?.syncPending"
+    :to="`/productos/${product.id}/editar`"
+    label="Resolver guardado pendiente"
+    color="neutral"
+    variant="outline"
+  />
+  <UModal
+    v-else
+    v-model:open="open"
+    :title="`${label} producto`"
+    :description="`${product.code} · ${product.name}`"
+  >
     <UButton :label="label" color="neutral" variant="outline" />
     <template #body>
       <div class="space-y-4">
         <p>{{ product.active === false ? 'El producto volverá a estar disponible para pedidos nuevos.' : 'El producto dejará de estar disponible para pedidos nuevos. Los pedidos anteriores se conservan.' }}</p>
         <UAlert v-if="errorMessage" :title="errorMessage" color="error" />
         <template v-if="ambiguous">
+          <UButton :to="`/productos/${product.id}/editar`" label="Resolver guardado pendiente" />
           <UButton label="Consultar resultado en Siigo" :loading="checking" @click="check(product.id)" />
           <p v-for="result in lookupResults" :key="result.id">
             Estado actual: {{ result.active ? 'Activo' : 'Inactivo' }}

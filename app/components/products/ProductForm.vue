@@ -4,9 +4,15 @@ import type { ProductContext, ProductInput } from '~/types/siigo-products'
 import { productInputSchema } from '#shared/schemas/product'
 import { productDuplicateInput, productMutationInput } from '~/utils/siigoProductMutation'
 
-const props = defineProps<{ product?: SiigoProduct, duplicate?: boolean, context: ProductContext, saving: boolean, blocked: boolean }>()
+const props = defineProps<{ product?: SiigoProduct, duplicate?: boolean, context: ProductContext, saving: boolean, blocked: boolean, draft?: ProductInput, confirmedVersion?: number }>()
 const emit = defineEmits<{ submit: [input: ProductInput], cancel: [] }>()
 const state = ref(props.duplicate && props.product ? productDuplicateInput(props.product) : productMutationInput(props.product))
+watch(() => props.draft, (input) => {
+  if (input) state.value = productInputSchema.parse(input)
+})
+watch(() => props.confirmedVersion, (version) => {
+  if (version) state.value.composition.version = version
+})
 const formState = computed(() => ({
   ...state.value,
   active: state.value.availability.purchase || state.value.availability.sale || state.value.availability.expense

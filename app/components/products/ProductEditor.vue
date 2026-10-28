@@ -29,26 +29,47 @@ const productImage = ref<ProductImage | null>(null)
 watch(product, (value) => {
   productImage.value = value?.internal?.image ?? null
 }, { immediate: true })
-const { saving, errorMessage, ambiguous, checking, lookupResults, operationId, save, check, discard } = useProductMutation()
+const { saving, errorMessage, ambiguous, checking, operationId, save, check, clearPending } = useProductMutation()
 const discardedWriteIds = shallowRef<string[]>([])
-const discardOpen = shallowRef(false)
+const formDraft = shallowRef<ProductInput>()
+const confirmedVersion = shallowRef<number>()
+const resolutionNotice = shallowRef('')
 const pendingWriteId = computed(() => ambiguous.value && operationId.value ? operationId.value : product.value?.internal?.pendingWriteId)
-const hasPendingWrite = computed(() => Boolean(props.productId && pendingWriteId.value && !discardedWriteIds.value.includes(pendingWriteId.value)
-  && (ambiguous.value || product.value?.internal?.syncPending)))
-async function unlock() {
-  const id = pendingWriteId.value
-  if (!props.productId || !id) return
-  if (await discard(props.productId, id)) {
-    discardedWriteIds.value = [...discardedWriteIds.value, id]
-    discardOpen.value = false
-    useToast().add({ title: 'Producto desbloqueado. Ya puedes guardar tus cambios.', color: 'success' })
+const hasPendingWrite = computed(() => Boolean(pendingWriteId.value && !discardedWriteIds.value.includes(pendingWriteId.value)
+  && ((props.productId && product.value?.internal?.syncPending) || (ambiguous.value && operationId.value))))
+function resolved(result: { operationIds: string[], input?: ProductInput }) {
+  discardedWriteIds.value = [...discardedWriteIds.value, ...result.operationIds, pendingWriteId.value || '']
+  clearPending()
+  if (result.input) {
+    formDraft.value = result.input
   }
+  resolutionNotice.value = result.input ? 'Cambios pendientes cargados. Revisa el formulario y pulsa Guardar cambios.' : 'Intento descartado. Se conservaron los datos actuales de Siigo y el producto quedó desbloqueado.'
+}
+async function recovered(saved: SiigoProduct) {
+  discardedWriteIds.value = [...discardedWriteIds.value, pendingWriteId.value || '']
+  clearPending()
+  product.value = { ...saved, internal: { ...saved.internal, image: productImage.value } }
+  confirmedVersion.value = saved.internal?.composition?.version
+  resolutionNotice.value = 'Guardado confirmado. El producto vuelve a estar disponible para nuevas ventas.'
+  await refreshNuxtData(['products-catalog-request', 'product-management-catalog', 'product-brand-options']).catch(() => undefined)
+  if (!props.productId) await navigateTo(`/productos/${saved.id}`)
 }
 async function recover() {
-  const saved = await check(props.productId, product.value?.internal?.pendingWriteId)
-  if (saved) await navigateTo(`/productos/${saved.id}`)
+  if (props.productId && !operationId.value) {
+    try {
+      const latest = await $fetch<SiigoProduct>(`/api/siigo/products/${encodeURIComponent(props.productId)}`)
+      product.value = latest
+      if (latest.internal?.pendingWriteId && !discardedWriteIds.value.includes(latest.internal.pendingWriteId)) return
+    } catch {
+      errorMessage.value = 'No se pudo localizar el intento pendiente. Conserva el formulario y vuelve a comprobar.'
+      return
+    }
+  }
+  const saved = await check(props.productId, pendingWriteId.value)
+  if (saved) await recovered(saved)
 }
 async function submit(input: ProductInput) {
+  resolutionNotice.value = ''
   const saved = await save(input, props.productId)
   if (saved) {
     useToast().add({ title: props.productId ? 'Producto actualizado' : 'Producto creado', color: 'success' })
@@ -77,45 +98,21 @@ useSeoMeta({ title })
       <UAlert v-if="!allowed" title="Solo administradores pueden gestionar productos." color="warning" />
       <UAlert v-else-if="contextError || loadError" :title="loadError || 'No se pudieron cargar las opciones del producto.'" color="error" />
       <template v-else-if="context && !loading">
+        <ProductsProductWriteRecovery
+          v-if="hasPendingWrite && pendingWriteId"
+          :operation-id="pendingWriteId"
+          :context="context"
+          :failure-message="errorMessage"
+          @recovered="recovered"
+          @resolved="resolved"
+        />
         <UAlert
-          v-if="hasPendingWrite"
+          v-if="resolutionNotice"
           class="shrink-0"
-          title="Este producto tiene un guardado pendiente de conciliar."
-          color="warning"
-        >
-          <template #actions>
-            <UButton
-              label="Consultar y conciliar guardado"
-              :loading="checking"
-              :disabled="checking"
-              @click="recover"
-            />
-            <UModal v-model:open="discardOpen" title="Desbloquear edición" description="Conservar los datos actuales y cerrar el intento anterior.">
-              <UButton
-                label="Desbloquear edición"
-                color="neutral"
-                variant="outline"
-                :disabled="checking"
-              />
-              <template #body>
-                <div class="space-y-4">
-                  <p>Se consultará el producto actual en Siigo y se cerrará el intento pendiente. Los cambios internos de ese intento no se aplicarán. Las correcciones que tienes capturadas aquí se conservan para que puedas guardarlas después.</p>
-                  <UAlert v-if="errorMessage" :title="errorMessage" color="error" />
-                  <div class="flex justify-end gap-3">
-                    <UButton
-                      label="Cancelar"
-                      color="neutral"
-                      variant="outline"
-                      :disabled="checking"
-                      @click="discardOpen = false"
-                    />
-                    <UButton label="Conservar datos actuales y desbloquear" :loading="checking" @click="unlock" />
-                  </div>
-                </div>
-              </template>
-            </UModal>
-          </template>
-        </UAlert>
+          :title="resolutionNotice"
+          color="success"
+          variant="subtle"
+        />
         <UAlert
           v-if="duplicateFrom"
           title="Revisa los datos de la copia e ingresa un código nuevo."
@@ -124,20 +121,16 @@ useSeoMeta({ title })
           variant="subtle"
         />
         <UAlert
-          v-if="errorMessage"
+          v-if="errorMessage && !hasPendingWrite"
           class="shrink-0"
           :title="errorMessage"
           color="error"
         />
         <div v-if="ambiguous && !hasPendingWrite" class="shrink-0 space-y-3 rounded-lg border border-warning p-4">
-          <UButton label="Consultar resultado en Siigo" :loading="checking" @click="recover" />
-          <div v-for="result in lookupResults" :key="result.id" class="space-y-1">
-            <p>{{ result.code }} · {{ result.name }} · {{ result.active ? 'Activo' : 'Inactivo' }}</p>
-            <UButton :to="{ path: `/productos/${result.id}`, query: { returnTo } }" label="Abrir producto para revisar" variant="outline" />
-          </div>
-          <p class="text-sm text-muted">
-            Revisa el producto antes de iniciar otro guardado; Siigo pudo procesar la solicitud.
+          <p class="text-sm">
+            La respuesta del guardado no llegó. Tus cambios siguen en el formulario. Comprueba el resultado antes de guardar otra vez.
           </p>
+          <UButton label="Comprobar resultado" :loading="checking" @click="recover" />
         </div>
         <ProductsProductImageField
           v-if="productId && product"
@@ -148,6 +141,8 @@ useSeoMeta({ title })
         />
         <ProductsProductForm
           :product="product"
+          :draft="formDraft"
+          :confirmed-version="confirmedVersion"
           :duplicate="Boolean(duplicateFrom)"
           :context="context"
           :saving="saving"

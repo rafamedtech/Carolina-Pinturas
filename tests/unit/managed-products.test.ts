@@ -1,11 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createError } from 'h3'
 import { productMutationInput } from '../../app/utils/siigoProductMutation'
-import { discardProductWrite, recoverProductWrite, saveManagedProduct } from '../../server/utils/managed-products'
+import { discardProductWrite, recoverProductWrite, reviewProductWrite, retryProductWrite, saveManagedProduct } from '../../server/utils/managed-products'
 
 const mocks = vi.hoisted(() => ({
   mutate: vi.fn(), update: vi.fn(), persist: vi.fn(), transaction: vi.fn(),
-  current: vi.fn(), validate: vi.fn(), findWrite: vi.fn(), lock: vi.fn()
+  current: vi.fn(), validate: vi.fn(), findWrite: vi.fn(), lock: vi.fn(), findPending: vi.fn(), attach: vi.fn(), stored: vi.fn(), localVersion: vi.fn()
 }))
 vi.mock('../../server/utils/siigo-products', () => ({
   getProductDetail: mocks.current, mutateProduct: mocks.mutate,
@@ -14,10 +14,11 @@ vi.mock('../../server/utils/siigo-products', () => ({
 vi.mock('../../server/utils/siigo-persistence', () => ({ upsertSiigoProduct: mocks.persist, siigoJson: (value: unknown) => value }))
 vi.mock('../../server/utils/product-compositions', () => ({
   validateComposition: mocks.validate, lockCompositions: vi.fn(),
-  assertNoPendingProductWrites: vi.fn(), attachProductCompositions: vi.fn()
+  assertNoPendingProductWrites: vi.fn(), attachProductCompositions: mocks.attach
 }))
+vi.mock('../../server/utils/stored-products', () => ({ getStoredProduct: mocks.stored }))
 vi.mock('../../server/utils/prisma', () => ({ usePrisma: () => ({
-  $transaction: mocks.transaction, productWrite: { update: mocks.update, findUniqueOrThrow: mocks.findWrite }
+  $transaction: mocks.transaction, productWrite: { update: mocks.update, findUniqueOrThrow: mocks.findWrite, findFirst: mocks.findPending }, siigoProduct: { findUnique: mocks.localVersion }
 }) }))
 const product = {
   id: '00000000-0000-4000-8000-000000000001', code: 'PIN-1', name: 'Pintura',
@@ -28,12 +29,79 @@ const operationId = '00000000-0000-4000-8000-000000000002'
 beforeEach(() => {
   vi.resetAllMocks()
   mocks.update.mockResolvedValue({})
+  mocks.findPending.mockResolvedValue(null)
+  mocks.localVersion.mockResolvedValue({ compositionVersion: 1 })
+  mocks.attach.mockImplementation(async (_db, products) => products)
   mocks.transaction.mockImplementation(async callback => callback({
     productWrite: {
       findFirst: vi.fn().mockResolvedValue(null),
       create: vi.fn().mockResolvedValue({ id: operationId, input: productMutationInput(product), isNew: true })
     }
   }))
+})
+
+describe('revisión del guardado sin reescribir Siigo', () => {
+  const oldDate = new Date('2026-01-01T00:00:00Z')
+  beforeEach(() => {
+    mocks.findWrite.mockResolvedValue({ id: operationId, code: product.code, productId: product.id, isNew: false, state: 'unknown', updatedAt: oldDate, input: productMutationInput(product) })
+    mocks.current.mockResolvedValue(product)
+    mocks.transaction.mockImplementation(async callback => callback({
+      $queryRaw: vi.fn().mockResolvedValue([{ state: 'unknown' }]),
+      siigoProduct: { findUnique: vi.fn().mockResolvedValue({ internalKind: 'product' }), update: vi.fn() },
+      productWrite: { update: mocks.update }
+    }))
+  })
+  it('completa automáticamente solo el commit local cuando Siigo ya coincide', async () => {
+    expect(await reviewProductWrite(operationId)).toMatchObject({ status: 'synced', product })
+    expect(mocks.update).toHaveBeenCalledWith({ where: { id: operationId }, data: { state: 'synced', productId: product.id } })
+    expect(mocks.mutate).not.toHaveBeenCalled()
+  })
+  it('devuelve comparación, borrador y acciones para diferencias de una edición antigua', async () => {
+    mocks.current.mockResolvedValue({ ...product, name: 'Anterior' })
+    expect(await reviewProductWrite(operationId)).toMatchObject({
+      status: 'different', input: productMutationInput(product), canRetry: true, canDiscard: true,
+      differences: [{ field: 'name', expected: product.name, actual: 'Anterior' }]
+    })
+    expect(mocks.update).not.toHaveBeenCalled()
+    expect(mocks.mutate).not.toHaveBeenCalled()
+    expect(mocks.current).toHaveBeenCalledTimes(1)
+  })
+  it('conserva el borrador durante una caída y no habilita escrituras ni cierres', async () => {
+    mocks.current.mockRejectedValue(createError({ statusCode: 503, statusMessage: 'Siigo no está disponible' }))
+    expect(await reviewProductWrite(operationId)).toMatchObject({ status: 'unavailable', input: productMutationInput(product), canRetry: false, canDiscard: false })
+    expect(mocks.mutate).not.toHaveBeenCalled()
+  })
+  it('explica el bloqueo de un intento reciente y de una creación incierta', async () => {
+    mocks.current.mockResolvedValue({ ...product, name: 'Anterior' })
+    mocks.findWrite.mockResolvedValue({ id: operationId, productId: product.id, isNew: false, state: 'unknown', updatedAt: new Date(), input: productMutationInput(product) })
+    expect(await reviewProductWrite(operationId)).toMatchObject({ status: 'different', canRetry: false, canDiscard: false })
+    mocks.findWrite.mockResolvedValue({ id: operationId, productId: product.id, isNew: true, state: 'unknown', updatedAt: oldDate, input: productMutationInput(product) })
+    expect(await reviewProductWrite(operationId)).toMatchObject({ status: 'different', isNew: true, canRetry: false, canDiscard: false })
+  })
+  it('permite corregir después de un fallo local sin reescribir datos confirmados', async () => {
+    mocks.transaction.mockRejectedValue(createError({ statusCode: 409, statusMessage: 'El producto cambió. Recarga antes de guardar.' }))
+    expect(await reviewProductWrite(operationId)).toMatchObject({ status: 'local_error', canRetry: false, canDiscard: true })
+    expect(mocks.mutate).not.toHaveBeenCalled()
+  })
+  it('sigue al reemplazo real si se perdió la respuesta del reenvío', async () => {
+    const replacement = '00000000-0000-4000-8000-000000000003'
+    mocks.findWrite.mockResolvedValueOnce({ id: operationId, code: product.code, productId: product.id, isNew: false, state: 'failed', updatedAt: oldDate, input: productMutationInput(product) })
+    mocks.findPending.mockResolvedValue({ id: replacement })
+    mocks.current.mockResolvedValue({ ...product, name: 'Anterior' })
+    expect(await reviewProductWrite(operationId)).toMatchObject({ status: 'different', operationId: replacement })
+    expect(mocks.findWrite).toHaveBeenCalledWith({ where: { id: replacement } })
+    expect(mocks.mutate).not.toHaveBeenCalled()
+  })
+  it('un reenvío explícito primero comprueba y evita el PUT si los datos ya coinciden', async () => {
+    expect(await retryProductWrite(operationId)).toMatchObject(product)
+    expect(mocks.mutate).not.toHaveBeenCalled()
+  })
+  it('rechaza otro reenvío cuando el intento ya se cerró', async () => {
+    mocks.findWrite.mockResolvedValue({ isNew: false, productId: product.id, state: 'failed' })
+    await expect(retryProductWrite(operationId)).rejects.toMatchObject({ statusCode: 409 })
+    expect(mocks.current).not.toHaveBeenCalled()
+    expect(mocks.mutate).not.toHaveBeenCalled()
+  })
 })
 
 describe('desbloqueo explícito de ediciones pendientes', () => {

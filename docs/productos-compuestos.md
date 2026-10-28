@@ -36,6 +36,19 @@ La acción **Desbloquear edición** permite cerrar explícitamente un intento de
 
 Solo los administradores pueden guardar o conciliar productos. Las tablas nuevas tienen RLS y no conceden acceso directo a `anon` o `authenticated`; el servidor aplica los permisos existentes. Los componentes locales están separados de los snapshots externos, por lo que recargar Siigo conserva las composiciones y los costos locales.
 
+## Resolver un guardado desde la aplicación
+
+El detalle del producto muestra **Resolver guardado pendiente**. En Editar, el panel comprueba automáticamente el resultado al abrirse y realiza hasta dos consultas adicionales (a los 15 y 60 segundos). Estas comprobaciones nunca repiten una escritura en Siigo y se cancelan al salir de la página.
+
+- Si Siigo confirma todos los datos comerciales, se completa el commit local una sola vez y el producto se habilita. El formulario conserva las correcciones que el usuario todavía no haya enviado.
+- Si Siigo no responde, se conservan y muestran los datos del intento, se explica el fallo y se ofrece **Comprobar otra vez**. No se habilita un reenvío sin una lectura vigente.
+- Si hay diferencias, se comparan los valores actuales de Siigo con los pendientes, con nombres de campos y precios legibles. **Cambios conservados** incluye los datos comerciales, disponibilidad y composición internas.
+- **Volver a enviar cambios pendientes** requiere confirmación. El servidor vuelve a consultar Siigo: si ya coincide, solo termina el commit; si no, cierra el intento anterior y reserva su reemplazo en una única transacción antes de enviar un solo PUT. Dos solicitudes simultáneas no pueden repetir la escritura.
+- **Cargar cambios para corregirlos** cierra el intento conservando Siigo, carga el borrador pendiente en el formulario y usa la versión interna vigente. Se advierte que sustituye lo capturado en ese formulario.
+- **Descartar cambios pendientes** conserva los datos de Siigo y el historial del intento; habilita nuevamente el producto. Ambas opciones exigen una consulta satisfactoria y una confirmación explícita.
+
+Durante los primeros cinco minutos se explica la espera y la hora a partir de la que se pueden habilitar las acciones al comprobar nuevamente. Las altas inciertas no se vuelven a crear: se revisan por código en Siigo y se concilian al confirmar sus datos. Si se pierde la respuesta de un reenvío, la comprobación sigue al reemplazo pendiente para no desbloquear a partir de un intento obsoleto.
+
 ## Verificación y migración
 
 La migración es `supabase/migrations/20261018190553_internal_product_compositions.sql`. Se aplica localmente con `supabase migration up --local`. No convierte tipos externos ni modifica pedidos históricos.

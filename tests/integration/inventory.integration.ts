@@ -24,7 +24,7 @@ const { executeInventory, listInventory, orderInventoryView } = await import('..
 const { createOrder, updateOrder, updateOrderStatus, updateOrderItemQuantity } = await import('../../server/utils/orders')
 const { createPurchase, mutatePurchase } = await import('../../server/utils/purchases')
 const { persistProductCatalog } = await import('../../server/utils/product-catalog-persistence')
-const { saveManagedProduct, recoverProductWrite } = await import('../../server/utils/managed-products')
+const { saveManagedProduct, recoverProductWrite, retryProductWrite, reviewProductWrite } = await import('../../server/utils/managed-products')
 const { attachProductCompositions, validateComposition } = await import('../../server/utils/product-compositions')
 const { productMutationInput } = await import('../../app/utils/siigoProductMutation')
 const url = process.env.INVENTORY_TEST_DATABASE_URL
@@ -685,6 +685,49 @@ suite('inventario: PostgreSQL aislado, sin conexión Siigo', () => {
     expect(mocks.mutation).toHaveBeenCalledTimes(1)
     await recoverProductWrite(operationId)
     expect((await db.siigoProduct.findUniqueOrThrow({ where: { id } })).compositionVersion).toBe(2)
+  })
+  it('dos reenvíos simultáneos reservan un único reemplazo y solo uno escribe en Siigo', async () => {
+    const target = await product()
+    const local = await db.siigoProduct.findUniqueOrThrow({ where: { id: target } })
+    let remote: SiigoProduct = { id: target, code: local.code, name: local.name, type: 'Product', active: true, stock_control: false, account_group: { id: 10 }, key: { code: '31211500' }, unit: { code: 'H87' } }
+    const input = { ...productMutationInput(remote), name: 'Cambio pendiente de reenvío' }
+    mocks.product.mockImplementation(async () => remote)
+    mocks.mutation.mockRejectedValueOnce(createError({ statusCode: 503, data: { ambiguous: true } }))
+    let operationId = ''
+    try {
+      await saveManagedProduct(input, target)
+    } catch (error) {
+      operationId = (error as { data: { operationId: string } }).data.operationId
+    }
+    await db.productWrite.update({ where: { id: operationId }, data: { updatedAt: new Date(Date.now() - 6 * 60_000) } })
+    const mutationCalls = mocks.mutation.mock.calls.length
+    mocks.mutation.mockImplementation(async () => {
+      remote = { ...remote, name: input.name }
+      return remote
+    })
+    const attempts = await Promise.allSettled([retryProductWrite(operationId), retryProductWrite(operationId)])
+    expect(attempts.filter(result => result.status === 'fulfilled')).toHaveLength(1)
+    expect(mocks.mutation.mock.calls.length - mutationCalls).toBe(1)
+    expect((await db.productWrite.findUniqueOrThrow({ where: { id: operationId } })).state).toBe('failed')
+    expect(await db.productWrite.count({ where: { productId: target, state: { in: ['pending', 'unknown'] } } })).toBe(0)
+    expect((await db.siigoProduct.findUniqueOrThrow({ where: { id: target } })).compositionVersion).toBe(2)
+  })
+  it('una comprobación termina el guardado confirmado y un intento cerrado sigue a su reemplazo pendiente', async () => {
+    const target = await product()
+    const local = await db.siigoProduct.findUniqueOrThrow({ where: { id: target } })
+    const remote: SiigoProduct = { id: target, code: local.code, name: local.name, type: 'Product', active: true, stock_control: false, account_group: { id: 10 }, key: { code: '31211500' }, unit: { code: 'H87' } }
+    const input = productMutationInput(remote)
+    const old = await db.productWrite.create({ data: { productId: target, code: remote.code, state: 'failed', input } })
+    const pending = await db.productWrite.create({ data: { productId: target, code: remote.code, state: 'unknown', input } })
+    mocks.product.mockResolvedValue(remote)
+    const mutationCalls = mocks.mutation.mock.calls.length
+    const result = await reviewProductWrite(old.id)
+    expect(result).toMatchObject({ status: 'synced', operationId: pending.id })
+    expect(result.product?.internal?.syncPending).toBe(false)
+    expect(mocks.mutation.mock.calls.length).toBe(mutationCalls)
+    expect((await db.productWrite.findUniqueOrThrow({ where: { id: pending.id } })).state).toBe('synced')
+    await reviewProductWrite(pending.id)
+    expect((await db.siigoProduct.findUniqueOrThrow({ where: { id: target } })).compositionVersion).toBe(2)
   })
   it('un fallo del commit local después del alta Siigo mantiene el bloqueo y se puede conciliar después', async () => {
     const base = await product(), id = randomUUID()

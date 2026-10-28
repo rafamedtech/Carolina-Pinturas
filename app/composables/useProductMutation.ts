@@ -81,5 +81,11 @@ export function useProductMutation() {
       checking.value = false
     }
   }
-  return { saving, errorMessage, ambiguous, checking, lookupResults, operationId: readonly(operationId), save, check, discard }
+  function clearPending() {
+    ambiguous.value = false
+    operationId.value = ''
+    errorMessage.value = ''
+    saveFailureMessage.value = ''
+  }
+  return { saving, errorMessage, ambiguous, checking, lookupResults, operationId: readonly(operationId), save, check, discard, clearPending }
 }

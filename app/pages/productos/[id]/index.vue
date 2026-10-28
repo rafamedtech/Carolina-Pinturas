@@ -134,9 +134,13 @@ function formatQuantity(value?: number) {
           v-if="product.internal?.syncPending"
           class="shrink-0"
           title="Guardado pendiente de conciliación"
-          description="Este producto no está disponible para nuevas ventas hasta revisar su guardado desde Editar."
+          :description="canManageProducts(user?.role) ? 'Revisa la comparación y elige volver a enviar, corregir o descartar los cambios pendientes. El producto se habilita al resolver el intento.' : 'Un administrador debe resolver los cambios pendientes para habilitar el producto en nuevas ventas.'"
           color="warning"
-        />
+        >
+          <template v-if="canManageProducts(user?.role)" #actions>
+            <UButton :to="{ path: `/productos/${productId}/editar`, query: { returnTo: backPath } }" label="Resolver guardado pendiente" icon="i-lucide-arrow-right" />
+          </template>
+        </UAlert>
         <UAlert
           v-if="!isManaged"
           title="Este tipo de producto se conserva para consulta histórica."

@@ -43,6 +43,22 @@ afterEach(() => {
 })
 
 describe('formulario de productos', () => {
+  it('conserva correcciones no enviadas al confirmar el intento y actualiza solo su versión interna', async () => {
+    wrapper = await mountSuspended(ProductForm, { props: { product, context, saving: false, blocked: true } })
+    await wrapper.get('input[maxlength="100"]').setValue('Corrección todavía no enviada')
+    await wrapper.setProps({ product: { ...product, name: 'Nombre confirmado' }, confirmedVersion: 2, blocked: false })
+    await wrapper.find('form').trigger('submit')
+    await flushPromises()
+    expect(wrapper.emitted('submit')?.at(-1)?.[0]).toMatchObject({ name: 'Corrección todavía no enviada', composition: { version: 2 } })
+  })
+  it('carga explícitamente el borrador pendiente para corregirlo', async () => {
+    wrapper = await mountSuspended(ProductForm, { props: { product, context, saving: false, blocked: true } })
+    const draft = { ...productMutationInput(product), name: 'Datos del intento pendiente', composition: { kind: 'product' as const, version: 3, components: [] } }
+    await wrapper.setProps({ draft, blocked: false })
+    await wrapper.find('form').trigger('submit')
+    await flushPromises()
+    expect(wrapper.emitted('submit')?.at(-1)?.[0]).toMatchObject({ name: draft.name, composition: { version: 3 } })
+  })
   it.each([false, true])('usa H87 y oculta referencia y código de barras al editar o duplicar (duplicar: %s)', async (duplicate) => {
     wrapper = await mountSuspended(ProductForm, { props: {
       product: { ...product, unit: {}, reference: 'Referencia original', additional_fields: { barcode: '123', brand: 'Marca' } },
@@ -193,8 +209,8 @@ describe('guardado cliente sin duplicados', () => {
       wrapper.findComponent(ProductForm).vm.$emit('submit', productMutationInput(product))
       await flushPromises()
       expect(wrapper.text()).toContain('El servicio de productos de Siigo no está disponible.')
-      expect(wrapper.text()).toContain('Este producto tiene un guardado pendiente de conciliar.')
-      expect(wrapper.text()).toContain('Desbloquear edición')
+      expect(wrapper.text()).toContain('Guardado pendiente · Paso 1: comprobar · Paso 2: resolver')
+      expect(wrapper.text()).toContain('Comprobar otra vez')
       expect(wrapper.findComponent(ProductForm).props('blocked')).toBe(true)
     } finally { globalThis.$fetch = originalFetch }
   })
