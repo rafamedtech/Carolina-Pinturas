@@ -30,7 +30,7 @@ const productImage = ref<ProductImage | null>(null)
 watch(product, (value) => {
   productImage.value = value?.internal?.image ?? null
 }, { immediate: true })
-const { saving, errorMessage, ambiguous, checking, operationId, restoredProduct, save, check, clearPending } = useProductMutation()
+const { saving, errorMessage, ambiguous, checking, operationId, save, check, clearPending } = useProductMutation()
 const discardedWriteIds = shallowRef<string[]>([])
 const formDraft = shallowRef<ProductInput>()
 const confirmedVersion = shallowRef<number>()
@@ -79,7 +79,6 @@ async function recover() {
 async function submit(input: ProductInput) {
   resolutionNotice.value = ''
   const saved = await save(input, props.productId)
-  if (restoredProduct.value) restored(restoredProduct.value)
   if (saved) {
     useToast().add({ title: props.productId ? 'Producto actualizado' : 'Producto creado', color: 'success' })
     await navigateTo({ path: `/productos/${encodeURIComponent(saved.id)}`, query: { returnTo: returnTo.value } })

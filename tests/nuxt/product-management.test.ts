@@ -197,26 +197,33 @@ describe('formulario de productos', () => {
 })
 
 describe('guardado cliente sin duplicados', () => {
-  it('restaura el formulario y permite editar cuando el servidor confirma que Siigo no cambió', async () => {
+  it.each([502, 504])('un fallo %s conserva los cambios del formulario y permite un nuevo intento manual', async (statusCode) => {
     wrapper = await mountSuspended(ProductEditor, { props: { productId: id } })
     await vi.waitFor(() => expect(wrapper!.findComponent(ProductForm).exists()).toBe(true))
-    await wrapper.get('input[maxlength="100"]').setValue('Nombre que no se guardará')
+    await wrapper.get('input[maxlength="100"]').setValue('Nombre que quiero guardar')
     const originalFetch = globalThis.$fetch
-    globalThis.$fetch = vi.fn().mockRejectedValue({ statusCode: 502, data: {
-      statusMessage: 'No se guardaron los cambios.',
-      data: { ambiguous: false, operationId: id, restoredProduct: product }
-    } }) as unknown as typeof $fetch
+    const failureMessage = 'No se guardaron los cambios en la aplicación. Vuelve a intentarlo.'
+    const fetchMock = vi.fn().mockRejectedValue({ statusCode, data: {
+      statusMessage: failureMessage,
+      data: { ambiguous: false, retryable: true, operationId: id }
+    } })
+    globalThis.$fetch = fetchMock as unknown as typeof $fetch
     try {
-      wrapper.findComponent(ProductForm).vm.$emit('submit', { ...productMutationInput(product), name: 'Nombre que no se guardará' })
+      const form = wrapper.findComponent(ProductForm)
+      const draft = { ...productMutationInput(product), name: 'Nombre que quiero guardar' }
+      form.vm.$emit('submit', draft)
       await flushPromises()
-      await vi.waitFor(() => expect((wrapper!.get('input[maxlength="100"]').element as HTMLInputElement).value).toBe(product.name))
-      expect(wrapper.findComponent(ProductForm).props('blocked')).toBe(false)
-      expect(wrapper.text()).toContain('No se guardaron los cambios. Se conservaron los valores anteriores de Siigo.')
+      expect((wrapper.get('input[maxlength="100"]').element as HTMLInputElement).value).toBe(draft.name)
+      expect(form.props('blocked')).toBe(false)
+      expect(wrapper.text()).toContain(failureMessage)
       expect(wrapper.text()).not.toContain('Guardado pendiente · Paso 1')
       expect(wrapper.text()).not.toContain('Guardado confirmado')
+      form.vm.$emit('submit', draft)
+      await flushPromises()
+      expect(fetchMock).toHaveBeenCalledTimes(2)
+      expect(fetchMock.mock.calls.every(([, options]) => options.body.name === draft.name)).toBe(true)
     } finally { globalThis.$fetch = originalFetch }
   })
-
   it('muestra el intento recién fallido y permite acceder al desbloqueo sin recargar', async () => {
     wrapper = await mountSuspended(ProductEditor, { props: { productId: id } })
     await vi.waitFor(() => expect(wrapper!.findComponent(ProductForm).exists()).toBe(true))

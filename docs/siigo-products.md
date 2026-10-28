@@ -4,7 +4,7 @@
 
 Administradores crean y actualizan productos simples y compuestos, incluyendo precios, impuestos, datos SAT y estado. Ambos se escriben en Siigo como `Product` con `stock_control: false`. La composición se administra exclusivamente en PostgreSQL. Los roles de captura conservan consultas. Pedidos nuevos rechazan productos inactivos y tipos históricos (`Combo`, `Service`, `ConsumerGood`); los pedidos anteriores conservan sus referencias. No hay borrado. Consulta [Productos compuestos](./productos-compuestos.md) para las reglas de inventario y conciliación.
 
-Las mutaciones usan `siigoRequest` exclusivamente en servidor. Ante timeout o respuesta inválida posterior al envío, no se reintenta ni se anuncia éxito: la interfaz ofrece consultar el resultado por ID o código antes de iniciar otra edición. No existe garantía de idempotencia de Siigo para productos.
+Las mutaciones usan `siigoRequest` exclusivamente en servidor. El guardado exige confirmación de los valores comerciales de Siigo antes de aplicar el producto y sus opciones internas en PostgreSQL. Ante un fallo no se anuncia éxito ni se repite automáticamente la escritura: se conserva el formulario y se permite volver a guardar manualmente. El siguiente intento consulta primero Siigo por ID o, para altas previamente fallidas, por código, para evitar repetir una operación ya aplicada. No existe garantía de idempotencia de Siigo para productos.
 
 ## Lectura local y sincronización explícita (26/10/2026)
 
@@ -59,8 +59,16 @@ Siigo México no expone imagen de producto (verificado contra listado y detalle 
 - Storage no tiene políticas para `anon`/`authenticated`: escribe solo el servidor con `NUXT_SUPABASE_SECRET_KEY` (llave `sb_secret_`, nunca `NUXT_PUBLIC_*`) después de `requireRole`.
 - Se sube desde la edición del producto; en el detalle solo se muestra si existe. Un producto nuevo recibe imagen después de crearse.
 
-## Restauración de ediciones fallidas (28/10/2026)
+## Guardado confirmado por Siigo (28/10/2026)
 
-Cada intento nuevo de edición conserva en su JSON de entrada los valores comerciales anteriores (`previousCommercial`), incluido el control de inventario real de Siigo. Si la escritura falla y una consulta fresca por ID confirma que Siigo conserva esos mismos valores, se cierra el intento como fallido, se conserva la composición y disponibilidad interna anterior y se restaura el formulario. Se muestra «No se guardaron los cambios» y se permite editar de nuevo; no se anuncia éxito ni se repite el PUT.
+Crear, editar y cambiar el estado de un producto sigue este orden:
 
-Tras un timeout se mantiene temporalmente el bloqueo porque Siigo todavía podría procesar la solicitud. La revisión vuelve a comprobar al concluir la espera de cinco minutos y restaura automáticamente si coincide con los valores anteriores. Si hay cambios parciales, otro identificador o no se puede consultar Siigo o completar el cierre local, se conserva la conciliación. Las altas y los intentos históricos sin snapshot previo mantienen su recuperación existente.
+1. Consultar Siigo y validar los datos y las reglas internas. Reservar únicamente un registro de operación; no actualizar anticipadamente el snapshot del producto.
+2. Si Siigo ya refleja exactamente los valores comerciales solicitados, usar esa confirmación sin repetir la escritura. Si no coincide, enviar una sola escritura y consultar el producto por ID sin caché para comprobar todos los campos comerciales, incluido `stock_control`.
+3. Solo después de la confirmación guardar el snapshot, los precios, impuestos, composición y disponibilidad interna en una misma transacción local. El producto queda confirmado únicamente si esa transacción termina correctamente.
+
+Si falla la escritura, la comprobación o la transacción local, el intento se marca `failed` y se devuelve `retryable: true`. El producto local conserva sus valores anteriores y el formulario mantiene los cambios capturados, con un error y el botón de guardar habilitado para un reintento manual. Un HTTP exitoso que todavía devuelva los valores anteriores o cambios parciales también falla localmente. No hay reenvíos automáticos ni restauración del formulario en este flujo.
+
+El reintento consulta primero Siigo: si el cambio anterior ya se aplicó, completa solo el guardado local. Para un alta fallida se localiza el producto por su ID conocido o por código exacto antes de considerar otro POST; si existe con datos distintos, se exige abrirlo para editarlo. Las escrituras siguen teniendo un único envío por acción explícita, incluidos los timeouts.
+
+Se conserva el bloqueo únicamente mientras otra operación está en curso o cuando la base de datos no puede cerrar la reserva. Los registros históricos `pending`/`unknown` conservan la recuperación existente; las operaciones nuevas que fallan y pueden cerrarse no entran en conciliación ni dejan bloqueado el producto.

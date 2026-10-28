@@ -10,14 +10,12 @@ export function useProductMutation() {
   const lookupResults = ref<SiigoProduct[]>([])
   const operationId = shallowRef('')
   const saveFailureMessage = shallowRef('')
-  const restoredProduct = shallowRef<SiigoProduct | null>(null)
 
   async function save(input: ProductInput | { active: boolean }, id?: string) {
     if (saving.value || ambiguous.value) return null
     saving.value = true
     errorMessage.value = ''
     saveFailureMessage.value = ''
-    restoredProduct.value = null
     lookupCode.value = 'code' in input ? input.code : ''
     try {
       const product = await $fetch<SiigoProduct>(id ? `/api/siigo/products/${encodeURIComponent(id)}${'code' in input ? '' : '/active'}` : '/api/siigo/products', {
@@ -27,21 +25,17 @@ export function useProductMutation() {
       await refreshNuxtData().catch(() => undefined)
       return product
     } catch (error: unknown) {
-      const failure = error as { statusCode?: number, data?: { statusMessage?: string, data?: { ambiguous?: boolean, operationId?: string, restoredProduct?: SiigoProduct, cause?: { message?: string } } } }
-      operationId.value = failure.data?.data?.operationId ?? ''
-      ambiguous.value = failure.data?.data?.ambiguous ?? (!failure.statusCode || failure.statusCode >= 500)
-      restoredProduct.value = failure.data?.data?.restoredProduct ?? null
-      if (restoredProduct.value) {
-        operationId.value = ''
-        await refreshNuxtData(['products-catalog-request', 'product-management-catalog', 'product-brand-options']).catch(() => undefined)
-      }
+      const failure = error as { statusCode?: number, data?: { statusMessage?: string, data?: { ambiguous?: boolean, retryable?: boolean, operationId?: string, cause?: { message?: string } } } }
+      const retryable = failure.data?.data?.retryable === true
+      operationId.value = retryable ? '' : failure.data?.data?.operationId ?? ''
+      ambiguous.value = retryable ? false : failure.data?.data?.ambiguous ?? (!failure.statusCode || failure.statusCode >= 500)
       const cause = failure.data?.data?.cause?.message ?? ''
       saveFailureMessage.value = /products service.*unavailable/i.test(cause)
         ? 'El servicio de productos de Siigo no está disponible. Intenta más tarde.'
         : cause
       errorMessage.value = ambiguous.value
         ? [saveFailureMessage.value || 'No se pudo confirmar el guardado.', 'Consulta el resultado antes de volver a guardar.'].join(' ')
-        : failure.data?.statusMessage || 'No se pudo guardar el producto.'
+        : [failure.data?.statusMessage || 'No se pudo guardar el producto.', retryable ? saveFailureMessage.value : ''].filter(Boolean).join(' ')
       return null
     } finally {
       saving.value = false
@@ -94,5 +88,5 @@ export function useProductMutation() {
     errorMessage.value = ''
     saveFailureMessage.value = ''
   }
-  return { saving, errorMessage, ambiguous, checking, lookupResults, restoredProduct, operationId: readonly(operationId), save, check, discard, clearPending }
+  return { saving, errorMessage, ambiguous, checking, lookupResults, operationId: readonly(operationId), save, check, discard, clearPending }
 }

@@ -4,12 +4,12 @@ import { productMutationInput } from '../../app/utils/siigoProductMutation'
 import { discardProductWrite, recoverProductWrite, reviewProductWrite, retryProductWrite, saveManagedProduct } from '../../server/utils/managed-products'
 
 const mocks = vi.hoisted(() => ({
-  mutate: vi.fn(), update: vi.fn(), persist: vi.fn(), transaction: vi.fn(),
+  mutate: vi.fn(), list: vi.fn(), localUpdate: vi.fn(), update: vi.fn(), persist: vi.fn(), transaction: vi.fn(),
   current: vi.fn(), validate: vi.fn(), findWrite: vi.fn(), lock: vi.fn(), findPending: vi.fn(), attach: vi.fn(), stored: vi.fn(), localVersion: vi.fn()
 }))
 vi.mock('../../server/utils/siigo-products', () => ({
   getProductDetail: mocks.current, mutateProduct: mocks.mutate,
-  validateProductReferences: vi.fn(), listProducts: vi.fn()
+  validateProductReferences: vi.fn(), listProducts: mocks.list
 }))
 vi.mock('../../server/utils/siigo-persistence', () => ({ upsertSiigoProduct: mocks.persist, siigoJson: (value: unknown) => value }))
 vi.mock('../../server/utils/product-compositions', () => ({
@@ -163,80 +163,121 @@ describe('desbloqueo explícito de ediciones pendientes', () => {
   })
 })
 
-describe('clasificación del resultado de un guardado de producto', () => {
-  it.each([429, 502, 504])('cierra como failed un error %s que ocurrió antes de escribir en Siigo', async (statusCode) => {
-    mocks.mutate.mockRejectedValue(createError({ statusCode, data: { ambiguous: false } }))
-    await expect(saveManagedProduct(productMutationInput(product))).rejects.toMatchObject({ statusCode, data: { ambiguous: false } })
-    expect(mocks.update).toHaveBeenCalledWith({ where: { id: operationId }, data: { state: 'failed' } })
-    expect(mocks.mutate).toHaveBeenCalledTimes(1)
+describe('guardado local condicionado a la confirmación de Siigo', () => {
+  const previous = { ...product, name: 'Anterior', stock_control: true }
+  const confirmed = { ...product, name: 'Nuevo nombre' }
+  const input = productMutationInput(confirmed)
+  const tx = () => ({
+    $queryRaw: vi.fn().mockResolvedValue([{ state: 'pending' }]),
+    siigoProduct: { findUnique: vi.fn().mockResolvedValue({ internalKind: 'product' }), update: mocks.localUpdate },
+    productWrite: {
+      findFirst: vi.fn().mockResolvedValue(null),
+      create: vi.fn().mockImplementation(async ({ data }) => ({ id: operationId, ...data })),
+      update: mocks.update
+    }
   })
-
-  it.each([undefined, true])('conserva el bloqueo ante un fallo remoto incierto: %s', async (ambiguous) => {
-    mocks.mutate.mockRejectedValue(createError({ statusCode: 504, data: { ambiguous } }))
-    await expect(saveManagedProduct(productMutationInput(product))).rejects.toMatchObject({ statusCode: 502, data: { ambiguous: true } })
-    expect(mocks.update).toHaveBeenCalledWith({ where: { id: operationId }, data: { state: 'unknown' } })
-    expect(mocks.mutate).toHaveBeenCalledTimes(1)
-  })
-
-  it('mantiene pendiente un fallo local después de confirmar Siigo', async () => {
-    mocks.mutate.mockResolvedValue(product)
-    mocks.transaction.mockImplementationOnce(async callback => callback({
-      productWrite: { findFirst: vi.fn().mockResolvedValue(null), create: vi.fn().mockResolvedValue({ id: operationId, input: productMutationInput(product), isNew: true }) }
-    })).mockRejectedValueOnce(createError({ statusCode: 409, data: { ambiguous: false } }))
-    await expect(saveManagedProduct(productMutationInput(product))).rejects.toMatchObject({ data: { ambiguous: true } })
-    expect(mocks.update).toHaveBeenCalledWith({ where: { id: operationId }, data: { state: 'unknown', productId: product.id } })
-  })
-})
-
-describe('restauración de una edición fallida sin cambios en Siigo', () => {
-  const previous = { ...product, stock_control: true, name: 'Anterior' }
-  const input = { ...productMutationInput(previous), name: 'Nuevo nombre' }
   beforeEach(() => {
-    mocks.current.mockResolvedValue(previous)
-    mocks.mutate.mockRejectedValue(createError({ statusCode: 502, data: { ambiguous: true, cause: { statusCode: 502, message: 'Servicio no disponible' } } }))
-    mocks.transaction.mockImplementation(async callback => callback({
-      $queryRaw: vi.fn().mockResolvedValue([{ state: 'unknown' }]),
-      productWrite: {
-        findFirst: vi.fn().mockResolvedValue(null),
-        create: vi.fn().mockImplementation(async ({ data }) => ({ id: operationId, ...data })),
-        update: mocks.update
-      }
-    }))
+    mocks.transaction.mockImplementation(async callback => callback(tx()))
+    mocks.current.mockResolvedValueOnce(previous).mockResolvedValue(confirmed)
+    mocks.mutate.mockResolvedValue(confirmed)
   })
-  it('cierra el intento, conserva el inventario anterior y devuelve el producto para restaurar el formulario', async () => {
-    await expect(saveManagedProduct(input, product.id)).rejects.toMatchObject({
-      statusCode: 502, data: { ambiguous: false, restoredProduct: previous }
+  it('escribe en Siigo, comprueba por ID y después guarda el snapshot y las opciones internas', async () => {
+    mocks.persist.mockImplementation(async () => {
+      expect(mocks.mutate).toHaveBeenCalledTimes(1)
+      expect(mocks.current).toHaveBeenCalledTimes(2)
     })
-    expect(mocks.update).toHaveBeenCalledWith({ where: { id: operationId }, data: { state: 'failed' } })
-    expect(mocks.mutate).toHaveBeenCalledTimes(1)
-    expect(mocks.current).toHaveBeenCalledTimes(2)
-    expect(mocks.validate).toHaveBeenCalledTimes(1)
+    expect(await saveManagedProduct(input, product.id)).toMatchObject(confirmed)
+    expect(mocks.current).toHaveBeenLastCalledWith(product.id, true)
+    expect(mocks.update).toHaveBeenCalledWith({ where: { id: operationId }, data: { state: 'synced', productId: product.id } })
+    expect(mocks.localUpdate).toHaveBeenCalledTimes(1)
   })
-  it.each(['changed', 'unavailable', 'other-id'])('mantiene pendiente si la verificación devuelve %s', async (result) => {
+  it.each([400, 429, 502, 504])('un error remoto %s falla localmente sin modificar el producto ni bloquear el reintento', async (statusCode) => {
+    mocks.mutate.mockRejectedValue(createError({ statusCode, data: { ambiguous: true } }))
+    await expect(saveManagedProduct(input, product.id)).rejects.toMatchObject({ statusCode, data: { ambiguous: false, retryable: true } })
+    expect(mocks.persist).not.toHaveBeenCalled()
+    expect(mocks.localUpdate).not.toHaveBeenCalled()
+    expect(mocks.update).toHaveBeenCalledWith({ where: { id: operationId }, data: { state: 'failed', productId: product.id } })
+  })
+  it('un HTTP exitoso con datos anteriores no aplica ningún cambio local', async () => {
+    mocks.current.mockReset().mockResolvedValue(previous)
+    mocks.mutate.mockResolvedValue(previous)
+    await expect(saveManagedProduct(input, product.id)).rejects.toMatchObject({ data: { retryable: true, cause: { message: 'Siigo todavía no confirma todos los cambios enviados.' } } })
+    expect(mocks.persist).not.toHaveBeenCalled()
+    expect(mocks.localUpdate).not.toHaveBeenCalled()
+  })
+  it('la comprobación final detecta que falta desactivar el inventario aunque el resto coincida', async () => {
+    mocks.current.mockReset().mockResolvedValueOnce(previous).mockResolvedValue({ ...confirmed, stock_control: true })
+    await expect(saveManagedProduct(input, product.id)).rejects.toMatchObject({ data: { retryable: true } })
+    expect(mocks.persist).not.toHaveBeenCalled()
+  })
+  it.each(['unavailable', 'other-id', 'partial'])('no guarda localmente si la lectura final devuelve %s', async (result) => {
     mocks.current.mockReset().mockResolvedValueOnce(previous)
     if (result === 'unavailable') mocks.current.mockRejectedValueOnce(createError({ statusCode: 502 }))
-    else mocks.current.mockResolvedValueOnce({ ...previous, ...(result === 'changed' ? { name: 'Cambio parcial' } : { id: 'otro' }) })
-    await expect(saveManagedProduct(input, product.id)).rejects.toMatchObject({ data: { ambiguous: true } })
-    expect(mocks.update).toHaveBeenCalledWith({ where: { id: operationId }, data: { state: 'unknown' } })
+    else mocks.current.mockResolvedValueOnce({ ...confirmed, ...(result === 'other-id' ? { id: 'otro' } : { name: 'Cambio parcial' }) })
+    await expect(saveManagedProduct(input, product.id)).rejects.toMatchObject({ data: { retryable: true } })
+    expect(mocks.persist).not.toHaveBeenCalled()
+    expect(mocks.localUpdate).not.toHaveBeenCalled()
   })
-  it('no desbloquea si falla el cierre local', async () => {
-    mocks.transaction.mockImplementationOnce(async callback => callback({
-      productWrite: { findFirst: vi.fn().mockResolvedValue(null), create: vi.fn().mockResolvedValue({ id: operationId }) }
-    })).mockRejectedValueOnce(new Error('Base de datos no disponible'))
-    await expect(saveManagedProduct(input, product.id)).rejects.toMatchObject({ data: { ambiguous: true } })
+  it('un reintento manual después del fallo vuelve a enviar y solo confirma localmente al coincidir Siigo', async () => {
+    mocks.current.mockReset().mockResolvedValueOnce(previous).mockResolvedValueOnce(previous).mockResolvedValueOnce(confirmed)
+    mocks.mutate.mockRejectedValueOnce(createError({ statusCode: 502 })).mockResolvedValueOnce(confirmed)
+    await expect(saveManagedProduct(input, product.id)).rejects.toMatchObject({ data: { retryable: true } })
+    expect(mocks.persist).not.toHaveBeenCalled()
+    expect(await saveManagedProduct(input, product.id)).toMatchObject(confirmed)
+    expect(mocks.mutate).toHaveBeenCalledTimes(2)
+    expect(mocks.localUpdate).toHaveBeenCalledTimes(1)
   })
-  it('espera antes de cerrar un timeout que todavía podría procesarse en Siigo', async () => {
-    mocks.mutate.mockRejectedValue(createError({ statusCode: 504, data: { ambiguous: true } }))
-    await expect(saveManagedProduct(input, product.id)).rejects.toMatchObject({ data: { ambiguous: true } })
-    expect(mocks.current).toHaveBeenCalledTimes(1)
-  })
-  it('la revisión posterior restaura un timeout antiguo únicamente si coincide con el snapshot anterior', async () => {
-    // Snapshot stored with the failed intent, using the actual remote stock_control.
-    const { composition: _composition, availability: _availability, ...commercial } = productMutationInput(previous)
-    const previousCommercial = Object.fromEntries(Object.entries({ ...commercial, stock_control: true, taxes: [], prices: [] }).reverse())
-    mocks.findWrite.mockResolvedValue({ id: operationId, productId: product.id, isNew: false, state: 'unknown', updatedAt: new Date('2026-01-01'), input: { ...input, previousCommercial } })
-    expect(await reviewProductWrite(operationId)).toMatchObject({ status: 'reverted', product: previous })
+  it('si la respuesta se perdió pero Siigo ya refleja los cambios, el reintento no repite el PUT', async () => {
+    mocks.current.mockReset().mockResolvedValue(confirmed)
+    expect(await saveManagedProduct(input, product.id)).toMatchObject(confirmed)
     expect(mocks.mutate).not.toHaveBeenCalled()
-    expect(mocks.update).toHaveBeenCalledWith({ where: { id: operationId }, data: { state: 'failed' } })
+    expect(mocks.localUpdate).toHaveBeenCalledTimes(1)
+  })
+  it('un fallo del commit local permite volver a guardar sin repetir el PUT confirmado', async () => {
+    mocks.transaction.mockImplementationOnce(async callback => callback(tx())).mockRejectedValueOnce(new Error('Fallo local'))
+    await expect(saveManagedProduct(input, product.id)).rejects.toMatchObject({ data: { retryable: true, cause: { stage: 'local' } } })
+    expect(mocks.localUpdate).not.toHaveBeenCalled()
+    expect(await saveManagedProduct(input, product.id)).toMatchObject(confirmed)
+    expect(mocks.mutate).toHaveBeenCalledTimes(1)
+  })
+  it('si la base de datos no puede cerrar el intento, conserva la reserva e informa que hay que comprobarlo', async () => {
+    mocks.mutate.mockRejectedValue(createError({ statusCode: 502 }))
+    mocks.update.mockRejectedValue(new Error('Base de datos no disponible'))
+    await expect(saveManagedProduct(input, product.id)).rejects.toMatchObject({ data: { retryable: false, ambiguous: true } })
+    expect(mocks.persist).not.toHaveBeenCalled()
+  })
+  it('un fallo de consulta antes de escribir permite reintentar sin aplicar cambios locales', async () => {
+    mocks.current.mockReset().mockRejectedValue(createError({ statusCode: 502, statusMessage: 'Siigo no está disponible.' }))
+    await expect(saveManagedProduct(input, product.id)).rejects.toMatchObject({ data: { retryable: true, ambiguous: false } })
+    expect(mocks.mutate).not.toHaveBeenCalled()
+    expect(mocks.persist).not.toHaveBeenCalled()
+    expect(mocks.transaction).not.toHaveBeenCalled()
+  })
+  it('un alta se confirma por ID antes de crear el producto local', async () => {
+    mocks.current.mockReset().mockResolvedValue(confirmed)
+    expect(await saveManagedProduct(input)).toMatchObject(confirmed)
+    expect(mocks.mutate).toHaveBeenCalledWith(input, undefined)
+    expect(mocks.current).toHaveBeenCalledWith(confirmed.id, true)
+  })
+  it('un alta fallida no crea el producto local', async () => {
+    mocks.mutate.mockRejectedValue(createError({ statusCode: 504 }))
+    await expect(saveManagedProduct(input)).rejects.toMatchObject({ data: { retryable: true } })
+    expect(mocks.persist).not.toHaveBeenCalled()
+    expect(mocks.localUpdate).not.toHaveBeenCalled()
+  })
+  it('un reintento de alta localiza por código el producto creado tras perder la respuesta, sin otro POST', async () => {
+    mocks.findPending.mockResolvedValue({ productId: null, code: input.code })
+    mocks.list.mockResolvedValue({ results: [confirmed] })
+    mocks.current.mockReset().mockResolvedValue(confirmed)
+    expect(await saveManagedProduct(input)).toMatchObject(confirmed)
+    expect(mocks.list).toHaveBeenCalledWith(expect.objectContaining({ code: input.code, refresh: 'true' }))
+    expect(mocks.mutate).not.toHaveBeenCalled()
+  })
+  it('un reintento de alta conserva el bloqueo de código duplicado si Siigo tiene datos distintos', async () => {
+    mocks.findPending.mockResolvedValue({ productId: null, code: input.code })
+    mocks.list.mockResolvedValue({ results: [previous] })
+    await expect(saveManagedProduct(input)).rejects.toMatchObject({ statusCode: 409 })
+    expect(mocks.mutate).not.toHaveBeenCalled()
+    expect(mocks.persist).not.toHaveBeenCalled()
   })
 })
