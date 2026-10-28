@@ -32,6 +32,8 @@ Los errores de consulta o validación anteriores al envío a Siigo cierran el in
 
 La acción **Consultar y conciliar guardado** consulta Siigo sin repetir la mutación. Verifica un resultado único y la coincidencia de los datos comerciales enviados; después completa la composición local. Ante diferencias o ausencia del producto mantiene el bloqueo e informa del problema. No se reintenta automáticamente una escritura remota.
 
+La acción **Desbloquear edición** permite cerrar explícitamente un intento de edición antiguo y conservar los datos actuales. Consulta Siigo antes de cerrar el intento como `failed`, conserva el registro y no aplica su composición ni disponibilidad pendientes. Solo admite ediciones del mismo producto con al menos cinco minutos de antigüedad; revalida el estado bajo bloqueo para no competir con una conciliación en curso. El formulario conserva las correcciones aún no guardadas. Los intentos cerrados no se pueden volver a conciliar.
+
 Solo los administradores pueden guardar o conciliar productos. Las tablas nuevas tienen RLS y no conceden acceso directo a `anon` o `authenticated`; el servidor aplica los permisos existentes. Los componentes locales están separados de los snapshots externos, por lo que recargar Siigo conserva las composiciones y los costos locales.
 
 ## Verificación y migración

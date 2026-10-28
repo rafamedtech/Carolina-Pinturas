@@ -176,6 +176,41 @@ describe('formulario de productos', () => {
 })
 
 describe('guardado cliente sin duplicados', () => {
+  it('desbloquea sin reemplazar las correcciones capturadas en el formulario', async () => {
+    let mutation!: ReturnType<typeof useProductMutation>
+    wrapper = await mountSuspended(defineComponent({ setup() {
+      mutation = useProductMutation()
+      return () => h(ProductForm, { product, context, saving: false, blocked: false })
+    } }))
+    const name = wrapper.get('input[maxlength="100"]')
+    await name.setValue('Nombre corregido sin guardar')
+    const originalFetch = globalThis.$fetch
+    const fetchMock = vi.fn().mockResolvedValue({ productId: id })
+    globalThis.$fetch = fetchMock as unknown as typeof $fetch
+    try {
+      expect(await mutation.discard(id, id)).toBe(true)
+      expect(fetchMock).toHaveBeenCalledWith('/api/siigo/products/discard-write', { method: 'POST', body: { productId: id, operationId: id }, retry: 0 })
+      expect((name.element as HTMLInputElement).value).toBe('Nombre corregido sin guardar')
+      expect(mutation.checking.value).toBe(false)
+    } finally { globalThis.$fetch = originalFetch }
+  })
+  it('expone la causa de conciliación y mantiene el bloqueo si falla el desbloqueo', async () => {
+    let mutation!: ReturnType<typeof useProductMutation>
+    wrapper = await mountSuspended(defineComponent({ setup() {
+      mutation = useProductMutation()
+      return () => h('div')
+    } }))
+    const originalFetch = globalThis.$fetch
+    globalThis.$fetch = vi.fn().mockRejectedValue({ data: { statusMessage: 'Siigo todavía no refleja los datos enviados.' } }) as unknown as typeof $fetch
+    try {
+      mutation.ambiguous.value = true
+      await mutation.check(id, id)
+      expect(mutation.errorMessage.value).toBe('Siigo todavía no refleja los datos enviados.')
+      expect(await mutation.discard(id, id)).toBe(false)
+      expect(mutation.ambiguous.value).toBe(true)
+    } finally { globalThis.$fetch = originalFetch }
+  })
+
   it.each([502, 504])('permite un nuevo intento manual tras un fallo %s confirmado antes de escribir', async (statusCode) => {
     let mutation!: ReturnType<typeof useProductMutation>
     wrapper = await mountSuspended(defineComponent({ setup() {

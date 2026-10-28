@@ -1,11 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createError } from 'h3'
 import { productMutationInput } from '../../app/utils/siigoProductMutation'
-import { saveManagedProduct } from '../../server/utils/managed-products'
+import { discardProductWrite, recoverProductWrite, saveManagedProduct } from '../../server/utils/managed-products'
 
 const mocks = vi.hoisted(() => ({
   mutate: vi.fn(), update: vi.fn(), persist: vi.fn(), transaction: vi.fn(),
-  current: vi.fn(), validate: vi.fn()
+  current: vi.fn(), validate: vi.fn(), findWrite: vi.fn(), lock: vi.fn()
 }))
 vi.mock('../../server/utils/siigo-products', () => ({
   getProductDetail: mocks.current, mutateProduct: mocks.mutate,
@@ -17,7 +17,7 @@ vi.mock('../../server/utils/product-compositions', () => ({
   assertNoPendingProductWrites: vi.fn(), attachProductCompositions: vi.fn()
 }))
 vi.mock('../../server/utils/prisma', () => ({ usePrisma: () => ({
-  $transaction: mocks.transaction, productWrite: { update: mocks.update }
+  $transaction: mocks.transaction, productWrite: { update: mocks.update, findUniqueOrThrow: mocks.findWrite }
 }) }))
 const product = {
   id: '00000000-0000-4000-8000-000000000001', code: 'PIN-1', name: 'Pintura',
@@ -34,6 +34,52 @@ beforeEach(() => {
       create: vi.fn().mockResolvedValue({ id: operationId, input: productMutationInput(product), isNew: true })
     }
   }))
+})
+
+describe('desbloqueo explícito de ediciones pendientes', () => {
+  const oldDate = new Date('2026-01-01T00:00:00Z')
+  beforeEach(() => {
+    mocks.findWrite.mockResolvedValue({ id: operationId, productId: product.id, isNew: false, state: 'unknown', updatedAt: oldDate })
+    mocks.current.mockResolvedValue(product)
+    mocks.lock.mockResolvedValue([{ state: 'unknown', updatedAt: oldDate }])
+    mocks.transaction.mockImplementation(async callback => callback({ $queryRaw: mocks.lock, productWrite: { update: mocks.update } }))
+  })
+
+  it('consulta Siigo, conserva el snapshot actual y cierra solo el intento sin repetir la mutación', async () => {
+    await expect(discardProductWrite(operationId, product.id)).resolves.toEqual({ productId: product.id })
+    expect(mocks.current).toHaveBeenCalledWith(product.id, true)
+    expect(mocks.persist).toHaveBeenCalledWith(expect.anything(), product)
+    expect(mocks.update).toHaveBeenCalledWith({ where: { id: operationId }, data: { state: 'failed' } })
+    expect(mocks.validate).not.toHaveBeenCalled()
+    expect(mocks.mutate).not.toHaveBeenCalled()
+  })
+
+  it.each([{ isNew: true }, { productId: 'otro' }, { updatedAt: new Date() }])('rechaza altas, otro producto e intentos recientes: %j', async (change) => {
+    mocks.findWrite.mockResolvedValue({ productId: product.id, isNew: false, updatedAt: oldDate, ...change })
+    await expect(discardProductWrite(operationId, product.id)).rejects.toMatchObject({ statusCode: 409 })
+    expect(mocks.current).not.toHaveBeenCalled()
+    expect(mocks.update).not.toHaveBeenCalled()
+  })
+
+  it.each([{ state: 'synced', updatedAt: oldDate }, { state: 'unknown', updatedAt: new Date() }])('revalida el estado bajo bloqueo: %j', async (change) => {
+    mocks.lock.mockResolvedValue([change])
+    await expect(discardProductWrite(operationId, product.id)).rejects.toMatchObject({ statusCode: 409 })
+    expect(mocks.persist).not.toHaveBeenCalled()
+    expect(mocks.update).not.toHaveBeenCalled()
+  })
+
+  it('no desbloquea si no puede consultar el producto actual', async () => {
+    mocks.current.mockRejectedValue(createError({ statusCode: 502 }))
+    await expect(discardProductWrite(operationId, product.id)).rejects.toMatchObject({ statusCode: 502 })
+    expect(mocks.update).not.toHaveBeenCalled()
+  })
+
+  it('no aplica un intento descartado al volver a conciliar', async () => {
+    mocks.findWrite.mockResolvedValue({ state: 'failed' })
+    await expect(recoverProductWrite(operationId)).rejects.toMatchObject({ statusCode: 409 })
+    expect(mocks.current).not.toHaveBeenCalled()
+    expect(mocks.transaction).not.toHaveBeenCalled()
+  })
 })
 
 describe('clasificación del resultado de un guardado de producto', () => {

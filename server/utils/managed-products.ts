@@ -30,7 +30,9 @@ async function finishWrite(write: ProductWrite, product: SiigoProduct) {
   const db = usePrisma()
   return db.$transaction(async (tx) => {
     // The persisted intent and local composition commit together.
+    await lockCompositions(tx, true)
     const locked = await tx.$queryRaw<Array<{ state: string }>>`SELECT state FROM product_writes WHERE id = ${write.id}::uuid FOR UPDATE`
+    if (!locked[0] || locked[0].state === 'failed') throw createError({ statusCode: 409, statusMessage: 'Este intento ya se cerró. Recarga el producto antes de guardar.' })
     if (locked[0]?.state !== 'synced') {
       await persistInternalProduct(tx, input, product, write.isNew)
       await tx.productWrite.update({ where: { id: write.id }, data: { state: 'synced', productId: product.id } })
@@ -79,6 +81,7 @@ const canonical = (input: ProductInput) => JSON.stringify({
 })
 export async function recoverProductWrite(id: string) {
   const write = await usePrisma().productWrite.findUniqueOrThrow({ where: { id } })
+  if (write.state === 'failed') throw createError({ statusCode: 409, statusMessage: 'Este intento ya se cerró. Recarga el producto antes de guardar.' })
   const input = productInputSchema.parse(write.input)
   const matches = write.productId ? [await getProductDetail(write.productId, true)] : (await listProducts({ all: 'true', refresh: 'true', active: 'all', page: 1, page_size: 100, code: write.code })).results
   if (matches.length !== 1) throw createError({ statusCode: 409, statusMessage: 'No se encontró un producto único para conciliar. Conserva el guardado pendiente y revisa Siigo.' })
@@ -87,4 +90,24 @@ export async function recoverProductWrite(id: string) {
     throw createError({ statusCode: 409, statusMessage: 'Siigo todavía no refleja los datos enviados. El guardado sigue pendiente; revisa el producto antes de intentar otra escritura.' })
   }
   return finishWrite(write, product)
+}
+
+/** Explicitly close an old edit without replaying it or applying its internal settings. */
+export async function discardProductWrite(id: string, productId: string) {
+  const db = usePrisma()
+  const write = await db.productWrite.findUniqueOrThrow({ where: { id } })
+  if (write.isNew || write.productId !== productId) throw createError({ statusCode: 409, statusMessage: 'Solo puedes cerrar un intento de edición de este producto.' })
+  // A recent operation may still be running. Never unlock a live mutation.
+  if (write.updatedAt.getTime() > Date.now() - 5 * 60_000) throw createError({ statusCode: 409, statusMessage: 'El guardado es reciente. Espera cinco minutos y consulta su resultado antes de desbloquearlo.' })
+  const product = await getProductDetail(productId, true)
+  if (product.id !== productId) throw createError({ statusCode: 502, statusMessage: 'Siigo devolvió otro identificador de producto.' })
+  return db.$transaction(async (tx) => {
+    await lockCompositions(tx, true)
+    const locked = await tx.$queryRaw<Array<{ state: string, updatedAt: Date }>>`SELECT state, updated_at AS "updatedAt" FROM product_writes WHERE id = ${id}::uuid FOR UPDATE`
+    const current = locked[0]
+    if (!current || current.state === 'synced' || current.updatedAt.getTime() > Date.now() - 5 * 60_000) throw createError({ statusCode: 409, statusMessage: 'El guardado cambió. Consulta su resultado antes de desbloquearlo.' })
+    await upsertSiigoProduct(tx, product)
+    await tx.productWrite.update({ where: { id }, data: { state: 'failed' } })
+    return { productId }
+  }, { timeout: 20000 })
 }

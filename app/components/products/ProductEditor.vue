@@ -29,7 +29,19 @@ const productImage = ref<ProductImage | null>(null)
 watch(product, (value) => {
   productImage.value = value?.internal?.image ?? null
 }, { immediate: true })
-const { saving, errorMessage, ambiguous, checking, lookupResults, save, check } = useProductMutation()
+const { saving, errorMessage, ambiguous, checking, lookupResults, save, check, discard } = useProductMutation()
+const discardedWriteId = shallowRef('')
+const discardOpen = shallowRef(false)
+const pendingWriteId = computed(() => product.value?.internal?.pendingWriteId)
+const hasPendingWrite = computed(() => Boolean(props.productId && product.value?.internal?.syncPending && pendingWriteId.value !== discardedWriteId.value))
+async function unlock() {
+  if (!props.productId || !pendingWriteId.value) return
+  if (await discard(props.productId, pendingWriteId.value)) {
+    discardedWriteId.value = pendingWriteId.value
+    discardOpen.value = false
+    useToast().add({ title: 'Producto desbloqueado. Ya puedes guardar tus cambios.', color: 'success' })
+  }
+}
 async function recover() {
   const saved = await check(props.productId, product.value?.internal?.pendingWriteId)
   if (saved) await navigateTo(`/productos/${saved.id}`)
@@ -63,9 +75,38 @@ useSeoMeta({ title })
       <UAlert v-if="!allowed" title="Solo administradores pueden gestionar productos." color="warning" />
       <UAlert v-else-if="contextError || loadError" :title="loadError || 'No se pudieron cargar las opciones del producto.'" color="error" />
       <template v-else-if="context && !loading">
-        <UAlert v-if="productId && product?.internal?.syncPending" title="Este producto tiene un guardado pendiente de conciliar." color="warning">
+        <UAlert v-if="hasPendingWrite" title="Este producto tiene un guardado pendiente de conciliar." color="warning">
           <template #actions>
-            <UButton label="Consultar y conciliar guardado" :loading="checking" @click="recover" />
+            <UButton
+              label="Consultar y conciliar guardado"
+              :loading="checking"
+              :disabled="checking"
+              @click="recover"
+            />
+            <UModal v-model:open="discardOpen" title="Desbloquear edición" description="Conservar los datos actuales y cerrar el intento anterior.">
+              <UButton
+                label="Desbloquear edición"
+                color="neutral"
+                variant="outline"
+                :disabled="checking"
+              />
+              <template #body>
+                <div class="space-y-4">
+                  <p>Se consultará el producto actual en Siigo y se cerrará el intento pendiente. Los cambios internos de ese intento no se aplicarán. Las correcciones que tienes capturadas aquí se conservan para que puedas guardarlas después.</p>
+                  <UAlert v-if="errorMessage" :title="errorMessage" color="error" />
+                  <div class="flex justify-end gap-3">
+                    <UButton
+                      label="Cancelar"
+                      color="neutral"
+                      variant="outline"
+                      :disabled="checking"
+                      @click="discardOpen = false"
+                    />
+                    <UButton label="Conservar datos actuales y desbloquear" :loading="checking" @click="unlock" />
+                  </div>
+                </div>
+              </template>
+            </UModal>
           </template>
         </UAlert>
         <UAlert
@@ -98,7 +139,7 @@ useSeoMeta({ title })
           :duplicate="Boolean(duplicateFrom)"
           :context="context"
           :saving="saving"
-          :blocked="ambiguous || Boolean(productId && product?.internal?.syncPending)"
+          :blocked="ambiguous || hasPendingWrite || checking"
           @submit="submit"
           @cancel="navigateTo(back)"
         />

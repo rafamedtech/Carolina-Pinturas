@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createError } from 'h3'
 import { productMutationInput } from '../../app/utils/siigoProductMutation'
 
-const mocks = vi.hoisted(() => ({ role: 'admin', mutate: vi.fn(), list: vi.fn(), detail: vi.fn(), context: vi.fn(), sat: vi.fn(), image: vi.fn(), saveImage: vi.fn(), deleteImage: vi.fn(), localList: vi.fn(), localDetail: vi.fn(), persist: vi.fn(), persistDetail: vi.fn(), archiveMissing: vi.fn() }))
+const mocks = vi.hoisted(() => ({ role: 'admin', discard: vi.fn(), mutate: vi.fn(), list: vi.fn(), detail: vi.fn(), context: vi.fn(), sat: vi.fn(), image: vi.fn(), saveImage: vi.fn(), deleteImage: vi.fn(), localList: vi.fn(), localDetail: vi.fn(), persist: vi.fn(), persistDetail: vi.fn(), archiveMissing: vi.fn() }))
 vi.mock('../../server/utils/auth', () => ({
   requireRole: async (_event: unknown, roles: readonly string[]) => {
     if (!roles.includes(mocks.role)) throw createError({ statusCode: 403 })
@@ -10,7 +10,7 @@ vi.mock('../../server/utils/auth', () => ({
   }
 }))
 vi.mock('../../server/utils/siigo-products', () => ({ mutateProduct: mocks.mutate, listProducts: mocks.list, getProductDetail: mocks.detail, getProductContext: mocks.context }))
-vi.mock('../../server/utils/managed-products', () => ({ saveManagedProduct: mocks.mutate, recoverProductWrite: vi.fn() }))
+vi.mock('../../server/utils/managed-products', () => ({ saveManagedProduct: mocks.mutate, recoverProductWrite: vi.fn(), discardProductWrite: mocks.discard }))
 vi.mock('../../server/utils/prisma', () => ({ usePrisma: () => ({ siigoProduct: { updateMany: mocks.archiveMissing } }) }))
 vi.mock('../../server/utils/stored-products', () => ({ listStoredProducts: mocks.localList, getStoredProduct: mocks.localDetail }))
 vi.mock('../../server/utils/siigo-persistence', () => ({ upsertSiigoProduct: mocks.persistDetail }))
@@ -29,6 +29,7 @@ const create = (await import('../../server/api/siigo/products/index.post')).defa
 const update = (await import('../../server/api/siigo/products/[id].put')).default
 const active = (await import('../../server/api/siigo/products/[id]/active.patch')).default
 const recover = (await import('../../server/api/siigo/products/recover.post')).default
+const discard = (await import('../../server/api/siigo/products/discard-write.post')).default
 const list = (await import('../../server/api/siigo/products.get')).default
 const detail = (await import('../../server/api/siigo/products/[id].get')).default
 const context = (await import('../../server/api/siigo/products/context.get')).default
@@ -61,7 +62,7 @@ describe('autorización y frontera HTTP de productos', () => {
   })
   it.each(['mostrador', 'vendedor', 'repartidor', 'igualaciones'])('rechaza escritura y catálogos de edición para %s', async (role) => {
     mocks.role = role
-    for (const route of [create, update, active, recover, context, sat, uploadImage, removeImage]) {
+    for (const route of [create, update, active, recover, discard, context, sat, uploadImage, removeImage]) {
       await expect(route(event({ id, body, query: { kind: 'unit' } }))).rejects.toMatchObject({ statusCode: 403 })
     }
     expect(mocks.saveImage).not.toHaveBeenCalled()
@@ -91,6 +92,12 @@ describe('autorización y frontera HTTP de productos', () => {
     await expect(list(event({ query: { refresh: 'true' } }))).rejects.toMatchObject({ statusCode: 502 })
     expect(mocks.persist).not.toHaveBeenCalled()
     expect(mocks.archiveMissing).not.toHaveBeenCalled()
+  })
+  it('admin desbloquea solo un intento y producto con UUID válidos', async () => {
+    await discard(event({ body: { operationId: id, productId: id } }))
+    expect(mocks.discard).toHaveBeenCalledWith(id, id)
+    await expect(discard(event({ body: { operationId: id, productId: '../auth' } }))).rejects.toMatchObject({ statusCode: 400 })
+    expect(mocks.discard).toHaveBeenCalledTimes(1)
   })
   it('admin puede crear, editar y activar', async () => {
     await create(event({ body }))
