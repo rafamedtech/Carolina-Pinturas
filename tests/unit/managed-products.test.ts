@@ -80,6 +80,19 @@ describe('desbloqueo explícito de ediciones pendientes', () => {
     expect(mocks.current).not.toHaveBeenCalled()
     expect(mocks.transaction).not.toHaveBeenCalled()
   })
+
+  it('identifica los campos que Siigo no refleja sin alterar ni reenviar el intento', async () => {
+    mocks.findWrite.mockResolvedValue({ id: operationId, productId: product.id, state: 'unknown', input: productMutationInput(product) })
+    mocks.current.mockResolvedValue({ ...product, stock_control: true, name: 'Nombre anterior' })
+    await expect(recoverProductWrite(operationId)).rejects.toMatchObject({
+      statusCode: 409, data: { operationId, differences: [
+        { field: 'name', expected: 'Pintura', actual: 'Nombre anterior' },
+        { field: 'stock_control', expected: false, actual: true }
+      ] }
+    })
+    expect(mocks.mutate).not.toHaveBeenCalled()
+    expect(mocks.update).not.toHaveBeenCalled()
+  })
 })
 
 describe('clasificación del resultado de un guardado de producto', () => {

@@ -172,7 +172,8 @@ export async function mutateProduct(input: ProductInput | { active: boolean }, i
     throw createError({
       statusCode: status,
       statusMessage: ambiguous ? 'No se pudo confirmar el guardado. Consulta el producto antes de volver a intentar.' : ((error as { statusMessage?: string }).statusMessage || 'Siigo rechazó los datos del producto.'),
-      data: { ambiguous, productId: id, code: 'code' in input ? input.code : undefined }
+      data: { ambiguous, productId: id, code: 'code' in input ? input.code : undefined,
+        cause: { statusCode: status, message: (error as { statusMessage?: string }).statusMessage || 'No se pudo completar la solicitud de producto.' } }
     })
   }
 }

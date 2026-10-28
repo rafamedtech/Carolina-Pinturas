@@ -9,11 +9,13 @@ export function useProductMutation() {
   const checking = shallowRef(false)
   const lookupResults = ref<SiigoProduct[]>([])
   const operationId = shallowRef('')
+  const saveFailureMessage = shallowRef('')
 
   async function save(input: ProductInput | { active: boolean }, id?: string) {
     if (saving.value || ambiguous.value) return null
     saving.value = true
     errorMessage.value = ''
+    saveFailureMessage.value = ''
     lookupCode.value = 'code' in input ? input.code : ''
     try {
       const product = await $fetch<SiigoProduct>(id ? `/api/siigo/products/${encodeURIComponent(id)}${'code' in input ? '' : '/active'}` : '/api/siigo/products', {
@@ -23,11 +25,15 @@ export function useProductMutation() {
       await refreshNuxtData().catch(() => undefined)
       return product
     } catch (error: unknown) {
-      const failure = error as { statusCode?: number, data?: { statusMessage?: string, data?: { ambiguous?: boolean, operationId?: string } } }
+      const failure = error as { statusCode?: number, data?: { statusMessage?: string, data?: { ambiguous?: boolean, operationId?: string, cause?: { message?: string } } } }
       operationId.value = failure.data?.data?.operationId ?? ''
       ambiguous.value = failure.data?.data?.ambiguous ?? (!failure.statusCode || failure.statusCode >= 500)
+      const cause = failure.data?.data?.cause?.message ?? ''
+      saveFailureMessage.value = /products service.*unavailable/i.test(cause)
+        ? 'El servicio de productos de Siigo no está disponible. Intenta más tarde.'
+        : cause
       errorMessage.value = ambiguous.value
-        ? 'No se pudo confirmar el guardado. Consulta el producto antes de volver a intentar.'
+        ? [saveFailureMessage.value || 'No se pudo confirmar el guardado.', 'Consulta el resultado antes de volver a guardar.'].join(' ')
         : failure.data?.statusMessage || 'No se pudo guardar el producto.'
       return null
     } finally {
@@ -43,6 +49,7 @@ export function useProductMutation() {
         ambiguous.value = false
         operationId.value = ''
         errorMessage.value = ''
+        saveFailureMessage.value = ''
         await refreshNuxtData().catch(() => undefined)
         return product
       }
@@ -50,7 +57,8 @@ export function useProductMutation() {
         ? [await $fetch<SiigoProduct>(`/api/siigo/products/${encodeURIComponent(id)}`, { query: { refresh: 'true' } })]
         : (await $fetch<{ results: SiigoProduct[] }>('/api/siigo/products', { query: { code: lookupCode.value, active: 'all', refresh: 'true' } })).results
     } catch (error: unknown) {
-      errorMessage.value = (error as { data?: { statusMessage?: string } }).data?.statusMessage || 'No se pudo consultar el resultado. Vuelve a consultar antes de guardar.'
+      const message = (error as { data?: { statusMessage?: string } }).data?.statusMessage || 'No se pudo consultar el resultado. Vuelve a consultar antes de guardar.'
+      errorMessage.value = [saveFailureMessage.value, message].filter(Boolean).join(' ')
     } finally {
       checking.value = false
     }
@@ -63,6 +71,7 @@ export function useProductMutation() {
       ambiguous.value = false
       operationId.value = ''
       errorMessage.value = ''
+      saveFailureMessage.value = ''
       // Do not refresh the form: the administrator may have unsaved corrections.
       return true
     } catch (error: unknown) {
@@ -72,5 +81,5 @@ export function useProductMutation() {
       checking.value = false
     }
   }
-  return { saving, errorMessage, ambiguous, checking, lookupResults, save, check, discard }
+  return { saving, errorMessage, ambiguous, checking, lookupResults, operationId: readonly(operationId), save, check, discard }
 }

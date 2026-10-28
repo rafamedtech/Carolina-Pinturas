@@ -2,6 +2,12 @@ import { describe, expect, it } from 'vitest'
 import { siigoErrorDetails, siigoErrorMessages } from '../../server/utils/siigo-errors'
 
 describe('siigoErrorMessages', () => {
+  it('traduce el error product_service observado en lecturas y escrituras de México', () => {
+    const data = { status: 503, errors: [{ code: 'product_service', message: 'The Products service is currently unavailable. Please try in a few minutes' }] }
+    expect(siigoErrorMessages(data)).toBe('El servicio de productos de Siigo no está disponible. Intenta más tarde.')
+    expect(siigoErrorMessages(data, true)).toContain('[product_service] El servicio de productos de Siigo no está disponible.')
+    expect(siigoErrorDetails(data)[0]?.message).toContain('The Products service')
+  })
   it('identifica documents_service aunque Siigo lo presente como un error genérico de datos', () => {
     const data = { Errors: [{ Code: 'documents_service', Message: 'Your request could not be completed with the data you submitted. Please verify' }] }
     expect(siigoErrorMessages(data, true)).toContain('[documents_service] El servicio de documentos de Siigo')

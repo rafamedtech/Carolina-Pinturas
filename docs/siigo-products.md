@@ -43,6 +43,12 @@ Las decisiones del 18/10/2026 sustituyen la edición de servicios/bienes de cons
 
 Pruebas unitarias y de rutas cubren validación, permisos, filtros, SAT, normalización, preservación de payload, caché y errores ambiguos. Pruebas Nuxt cubren formulario, monedas, errores, calendarios y doble envío. Se verificaron consultas de catálogo y buscadores en Chrome con sesión existente. Las escrituras se prueban con mocks; no se crean datos de prueba en el tenant real.
 
+## Indisponibilidad del servicio de productos (27/10/2026)
+
+Se observó una actualización rechazada con `The Products service is currently unavailable. Please try in a few minutes`, mientras la consulta por ID seguía disponible y conservaba los datos anteriores. La respuesta de una consulta posterior confirmó `status: 503` y código `product_service`. La causa procede del servicio externo de productos; una lectura exitosa anterior no confirma que las actualizaciones estén disponibles. No repetir automáticamente el PUT ni cerrar el intento como exitoso si los datos no coinciden.
+
+El servidor conserva la causa controlada del fallo (etapa Siigo o persistencia local y código), sin registrar credenciales ni el payload completo. La conciliación compara campos comerciales normalizados con orden estable e informa de los campos diferentes. La interfaz traduce la indisponibilidad, conserva la causa al consultar el resultado y permite revisar el intento recién fallido sin recargar ni perder las correcciones capturadas.
+
 ## Imágenes de producto
 
 Siigo México no expone imagen de producto (verificado contra listado y detalle reales el 2026-09-15). La imagen es dato propio de la app:

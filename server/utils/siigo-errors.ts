@@ -28,12 +28,15 @@ export function siigoErrorDetails(data: unknown) {
 export function siigoErrorMessages(data: unknown, includeDetails = false): string | null {
   const messages = siigoErrorDetails(data)
     .map((error) => {
-      if (!includeDetails) return error.message
+      const message = error.code === 'product_service'
+        ? 'El servicio de productos de Siigo no está disponible. Intenta más tarde.'
+        : error.message
+      if (!includeDetails) return message
       return [
         error.code ? `[${error.code}]` : '',
         error.code === 'documents_service'
           ? 'El servicio de documentos de Siigo no pudo procesar la solicitud. Verifica en Siigo si se creó el documento antes de volver a intentar.'
-          : error.message,
+          : message,
         error.params.length ? `Campos: ${error.params.join(', ')}.` : '',
         error.detail && error.detail !== error.message ? error.detail : ''
       ].filter(Boolean).join(' ')

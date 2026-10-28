@@ -67,18 +67,26 @@ export async function saveManagedProduct(input: ProductInput, id?: string) {
     if (id && product.id !== id) throw createError({ statusCode: 502, statusMessage: 'Siigo devolvió otro identificador de producto.' })
     return await finishWrite(write, product)
   } catch (error: unknown) {
-    const failure = error as { statusCode?: number, statusMessage?: string, data?: { ambiguous?: boolean } }
+    const failure = error as { code?: string, statusCode?: number, statusMessage?: string, data?: { ambiguous?: boolean, cause?: { statusCode: number, message: string } } }
     const ambiguous = Boolean(product) || (failure.data?.ambiguous ?? (!failure.statusCode || failure.statusCode >= 500))
+    const cause = { stage: product ? 'local' : 'siigo', code: failure.code, ...failure.data?.cause,
+      ...(!failure.data?.cause ? { statusCode: failure.statusCode, message: failure.statusMessage } : {}) }
+    console.error('[managed-products] save failed', { operationId: write.id, productId: id, ...cause })
     await db.productWrite.update({ where: { id: write.id }, data: { state: ambiguous ? 'unknown' : 'failed', ...(product && !id ? { productId: product.id } : {}) } }).catch(() => undefined)
     throw createError({ statusCode: ambiguous ? 502 : failure.statusCode, statusMessage: ambiguous ? 'El guardado necesita conciliación. Consulta el resultado antes de volver a guardar.' : failure.statusMessage,
-      data: { ambiguous, operationId: write.id, productId: product?.id ?? id, code: input.code } })
+      data: { ambiguous, operationId: write.id, productId: product?.id ?? id, code: input.code, cause } })
   }
 }
-const canonical = (input: ProductInput) => JSON.stringify({
-  ...input, composition: undefined, availability: undefined,
+const commercialSnapshot = (input: ProductInput) => ({
+  code: input.code, name: input.name, account_group: input.account_group,
+  type: input.type, active: input.active, stock_control: input.stock_control,
+  tax_included: input.tax_included, unit: input.unit, key: input.key,
+  reference: input.reference, description: input.description,
+  additional_fields: { barcode: input.additional_fields.barcode, brand: input.additional_fields.brand },
   taxes: input.taxes.map(t => t.id).sort((a, b) => a - b),
-  prices: input.prices.map(p => ({ ...p, price_list: [...p.price_list].sort((a, b) => a.position - b.position) })).sort((a, b) => a.currency_code.localeCompare(b.currency_code))
+  prices: input.prices.map(p => ({ currency_code: p.currency_code, price_list: p.price_list.map(item => ({ position: item.position, value: item.value })).sort((a, b) => a.position - b.position) })).sort((a, b) => a.currency_code.localeCompare(b.currency_code))
 })
+const canonical = (input: ProductInput) => JSON.stringify(commercialSnapshot(input))
 export async function recoverProductWrite(id: string) {
   const write = await usePrisma().productWrite.findUniqueOrThrow({ where: { id } })
   if (write.state === 'failed') throw createError({ statusCode: 409, statusMessage: 'Este intento ya se cerró. Recarga el producto antes de guardar.' })
@@ -86,8 +94,12 @@ export async function recoverProductWrite(id: string) {
   const matches = write.productId ? [await getProductDetail(write.productId, true)] : (await listProducts({ all: 'true', refresh: 'true', active: 'all', page: 1, page_size: 100, code: write.code })).results
   if (matches.length !== 1) throw createError({ statusCode: 409, statusMessage: 'No se encontró un producto único para conciliar. Conserva el guardado pendiente y revisa Siigo.' })
   const product = await getProductDetail(matches[0]!.id, true)
-  if (product.type !== 'Product' || product.stock_control !== false || canonical(productMutationInput(product)) !== canonical(input)) {
-    throw createError({ statusCode: 409, statusMessage: 'Siigo todavía no refleja los datos enviados. El guardado sigue pendiente; revisa el producto antes de intentar otra escritura.' })
+  const expected = commercialSnapshot(input)
+  const actual = { ...commercialSnapshot(productMutationInput(product)), type: product.type ?? 'Product', stock_control: product.stock_control }
+  const differences = (Object.keys(expected) as Array<keyof typeof expected>).filter(key => JSON.stringify(expected[key]) !== JSON.stringify(actual[key]))
+    .map(field => ({ field, expected: expected[field], actual: actual[field] }))
+  if (differences.length) {
+    throw createError({ statusCode: 409, statusMessage: 'Siigo todavía no refleja los datos enviados. El guardado sigue pendiente; revisa el producto antes de intentar otra escritura.', data: { operationId: id, differences } })
   }
   return finishWrite(write, product)
 }

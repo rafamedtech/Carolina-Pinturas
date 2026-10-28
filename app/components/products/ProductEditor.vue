@@ -29,15 +29,17 @@ const productImage = ref<ProductImage | null>(null)
 watch(product, (value) => {
   productImage.value = value?.internal?.image ?? null
 }, { immediate: true })
-const { saving, errorMessage, ambiguous, checking, lookupResults, save, check, discard } = useProductMutation()
-const discardedWriteId = shallowRef('')
+const { saving, errorMessage, ambiguous, checking, lookupResults, operationId, save, check, discard } = useProductMutation()
+const discardedWriteIds = shallowRef<string[]>([])
 const discardOpen = shallowRef(false)
-const pendingWriteId = computed(() => product.value?.internal?.pendingWriteId)
-const hasPendingWrite = computed(() => Boolean(props.productId && product.value?.internal?.syncPending && pendingWriteId.value !== discardedWriteId.value))
+const pendingWriteId = computed(() => ambiguous.value && operationId.value ? operationId.value : product.value?.internal?.pendingWriteId)
+const hasPendingWrite = computed(() => Boolean(props.productId && pendingWriteId.value && !discardedWriteIds.value.includes(pendingWriteId.value)
+  && (ambiguous.value || product.value?.internal?.syncPending)))
 async function unlock() {
-  if (!props.productId || !pendingWriteId.value) return
-  if (await discard(props.productId, pendingWriteId.value)) {
-    discardedWriteId.value = pendingWriteId.value
+  const id = pendingWriteId.value
+  if (!props.productId || !id) return
+  if (await discard(props.productId, id)) {
+    discardedWriteIds.value = [...discardedWriteIds.value, id]
     discardOpen.value = false
     useToast().add({ title: 'Producto desbloqueado. Ya puedes guardar tus cambios.', color: 'success' })
   }
@@ -121,8 +123,13 @@ useSeoMeta({ title })
           color="info"
           variant="subtle"
         />
-        <UAlert v-if="errorMessage" :title="errorMessage" color="error" />
-        <div v-if="ambiguous" class="space-y-3 rounded-lg border border-warning p-4">
+        <UAlert
+          v-if="errorMessage"
+          class="shrink-0"
+          :title="errorMessage"
+          color="error"
+        />
+        <div v-if="ambiguous && !hasPendingWrite" class="shrink-0 space-y-3 rounded-lg border border-warning p-4">
           <UButton label="Consultar resultado en Siigo" :loading="checking" @click="recover" />
           <div v-for="result in lookupResults" :key="result.id" class="space-y-1">
             <p>{{ result.code }} · {{ result.name }} · {{ result.active ? 'Activo' : 'Inactivo' }}</p>

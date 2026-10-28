@@ -1,14 +1,17 @@
 // @vitest-environment nuxt
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { mountSuspended, registerEndpoint } from '@nuxt/test-utils/runtime'
+import { mountSuspended, registerEndpoint, mockNuxtImport } from '@nuxt/test-utils/runtime'
 import { defineComponent, h } from 'vue'
 import { flushPromises, type VueWrapper } from '@vue/test-utils'
 import ProductForm from '~/components/products/ProductForm.vue'
+import ProductEditor from '~/components/products/ProductEditor.vue'
 import SatPicker from '~/components/products/SatPicker.vue'
 import ProductBrandField from '~/components/products/ProductBrandField.vue'
 import { useProductMutation } from '~/composables/useProductMutation'
 import type { SiigoProduct } from '~/types/siigo'
 import { productMutationInput } from '~/utils/siigoProductMutation'
+
+mockNuxtImport('useAuth', () => () => ({ user: { value: { role: 'admin' } } }))
 
 const id = '00000000-0000-4000-8000-000000000001'
 const product: SiigoProduct = {
@@ -21,6 +24,8 @@ const context = {
   taxes: [{ id: 5, name: 'IVA 8%', active: true }],
   priceLists: [{ id: 1, name: 'Público', active: true }, { id: 2, name: 'Mayoreo', active: true }]
 }
+registerEndpoint('/api/siigo/products/context', () => context)
+registerEndpoint(`/api/siigo/products/${id}`, () => product)
 let wrapper: VueWrapper | undefined
 registerEndpoint('/api/siigo/products', () => ({ results: [
   { ...product, additional_fields: { brand: 'MAX' } },
@@ -176,6 +181,44 @@ describe('formulario de productos', () => {
 })
 
 describe('guardado cliente sin duplicados', () => {
+  it('muestra el intento recién fallido y permite acceder al desbloqueo sin recargar', async () => {
+    wrapper = await mountSuspended(ProductEditor, { props: { productId: id } })
+    await vi.waitFor(() => expect(wrapper!.findComponent(ProductForm).exists()).toBe(true))
+    const originalFetch = globalThis.$fetch
+    globalThis.$fetch = vi.fn().mockRejectedValue({ statusCode: 502, data: { data: {
+      ambiguous: true, operationId: id,
+      cause: { message: 'The Products service is currently unavailable. Please try in a few minutes' }
+    } } }) as unknown as typeof $fetch
+    try {
+      wrapper.findComponent(ProductForm).vm.$emit('submit', productMutationInput(product))
+      await flushPromises()
+      expect(wrapper.text()).toContain('El servicio de productos de Siigo no está disponible.')
+      expect(wrapper.text()).toContain('Este producto tiene un guardado pendiente de conciliar.')
+      expect(wrapper.text()).toContain('Desbloquear edición')
+      expect(wrapper.findComponent(ProductForm).props('blocked')).toBe(true)
+    } finally { globalThis.$fetch = originalFetch }
+  })
+  it('conserva la causa de Siigo después de consultar un intento con diferencias', async () => {
+    let mutation!: ReturnType<typeof useProductMutation>
+    wrapper = await mountSuspended(defineComponent({ setup() {
+      mutation = useProductMutation()
+      return () => h('div')
+    } }))
+    const originalFetch = globalThis.$fetch
+    const fetchMock = vi.fn().mockRejectedValueOnce({ statusCode: 502, data: { data: {
+      ambiguous: true, operationId: id, cause: { message: 'The Products service is currently unavailable. Please try in a few minutes' }
+    } } }).mockRejectedValueOnce({ data: { statusMessage: 'Siigo todavía no refleja los datos enviados.' } })
+    globalThis.$fetch = fetchMock as unknown as typeof $fetch
+    try {
+      await mutation.save(productMutationInput(product), id)
+      expect(mutation.operationId.value).toBe(id)
+      await mutation.check(id)
+      expect(mutation.errorMessage.value).toContain('El servicio de productos de Siigo no está disponible.')
+      expect(mutation.errorMessage.value).toContain('Siigo todavía no refleja los datos enviados.')
+      expect(fetchMock.mock.calls[1]?.[1]).toMatchObject({ method: 'POST', body: { operationId: id }, retry: 0 })
+    } finally { globalThis.$fetch = originalFetch }
+  })
+
   it('desbloquea sin reemplazar las correcciones capturadas en el formulario', async () => {
     let mutation!: ReturnType<typeof useProductMutation>
     wrapper = await mountSuspended(defineComponent({ setup() {
