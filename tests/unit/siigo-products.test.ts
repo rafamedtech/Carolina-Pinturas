@@ -143,6 +143,16 @@ describe('mutaciones, caché y referencias', () => {
     await expect(mutateProduct({ ...input(), account_group: 999 })).rejects.toMatchObject({ statusCode: 422 })
     expect(mocks.request.mock.calls.some(([, opts]) => opts?.method === 'POST')).toBe(false)
   })
+  it.each([429, 502, 504])('un fallo %s al consultar antes de editar no deja una escritura ambigua', async (statusCode) => {
+    mocks.request.mockRejectedValueOnce(createError({ statusCode, statusMessage: 'No se pudo consultar Siigo.' }))
+    await expect(mutateProduct(input(), id)).rejects.toMatchObject({ statusCode, data: { ambiguous: false } })
+    expect(mocks.request.mock.calls.some(([, options]) => options?.method === 'PUT')).toBe(false)
+  })
+  it('un fallo de catálogo antes de crear no deja una escritura ambigua', async () => {
+    mocks.request.mockRejectedValue(createError({ statusCode: 502 }))
+    await expect(mutateProduct(input())).rejects.toMatchObject({ statusCode: 502, data: { ambiguous: false } })
+    expect(mocks.request.mock.calls.some(([, options]) => options?.method === 'POST')).toBe(false)
+  })
   it('no reintenta timeout ni expone datos externos', async () => {
     mocks.request.mockImplementation(async (_path, options) => {
       if (options?.method === 'PUT') throw createError({ statusCode: 504, data: { token: 'secreto' } })

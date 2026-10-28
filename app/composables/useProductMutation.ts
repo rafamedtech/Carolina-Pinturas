@@ -25,7 +25,7 @@ export function useProductMutation() {
     } catch (error: unknown) {
       const failure = error as { statusCode?: number, data?: { statusMessage?: string, data?: { ambiguous?: boolean, operationId?: string } } }
       operationId.value = failure.data?.data?.operationId ?? ''
-      ambiguous.value = failure.data?.data?.ambiguous === true || !failure.statusCode || failure.statusCode >= 500
+      ambiguous.value = failure.data?.data?.ambiguous ?? (!failure.statusCode || failure.statusCode >= 500)
       errorMessage.value = ambiguous.value
         ? 'No se pudo confirmar el guardado. Consulta el producto antes de volver a intentar.'
         : failure.data?.statusMessage || 'No se pudo guardar el producto.'

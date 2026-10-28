@@ -149,27 +149,30 @@ export async function listProducts(query: ProductQuery) {
 }
 
 export async function mutateProduct(input: ProductInput | { active: boolean }, id?: string) {
-  const current = id ? normalizeSiigoProduct(await siigoRequest<unknown>(`/v1/products/${encodeURIComponent(id)}`)) : undefined
-  if (current && current.type !== undefined && current.type !== 'Product') throw createError({ statusCode: 422, statusMessage: 'Este tipo de producto se conserva solo para consulta histórica.' })
-  const parsed = productInputSchema.safeParse('code' in input ? input : { ...productMutationInput(current), active: input.active })
-  if (!parsed.success) throw createError({ statusCode: 422, statusMessage: 'Completa los datos del producto antes de guardarlo.', data: { issues: parsed.error.issues.map(issue => ({ path: issue.path, message: issue.message })) } })
-  if ('code' in input) await validateProductReferences(parsed.data, current)
-  let response: unknown
+  let writeAttempted = false
   try {
-    response = await siigoRequest<unknown>(id ? `/v1/products/${encodeURIComponent(id)}` : '/v1/products', {
-      method: id ? 'PUT' : 'POST', body: buildSiigoProductPayload(parsed.data, current)
+    const current = id ? normalizeSiigoProduct(await siigoRequest<unknown>(`/v1/products/${encodeURIComponent(id)}`)) : undefined
+    if (current && current.type !== undefined && current.type !== 'Product') throw createError({ statusCode: 422, statusMessage: 'Este tipo de producto se conserva solo para consulta histórica.' })
+    const parsed = productInputSchema.safeParse('code' in input ? input : { ...productMutationInput(current), active: input.active })
+    if (!parsed.success) throw createError({ statusCode: 422, statusMessage: 'Completa los datos del producto antes de guardarlo.', data: { issues: parsed.error.issues.map(issue => ({ path: issue.path, message: issue.message })) } })
+    if ('code' in input) await validateProductReferences(parsed.data, current)
+    const body = buildSiigoProductPayload(parsed.data, current)
+    writeAttempted = true
+    const response = await siigoRequest<unknown>(id ? `/v1/products/${encodeURIComponent(id)}` : '/v1/products', {
+      method: id ? 'PUT' : 'POST', body
     })
     const product = normalizeSiigoProduct(response)
     invalidateProductCaches()
     return product
   } catch (error: unknown) {
     const status = (error as { statusCode?: number }).statusCode ?? 502
-    const ambiguous = status >= 500
+    // A failed preflight read cannot have changed the remote product.
+    const ambiguous = writeAttempted && status >= 500
     invalidateProductCaches()
     throw createError({
       statusCode: status,
       statusMessage: ambiguous ? 'No se pudo confirmar el guardado. Consulta el producto antes de volver a intentar.' : ((error as { statusMessage?: string }).statusMessage || 'Siigo rechazó los datos del producto.'),
-      data: { ambiguous, productId: id, code: parsed.data.code }
+      data: { ambiguous, productId: id, code: 'code' in input ? input.code : undefined }
     })
   }
 }

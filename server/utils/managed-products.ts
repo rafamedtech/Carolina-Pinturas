@@ -66,7 +66,7 @@ export async function saveManagedProduct(input: ProductInput, id?: string) {
     return await finishWrite(write, product)
   } catch (error: unknown) {
     const failure = error as { statusCode?: number, statusMessage?: string, data?: { ambiguous?: boolean } }
-    const ambiguous = Boolean(product) || failure.data?.ambiguous === true || !failure.statusCode || failure.statusCode >= 500
+    const ambiguous = Boolean(product) || (failure.data?.ambiguous ?? (!failure.statusCode || failure.statusCode >= 500))
     await db.productWrite.update({ where: { id: write.id }, data: { state: ambiguous ? 'unknown' : 'failed', ...(product && !id ? { productId: product.id } : {}) } }).catch(() => undefined)
     throw createError({ statusCode: ambiguous ? 502 : failure.statusCode, statusMessage: ambiguous ? 'El guardado necesita conciliación. Consulta el resultado antes de volver a guardar.' : failure.statusMessage,
       data: { ambiguous, operationId: write.id, productId: product?.id ?? id, code: input.code } })

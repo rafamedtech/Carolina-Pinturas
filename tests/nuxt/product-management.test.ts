@@ -176,6 +176,27 @@ describe('formulario de productos', () => {
 })
 
 describe('guardado cliente sin duplicados', () => {
+  it.each([502, 504])('permite un nuevo intento manual tras un fallo %s confirmado antes de escribir', async (statusCode) => {
+    let mutation!: ReturnType<typeof useProductMutation>
+    wrapper = await mountSuspended(defineComponent({ setup() {
+      mutation = useProductMutation()
+      return () => h('div')
+    } }))
+    const originalFetch = globalThis.$fetch
+    const fetchMock = vi.fn().mockRejectedValue({
+      statusCode, data: { statusMessage: 'No se pudo consultar Siigo.', data: { ambiguous: false } }
+    })
+    globalThis.$fetch = fetchMock as unknown as typeof $fetch
+    try {
+      await mutation.save(productMutationInput(product), id)
+      expect(mutation.ambiguous.value).toBe(false)
+      expect(mutation.errorMessage.value).toBe('No se pudo consultar Siigo.')
+      expect(fetchMock).toHaveBeenCalledTimes(1)
+      await mutation.save(productMutationInput(product), id)
+      expect(fetchMock).toHaveBeenCalledTimes(2)
+    } finally { globalThis.$fetch = originalFetch }
+  })
+
   it('envíos simultáneos hacen una sola llamada y no reintentan timeout', async () => {
     let mutation!: ReturnType<typeof useProductMutation>
     wrapper = await mountSuspended(defineComponent({ setup() {

@@ -28,6 +28,8 @@ El tipo de un producto existente se puede cambiar cuando no tiene existencias, r
 
 Siigo y PostgreSQL no comparten una transacción. Antes de enviar una mutación se guarda su intención en `product_writes`. Solo después de confirmar la respuesta se persisten el producto, la composición y el cierre de la operación en una transacción local. Un guardado con timeout, respuesta ambigua o fallo del commit queda `pending`/`unknown`. Su identificador y el código impiden otra escritura y excluyen el producto de ventas y de movimientos de inventario mientras se resuelve.
 
+Los errores de consulta o validación anteriores al envío a Siigo cierran el intento como `failed`, incluso si son `5xx` o timeout: no hubo escritura remota y el usuario puede volver a guardar manualmente. Solo una escritura enviada cuyo resultado sea incierto, o un fallo local posterior a su confirmación, mantiene el bloqueo de conciliación.
+
 La acción **Consultar y conciliar guardado** consulta Siigo sin repetir la mutación. Verifica un resultado único y la coincidencia de los datos comerciales enviados; después completa la composición local. Ante diferencias o ausencia del producto mantiene el bloqueo e informa del problema. No se reintenta automáticamente una escritura remota.
 
 Solo los administradores pueden guardar o conciliar productos. Las tablas nuevas tienen RLS y no conceden acceso directo a `anon` o `authenticated`; el servidor aplica los permisos existentes. Los componentes locales están separados de los snapshots externos, por lo que recargar Siigo conserva las composiciones y los costos locales.
