@@ -56,6 +56,30 @@ function payloadTotal(payload: ReturnType<typeof buildSiigoInvoiceDraftPayload>,
 }
 
 describe('Siigo invoice drafts', () => {
+  it('factura PED-001175 por 1341.63 conservando el medio centavo de la partida fraccionada', () => {
+    const rows = [
+      ['218SM', 1, 615], ['31370', 2, 50], ['31371', 2, 50],
+      ['2322S', 0.25, 1226.50], ['34490', 2, 50], ['34492', 2, 60]
+    ] as const
+    const items = rows.map(([code, quantity, unitPrice]) => {
+      const amounts = orderLineAmounts(quantity, unitPrice, 8, true)
+      return {
+        code, quantity, unitPrice, taxIncluded: true, description: null, discountAmount: 0,
+        subtotal: amounts.subtotal.toNumber(), taxAmount: amounts.taxAmount.toNumber(), total: amounts.total.toNumber()
+      }
+    })
+    const products = new Map(items.map(line => [line.code, {
+      id: line.code, code: line.code, name: line.code, active: true, taxes: [{ id: 8, percentage: 8 }]
+    }]))
+    const payload = buildSiigoInvoiceDraftPayload({
+      input, customerRfc: 'MELM8305281H0', products, documentType, costCenterId: null,
+      order: { folio: 1175, observations: null, discountAmount: 0, total: 1341.63, items }
+    })
+    expect(payloadTotal(payload, 8)).toBe(1341.63)
+    expect(payload.payment.conditions[0]!.value).toBe(1341.63)
+    expect(payloadTotal({ ...payload, items: [payload.items[3]!] }, 8)).toBe(306.63)
+  })
+
   it('factura PED-001219 por 3970.00 sin acumular los diez centavos del redondeo unitario', () => {
     const rows = [
       ['THINNER-GL', 1, 195, 180.56, 14.44, 195],
@@ -114,7 +138,8 @@ describe('Siigo invoice drafts', () => {
     expect(payload.payment.conditions[0]!.value).toBe(total)
   })
 
-  it.each([[8, 3, 100], [16, 3, 100], [8, 20, 1940], [8, 5, 45], [16, 5, 45], [0, 5, 45], [8, 0.25, 100]])(
+  it.each([[8, 3, 100], [16, 3, 100], [8, 20, 1940], [8, 5, 45], [16, 5, 45], [0, 5, 45], [8, 0.25, 100],
+    [8, 0.25, 1226.50], [16, 0.25, 1226.50], [0, 0.25, 1226.50], [8, 0.33, 45.50], [16, 0.15, 45.50]])(
     'conserva el importe pactado sin redondear antes de multiplicar (IVA %s, cantidad %s)', (rate, quantity, unitPrice) => {
       const amounts = orderLineAmounts(quantity, unitPrice, rate, true)
       const product = normalizeInvoiceProduct({ id: 'product', code: 'P1', name: 'Pintura', taxes: [{ id: 1, percentage: rate }] })
@@ -126,7 +151,8 @@ describe('Siigo invoice drafts', () => {
             taxAmount: amounts.taxAmount.toNumber(), total: amounts.total.toNumber() }] }
       })
       expect(payload.payment.conditions[0]!.value).toBe(amounts.total.toNumber())
-      expect(payload.items[0]!.price).toBe(Number((unitPrice / (1 + rate / 100)).toFixed(6)))
+      expect(payload.items[0]!.price).toBe(new Decimal(unitPrice).mul(quantity).toDecimalPlaces(2, Decimal.ROUND_HALF_UP)
+        .div(quantity).div(new Decimal(rate).div(100).plus(1)).toDecimalPlaces(6, Decimal.ROUND_HALF_UP).toNumber())
       expect(payloadTotal(payload, rate)).toBe(amounts.total.toNumber())
     }
   )
@@ -162,11 +188,11 @@ describe('Siigo invoice drafts', () => {
     expect(payload.payment.conditions[0]!.value).toBe(202.5)
   })
 
-  it('rechaza una diferencia real de diez centavos en lugar de ampliar la tolerancia', () => {
+  it.each([99.9, 99.99, 100.01])('rechaza un total distinto de %s sin ampliar la tolerancia', (total) => {
     const product = normalizeInvoiceProduct({ id: 'p', code: 'P1', name: 'Pintura', taxes: [] })
     expect(() => buildSiigoInvoiceDraftPayload({
       input, customerRfc: 'MELM8305281H0', products: new Map([['P1', product]]), documentType, costCenterId: null,
-      order: { folio: 1, observations: null, discountAmount: 0, total: 99.9,
+      order: { folio: 1, observations: null, discountAmount: 0, total,
         items: [{ code: 'P1', description: null, quantity: 1, unitPrice: 100, taxIncluded: false,
           subtotal: 100, discountAmount: 0, taxAmount: 0, total: 100 }] }
     })).toThrow('no coincide')

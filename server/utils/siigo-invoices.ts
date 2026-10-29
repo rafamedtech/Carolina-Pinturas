@@ -461,7 +461,9 @@ export function buildSiigoInvoiceDraftPayload(options: {
     // Legacy snapshots keep their stored pre-tax subtotal.
     const price = (line.taxIncluded === undefined
       ? new Decimal(line.subtotal).div(quantity)
-      : line.taxIncluded ? listedPrice.div(taxRate.plus(1)) : listedPrice
+      // La partida ya se cobra en centavos: 0.25 × 1226.50 = 306.63.
+      // Extraer el IVA antes de ese redondeo produciría 306.62 en Siigo.
+      : line.taxIncluded ? money(listedPrice.mul(quantity)).div(quantity).div(taxRate.plus(1)) : listedPrice
     ).toDecimalPlaces(6, Decimal.ROUND_HALF_UP)
     const discount = invoiceDiscount({
       line,
