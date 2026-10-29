@@ -79,6 +79,13 @@ export function useOrderListTable(options: { returnTo: MaybeRefOrGetter<string>,
     })
   }
 
+  const siigoInvoiceColumn: TableColumn<SalesOrderListItem> = {
+    id: 'siigoInvoice',
+    accessorFn: row => row.siigoInvoiceName || row.siigoInvoiceId || '',
+    header: 'Factura Siigo',
+    cell: ({ row }) => row.original.siigoInvoiceName || row.original.siigoInvoiceId || h('span', { class: 'text-muted' }, 'Sin asignar')
+  }
+
   const totalColumn: TableColumn<SalesOrderListItem> = {
     accessorKey: 'total',
     header: sortableHeader('Total', 'right'),
@@ -190,7 +197,7 @@ export function useOrderListTable(options: { returnTo: MaybeRefOrGetter<string>,
     header: sortableHeader('Partidas')
   }, ...(options.igualacion ? [igualacionColumn] : [paymentStatusColumn]),
   ...(toValue(options.delivered) ? deliveryColumns : [statusColumn]),
-  ...(toValue(options.billing) ? [invoiceStatusColumn] : []), ...(options.igualacion
+  ...(toValue(options.billing) ? [invoiceStatusColumn, siigoInvoiceColumn] : []), ...(options.igualacion
     ? []
     : toValue(options.pendingPayment)
       ? [balanceColumn, { ...totalColumn, id: 'pendingPaymentTotal' }]

@@ -58,13 +58,15 @@ describe('listado de pedidos', () => {
       customerId: 'customer-1', customerNameSnapshot: 'Cliente', customerRfcSnapshot: null,
       orderDate: new Date('2026-10-19T00:00:00Z'), promisedDate: null,
       total: 100, _count: { items: 1 }, paymentStatus: 'pagado', paymentMethod: 'efectivo',
-      siigoInvoice: invoiceStatus ? { status: invoiceStatus } : null,
+      siigoInvoice: invoiceStatus ? { status: invoiceStatus, siigoInvoiceName: 'FV-1-123', siigoInvoiceId: 'invoice-1' } : null,
       createdAt: new Date(), updatedAt: new Date()
     }])
     const result = await listOrders({ page: 1, pageSize: 25, view: 'facturacion' }, admin)
     expect(result.results[0]?.invoiceCreated).toBe(expected)
+    expect(result.results[0]?.siigoInvoiceName).toBe(expected ? 'FV-1-123' : null)
+    expect(result.results[0]?.siigoInvoiceId).toBe(expected ? 'invoice-1' : null)
     expect(mocks.findMany).toHaveBeenCalledWith(expect.objectContaining({
-      include: expect.objectContaining({ siigoInvoice: { select: { status: true } } })
+      include: expect.objectContaining({ siigoInvoice: { select: { status: true, siigoInvoiceName: true, siigoInvoiceId: true } } })
     }))
   })
 

@@ -332,7 +332,7 @@ function assertStatusPermission(user: AppUser, statusKey: string) {
 
 function listItem(order: SalesOrder & {
   payments?: { amount: Prisma.Decimal }[]
-  siigoInvoice?: { status: string } | null
+  siigoInvoice?: { status: string, siigoInvoiceName?: string | null, siigoInvoiceId?: string | null } | null
   status: { key: string, label: string, color: string, sortOrder: number, isTerminal: boolean }
   _count: { items: number }
   statusHistory?: { toStatusKey: string, changedAt: Date }[]
@@ -368,6 +368,8 @@ function listItem(order: SalesOrder & {
     paymentMethod: order.paymentMethod,
     tags: order.tags,
     invoiceCreated: order.siigoInvoice?.status === 'created',
+    siigoInvoiceName: order.siigoInvoice?.status === 'created' ? order.siigoInvoice.siigoInvoiceName ?? null : null,
+    siigoInvoiceId: order.siigoInvoice?.status === 'created' ? order.siigoInvoice.siigoInvoiceId ?? null : null,
     ...(order.items
       ? {
           partidas: order.items.map(item => ({
@@ -966,7 +968,7 @@ export async function listOrders(options: {
       where,
       include: {
         status: true,
-        siigoInvoice: { select: { status: true } },
+        siigoInvoice: { select: { status: true, siigoInvoiceName: true, siigoInvoiceId: true } },
         ...(options.view === 'entregado'
           ? {
               statusHistory: {

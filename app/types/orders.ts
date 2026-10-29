@@ -63,6 +63,8 @@ export interface SalesOrderListItem {
   paymentMethod: string | null
   tags?: string[]
   invoiceCreated?: boolean
+  siigoInvoiceName?: string | null
+  siigoInvoiceId?: string | null
   partidas?: { code: string, name: string, quantity: number, observations: string | null, isIgualacion: boolean }[]
   createdAt: string
   updatedAt: string
