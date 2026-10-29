@@ -7,6 +7,7 @@ import type { AppUser, SiigoProduct } from '../../app/types/siigo'
 const mocks = vi.hoisted(() => {
   const tx = {
     $queryRaw: vi.fn(),
+    siigoCustomer: { findUniqueOrThrow: vi.fn() },
     salesOrder: { updateMany: vi.fn() },
     salesOrderItem: { findMany: vi.fn() }
   }
@@ -42,9 +43,27 @@ beforeEach(() => {
   vi.clearAllMocks()
   mocks.findFirst.mockResolvedValue({ statusKey: 'entregado', customerId: id, orderDate: new Date('2026-10-28'), paymentStatus: input.paymentStatus, items: [{ productId: id }] })
   mocks.tx.salesOrderItem.findMany.mockResolvedValue([])
+  mocks.tx.siigoCustomer.findUniqueOrThrow.mockResolvedValue({ requiresInvoice: false })
   mocks.recipes.mockResolvedValue(new Map())
   mocks.inventory.mockResolvedValue(undefined)
   mocks.tx.salesOrder.updateMany.mockRejectedValue(stopAfterUpdate)
+})
+
+describe('facturación del cliente al actualizar un pedido', () => {
+  it.each([
+    [true, false, true],
+    [true, true, true],
+    [false, true, true],
+    [false, false, false]
+  ])('cliente=%s, pedido=%s: guarda requiere factura=%s', async (customerRequiresInvoice, requiresInvoice, expected) => {
+    mocks.tx.siigoCustomer.findUniqueOrThrow.mockResolvedValue({ requiresInvoice: customerRequiresInvoice })
+    await expect(updateOrder(id, { ...input, requiresInvoice }, admin, customer, new Map([[id, product]]), courier))
+      .rejects.toBe(stopAfterUpdate)
+    expect(mocks.tx.siigoCustomer.findUniqueOrThrow).toHaveBeenCalledWith({ where: { id }, select: { requiresInvoice: true } })
+    expect(mocks.tx.salesOrder.updateMany).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ requiresInvoice: expected })
+    }))
+  })
 })
 
 describe('edición de pedidos entregados', () => {

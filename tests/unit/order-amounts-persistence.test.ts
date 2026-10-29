@@ -6,7 +6,7 @@ import type { AppUser, SiigoProduct } from '../../app/types/siigo'
 vi.mock('../../server/utils/product-compositions', () => ({ captureInventoryRecipes: async (_tx: unknown, ids: string[]) => new Map(ids.map(id => [id, [{ productId: id, quantity: '1', code: 'PIN', name: 'Pintura', unit: null }]])) }))
 
 const mocks = vi.hoisted(() => ({
-  order: vi.fn(), items: vi.fn(), payment: vi.fn(), history: vi.fn()
+  order: vi.fn(), items: vi.fn(), payment: vi.fn(), history: vi.fn(), customerSettings: vi.fn()
 }))
 vi.mock('../../server/utils/prisma', () => ({
   usePrisma: () => ({ orderStatus: { findFirst: async () => ({ key: 'completado' }) } })
@@ -19,6 +19,7 @@ vi.mock('../../server/utils/inventory', () => ({
   inventorySettings: async () => ({ enabledAt: null }), syncOrderInventory: vi.fn(),
   inventoryRequest: async (_input: unknown, _user: unknown, action: (tx: unknown) => Promise<unknown>) => {
     await action({
+      siigoCustomer: { findUniqueOrThrow: mocks.customerSettings },
       salesOrder: { create: mocks.order }, salesOrderItem: { createMany: mocks.items },
       salesOrderPayment: { create: mocks.payment }, salesOrderStatusHistory: { create: mocks.history }
     })
@@ -31,6 +32,27 @@ const user: AppUser = { id, name: 'Admin', email: 'test@example.com', role: 'adm
 beforeEach(() => {
   vi.clearAllMocks()
   mocks.order.mockResolvedValue({ id })
+  mocks.customerSettings.mockResolvedValue({ requiresInvoice: false })
+})
+
+describe('facturación del cliente al crear un pedido', () => {
+  it.each([
+    [true, false, true],
+    [true, true, true],
+    [false, true, true],
+    [false, false, false]
+  ])('cliente=%s, pedido=%s: guarda requiere factura=%s', async (customerRequiresInvoice, requiresInvoice, expected) => {
+    mocks.customerSettings.mockResolvedValue({ requiresInvoice: customerRequiresInvoice })
+    const input = createOrderSchema.parse({
+      customerId: id, orderDate: '2026-10-29', statusKey: 'borrador', requiresInvoice,
+      lines: [{ productId: id, quantity: 1 }]
+    })
+    const product: SiigoProduct = { id, code: 'P1', name: 'Pintura' }
+    await expect(createOrder(input, user, { id, name: ['Cliente'] }, new Map([[id, product]]), null))
+      .rejects.toThrow('Fin de la persistencia simulada')
+    expect(mocks.customerSettings).toHaveBeenCalledWith({ where: { id }, select: { requiresInvoice: true } })
+    expect(mocks.order).toHaveBeenCalledWith({ data: expect.objectContaining({ requiresInvoice: expected }) })
+  })
 })
 
 describe('persistencia de los centavos del pedido y su pago inicial', () => {

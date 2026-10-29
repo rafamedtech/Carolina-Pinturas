@@ -567,6 +567,10 @@ export async function createOrder(
   }
 
   const createdOrderId = await inventoryRequest({ requestId: input.requestId ?? input.initialPayment?.requestId ?? randomUUID(), command: input }, user, async (tx) => {
+    const customerSettings = await tx.siigoCustomer.findUniqueOrThrow({
+      where: { id: customer.id },
+      select: { requiresInvoice: true }
+    })
     const settings = await inventorySettings(tx)
     const recipes = await captureInventoryRecipes(tx, input.lines.map(l => l.productId))
     const order = await tx.salesOrder.create({
@@ -584,7 +588,7 @@ export async function createOrder(
           : null,
         observations: input.observations || null,
         remision: input.remision || null,
-        requiresInvoice: input.requiresInvoice,
+        requiresInvoice: customerSettings.requiresInvoice || input.requiresInvoice,
         tags: input.tags,
         paymentStatus: input.initialPayment ? 'pago_recibido' : 'pendiente_pago',
         paymentMethod: input.initialPayment?.paymentMethod ?? null,
@@ -741,6 +745,10 @@ export async function updateOrder(
 
   await prisma.$transaction(async (tx) => {
     await tx.$queryRaw`SELECT id FROM sales_orders WHERE id = ${id}::uuid FOR UPDATE`
+    const customerSettings = await tx.siigoCustomer.findUniqueOrThrow({
+      where: { id: customer.id },
+      select: { requiresInvoice: true }
+    })
     await inventorySettings(tx)
     await assertOrderInventoryEditable(tx, id, input.lines, input.warehouseId)
     const previousItems = await tx.salesOrderItem.findMany({ where: { orderId: id }, select: { productId: true, inventoryRecipe: true } })
@@ -762,7 +770,7 @@ export async function updateOrder(
           ? new Date(`${input.promisedDate}T00:00:00.000Z`)
           : null,
         observations: input.observations || null,
-        requiresInvoice: input.requiresInvoice,
+        requiresInvoice: customerSettings.requiresInvoice || input.requiresInvoice,
         tags: input.tags,
         paymentStatus: input.paymentStatus,
         paymentMethod: input.paymentMethod || null,
