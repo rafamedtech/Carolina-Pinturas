@@ -46,17 +46,9 @@ const allLinks: AppNavigationItem[] = [{
   roles: managementRoles,
   onSelect: () => { open.value = false }
 }, {
-  label: 'Clientes',
+  label: 'Clientes y proveedores',
   icon: 'i-lucide-users',
   to: '/clientes',
-  roles: managementRoles,
-  onSelect: () => {
-    open.value = false
-  }
-}, {
-  label: 'Proveedores',
-  icon: 'i-lucide-building-2',
-  to: '/proveedores',
   roles: managementRoles,
   onSelect: () => {
     open.value = false

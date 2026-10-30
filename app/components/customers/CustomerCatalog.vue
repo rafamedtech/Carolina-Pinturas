@@ -4,23 +4,17 @@ import { tableQueryField, tableQueryText, tableQueryPage } from '~/utils/tableQu
 import type { TableColumn, TableRow } from '@nuxt/ui'
 import type { SiigoCustomer } from '~/types/siigo'
 import type { CsvColumn } from '~/utils/csv'
-
-const props = withDefaults(defineProps<{
-  title: string
-  singularLabel: string
-  routeBase: '/clientes' | '/proveedores'
-  customerType?: 'Customer' | 'Supplier'
-}>(), {
-  customerType: undefined
-})
+import { customerCatalogTabs, customerCatalogRoles, customerCatalogRoleLabel, filterCustomerCatalog } from '~/utils/customerCatalog'
 
 const filter = shallowRef('')
+const view = shallowRef('all')
 const page = shallowRef(1)
 const pageSize = 25
 const { returnTo } = useTableQuery([
   tableQueryField('search', filter, tableQueryText()),
+  tableQueryField('view', view, tableQueryText('all', customerCatalogTabs.map(tab => tab.value))),
   tableQueryField('page', page, tableQueryPage)
-], { page, resetOn: [filter] })
+], { page, resetOn: [filter, view] })
 const router = useRouter()
 const toast = useToast()
 const {
@@ -29,26 +23,16 @@ const {
   error,
   refreshing,
   refresh
-} = useCustomersCatalog({ customerType: props.customerType })
+} = useCustomersCatalog()
 
-const singularLower = computed(() => props.singularLabel.toLowerCase())
-const pluralLower = computed(() => props.title.toLowerCase())
 const loading = computed(() => ['idle', 'pending'].includes(status.value))
-const records = computed(() => {
-  const value = filter.value.trim().toLowerCase()
-  const customers = data.value?.results || []
-  if (!value) return customers
-
-  return customers.filter((customer) => {
-    const name = customer.name?.filter(Boolean).join(' ') || ''
-    const email = customer.contacts?.[0]?.email || ''
-    return `${customer.rfc_id || ''} ${name} ${email}`.toLowerCase().includes(value)
-  })
-})
+const records = computed(() => filterCustomerCatalog(data.value?.results || [], view.value, filter.value))
 
 const csvColumns: CsvColumn<SiigoCustomer>[] = [
   { key: 'rfc_id', label: 'RFC', value: row => row.rfc_id || '' },
-  { key: 'name', label: props.singularLabel, value: row => row.name?.filter(Boolean).join(' ') || '' },
+  { key: 'name', label: 'Nombre', value: row => row.name?.filter(Boolean).join(' ') || '' },
+  { key: 'role', label: 'Tipo', value: customerCatalogRoleLabel },
+  { key: 'requires_invoice', label: 'Requiere factura', value: row => row.internal?.requires_invoice === true ? 'Sí' : 'No' },
   { key: 'email', label: 'Correo', value: row => row.contacts?.[0]?.email || '' },
   { key: 'phone', label: 'Teléfono', value: row => row.phones?.map(phone => phone.number).filter(Boolean).join(', ') || '' },
   { key: 'active', label: 'Estado', value: row => row.active === false ? 'Inactivo' : 'Activo' }
@@ -60,8 +44,16 @@ const columns = computed<TableColumn<SiigoCustomer>[]>(() => [{
   cell: ({ row }) => row.getValue('rfc_id') || '—'
 }, {
   id: 'name',
-  header: props.singularLabel,
+  header: 'Nombre',
   cell: ({ row }) => row.original.name?.filter(Boolean).join(' ') || '—'
+}, {
+  id: 'role',
+  header: 'Tipo',
+  cell: ({ row }) => customerCatalogRoleLabel(row.original)
+}, {
+  id: 'requires_invoice',
+  header: 'Requiere factura',
+  cell: ({ row }) => row.original.internal?.requires_invoice === true ? 'Sí' : 'No'
 }, {
   id: 'email',
   header: 'Correo',
@@ -77,18 +69,20 @@ const columns = computed<TableColumn<SiigoCustomer>[]>(() => [{
 }])
 
 const message = computed(() =>
-  error.value?.data?.statusMessage || `No fue posible cargar los ${pluralLower.value}.`
+  error.value?.data?.statusMessage || 'No fue posible cargar los clientes y proveedores.'
 )
 
 function openRecord(_: Event, row: TableRow<SiigoCustomer>) {
-  router.push({ path: `${props.routeBase}/${encodeURIComponent(row.original.id)}`, query: { returnTo: returnTo.value } })
+  const roles = customerCatalogRoles(row.original)
+  const routeBase = view.value === 'proveedores' || (!roles.customer && roles.supplier) ? '/proveedores' : '/clientes'
+  router.push({ path: `${routeBase}/${encodeURIComponent(row.original.id)}`, query: { returnTo: returnTo.value } })
 }
 
 async function reloadRecords() {
   try {
     await refresh()
     toast.add({
-      title: `${props.title} actualizados`,
+      title: 'Clientes y proveedores actualizados',
       description: 'La información se volvió a consultar directamente en Siigo.',
       color: 'success'
     })
@@ -101,18 +95,22 @@ async function reloadRecords() {
     })
   }
 }
-const listConfig = computed<ListLayoutConfig>(() => ({
-  id: props.routeBase === '/proveedores' ? 'suppliers' : 'customers', title: props.title,
-  empty: `No hay ${pluralLower.value} para mostrar.`, search: { placeholder: `Buscar ${singularLower.value}` },
-  create: { label: `Nuevo ${singularLower.value}`, icon: props.routeBase === '/proveedores' ? 'i-lucide-building-2' : 'i-lucide-user-plus', disabled: true, reason: 'Se habilita tras validar la API de Siigo México.' },
-  pagination: { mode: 'client', label: pluralLower.value, pageSize }
-}))
+const listConfig: ListLayoutConfig = {
+  id: 'customers',
+  title: 'Clientes y proveedores',
+  empty: 'No hay registros que coincidan con esta vista y búsqueda.',
+  search: { placeholder: 'Buscar por nombre, RFC o correo' },
+  tabs: customerCatalogTabs,
+  create: { label: 'Nuevo registro', icon: 'i-lucide-user-plus', disabled: true, reason: 'Se habilita tras validar la API de Siigo México.' },
+  pagination: { mode: 'client', label: 'registros', pageSize }
+}
 </script>
 
 <template>
   <ListLayout
     v-model:search="filter"
     v-model:page="page"
+    v-model:tab="view"
     :config="listConfig"
     :data="records"
     :columns="columns"
@@ -124,7 +122,7 @@ const listConfig = computed<ListLayoutConfig>(() => ({
   >
     <template #actions>
       <AppCsvExportButton
-        :filename="routeBase === '/proveedores' ? 'proveedores' : 'clientes'"
+        :filename="view === 'all' ? 'clientes-y-proveedores' : view"
         :columns="csvColumns"
         :rows="records"
         :disabled="loading"

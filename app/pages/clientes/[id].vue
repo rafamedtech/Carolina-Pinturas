@@ -13,8 +13,12 @@ const isSupplierContext = route.path.startsWith('/proveedores')
 const entityLabel = isSupplierContext ? 'Proveedor' : 'Cliente'
 const entityLabelLower = entityLabel.toLowerCase()
 const entitiesLabelLower = isSupplierContext ? 'proveedores' : 'clientes'
-const collectionPath = isSupplierContext ? '/proveedores' : '/clientes'
-const backPath = computed(() => tableReturnPath(route.query.returnTo, collectionPath))
+const collectionPath = '/clientes'
+const backPath = computed(() => tableReturnPath(
+  route.query.returnTo,
+  isSupplierContext ? '/clientes?view=proveedores' : collectionPath,
+  ['/clientes', '/proveedores']
+))
 const catalogKey = isSupplierContext
   ? 'customers-catalog-request-supplier'
   : 'customers-catalog-request-customer'
@@ -150,7 +154,8 @@ async function saveRoles(roles: { customer: boolean, supplier: boolean }) {
     customer.value = { ...customer.value, internal }
     await Promise.all([
       refreshNuxtData('customers-catalog-request-customer'),
-      refreshNuxtData('customers-catalog-request-supplier')
+      refreshNuxtData('customers-catalog-request-supplier'),
+      refreshNuxtData('customers-catalog-request')
     ])
     toast.add({
       title: 'Roles actualizados',
@@ -217,7 +222,7 @@ useSeoMeta({ title: () => fullName.value })
             icon="i-lucide-arrow-left"
             color="neutral"
             variant="ghost"
-            :aria-label="`Volver a ${collectionPath.slice(1)}`"
+            aria-label="Volver a clientes y proveedores"
           />
         </template>
         <template #right>

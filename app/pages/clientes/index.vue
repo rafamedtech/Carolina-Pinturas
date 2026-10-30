@@ -1,12 +1,7 @@
 <script setup lang="ts">
-useSeoMeta({ title: 'Clientes' })
+useSeoMeta({ title: 'Clientes y proveedores' })
 </script>
 
 <template>
-  <CustomersCustomerCatalog
-    title="Clientes"
-    singular-label="Cliente"
-    route-base="/clientes"
-    customer-type="Customer"
-  />
+  <CustomersCustomerCatalog />
 </template>

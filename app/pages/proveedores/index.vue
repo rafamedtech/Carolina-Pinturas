@@ -1,12 +1,8 @@
 <script setup lang="ts">
-useSeoMeta({ title: 'Proveedores' })
+const route = useRoute()
+await navigateTo({ path: '/clientes', query: { ...route.query, view: 'proveedores' } }, { replace: true })
 </script>
 
 <template>
-  <CustomersCustomerCatalog
-    title="Proveedores"
-    singular-label="Proveedor"
-    route-base="/proveedores"
-    customer-type="Supplier"
-  />
+  <div />
 </template>
