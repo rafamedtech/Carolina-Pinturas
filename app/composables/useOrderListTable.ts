@@ -1,5 +1,6 @@
 import { UButton, UBadge, NuxtLink, OrdersOrderStatusBadge as OrderStatusBadge } from '#components'
 import { toValue, h } from 'vue'
+import { useLocalStorage } from '@vueuse/core'
 import type { MaybeRefOrGetter } from 'vue'
 import { tableQueryField, tableQuerySorting } from '~/utils/tableQuery'
 import { formatDate, formatDateTime } from '~/utils/datetime'
@@ -8,17 +9,35 @@ import type { SortingState, VisibilityState } from '@tanstack/table-core'
 import type { SalesOrderListItem } from '~/types/orders'
 import { orderHasPaymentStatus, orderPaymentStatusColor, orderPaymentStatusLabel } from '~/utils/orderPayment'
 
-export function useOrderListTable(options: { returnTo: MaybeRefOrGetter<string>, igualacion?: boolean, billing?: MaybeRefOrGetter<boolean>, internal?: MaybeRefOrGetter<boolean>, pendingPayment?: MaybeRefOrGetter<boolean>, delivered?: MaybeRefOrGetter<boolean> }) {
+export function useOrderListTable(options: { returnTo: MaybeRefOrGetter<string>, igualacion?: boolean, billing?: MaybeRefOrGetter<boolean>, internal?: MaybeRefOrGetter<boolean>, pendingPayment?: MaybeRefOrGetter<boolean>, delivered?: MaybeRefOrGetter<boolean>, columnVisibilityKey?: MaybeRefOrGetter<string>, tab?: MaybeRefOrGetter<string> }) {
   const currency = new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' })
   const sorting = ref<SortingState>([])
   useTableQuery([tableQueryField('sort', sorting, tableQuerySorting)])
-  const columnVisibility = ref<VisibilityState>({
+  const defaultColumnVisibility: VisibilityState = {
     promisedDate: false,
     rfc: false,
     itemCount: false,
     pendingPaymentTotal: false,
     createdAt: false,
     updatedAt: false
+  }
+  const savedColumnVisibility = options.columnVisibilityKey
+    ? useLocalStorage<Record<string, VisibilityState>>(options.columnVisibilityKey, {}, {
+        initOnMounted: true,
+        flush: 'sync'
+      })
+    : ref<Record<string, VisibilityState>>({})
+  const columnVisibility = computed<VisibilityState>({
+    get: () => ({
+      ...defaultColumnVisibility,
+      ...savedColumnVisibility.value[toValue(options.tab) ?? 'all']
+    }),
+    set: (value) => {
+      savedColumnVisibility.value = {
+        ...savedColumnVisibility.value,
+        [toValue(options.tab) ?? 'all']: value
+      }
+    }
   })
 
   const selectedOrder = shallowRef<SalesOrderListItem | null>(null)

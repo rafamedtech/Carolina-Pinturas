@@ -306,6 +306,8 @@ const newOrderItems = computed<DropdownMenuItem[][]>(() => [[
 const filterValues = useListFilterBindings({ paymentStatus: paymentStatusKey, paymentMethod: paymentMethodKey, hideCancelled, hideQuotes })
 const { columns, sorting, columnVisibility, selectedOrder, detailOpen, openOrder } = useOrderListTable({
   returnTo,
+  columnVisibilityKey: () => `cp:${user.value?.id ?? 'anonymous'}:${props.igualacion ? 'igualaciones' : 'sales-orders'}:column-visibility`,
+  tab: selectedTab,
   igualacion: props.igualacion,
   internal: isInternalCustomersView,
   pendingPayment: isPendingPaymentView,
