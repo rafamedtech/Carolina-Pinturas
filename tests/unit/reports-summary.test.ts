@@ -60,8 +60,8 @@ describe('report summary cards', () => {
       id: 'sale', orderDate: new Date('2026-10-01'), total: 1110, taxTotal: 160, discountTotal: 50,
       customerId: 'customer', customerNameSnapshot: 'Cliente', vendedorEmail: 'seller', vendedorNombre: 'Vendedor',
       payments: [{ amount: 100 }], items: [
-        { productId: 'p1', productCodeSnapshot: 'P1', productNameSnapshot: 'Pintura', quantity: 2, total: 696, taxAmount: 96 },
-        { productId: 'p2', productCodeSnapshot: 'P2', productNameSnapshot: 'Material', quantity: 1, total: 464, taxAmount: 64 }
+        { productId: 'p1', productCodeSnapshot: 'P1', productNameSnapshot: 'Pintura', quantity: 2, total: 696, taxAmount: 96, product: { accountGroupName: 'Esmaltes ' } },
+        { productId: 'p2', productCodeSnapshot: 'P2', productNameSnapshot: 'Material', quantity: 1, total: 464, taxAmount: 64, product: { accountGroupName: null } }
       ], customer: { isInternalOrderCustomer: false }
     }]).mockResolvedValueOnce([{ total: 580, taxTotal: 80, customerNameSnapshot: 'Cliente', customer: { isInternalOrderCustomer: false } }])
     const result = await summary(event)
@@ -78,6 +78,10 @@ describe('report summary cards', () => {
     expect(result.topSellers[0]).toMatchObject({ amount: 950, percentage: 100 })
     expect(result.topProducts).toMatchObject([{ amount: 570, percentage: 60 }, { amount: 380, percentage: 40 }])
     expect(result.topDebtors[0]?.amount).toBe(1010)
+    expect(result.salesByLine).toEqual([
+      { key: 'Esmaltes', label: 'Esmaltes', amount: 570, count: 1, percentage: 60 },
+      { key: 'Sin línea', label: 'Sin línea', amount: 380, count: 1, percentage: 40 }
+    ])
   })
 
   it('excludes material purchases from the card while preserving cash outflows', async () => {
@@ -92,7 +96,7 @@ describe('report summary cards', () => {
     ])
     const result = await summary(event)
     expect(result.metrics).toMatchObject({
-      operatingExpenses: 200, operatingExpensesChangePercentage: 100, expenses: 350, netCashFlow: -350
+      operatingExpenses: 200, previousOperatingExpenses: 100, operatingExpensesChangePercentage: 100, expenses: 350, netCashFlow: -350
     })
   })
 
