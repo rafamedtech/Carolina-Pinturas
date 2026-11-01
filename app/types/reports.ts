@@ -10,6 +10,7 @@ export interface ReportMetrics {
   salesBeforeTax: number
   salesBeforeTaxChangePercentage: number | null
   operatingExpenses: number
+  previousOperatingExpenses: number
   operatingExpensesChangePercentage: number | null
   purchaseInvoiceTotals: {
     currencyCode: string
@@ -82,6 +83,7 @@ export interface BusinessReportSummary {
   topDebtors: ReportRankingItem[]
   topCustomers: ReportRankingItem[]
   topProducts: ReportRankingItem[]
+  salesByLine: ReportBreakdownItem[]
   topSellers: ReportRankingItem[]
 }
 

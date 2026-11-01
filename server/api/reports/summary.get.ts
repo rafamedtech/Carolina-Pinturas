@@ -56,7 +56,8 @@ export default eventHandler(async (event) => {
             productNameSnapshot: true,
             quantity: true,
             taxAmount: true,
-            total: true
+            total: true,
+            product: { select: { accountGroupName: true } }
           }
         }
       }
@@ -224,6 +225,7 @@ export default eventHandler(async (event) => {
   const customers = new Map<string, Omit<ReportRankingItem, 'id' | 'percentage'>>()
   const sellers = new Map<string, Omit<ReportRankingItem, 'id' | 'percentage'>>()
   const products = new Map<string, Omit<ReportRankingItem, 'id' | 'percentage'>>()
+  const productLines = new Map<string, { amount: number, count: number }>()
 
   for (const order of orders) {
     const orderTotal = reportSalesBeforeTax(order)
@@ -259,9 +261,16 @@ export default eventHandler(async (event) => {
         amount: 0,
         count: 0
       }
-      product.amount += (reportNumeric(item.total) - reportNumeric(item.taxAmount)) * itemShare
+      const itemAmount = (reportNumeric(item.total) - reportNumeric(item.taxAmount)) * itemShare
+      product.amount += itemAmount
       product.count += reportNumeric(item.quantity)
       products.set(item.productId, product)
+
+      const lineKey = item.product.accountGroupName?.trim() || 'Sin línea'
+      const line = productLines.get(lineKey) ?? { amount: 0, count: 0 }
+      line.amount += itemAmount
+      line.count += 1
+      productLines.set(lineKey, line)
     }
   }
 
@@ -287,6 +296,7 @@ export default eventHandler(async (event) => {
       salesBeforeTax: sales,
       salesBeforeTaxChangePercentage: reportPercentageChange(sales, previousSales),
       operatingExpenses,
+      previousOperatingExpenses,
       operatingExpensesChangePercentage: reportPercentageChange(operatingExpenses, previousOperatingExpenses),
       purchaseInvoiceTotals,
       sales,
@@ -341,6 +351,9 @@ export default eventHandler(async (event) => {
     topDebtors: reportTopDebtors(orders),
     topCustomers: ranking(customers, sales),
     topProducts: ranking(products, sales),
+    salesByLine: [...productLines.entries()]
+      .map(([key, value]) => ({ key, label: key, ...value, percentage: reportPercentage(value.amount, sales) }))
+      .sort((a, b) => b.amount - a.amount),
     topSellers: ranking(sellers, orders.filter(order => reportSalesChannel(order) !== 'internal').reduce((sum, order) => sum + reportSalesBeforeTax(order), 0))
   }
 

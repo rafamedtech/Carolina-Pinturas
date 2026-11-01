@@ -5,10 +5,9 @@ import type { BusinessReportSummary } from '~/types/reports'
 import { dashboardNumber } from '~/utils/dashboardFormatters'
 
 const props = defineProps<{ report: BusinessReportSummary }>()
-const view = shallowRef('monthly')
-useTableQuery([tableQueryField('analysis_view', view, tableQueryText('monthly', ['monthly', 'weekly', 'daily']))])
+const view = shallowRef('weekly')
+useTableQuery([tableQueryField('analysis_view', view, tableQueryText('weekly', ['weekly', 'daily']))])
 const views = [
-  { label: 'Mensual vs. anterior', value: 'monthly' },
   { label: 'Semanal', value: 'weekly' },
   { label: 'Promedio diario', value: 'daily' }
 ]
@@ -27,8 +26,8 @@ const comparisons = computed(() => {
   ]
 })
 const rows = computed(() => comparisons.value.map((row) => {
-  const current = view.value === 'daily' ? reportDailyAverage(row.current, props.report.period.elapsedDays) : row.current
-  const previous = view.value === 'daily' ? reportDailyAverage(row.previous, props.report.metrics.previousDays) : row.previous
+  const current = reportDailyAverage(row.current, props.report.period.elapsedDays)
+  const previous = reportDailyAverage(row.previous, props.report.metrics.previousDays)
   return { ...row, current, previous, change: previous ? (current - previous) / previous * 100 : null }
 }))
 function format(value: number, money: boolean) {
@@ -40,7 +39,7 @@ function format(value: number, money: boolean) {
   <UCard>
     <template #header>
       <h2 class="text-base font-semibold text-highlighted">
-        Comparación del negocio
+        Ritmo de venta
       </h2>
       <p class="mt-1 text-sm text-muted">
         {{ report.period.elapsedDays }} días del mes seleccionado frente a {{ report.metrics.previousDays }} días del mes anterior completo.
@@ -50,6 +49,7 @@ function format(value: number, money: boolean) {
       <UButton
         v-for="item in views"
         :key="item.value"
+        size="sm"
         :label="item.label"
         :variant="view === item.value ? 'solid' : 'outline'"
         :color="view === item.value ? 'primary' : 'neutral'"
@@ -84,25 +84,22 @@ function format(value: number, money: boolean) {
       <UEmpty v-else title="Sin días transcurridos" icon="i-lucide-calendar" />
     </template>
     <template v-else>
-      <p v-if="view === 'daily'" class="mb-4 text-sm text-muted">
+      <p class="mb-4 text-sm text-muted">
         Totales divididos entre días calendario, incluidos los días sin actividad. El mes actual usa únicamente días transcurridos.
-      </p>
-      <p v-else-if="report.period.elapsedDays < report.period.totalDays" class="mb-4 text-sm text-muted">
-        Mes en curso: el comparativo mensual enfrenta un periodo parcial con el mes anterior completo. Usa el promedio diario para comparar el ritmo de venta.
       </p>
       <div class="overflow-x-auto">
         <table class="w-full text-sm">
           <caption class="sr-only">
-            {{ view === 'daily' ? 'Promedios diarios' : 'Totales mensuales' }} comparados con el mes anterior
+            Promedios diarios comparados con el mes anterior
           </caption>
           <thead class="border-b border-default text-xs text-muted">
             <tr>
               <th class="py-3 text-left font-medium">
                 Indicador
               </th><th class="px-3 py-3 text-right font-medium">
-                {{ view === 'daily' ? 'Actual / día' : 'Mes seleccionado' }}
+                Actual / día
               </th><th class="px-3 py-3 text-right font-medium">
-                {{ view === 'daily' ? 'Anterior / día' : 'Mes anterior' }}
+                Anterior / día
               </th><th class="py-3 text-right font-medium">
                 Variación
               </th>

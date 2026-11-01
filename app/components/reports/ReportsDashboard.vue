@@ -1,4 +1,7 @@
 <script setup lang="ts">
+import { dashboardNumber } from '~/utils/dashboardFormatters'
+import { reportCurrency } from '~/utils/reportPeriods'
+
 const props = defineProps<{
   month: string
 }>()
@@ -7,6 +10,10 @@ const { data, status, error, refresh } = useBusinessReports(toRef(props, 'month'
 const errorMessage = computed(() =>
   error.value?.data?.statusMessage || 'No fue posible generar los reportes del periodo.'
 )
+
+function plural(count: number, singular: string, pluralLabel: string) {
+  return `${dashboardNumber.format(count)} ${count === 1 ? singular : pluralLabel}`
+}
 </script>
 
 <template>
@@ -33,32 +40,137 @@ const errorMessage = computed(() =>
 
     <template v-if="['idle', 'pending'].includes(status)">
       <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <USkeleton v-for="index in 4" :key="index" class="h-36 rounded-lg" />
+        <USkeleton v-for="index in 4" :key="index" class="h-44 rounded-lg" />
       </div>
-      <USkeleton class="h-28 rounded-lg" />
+      <div class="grid gap-4 xl:grid-cols-3">
+        <USkeleton class="h-56 rounded-lg xl:col-span-2" />
+        <USkeleton class="h-56 rounded-lg" />
+      </div>
       <USkeleton class="h-96 rounded-lg" />
-      <div class="grid gap-4 xl:grid-cols-2">
-        <USkeleton v-for="index in 2" :key="index" class="h-80 rounded-lg" />
-      </div>
       <div class="grid gap-4 xl:grid-cols-3">
         <USkeleton v-for="index in 3" :key="index" class="h-80 rounded-lg" />
       </div>
     </template>
 
     <template v-else-if="data && !error">
-      <ReportsSummaryCards :metrics="data.metrics" />
-      <ReportsPeriodAnalysis :report="data" />
-      <ReportsSalesChannels :channels="data.salesChannels" />
-      <ReportsCashFlowChart :data="data.dailyMovements" />
-      <ReportsBreakdowns
-        :payment-methods="data.paymentMethods"
-        :expense-categories="data.expenseCategories"
-      />
-      <ReportsRankings
-        :customers="data.topCustomers"
-        :products="data.topProducts"
-        :debtors="data.topDebtors"
-      />
+      <section aria-labelledby="reports-summary" class="space-y-3">
+        <div class="flex flex-wrap items-baseline justify-between gap-2">
+          <h2 id="reports-summary" class="text-sm font-semibold text-highlighted">
+            Resumen
+          </h2>
+          <p class="text-xs text-muted">
+            {{ data.period.label }} · importes antes de IVA
+          </p>
+        </div>
+        <ReportsSummaryCards :metrics="data.metrics" />
+      </section>
+
+      <section aria-labelledby="reports-sales" class="space-y-3">
+        <h2 id="reports-sales" class="text-sm font-semibold text-highlighted">
+          Ventas
+        </h2>
+        <div class="grid gap-4 xl:grid-cols-3">
+          <ReportsSalesChannels :channels="data.salesChannels" :metrics="data.metrics" class="xl:col-span-2" />
+          <ReportsMonthPace :report="data" />
+        </div>
+        <ReportsCashFlowChart :data="data.dailyMovements" />
+        <ReportsPeriodAnalysis :report="data" />
+        <div class="grid gap-4 xl:grid-cols-3">
+          <ReportsBreakdownCard
+            title="Ventas por línea"
+            description="Línea de producto en Siigo."
+            icon="i-lucide-paint-bucket"
+            color="primary"
+            :items="data.salesByLine"
+            empty-icon="i-lucide-paint-bucket"
+            empty-title="Sin ventas"
+            :count-label="count => plural(count, 'partida', 'partidas')"
+          />
+          <ReportsRankingCard
+            title="Productos destacados"
+            description="Productos con mayor venta del periodo."
+            icon="i-lucide-package-open"
+            empty="Sin productos vendidos"
+            :items="data.topProducts"
+            :count-label="count => `${dashboardNumber.format(count)} uds.`"
+          />
+          <ReportsRankingCard
+            title="Clientes principales"
+            description="Concentración de ventas por cliente."
+            icon="i-lucide-users"
+            empty="Sin clientes con ventas"
+            :items="data.topCustomers"
+            :count-label="count => plural(count, 'pedido', 'pedidos')"
+          />
+        </div>
+      </section>
+
+      <section aria-labelledby="reports-collections" class="space-y-3">
+        <h2 id="reports-collections" class="text-sm font-semibold text-highlighted">
+          Cobranza
+        </h2>
+        <div class="grid gap-4 xl:grid-cols-2">
+          <ReportsRankingCard
+            title="Saldo por cobrar"
+            description="Saldo vigente de pedidos del mes."
+            icon="i-lucide-hourglass"
+            empty="Sin clientes con adeudo en este mes"
+            :items="data.topDebtors"
+            :count-label="count => plural(count, 'pedido con saldo', 'pedidos con saldo')"
+            exact-amounts
+          >
+            <template #summary>
+              <div class="mb-4 flex flex-wrap items-end justify-between gap-3 rounded-lg bg-elevated/60 p-3">
+                <div>
+                  <p class="text-xs text-muted">
+                    Pendiente total
+                  </p>
+                  <p class="text-xl font-semibold tabular-nums text-highlighted">
+                    {{ reportCurrency.format(data.metrics.outstandingBalance) }}
+                  </p>
+                </div>
+                <p class="text-xs text-muted tabular-nums">
+                  {{ dashboardNumber.format(data.metrics.collectionCoveragePercentage) }}% cubierto
+                </p>
+              </div>
+              <p v-if="data.topDebtors.length" class="mb-2 text-xs font-medium text-muted">
+                Clientes con mayor adeudo
+              </p>
+            </template>
+          </ReportsRankingCard>
+          <ReportsBreakdownCard
+            title="Cobros por método"
+            description="Cómo entra el dinero al negocio."
+            icon="i-lucide-wallet-cards"
+            color="success"
+            :items="data.paymentMethods"
+            empty-icon="i-lucide-hand-coins"
+            empty-title="Sin cobros"
+            :count-label="count => plural(count, 'movimiento', 'movimientos')"
+          />
+        </div>
+      </section>
+
+      <section aria-labelledby="reports-expenses" class="space-y-3">
+        <h2 id="reports-expenses" class="text-sm font-semibold text-highlighted">
+          Gastos y compras
+        </h2>
+        <div class="grid gap-4 xl:grid-cols-3">
+          <ReportsBreakdownCard
+            title="Gastos por categoría"
+            description="En qué se concentraron los egresos."
+            icon="i-lucide-chart-pie"
+            color="warning"
+            :items="data.expenseCategories"
+            empty-icon="i-lucide-receipt"
+            empty-title="Sin gastos"
+            :count-label="count => plural(count, 'gasto', 'gastos')"
+            class="xl:col-span-2"
+          />
+          <ReportsPurchaseInvoices :totals="data.metrics.purchaseInvoiceTotals" />
+        </div>
+        <ReportsExpenseDetails :expenses="data.expenseDetails" />
+      </section>
     </template>
   </div>
 </template>
