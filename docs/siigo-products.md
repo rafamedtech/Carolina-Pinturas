@@ -83,4 +83,20 @@ El formulario ahora conserva el booleano original y el servidor valida que coinc
 
 Se confirmó por consulta directa que `IW301-0.5LT` (`a27ffd1b-3cd9-4e33-b727-c5826fa50822`) estaba inactivo en Siigo mientras el snapshot local seguía activo. La operación fallaba en la etapa local: el esquema rechazaba el punto del código, por lo que no llegaba a persistir el estado confirmado. Se aceptan puntos en los códigos, conservando las demás restricciones y el máximo de 30 caracteres.
 
+## Activación con datos históricos (02/11/2026)
+
+La activación de `EXITO-1/2` fallaba antes del PUT: `mutateProduct` reconstruía el producto vigente y lo validaba con `productInputSchema`, cuyo código entonces no admitía `/`. Aunque la ruta y la persistencia ya distinguían cambios de estado, la frontera con Siigo seguía exigiendo las reglas de alta.
+
+Ahora el cambio de estado exige un identificador existente y únicamente un booleano `active`. Reconstruye los campos comerciales desde una lectura vigente normalizada de Siigo y conserva la lista de campos editables del constructor, sin aplicar las restricciones de alta a datos históricos que no se están editando. Las altas y ediciones completas mantienen su validación. Siigo aún puede rechazar sus propios datos al ejecutar el PUT; no se ha probado una escritura real en producción. Las regresiones simuladas cubren activar y desactivar códigos con `/`, precios históricos en cero y rechazo de estados inválidos, campos inyectados o cambios sin identificador.
+
+Contrato consultado: [Actualizar Producto, Siigo México](https://developers.siigo.com/docs/siigoapimexico/productos/2-edit-product). La documentación describe restricciones de alta también para el código de actualización; la presencia del código histórico en el producto no justifica renombrarlo para cambiar su estado.
+
+## Validaciones compartidas de productos (02/11/2026)
+
+Se revisaron los contratos oficiales de [creación](https://developers.siigo.com/docs/siigoapimexico/productos/1-create-product) y actualización. Ambos llaman al código «alfanumérico», pero el producto observado `EXITO-1/2` y el comportamiento reportado por el usuario en Siigo Nube contradicen una lista cerrada de símbolos. El esquema compartido ahora admite símbolos sin enumerarlos, incluido `/`, y conserva código obligatorio, máximo de 30 caracteres y ausencia de espacios o caracteres de control. Se recortan espacios exteriores como antes. Esto aplica al formulario, altas, ediciones, duplicados y recuperación de guardados; Siigo sigue validando el código definitivo. No equivale a haber confirmado mediante POST/PUT real que la API acepte todos los símbolos de Siigo Nube.
+
+La revisión conserva los límites publicados: nombre 100, referencia 80, descripción 2500, marca y código de barras 50; precios positivos con máximo dos decimales y posiciones de lista de 1 a 12; referencias a catálogos vigentes y claves SAT. Los campos de texto libre ya permitían símbolos. Las restricciones de `Product`, control de inventario y composición corresponden al dominio de esta aplicación. La excepción para cambiar únicamente el estado permanece para tolerar otros datos históricos sin forzar su edición.
+
+Las regresiones cubren límites de texto, símbolos, espacios y controles, envío intacto de `/` en POST/PUT simulados y envío del formulario al editar o duplicar.
+
 La ruta de activar/desactivar identifica ahora el intento como `statusOnly` exclusivamente desde el servidor. Compara y confirma únicamente `active`; si Siigo ya tiene el estado solicitado, sincroniza el snapshot sin PUT. El commit local de estado no depende de validar todos los datos comerciales ni reconstruye o modifica la composición. Al desactivar, desmarca las tres disponibilidades internas y aumenta la versión solo si esas disponibilidades cambian. Una edición comercial completa conserva su validación y comparación completas.

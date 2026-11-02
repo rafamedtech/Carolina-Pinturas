@@ -155,9 +155,19 @@ export async function listProducts(query: ProductQuery) {
 export async function mutateProduct(input: ProductInput | { active: boolean }, id?: string) {
   let writeAttempted = false
   try {
+    const statusOnly = !('code' in input)
+    if (statusOnly && (!id || !z.object({ active: z.boolean() }).strict().safeParse(input).success)) {
+      throw createError({ statusCode: 400, statusMessage: 'El cambio de estado requiere un producto existente y un estado válido.' })
+    }
     const current = id ? normalizeSiigoProduct(await siigoRequest<unknown>(`/v1/products/${encodeURIComponent(id)}`)) : undefined
     if (current && current.type !== undefined && current.type !== 'Product') throw createError({ statusCode: 422, statusMessage: 'Este tipo de producto se conserva solo para consulta histórica.' })
-    const parsed = productInputSchema.safeParse('code' in input ? input : { ...productMutationInput(current), active: input.active })
+    // Status changes preserve data read from Siigo, including historical codes
+    // such as EXITO-1/2 and prices that do not meet today's creation rules.
+    // Only the requested boolean comes from the caller; keep the writable-field
+    // allowlist and let Siigo validate its existing commercial data on PUT.
+    const parsed = statusOnly
+      ? { success: true as const, data: { ...productMutationInput(current), active: input.active } }
+      : productInputSchema.safeParse(input)
     if (!parsed.success) throw createError({ statusCode: 422, statusMessage: 'Completa los datos del producto antes de guardarlo.', data: { issues: parsed.error.issues.map(issue => ({ path: issue.path, message: issue.message })) } })
     if ('code' in input) await validateProductReferences(parsed.data, current)
     const body = buildSiigoProductPayload(parsed.data, current)

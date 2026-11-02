@@ -125,6 +125,23 @@ describe('contrato de productos México', () => {
     expect(productInputSchema.parse({ ...input(), available_quantity: 999 })).not.toHaveProperty('available_quantity')
     expect(productInputSchema.safeParse(productMutationInput()).success).toBe(false)
   })
+  it.each([true, false])('cambia a active=%s con código histórico EXITO-1/2 sin exigir reglas de alta', async (active) => {
+    const historic = { ...external, code: 'EXITO-1/2', name: 'BROCHA EXITO NORTEÑA 1/2', active: !active,
+      prices: [{ currency_code: 'MXN', price_list: [{ position: 1, value: 0 }] }] }
+    const current = normalizeSiigoProduct(historic)
+    expect(productInputSchema.safeParse(productMutationInput(current)).success).toBe(false)
+    mocks.request.mockImplementation(async (_path, options) => options?.method === 'PUT' ? { ...historic, active } : historic)
+    await expect(mutateProduct({ active }, id)).resolves.toMatchObject({ code: historic.code, active })
+    expect(mocks.request.mock.calls).toEqual([
+      [`/v1/products/${id}`],
+      [`/v1/products/${id}`, { method: 'PUT', body: { ...buildSiigoProductPayload(productMutationInput(current), current), active } }]
+    ])
+  })
+  it.each([{ active: true }, { active: 'false' }, { active: true, name: 'Inyectado' }])('rechaza cambios de estado inválidos o sin identificador %j', async (value) => {
+    const productId = typeof value.active === 'boolean' && !('name' in value) ? undefined : id
+    await expect(mutateProduct(value as { active: boolean }, productId)).rejects.toMatchObject({ statusCode: 400, data: { ambiguous: false } })
+    expect(mocks.request).not.toHaveBeenCalled()
+  })
   it.each(['name', 'code', 'key', 'unit'])('exige %s', (field) => {
     expect(productInputSchema.safeParse({ ...input(), [field]: '' }).success).toBe(false)
   })
@@ -143,9 +160,43 @@ describe('contrato de productos México', () => {
     expect(productInputSchema.safeParse({ ...input(), code: 'Item-1' }).success).toBe(true)
     expect(productInputSchema.safeParse({ ...input(), code: 'Item 1' }).success).toBe(false)
   })
+  it.each(['EXITO-1/2', 'EXITO-3/4', 'PINTURA+CAT', 'BROCHA(1/2)', 'REF#1', 'A&B', 'A:B', 'A%1', 'CAÑA-1', 'IW301-0.5LT'])('permite símbolos sin lista local cerrada en el código %s', (code) => {
+    expect(productInputSchema.parse({ ...input(), code }).code).toBe(code)
+    expect(productQuerySchema.parse({ code }).code).toBe(code)
+  })
+  it.each(['A B', 'A\tB', 'A\nB', 'A\u00a0B', 'A\u0000B', 'A\u200bB'])('rechaza espacios o controles dentro del código %j', (code) => {
+    expect(productInputSchema.safeParse({ ...input(), code }).success).toBe(false)
+  })
+  it('conserva el límite de código y normaliza espacios exteriores sin alterar los símbolos', () => {
+    expect(productInputSchema.parse({ ...input(), code: '  EXITO-1/2  ' }).code).toBe('EXITO-1/2')
+    expect(productInputSchema.safeParse({ ...input(), code: 'A'.repeat(30) }).success).toBe(true)
+    expect(productInputSchema.safeParse({ ...input(), code: 'A'.repeat(31) }).success).toBe(false)
+  })
+  it.each([['name', 100], ['reference', 80], ['description', 2500]] as const)('conserva el límite documentado de %s: %s caracteres', (field, max) => {
+    expect(productInputSchema.safeParse({ ...input(), [field]: 'A'.repeat(max) }).success).toBe(true)
+    expect(productInputSchema.safeParse({ ...input(), [field]: 'A'.repeat(max + 1) }).success).toBe(false)
+  })
+  it.each(['barcode', 'brand'] as const)('permite símbolos y conserva el máximo de 50 en %s', (field) => {
+    expect(productInputSchema.safeParse({ ...input(), additional_fields: { ...input().additional_fields, [field]: 'MARCA / + & (1/2)' } }).success).toBe(true)
+    expect(productInputSchema.safeParse({ ...input(), additional_fields: { ...input().additional_fields, [field]: 'A'.repeat(50) } }).success).toBe(true)
+    expect(productInputSchema.safeParse({ ...input(), additional_fields: { ...input().additional_fields, [field]: 'A'.repeat(51) } }).success).toBe(false)
+  })
 })
 
 describe('mutaciones, caché y referencias', () => {
+  it.each([undefined, id])('envía el código con / intacto a Siigo al crear o editar (id: %s)', async (productId) => {
+    const current = { ...external, code: 'EXITO-1/2' }
+    mocks.request.mockImplementation(async (path, options) => {
+      if (path === '/v1/account-groups') return [{ id: 10, name: 'Pinturas' }]
+      if (path === '/v1/taxes') return [{ id: 5, name: 'IVA' }]
+      if (path === '/v1/price-lists') return [{ position: 1, name: 'Público' }, { position: 2, name: 'Mayoreo' }]
+      return options?.method ? { ...current, stock_control: Boolean(productId) } : current
+    })
+    await expect(mutateProduct({ ...input(), code: current.code, stock_control: Boolean(productId) }, productId)).resolves.toMatchObject({ code: current.code })
+    expect(mocks.request).toHaveBeenCalledWith(productId ? `/v1/products/${id}` : '/v1/products', expect.objectContaining({
+      method: productId ? 'PUT' : 'POST', body: expect.objectContaining({ code: 'EXITO-1/2' })
+    }))
+  })
   it('crea tras validar catálogos y SAT', async () => {
     await expect(mutateProduct({ ...input(), stock_control: false })).resolves.toMatchObject({ id })
     expect(mocks.request).toHaveBeenCalledWith('/v1/products', expect.objectContaining({ method: 'POST', body: expect.objectContaining({ key: '31211500', account_group: 10 }) }))
