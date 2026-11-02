@@ -28,7 +28,11 @@ export const productAvailabilitySchema = z.object({
 export type ProductAvailability = z.infer<typeof productAvailabilitySchema>
 
 export const productInputSchema = z.object({
-  code: z.string().trim().min(1, 'Escribe el código.').max(30).regex(/^[A-Za-z0-9_.-]+$/, 'Usa letras, números, puntos, guiones o guiones bajos, sin espacios.'),
+  // 02/11/2026: Siigo Nube stores codes such as EXITO-1/2 despite the API
+  // documentation describing them as alphanumeric. Do not impose a local
+  // symbol allowlist; Siigo remains responsible for accepting the exact code.
+  code: z.string().trim().min(1, 'Escribe el código.').max(30, 'Usa máximo 30 caracteres.')
+    .refine(value => !/[\s\p{Cc}\p{Cf}]/u.test(value), 'El código no admite espacios ni caracteres de control.'),
   name: z.string().trim().min(1, 'Escribe el nombre.').max(100),
   account_group: z.number().int().positive('Selecciona una clasificación.'),
   type: z.literal('Product'),
