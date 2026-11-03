@@ -21,14 +21,15 @@ const comparisons = computed(() => {
     { label: 'Mostrador', current: props.report.salesChannels.find(c => c.key === 'counter')?.amount ?? 0, previous: m.previousCounterSales, money: true },
     { label: 'Vendedor', current: props.report.salesChannels.find(c => c.key === 'seller')?.amount ?? 0, previous: m.previousSellerSales, money: true },
     { label: 'Clientes internos', current: props.report.salesChannels.find(c => c.key === 'internal')?.amount ?? 0, previous: m.previousInternalSales, money: true },
-    { label: 'Gastos', current: m.expenses, previous: m.previousExpenses, money: true },
-    { label: 'Cobros', current: m.collections, previous: m.previousCollections, money: true }
+    { label: 'Compras de material', current: m.materialPurchases, previous: m.previousMaterialPurchases, money: true },
+    { label: 'Gastos operativos', current: m.operatingExpenses, previous: m.previousOperatingExpenses, money: true },
+    { label: 'Utilidad neta', current: m.netProfit, previous: m.previousNetProfit, money: true }
   ]
 })
 const rows = computed(() => comparisons.value.map((row) => {
   const current = reportDailyAverage(row.current, props.report.period.elapsedDays)
   const previous = reportDailyAverage(row.previous, props.report.metrics.previousDays)
-  return { ...row, current, previous, change: previous ? (current - previous) / previous * 100 : null }
+  return { ...row, current, previous, change: previous ? (current - previous) / Math.abs(previous) * 100 : null }
 }))
 function format(value: number, money: boolean) {
   return money ? reportCurrency.format(value) : dashboardNumber.format(value)
@@ -76,7 +77,9 @@ function format(value: number, money: boolean) {
             <span>Mostrador: {{ reportCurrency.format(week.counterSales) }}</span>
             <span>Vendedor: {{ reportCurrency.format(week.sellerSales) }}</span>
             <span>Clientes internos: {{ reportCurrency.format(week.internalSales) }}</span>
-            <span>Gastos: {{ reportCurrency.format(week.expenses) }}</span>
+            <span>Material: {{ reportCurrency.format(week.materialPurchases) }}</span>
+            <span>Operativos: {{ reportCurrency.format(week.operatingExpenses) }}</span>
+            <span :class="week.netProfit < 0 ? 'text-error' : ''">Utilidad: {{ reportCurrency.format(week.netProfit) }}</span>
             <span>Venta diaria: {{ reportCurrency.format(reportDailyAverage(week.sales, week.days)) }}</span>
           </div>
         </div>

@@ -8,12 +8,13 @@ const props = defineProps<{
 
 const totals = computed(() => props.data.reduce((result, day) => ({
   sales: result.sales + day.sales,
-  collections: result.collections + day.collections,
-  expenses: result.expenses + day.expenses
-}), { sales: 0, collections: 0, expenses: 0 }))
+  materialPurchases: result.materialPurchases + day.materialPurchases,
+  operatingExpenses: result.operatingExpenses + day.operatingExpenses,
+  netProfit: result.netProfit + day.netProfit
+}), { sales: 0, materialPurchases: 0, operatingExpenses: 0, netProfit: 0 }))
 
 const maximum = computed(() => Math.max(
-  ...props.data.flatMap(day => [day.sales, day.collections, day.expenses]),
+  ...props.data.flatMap(day => [day.sales, day.materialPurchases, day.operatingExpenses]),
   0
 ))
 const hasMovements = computed(() => maximum.value > 0)
@@ -27,13 +28,13 @@ const series = computed(() => [{
   dot: 'bg-primary',
   bar: 'bg-primary'
 }, {
-  key: 'collections' as const,
-  label: 'Cobros',
-  dot: 'bg-success',
-  bar: 'bg-success'
+  key: 'materialPurchases' as const,
+  label: 'Material',
+  dot: 'bg-violet-500',
+  bar: 'bg-violet-500'
 }, {
-  key: 'expenses' as const,
-  label: 'Gastos',
+  key: 'operatingExpenses' as const,
+  label: 'Operativos',
   dot: 'bg-warning',
   bar: 'bg-warning'
 }])
@@ -49,7 +50,7 @@ function barHeight(value: number) {
 }
 
 function dayLabel(day: ReportDailyMovement) {
-  return `${day.label}: ventas ${dashboardCurrency.format(day.sales)}, cobros ${dashboardCurrency.format(day.collections)}, gastos ${dashboardCurrency.format(day.expenses)}`
+  return `${day.label}: ventas ${dashboardCurrency.format(day.sales)}, compras de material ${dashboardCurrency.format(day.materialPurchases)}, gastos operativos ${dashboardCurrency.format(day.operatingExpenses)}`
 }
 </script>
 
@@ -59,10 +60,10 @@ function dayLabel(day: ReportDailyMovement) {
       <div class="flex flex-wrap items-start justify-between gap-x-6 gap-y-3">
         <div>
           <h2 class="text-base font-semibold text-highlighted">
-            Movimiento diario
+            Venta y costo por día
           </h2>
           <p class="mt-1 text-sm text-muted">
-            {{ hoveredDay ? hoveredDay.label : 'Ritmo de venta y liquidez a lo largo del mes.' }}
+            {{ hoveredDay ? hoveredDay.label : 'Cuánto se vendió y cuánto se gastó en material y operación.' }}
           </p>
         </div>
 
@@ -74,6 +75,17 @@ function dayLabel(day: ReportDailyMovement) {
             </dt>
             <dd class="mt-0.5 text-sm font-semibold tabular-nums text-highlighted">
               {{ dashboardCompactCurrency(hoveredDay ? hoveredDay[serie.key] : totals[serie.key]) }}
+            </dd>
+          </div>
+          <div class="min-w-24 border-l border-default pl-5">
+            <dt class="text-xs text-muted">
+              Resultado
+            </dt>
+            <dd
+              class="mt-0.5 text-sm font-semibold tabular-nums"
+              :class="(hoveredDay ? hoveredDay.netProfit : totals.netProfit) < 0 ? 'text-error' : 'text-success'"
+            >
+              {{ dashboardCompactCurrency(hoveredDay ? hoveredDay.netProfit : totals.netProfit) }}
             </dd>
           </div>
         </dl>
@@ -132,7 +144,7 @@ function dayLabel(day: ReportDailyMovement) {
       v-else
       icon="i-lucide-chart-column"
       title="Sin movimientos en este periodo"
-      description="La tendencia diaria aparecerá cuando se registren ventas, cobros o gastos."
+      description="La tendencia diaria aparecerá cuando se registren ventas, compras o gastos."
       class="h-72"
     />
   </UCard>

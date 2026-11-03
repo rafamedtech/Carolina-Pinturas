@@ -15,6 +15,11 @@ export function reportPercentage(amount: number, total: number) {
   return total > 0 ? Math.round((amount / total) * 1000) / 10 : 0
 }
 
+// Unlike reportPercentage, a margin can be negative when costs exceed sales.
+export function reportMargin(profit: number, sales: number) {
+  return sales > 0 ? Math.round((profit / sales) * 1000) / 10 : null
+}
+
 export function reportPercentageChange(current: number, previous: number) {
   return previous !== 0
     ? Math.round(((current - previous) / Math.abs(previous)) * 1000) / 10

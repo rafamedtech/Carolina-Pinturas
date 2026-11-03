@@ -12,6 +12,19 @@ export interface ReportMetrics {
   operatingExpenses: number
   previousOperatingExpenses: number
   operatingExpensesChangePercentage: number | null
+  materialPurchases: number
+  previousMaterialPurchases: number
+  materialPurchasesChangePercentage: number | null
+  grossProfit: number
+  previousGrossProfit: number
+  grossProfitChangePercentage: number | null
+  grossMarginPercentage: number | null
+  previousGrossMarginPercentage: number | null
+  netProfit: number
+  previousNetProfit: number
+  netProfitChangePercentage: number | null
+  netMarginPercentage: number | null
+  previousNetMarginPercentage: number | null
   purchaseInvoiceTotals: {
     currencyCode: string
     amount: number
@@ -53,6 +66,9 @@ export interface ReportDailyMovement {
   collections: number
   expenses: number
   netCashFlow: number
+  materialPurchases: number
+  operatingExpenses: number
+  netProfit: number
 }
 
 export interface ReportBreakdownItem {
@@ -80,6 +96,8 @@ export interface BusinessReportSummary {
   expenseDetails: ReportExpenseDetail[]
   paymentMethods: ReportBreakdownItem[]
   expenseCategories: ReportBreakdownItem[]
+  operatingExpenseCategories: ReportBreakdownItem[]
+  topMaterialProviders: ReportRankingItem[]
   topDebtors: ReportRankingItem[]
   topCustomers: ReportRankingItem[]
   topProducts: ReportRankingItem[]
@@ -91,6 +109,7 @@ export interface ReportExpenseDetail {
   id: string
   date: string
   category: string
+  kind: 'material' | 'operating'
   description: string
   provider: string
   paymentMethod: string

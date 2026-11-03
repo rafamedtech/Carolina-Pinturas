@@ -15,11 +15,21 @@ import {
   reportSalesBeforeTax,
   reportMonthBounds,
   reportNumeric,
+  reportMargin,
   reportPercentage,
   reportPercentageChange
 } from '../../utils/reports'
 
 const EXCLUDED_SALES_STATUSES = ['borrador', 'cancelado']
+
+// Supplier payments for material are recorded as expenses; everything else is operating cost.
+function isMaterialPurchase(expense: { category: string, purchasePaymentId: string | null }) {
+  return expense.category === 'Compra de materiales' || expense.purchasePaymentId !== null
+}
+
+function expenseAmount(expense: { amount: { toString(): string } | number, exchangeRate: { toString(): string } | number }) {
+  return reportNumeric(expense.amount) * reportNumeric(expense.exchangeRate)
+}
 
 export default eventHandler(async (event) => {
   await requireRole(event, ['admin'])
@@ -82,7 +92,7 @@ export default eventHandler(async (event) => {
       orderBy: [{ expenseDate: 'desc' }, { id: 'desc' }],
       select: {
         id: true, expenseDate: true, category: true, description: true,
-        providerNameSnapshot: true, paymentMethod: true, currencyCode: true,
+        providerId: true, providerNameSnapshot: true, paymentMethod: true, currencyCode: true,
         amount: true, exchangeRate: true, notes: true, purchasePaymentId: true
       }
     }),
@@ -103,10 +113,14 @@ export default eventHandler(async (event) => {
   const grossSales = orders.reduce((sum, order) => sum + reportNumeric(order.total), 0)
   const sales = orders.reduce((sum, order) => sum + reportSalesBeforeTax(order), 0)
   const previousSales = previousSalesResult.reduce((sum, order) => sum + reportSalesBeforeTax(order), 0)
-  const operatingExpenses = expenses.filter(expense => expense.category !== 'Compra de materiales' && !expense.purchasePaymentId)
-    .reduce((sum, expense) => sum + reportNumeric(expense.amount) * reportNumeric(expense.exchangeRate), 0)
-  const previousOperatingExpenses = previousExpenses.filter(expense => expense.category !== 'Compra de materiales' && !expense.purchasePaymentId)
-    .reduce((sum, expense) => sum + reportNumeric(expense.amount) * reportNumeric(expense.exchangeRate), 0)
+  const materialExpenses = expenses.filter(isMaterialPurchase)
+  const operatingExpenseEntries = expenses.filter(expense => !isMaterialPurchase(expense))
+  const materialPurchases = materialExpenses.reduce((sum, expense) => sum + expenseAmount(expense), 0)
+  const previousMaterialPurchases = previousExpenses.filter(isMaterialPurchase)
+    .reduce((sum, expense) => sum + expenseAmount(expense), 0)
+  const operatingExpenses = operatingExpenseEntries.reduce((sum, expense) => sum + expenseAmount(expense), 0)
+  const previousOperatingExpenses = previousExpenses.filter(expense => !isMaterialPurchase(expense))
+    .reduce((sum, expense) => sum + expenseAmount(expense), 0)
   const purchaseInvoiceTotals = ['MXN', 'USD'].map((currencyCode) => {
     const invoices = purchaseInvoices.filter(invoice => invoice.order.currencyCode === currencyCode)
     const amount = invoices.filter(invoice => invoice.date >= start)
@@ -117,15 +131,13 @@ export default eventHandler(async (event) => {
   })
   const collectionsAmount = collections.reduce((sum, payment) => sum + reportNumeric(payment.amount), 0)
   const previousCollections = reportNumeric(previousCollectionsResult._sum.amount)
-  const expensesAmount = expenses.reduce(
-    (sum, expense) => sum + reportNumeric(expense.amount) * reportNumeric(expense.exchangeRate),
-    0
-  )
-  const previousExpensesAmount = previousExpenses.reduce(
-    (sum, expense) => sum + reportNumeric(expense.amount) * reportNumeric(expense.exchangeRate),
-    0
-  )
+  const expensesAmount = materialPurchases + operatingExpenses
+  const previousExpensesAmount = previousMaterialPurchases + previousOperatingExpenses
   const netCashFlow = collectionsAmount - expensesAmount
+  const grossProfit = sales - materialPurchases
+  const previousGrossProfit = previousSales - previousMaterialPurchases
+  const netProfit = grossProfit - operatingExpenses
+  const previousNetProfit = previousGrossProfit - previousOperatingExpenses
   const previousNetCashFlow = previousCollections - previousExpensesAmount
   const discounts = orders.reduce((sum, order) => sum + reportNumeric(order.discountTotal), 0)
   const outstandingBalance = orders.reduce((sum, order) => {
@@ -139,6 +151,7 @@ export default eventHandler(async (event) => {
   const dailySales = new Map<string, number>()
   const dailyCollections = new Map<string, number>()
   const dailyExpenses = new Map<string, number>()
+  const dailyMaterialPurchases = new Map<string, number>()
 
   for (const order of orders) {
     const key = reportDateOnly(order.orderDate)
@@ -161,8 +174,11 @@ export default eventHandler(async (event) => {
 
   for (const expense of expenses) {
     const key = reportDateOnly(expense.expenseDate)
-    const amount = reportNumeric(expense.amount) * reportNumeric(expense.exchangeRate)
+    const amount = expenseAmount(expense)
     dailyExpenses.set(key, (dailyExpenses.get(key) ?? 0) + amount)
+    if (isMaterialPurchase(expense)) {
+      dailyMaterialPurchases.set(key, (dailyMaterialPurchases.get(key) ?? 0) + amount)
+    }
   }
 
   const dailyMovements = Array.from({ length: elapsedDays }, (_, index) => {
@@ -170,6 +186,9 @@ export default eventHandler(async (event) => {
     const key = reportDateOnly(date)
     const dayCollections = dailyCollections.get(key) ?? 0
     const dayExpenses = dailyExpenses.get(key) ?? 0
+    const daySales = dailySales.get(key) ?? 0
+    const dayMaterialPurchases = dailyMaterialPurchases.get(key) ?? 0
+    const dayOperatingExpenses = dayExpenses - dayMaterialPurchases
 
     return {
       date: key,
@@ -181,7 +200,10 @@ export default eventHandler(async (event) => {
       internalSales: dailyInternalSales.get(key) ?? 0,
       collections: dayCollections,
       expenses: dayExpenses,
-      netCashFlow: dayCollections - dayExpenses
+      netCashFlow: dayCollections - dayExpenses,
+      materialPurchases: dayMaterialPurchases,
+      operatingExpenses: dayOperatingExpenses,
+      netProfit: daySales - dayMaterialPurchases - dayOperatingExpenses
     }
   })
 
@@ -220,6 +242,19 @@ export default eventHandler(async (event) => {
       .map(([id, value]) => ({ ...value, id, percentage: reportPercentage(value.amount, total) }))
       .sort((a, b) => b.amount - a.amount)
       .slice(0, 5)
+  }
+
+  const materialProviders = new Map<string, Omit<ReportRankingItem, 'id' | 'percentage'>>()
+  for (const expense of materialExpenses) {
+    const provider = materialProviders.get(expense.providerId) ?? {
+      label: expense.providerNameSnapshot,
+      detail: 'Proveedor',
+      amount: 0,
+      count: 0
+    }
+    provider.amount += expenseAmount(expense)
+    provider.count += 1
+    materialProviders.set(expense.providerId, provider)
   }
 
   const customers = new Map<string, Omit<ReportRankingItem, 'id' | 'percentage'>>()
@@ -298,6 +333,19 @@ export default eventHandler(async (event) => {
       operatingExpenses,
       previousOperatingExpenses,
       operatingExpensesChangePercentage: reportPercentageChange(operatingExpenses, previousOperatingExpenses),
+      materialPurchases,
+      previousMaterialPurchases,
+      materialPurchasesChangePercentage: reportPercentageChange(materialPurchases, previousMaterialPurchases),
+      grossProfit,
+      previousGrossProfit,
+      grossProfitChangePercentage: reportPercentageChange(grossProfit, previousGrossProfit),
+      grossMarginPercentage: reportMargin(grossProfit, sales),
+      previousGrossMarginPercentage: reportMargin(previousGrossProfit, previousSales),
+      netProfit,
+      previousNetProfit,
+      netProfitChangePercentage: reportPercentageChange(netProfit, previousNetProfit),
+      netMarginPercentage: reportMargin(netProfit, sales),
+      previousNetMarginPercentage: reportMargin(previousNetProfit, previousSales),
       purchaseInvoiceTotals,
       sales,
       previousOrderCount: previousSalesResult.length,
@@ -331,13 +379,14 @@ export default eventHandler(async (event) => {
       id: expense.id,
       date: reportDateOnly(expense.expenseDate),
       category: expense.category,
+      kind: isMaterialPurchase(expense) ? 'material' : 'operating',
       description: expense.description,
       provider: expense.providerNameSnapshot,
       paymentMethod: paymentMethodLabel(expense.paymentMethod),
       currencyCode: expense.currencyCode,
       originalAmount: reportNumeric(expense.amount),
       exchangeRate: reportNumeric(expense.exchangeRate),
-      amount: reportNumeric(expense.amount) * reportNumeric(expense.exchangeRate),
+      amount: expenseAmount(expense),
       notes: expense.notes
     })),
     dailyMovements,
@@ -345,9 +394,16 @@ export default eventHandler(async (event) => {
     expenseCategories: breakdown(
       expenses,
       expense => expense.category,
-      expense => reportNumeric(expense.amount) * reportNumeric(expense.exchangeRate),
+      expenseAmount,
       expensesAmount
     ),
+    operatingExpenseCategories: breakdown(
+      operatingExpenseEntries,
+      expense => expense.category,
+      expenseAmount,
+      operatingExpenses
+    ),
+    topMaterialProviders: ranking(materialProviders, materialPurchases),
     topDebtors: reportTopDebtors(orders),
     topCustomers: ranking(customers, sales),
     topProducts: ranking(products, sales),
