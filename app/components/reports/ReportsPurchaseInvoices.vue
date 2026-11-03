@@ -20,10 +20,10 @@ const visible = computed(() => {
             Facturas de compras
           </h2>
           <p class="mt-1 text-sm text-muted">
-            Facturado por proveedores en órdenes de compra, por moneda.
+            Facturado por proveedores en el mes, por moneda. Puede diferir de lo pagado.
           </p>
         </div>
-        <span class="flex size-8 shrink-0 items-center justify-center rounded-lg bg-success/10 text-success">
+        <span class="flex size-8 shrink-0 items-center justify-center rounded-lg bg-violet-500/10 text-violet-500">
           <UIcon name="i-lucide-receipt-text" class="size-4" />
         </span>
       </div>

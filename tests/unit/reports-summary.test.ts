@@ -100,6 +100,39 @@ describe('report summary cards', () => {
     })
   })
 
+  it('derives gross and net profit from sales, material purchases and operating expenses', async () => {
+    const sale = (total: number) => ({
+      id: `s${total}`, orderDate: new Date('2026-10-01'), total: total * 1.16, taxTotal: total * 0.16, discountTotal: 0,
+      customerId: 'c', customerNameSnapshot: 'Cliente', customer: { isInternalOrderCustomer: false },
+      vendedorEmail: 'seller', vendedorNombre: 'Vendedor', payments: [], items: []
+    })
+    const expense = { expenseDate: new Date('2026-10-02'), description: '', paymentMethod: 'efectivo', currencyCode: 'MXN', exchangeRate: 1, notes: null }
+    mocks.orders.mockResolvedValueOnce([sale(1000)]).mockResolvedValueOnce([sale(500)])
+    mocks.expenses.mockResolvedValueOnce([
+      { ...expense, id: 'm1', providerId: 'p1', providerNameSnapshot: 'Comex', category: 'Compra de materiales', amount: 300, purchasePaymentId: null },
+      { ...expense, id: 'm2', providerId: 'p2', providerNameSnapshot: 'Sherwin', category: 'Otros', amount: 100, purchasePaymentId: 'payment' },
+      { ...expense, id: 'o1', providerId: 'p3', providerNameSnapshot: 'CFE', category: 'Servicios', amount: 200, purchasePaymentId: null }
+    ]).mockResolvedValueOnce([
+      { category: 'Compra de materiales', amount: 600, exchangeRate: 1, purchasePaymentId: null }
+    ])
+    const result = await summary(event)
+    expect(result.metrics).toMatchObject({
+      materialPurchases: 400, previousMaterialPurchases: 600,
+      grossProfit: 600, previousGrossProfit: -100, grossMarginPercentage: 60, previousGrossMarginPercentage: -20,
+      netProfit: 400, previousNetProfit: -100, netMarginPercentage: 40, netProfitChangePercentage: 500
+    })
+    expect(result.topMaterialProviders.map(item => [item.label, item.amount, item.percentage])).toEqual([['Comex', 300, 75], ['Sherwin', 100, 25]])
+    expect(result.operatingExpenseCategories).toEqual([{ key: 'Servicios', label: 'Servicios', amount: 200, count: 1, percentage: 100 }])
+    expect(result.expenseDetails.map(item => item.kind)).toEqual(['material', 'material', 'operating'])
+    expect(result.dailyMovements[0]).toMatchObject({ sales: 1000, netProfit: 1000 })
+    expect(result.dailyMovements[1]).toMatchObject({ materialPurchases: 400, operatingExpenses: 200, netProfit: -600 })
+  })
+
+  it('reports no margin when the month has no sales', async () => {
+    const result = await summary(event)
+    expect(result.metrics).toMatchObject({ grossMarginPercentage: null, netMarginPercentage: null, netProfit: 0 })
+  })
+
   it('totals invoices by currency and invoice month, excluding voided invoices in the query', async () => {
     mocks.invoices.mockResolvedValue([
       { date: new Date('2026-10-01'), amount: 100, order: { currencyCode: 'MXN' } },

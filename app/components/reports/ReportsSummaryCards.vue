@@ -7,98 +7,134 @@ const props = defineProps<{
   metrics: ReportMetrics
 }>()
 
-function comparison(value: number | null, inverse = false) {
-  if (value === null) return { label: 'Sin base', color: 'neutral' as const, icon: 'i-lucide-minus' }
+type Tone = 'success' | 'error' | 'neutral'
+
+function comparison(value: number | null, inverse = false): { label: string, tone: Tone, icon: string } {
+  if (value === null) return { label: 'Sin base', tone: 'neutral', icon: 'i-lucide-minus' }
   const isFavorable = inverse ? value <= 0 : value >= 0
   return {
     label: `${value > 0 ? '+' : ''}${dashboardNumber.format(value)}%`,
-    color: isFavorable ? 'success' as const : 'error' as const,
-    icon: value >= 0 ? 'i-lucide-trending-up' : 'i-lucide-trending-down'
+    tone: isFavorable ? 'success' : 'error',
+    icon: value >= 0 ? 'i-lucide-arrow-up-right' : 'i-lucide-arrow-down-right'
   }
 }
 
-function count(value: number, singular: string, plural: string) {
-  return `${dashboardNumber.format(value)} ${value === 1 ? singular : plural}`
+function marginPoints(current: number | null, previous: number | null) {
+  if (current === null || previous === null) return comparison(null)
+  const points = Math.round((current - previous) * 10) / 10
+  return {
+    label: `${points > 0 ? '+' : ''}${dashboardNumber.format(points)} pts`,
+    tone: points >= 0 ? 'success' as const : 'error' as const,
+    icon: points >= 0 ? 'i-lucide-arrow-up-right' : 'i-lucide-arrow-down-right'
+  }
+}
+
+function shareOfSales(amount: number) {
+  const sales = props.metrics.sales
+  return sales > 0 ? `${dashboardNumber.format(Math.round(amount / sales * 1000) / 10)}% de la venta` : 'Sin ventas en el mes'
+}
+
+const toneClasses: Record<Tone, string> = {
+  success: 'text-success',
+  error: 'text-error',
+  neutral: 'text-muted'
 }
 
 const cards = computed(() => {
   const m = props.metrics
   return [{
+    key: 'sales',
     title: 'Ventas netas',
-    value: reportCurrency.format(m.salesBeforeTax),
+    value: reportCurrency.format(m.sales),
     previous: reportCurrency.format(m.previousSales),
-    icon: 'i-lucide-chart-no-axes-combined',
-    accent: 'text-primary bg-primary/10',
-    comparison: comparison(m.salesBeforeTaxChangePercentage),
-    details: [
-      `${count(m.orderCount, 'venta', 'ventas')} (ant. ${dashboardNumber.format(m.previousOrderCount)})`,
-      `Ticket promedio ${reportCurrency.format(m.averageTicket)}`
-    ]
+    marker: 'bg-primary',
+    comparison: comparison(m.salesChangePercentage),
+    detail: `${dashboardNumber.format(m.orderCount)} ${m.orderCount === 1 ? 'venta' : 'ventas'} · ticket ${reportCurrency.format(m.averageTicket)}`
   }, {
-    title: 'Cobrado',
-    value: reportCurrency.format(m.collections),
-    previous: reportCurrency.format(m.previousCollections),
-    icon: 'i-lucide-banknote-arrow-up',
-    accent: 'text-success bg-success/10',
-    comparison: comparison(m.collectionsChangePercentage),
-    details: [
-      `${dashboardNumber.format(m.collectionCoveragePercentage)}% de pedidos del mes cubierto`
-    ]
+    key: 'materials',
+    title: 'Compras de material',
+    value: reportCurrency.format(m.materialPurchases),
+    previous: reportCurrency.format(m.previousMaterialPurchases),
+    marker: 'bg-violet-500',
+    comparison: comparison(m.materialPurchasesChangePercentage, true),
+    detail: shareOfSales(m.materialPurchases)
   }, {
+    key: 'operating',
     title: 'Gastos operativos',
     value: reportCurrency.format(m.operatingExpenses),
     previous: reportCurrency.format(m.previousOperatingExpenses),
-    icon: 'i-lucide-banknote-arrow-down',
-    accent: 'text-warning bg-warning/10',
+    marker: 'bg-warning',
     comparison: comparison(m.operatingExpensesChangePercentage, true),
-    details: [
-      'Sin compra de materiales · MXN',
-      `Total con materiales ${reportCurrency.format(m.expenses)} (ant. ${reportCurrency.format(m.previousExpenses)})`
-    ]
-  }, {
-    title: 'Flujo neto',
-    value: reportCurrency.format(m.netCashFlow),
-    previous: reportCurrency.format(m.previousNetCashFlow),
-    icon: 'i-lucide-scale',
-    accent: 'text-info bg-info/10',
-    comparison: comparison(m.netCashFlowChangePercentage),
-    details: ['Cobros menos gastos totales']
+    detail: shareOfSales(m.operatingExpenses)
   }]
+})
+
+const margin = computed(() => {
+  const m = props.metrics
+  return {
+    percentage: m.netMarginPercentage === null ? '—' : `${dashboardNumber.format(m.netMarginPercentage)}%`,
+    previous: m.previousNetMarginPercentage === null ? 'sin base' : `${dashboardNumber.format(m.previousNetMarginPercentage)}%`,
+    comparison: marginPoints(m.netMarginPercentage, m.previousNetMarginPercentage),
+    isLoss: m.netProfit < 0
+  }
 })
 </script>
 
 <template>
-  <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-    <UCard
+  <div class="grid gap-px overflow-hidden rounded-xl bg-(--ui-border) ring ring-default sm:grid-cols-2 xl:grid-cols-4">
+    <article
       v-for="card in cards"
-      :key="card.title"
-      :ui="{ body: 'p-4 sm:p-5' }"
+      :key="card.key"
+      class="flex flex-col bg-default p-5"
     >
-      <div class="flex items-center justify-between gap-3">
-        <p class="text-xs font-medium tracking-wide text-muted uppercase">
-          {{ card.title }}
-        </p>
-        <span class="flex size-8 shrink-0 items-center justify-center rounded-lg" :class="card.accent">
-          <UIcon :name="card.icon" class="size-4" />
-        </span>
-      </div>
+      <h3 class="flex items-center gap-2 text-sm font-medium text-muted">
+        <span class="h-3.5 w-1 rounded-full" :class="card.marker" />
+        {{ card.title }}
+      </h3>
 
-      <p class="mt-3 text-2xl font-semibold tracking-tight tabular-nums text-highlighted">
+      <p class="mt-3 text-[1.65rem] leading-none font-semibold tracking-tight tabular-nums text-highlighted">
         {{ card.value }}
       </p>
 
-      <div class="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1">
-        <UBadge v-bind="card.comparison" variant="soft" size="sm" />
-        <span class="text-xs text-muted">
-          vs. mes anterior<template v-if="card.previous"> · {{ card.previous }}</template>
+      <p class="mt-3 flex flex-wrap items-center gap-x-1.5 text-xs tabular-nums">
+        <span class="inline-flex items-center gap-0.5 font-medium" :class="toneClasses[card.comparison.tone]">
+          <UIcon :name="card.comparison.icon" class="size-3.5" />
+          {{ card.comparison.label }}
         </span>
-      </div>
+        <span class="text-muted">vs. {{ card.previous }}</span>
+      </p>
 
-      <ul class="mt-4 space-y-1 border-t border-default pt-3 text-xs text-muted">
-        <li v-for="detail in card.details" :key="detail" class="tabular-nums">
-          {{ detail }}
-        </li>
-      </ul>
-    </UCard>
+      <p class="mt-auto pt-4 text-xs text-muted tabular-nums">
+        {{ card.detail }}
+      </p>
+    </article>
+
+    <article class="flex flex-col p-5" :class="margin.isLoss ? 'bg-error/5' : 'bg-success/5'">
+      <h3 class="flex items-center gap-2 text-sm font-medium text-muted">
+        <span class="h-3.5 w-1 rounded-full" :class="margin.isLoss ? 'bg-error' : 'bg-success'" />
+        Margen de ganancia
+      </h3>
+
+      <p class="mt-3 flex items-baseline gap-2">
+        <span class="text-[1.65rem] leading-none font-semibold tracking-tight tabular-nums" :class="margin.isLoss ? 'text-error' : 'text-highlighted'">
+          {{ margin.percentage }}
+        </span>
+        <span class="text-sm font-medium tabular-nums text-muted">
+          {{ reportCurrency.format(metrics.netProfit) }}
+        </span>
+      </p>
+
+      <p class="mt-3 flex flex-wrap items-center gap-x-1.5 text-xs tabular-nums">
+        <span class="inline-flex items-center gap-0.5 font-medium" :class="toneClasses[margin.comparison.tone]">
+          <UIcon :name="margin.comparison.icon" class="size-3.5" />
+          {{ margin.comparison.label }}
+        </span>
+        <span class="text-muted">vs. {{ margin.previous }}</span>
+      </p>
+
+      <p class="mt-auto pt-4 text-xs text-muted">
+        Utilidad neta sobre ventas
+      </p>
+    </article>
   </div>
 </template>

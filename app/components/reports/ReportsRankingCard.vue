@@ -3,7 +3,7 @@ import { reportCurrency } from '~/utils/reportPeriods'
 import type { ReportRankingItem } from '~/types/reports'
 import { dashboardCompactCurrency } from '~/utils/dashboardFormatters'
 
-defineProps<{
+const props = withDefaults(defineProps<{
   title: string
   description: string
   icon: string
@@ -11,7 +11,11 @@ defineProps<{
   items: ReportRankingItem[]
   countLabel: (count: number) => string
   exactAmounts?: boolean
-}>()
+  color?: 'primary' | 'material'
+}>(), { color: 'primary' })
+
+const accent = computed(() => props.color === 'material' ? 'bg-violet-500/10 text-violet-500' : 'bg-primary/10 text-primary')
+const bar = computed(() => props.color === 'material' ? 'bg-violet-500' : 'bg-primary')
 </script>
 
 <template>
@@ -26,7 +30,7 @@ defineProps<{
             {{ description }}
           </p>
         </div>
-        <span class="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+        <span class="flex size-8 shrink-0 items-center justify-center rounded-lg" :class="accent">
           <UIcon :name="icon" class="size-4" />
         </span>
       </div>
@@ -38,7 +42,7 @@ defineProps<{
       <li v-for="(item, index) in items" :key="item.id" class="flex items-start gap-3 py-3 first:pt-0 last:pb-0">
         <span
           class="flex size-6 shrink-0 items-center justify-center rounded-md text-[11px] font-semibold tabular-nums"
-          :class="index === 0 ? 'bg-primary/10 text-primary' : 'bg-elevated text-muted'"
+          :class="index === 0 ? accent : 'bg-elevated text-muted'"
         >
           {{ index + 1 }}
         </span>
@@ -51,12 +55,9 @@ defineProps<{
               {{ exactAmounts ? reportCurrency.format(item.amount) : dashboardCompactCurrency(item.amount) }}
             </p>
           </div>
-          <UProgress
-            :model-value="item.percentage"
-            color="primary"
-            size="xs"
-            class="mt-2"
-          />
+          <div class="mt-2 h-1 overflow-hidden rounded-full bg-accented">
+            <div class="h-full rounded-full" :class="bar" :style="{ width: `${Math.min(item.percentage, 100)}%` }" />
+          </div>
           <p class="mt-1.5 truncate text-xs text-muted">
             {{ item.detail }} · {{ countLabel(item.count) }} · {{ item.percentage }}%
           </p>

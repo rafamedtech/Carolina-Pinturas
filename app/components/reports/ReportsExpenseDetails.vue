@@ -6,15 +6,22 @@ import { dashboardNumber } from '~/utils/dashboardFormatters'
 
 const props = defineProps<{ expenses: ReportExpenseDetail[] }>()
 const search = shallowRef('')
+const kind = shallowRef('all')
 const page = shallowRef(1)
 useTableQuery([
   tableQueryField('expenses_search', search, tableQueryText()),
+  tableQueryField('expenses_kind', kind, tableQueryText('all', ['all', 'material', 'operating'])),
   tableQueryField('expenses_page', page, tableQueryPage)
-], { page, resetOn: [search] })
+], { page, resetOn: [search, kind] })
+const kinds = computed(() => [
+  { label: 'Todos', value: 'all', count: props.expenses.length },
+  { label: 'Material', value: 'material', count: props.expenses.filter(expense => expense.kind === 'material').length },
+  { label: 'Operativos', value: 'operating', count: props.expenses.filter(expense => expense.kind === 'operating').length }
+])
 const pageSize = 10
 const filtered = computed(() => {
   const term = search.value.trim().toLocaleLowerCase('es-MX')
-  return props.expenses.filter(expense => [expense.description, expense.provider, expense.category, expense.notes].join(' ').toLocaleLowerCase('es-MX').includes(term))
+  return props.expenses.filter(expense => kind.value === 'all' || expense.kind === kind.value).filter(expense => [expense.description, expense.provider, expense.category, expense.notes].join(' ').toLocaleLowerCase('es-MX').includes(term))
 })
 const total = computed(() => filtered.value.reduce((sum, expense) => sum + expense.amount, 0))
 const visible = computed(() => filtered.value.slice((page.value - 1) * pageSize, page.value * pageSize))
@@ -30,19 +37,34 @@ watch(pages, (total) => {
       <div class="flex flex-wrap items-center justify-between gap-4">
         <div>
           <h2 class="text-base font-semibold text-highlighted">
-            Gastos a detalle
+            Egresos a detalle
           </h2>
-          <p class="mt-1 text-sm text-muted">
-            {{ filtered.length }} {{ filtered.length === 1 ? 'gasto' : 'gastos' }} · {{ reportCurrency.format(total) }} MXN{{ search ? ' en resultados' : ' en el mes' }}
+          <p class="mt-1 text-sm text-muted tabular-nums">
+            {{ filtered.length }} {{ filtered.length === 1 ? 'registro' : 'registros' }} · {{ reportCurrency.format(total) }} MXN{{ search || kind !== 'all' ? ' en resultados' : ' en el mes' }}
           </p>
         </div>
-        <UInput
-          v-model="search"
-          icon="i-lucide-search"
-          placeholder="Buscar concepto, proveedor…"
-          aria-label="Buscar gastos por concepto, proveedor o categoría"
-          class="w-full sm:w-72"
-        />
+        <div class="flex w-full flex-wrap items-center gap-2 sm:w-auto">
+          <div class="flex rounded-lg bg-elevated p-0.5" role="group" aria-label="Tipo de egreso">
+            <button
+              v-for="item in kinds"
+              :key="item.value"
+              type="button"
+              class="rounded-md px-2.5 py-1 text-xs font-medium transition-colors focus-visible:outline-2 focus-visible:outline-primary"
+              :class="kind === item.value ? 'bg-default text-highlighted shadow-xs' : 'text-muted hover:text-default'"
+              :aria-pressed="kind === item.value"
+              @click="kind = item.value"
+            >
+              {{ item.label }} <span class="tabular-nums text-dimmed">{{ item.count }}</span>
+            </button>
+          </div>
+          <UInput
+            v-model="search"
+            icon="i-lucide-search"
+            placeholder="Buscar concepto, proveedor…"
+            aria-label="Buscar egresos por concepto, proveedor o categoría"
+            class="w-full sm:w-64"
+          />
+        </div>
       </div>
     </template>
     <div v-if="visible.length" class="overflow-x-auto">
@@ -74,7 +96,8 @@ watch(pages, (total) => {
               <p class="font-medium text-default">
                 {{ expense.description }}
               </p>
-              <p class="mt-1 text-xs text-muted">
+              <p class="mt-1 flex items-center gap-1.5 text-xs text-muted">
+                <span class="size-1.5 rounded-full" :class="expense.kind === 'material' ? 'bg-violet-500' : 'bg-warning'" />
                 {{ expense.category }}
               </p>
               <p v-if="expense.notes" class="mt-1 max-w-sm text-xs text-muted">
@@ -99,7 +122,7 @@ watch(pages, (total) => {
         </tbody>
       </table>
     </div>
-    <UEmpty v-else icon="i-lucide-receipt" :title="search ? 'Sin gastos que coincidan' : 'Sin gastos en este mes'" />
+    <UEmpty v-else icon="i-lucide-receipt" :title="search || kind !== 'all' ? 'Sin egresos que coincidan' : 'Sin egresos en este mes'" />
     <template v-if="pages > 1" #footer>
       <div class="flex items-center justify-between gap-3">
         <span class="text-xs text-muted">Página {{ page }} de {{ pages }}</span>
