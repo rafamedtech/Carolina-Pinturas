@@ -81,5 +81,8 @@ const visible = computed(() => expanded.value ? props.items : props.items.slice(
       class="mt-3 px-0"
       @click="expanded = !expanded"
     />
+    <template v-if="$slots.footer" #footer>
+      <slot name="footer" />
+    </template>
   </UCard>
 </template>

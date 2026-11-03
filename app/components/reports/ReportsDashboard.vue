@@ -149,8 +149,11 @@ function plural(count: number, singular: string, pluralLabel: string) {
           empty-icon="i-lucide-receipt"
           empty-title="Sin gastos operativos"
           :count-label="count => plural(count, 'gasto', 'gastos')"
-        />
-        <ReportsExpenseDetails :expenses="data.expenseDetails" />
+        >
+          <template #footer>
+            <ReportsExpenseDetails :expenses="data.expenseDetails" :period-label="data.period.label" />
+          </template>
+        </ReportsBreakdownCard>
       </section>
 
       <section aria-labelledby="reports-collections" class="space-y-3">
