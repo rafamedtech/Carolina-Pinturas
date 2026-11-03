@@ -838,6 +838,9 @@ function submitReview(intent: OrderReviewSubmissionIntent) {
                   class="flex items-center justify-between gap-4 px-3 py-2"
                 >
                   <div>
+                    <p class="text-xs font-medium text-muted">
+                      Código: {{ line.code }}
+                    </p>
                     <p class="font-medium">
                       {{ line.name }}
                     </p>
