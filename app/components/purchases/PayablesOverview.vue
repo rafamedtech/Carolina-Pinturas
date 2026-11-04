@@ -33,22 +33,6 @@ const providers = computed(() => {
 
 <template>
   <section class="space-y-5" aria-label="Resumen de cuentas por pagar" :aria-busy="loading">
-    <div class="flex flex-wrap items-end justify-between gap-3">
-      <div>
-        <p class="text-xs font-semibold tracking-widest text-muted">
-          CONTROL DE PAGOS
-        </p>
-        <h2 class="mt-2 text-2xl font-semibold tracking-tight sm:text-3xl">
-          Anticipa tus próximos pagos
-        </h2>
-        <p class="mt-2 text-sm text-muted">
-          Saldos abiertos en {{ currency }} · Corte al {{ formatDate(today) }}
-        </p>
-      </div>
-      <p class="max-w-sm text-xs leading-relaxed text-muted">
-        Semana y mes incluyen vencimientos desde hoy. Las cuentas vencidas se muestran por separado.
-      </p>
-    </div>
     <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
       <button
         v-for="card in cards"

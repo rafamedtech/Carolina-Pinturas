@@ -100,19 +100,14 @@ watch(status, (value) => {
         color="neutral"
         variant="ghost"
       />
+      <USelect
+        v-model="currency"
+        :items="[{ label: 'Pesos · MXN', value: 'MXN' }, { label: 'Dólares · USD', value: 'USD' }]"
+        aria-label="Moneda de cuentas por pagar"
+        class="w-36 sm:w-44"
+      />
     </template>
     <template #before>
-      <div class="flex flex-wrap items-center justify-between gap-3">
-        <p class="text-sm text-muted">
-          Administra vencimientos y saldos de tus facturas de compra.
-        </p>
-        <USelect
-          v-model="currency"
-          :items="[{ label: 'Pesos · MXN', value: 'MXN' }, { label: 'Dólares · USD', value: 'USD' }]"
-          aria-label="Moneda de cuentas por pagar"
-          class="w-44"
-        />
-      </div>
       <PurchasesPayablesOverview
         :rows="currencyRows"
         :today="today"
