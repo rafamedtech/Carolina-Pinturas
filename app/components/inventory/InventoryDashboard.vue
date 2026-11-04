@@ -194,6 +194,7 @@ const reservationColumns: TableColumn<Extract<Row, { orderId: string }>>[] = [
         title="Carga las existencias reales antes de activar"
         description="Crea almacenes, registra el saldo inicial o aplica un conteo. Al activar, los pedidos nuevos reservarán y descontarán inventario; los documentos históricos conservarán su comportamiento."
         color="warning"
+        class="shrink-0"
       >
         <template #actions>
           <UButton
