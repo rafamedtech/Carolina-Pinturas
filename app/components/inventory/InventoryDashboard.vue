@@ -16,8 +16,9 @@ const admin = computed(() => user.value?.role === 'admin')
 const operational = computed(() => admin.value || user.value?.role === 'mostrador')
 const tab = shallowRef('stocks')
 const search = shallowRef(''), warehouse = shallowRef(''), type = shallowRef(''), from = shallowRef(''), to = shallowRef(''), productId = shallowRef('')
+const tracking = shallowRef('all')
 const low = shallowRef(false), pageNumber = shallowRef(1)
-const query = computed(() => ({ page: pageNumber.value, page_size: 25, search: search.value, warehouseId: warehouse.value || undefined, productId: productId.value || undefined, type: type.value || undefined, from: from.value || undefined, to: to.value || undefined, low: low.value ? 'true' : undefined }))
+const query = computed(() => ({ page: pageNumber.value, page_size: 25, search: search.value, warehouseId: warehouse.value || undefined, productId: productId.value || undefined, type: type.value || undefined, from: from.value || undefined, to: to.value || undefined, low: low.value ? 'true' : undefined, tracking: tab.value === 'warehouses' && tracking.value !== 'all' ? tracking.value : undefined }))
 const { returnTo } = useTableQuery([
   tableQueryField('productId', productId, tableQueryText()),
   tableQueryField('tab', tab, {
@@ -29,9 +30,10 @@ const { returnTo } = useTableQuery([
   tableQueryField('type', type, tableQueryText()),
   tableQueryField('from', from, tableQueryDate),
   tableQueryField('to', to, tableQueryDate),
+  tableQueryField('tracking', tracking, tableQueryText('all', ['all', 'enabled', 'disabled'])),
   tableQueryField('low', low, tableQueryBoolean),
   tableQueryField('page', pageNumber, tableQueryPage)
-], { page: pageNumber, resetOn: [tab, search, warehouse, type, from, to, productId, low] })
+], { page: pageNumber, resetOn: [tab, search, warehouse, type, from, to, productId, low, tracking] })
 const requestFetch = useRequestFetch()
 const { data: warehouseData, refresh: refreshWarehouses, error: warehouseError } = useAsyncData('inventory-warehouses', async () => ({ results: await fetchAllPages<InventoryWarehouse>('/api/inventory/warehouses', {}, 100, requestFetch) }), { lazy: true, server: false })
 const { data: settings, refresh: refreshSettings } = useFetch<InventorySettings>('/api/inventory/settings', { lazy: true, server: false })
@@ -97,7 +99,7 @@ const warehouseFilter = computed({ get: () => warehouse.value || 'all', set: (va
 const typeFilter = computed({ get: () => type.value || 'all', set: (value: string) => {
   type.value = value === 'all' ? '' : value
 } })
-const filterValues = useListFilterBindings({ warehouse: warehouseFilter, type: typeFilter, low })
+const filterValues = useListFilterBindings({ warehouse: warehouseFilter, type: typeFilter, low, tracking })
 const dateRange = computed<OrderDateRange | null>({
   get: () => {
     try {
@@ -116,7 +118,7 @@ const listConfig = computed<ListLayoutConfig>(() => ({
   search: { placeholder: 'Buscar código o producto' }, tabs: tabs.value, defaultTab: 'stocks',
   dateFilter: ['movements', 'kardex', 'counts'].includes(tab.value) ? { subject: 'movimientos de inventario' } : undefined,
   filters: [
-    { key: 'warehouse', label: 'Almacén', type: 'select', defaultValue: 'all', items: [{ label: 'Todos los almacenes', value: 'all' }, ...(warehouseData.value?.results ?? []).map(w => ({ label: w.name, value: w.id }))] },
+    ...(tab.value === 'warehouses' ? [{ key: 'tracking', label: 'Control interno', type: 'select' as const, defaultValue: 'all', items: [{ label: 'Todos los productos', value: 'all' }, { label: 'Activo', value: 'enabled' }, { label: 'Inactivo', value: 'disabled' }] }] : [{ key: 'warehouse', label: 'Almacén', type: 'select' as const, defaultValue: 'all', items: [{ label: 'Todos los almacenes', value: 'all' }, ...(warehouseData.value?.results ?? []).map(w => ({ label: w.name, value: w.id }))] }]),
     ...(['movements', 'kardex'].includes(tab.value) ? [{ key: 'type', label: 'Movimiento', type: 'select' as const, defaultValue: 'all', items: [{ label: 'Todos', value: 'all' }, ...inventoryTypes.map(value => ({ label: value.replaceAll('_', ' '), value }))] }] : []),
     ...(tab.value === 'stocks' ? [{ key: 'low', label: 'Bajo mínimo', type: 'checkbox' as const, defaultValue: false }] : [])
   ],
@@ -133,11 +135,27 @@ function createInventoryRecord() {
   else openMove()
 }
 function clearInventoryFilters() {
+  tracking.value = 'all'
   productId.value = ''
   warehouse.value = ''
   type.value = ''
   low.value = false
 }
+
+const hasProductFilters = computed(() => Boolean(search.value.trim() || productId.value || tracking.value !== 'all'))
+const canUpdateFiltered = computed(() => admin.value && tab.value === 'warehouses' && hasProductFilters.value && status.value === 'success' && !loadError.value && Boolean(result.value?.pagination.totalResults) && !busy.value)
+async function setFilteredTracking(enabled: boolean) {
+  if (!canUpdateFiltered.value) return
+  await run({ action: 'trackingFiltered', enabled, filters: {
+    search: search.value.trim(),
+    productId: productId.value || undefined,
+    tracking: tracking.value === 'enabled' || tracking.value === 'disabled' ? tracking.value : undefined
+  } })
+}
+const filteredTrackingActions = computed(() => [
+  { label: 'Activar resultados filtrados', icon: 'i-lucide-toggle-right', onSelect: () => setFilteredTracking(true) },
+  { label: 'Desactivar resultados filtrados', icon: 'i-lucide-toggle-left', onSelect: () => setFilteredTracking(false) }
+])
 
 const NuxtLink = resolveComponent('NuxtLink')
 const reservationColumns: TableColumn<Extract<Row, { orderId: string }>>[] = [
@@ -283,10 +301,27 @@ const reservationColumns: TableColumn<Extract<Row, { orderId: string }>>[] = [
           </UCard>
         </div><UCard>
           <template #header>
-            <h2 class="font-semibold">
-              Control interno por producto
-            </h2><p class="text-sm text-muted">
-              Esta configuración pertenece al inventario interno y es independiente del catálogo fiscal.
+            <div class="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <h2 class="font-semibold">
+                  Control interno por producto
+                </h2><p class="text-sm text-muted">
+                  Esta configuración pertenece al inventario interno y es independiente del catálogo fiscal.
+                </p>
+              </div>
+              <UDropdownMenu :items="filteredTrackingActions">
+                <UButton
+                  label="Acciones sobre filtrados"
+                  icon="i-lucide-list-checks"
+                  trailing-icon="i-lucide-chevron-down"
+                  variant="outline"
+                  :disabled="!canUpdateFiltered"
+                  :loading="busy"
+                />
+              </UDropdownMenu>
+            </div>
+            <p class="mt-2 text-sm text-muted">
+              {{ hasProductFilters ? `Se aplicará a todos los resultados filtrados (${result?.pagination.totalResults ?? 0}), incluidas las demás páginas.` : 'Aplica una búsqueda o un filtro de control interno para habilitar las acciones.' }}
             </p>
           </template><ul class="divide-y divide-default">
             <li v-for="p in productRows" :key="p.id" class="flex items-center justify-between gap-4 py-3">

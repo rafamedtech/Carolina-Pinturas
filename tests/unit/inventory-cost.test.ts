@@ -18,3 +18,16 @@ describe('costos de inventario inicial', () => {
     expect(valid({ ...move, type: 'entrada', lines: [{ productId: move.lines[0]!.productId, quantity: '1' }] })).toBe(true)
   })
 })
+
+describe('control interno de resultados filtrados', () => {
+  it('rechaza cambios masivos sin una búsqueda o filtro efectivo', () => {
+    for (const filters of [{}, { search: '   ' }, { warehouseId: randomUUID() }, { low: 'true' }]) {
+      expect(valid({ action: 'trackingFiltered', enabled: false, filters })).toBe(false)
+    }
+  })
+  it('acepta búsquedas, productos y estados de control interno', () => {
+    for (const filters of [{ search: 'pintura' }, { productId: randomUUID() }, { tracking: 'disabled' }]) {
+      expect(valid({ action: 'trackingFiltered', enabled: true, filters })).toBe(true)
+    }
+  })
+})

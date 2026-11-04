@@ -120,6 +120,35 @@ suite('inventario: PostgreSQL aislado, sin conexión Siigo', () => {
     await command({ action: 'countApply', id: count.id, version: count.version })
     await command({ action: 'activate', version: 1 })
   })
+  it('cambia todos los productos filtrados entre páginas y conserva los demás', async () => {
+    const ids: string[] = []
+    for (let i = 0; i < 27; i++) {
+      const id = await product()
+      ids.push(id)
+      await db.siigoProduct.update({ where: { id }, data: { code: `BULK-TEST-${i}` } })
+    }
+    const filters = { search: 'BULK-TEST-' }
+    const filtered = await listInventory('products', { ...filters, page: 1, page_size: 25 }) as { results: unknown[], pagination: { totalResults: number } }
+    expect(filtered.results).toHaveLength(25)
+    expect(filtered.pagination.totalResults).toBe(27)
+    expect(await command({ action: 'trackingFiltered', enabled: false, filters })).toMatchObject({ updated: 27 })
+    expect(await db.inventoryProduct.count({ where: { productId: { in: ids }, enabled: false } })).toBe(27)
+    expect((await db.inventoryProduct.findUniqueOrThrow({ where: { productId: initialProduct } })).enabled).toBe(true)
+    const disabled = await listInventory('products', { ...filters, tracking: 'disabled', page: 1, page_size: 100 }) as { results: unknown[] }
+    expect(disabled.results).toHaveLength(27)
+    expect(await command({ action: 'trackingFiltered', enabled: true, filters: { ...filters, tracking: 'disabled' } })).toMatchObject({ updated: 27 })
+    expect(await db.inventoryProduct.count({ where: { productId: { in: ids }, enabled: true } })).toBe(27)
+    await expect(command({ action: 'trackingFiltered', enabled: false, filters }, { ...user, role: 'mostrador' })).rejects.toThrow('administrador')
+  })
+
+  it('revierte todo el cambio filtrado si un producto tiene existencias', async () => {
+    const ids = [await product(), await product()].sort()
+    for (const [index, id] of ids.entries()) await db.siigoProduct.update({ where: { id }, data: { code: `BULK-BLOCK-${index}` } })
+    await entry(ids[1]!)
+    await expect(command({ action: 'trackingFiltered', enabled: false, filters: { search: 'BULK-BLOCK-' } })).rejects.toThrow('existencias')
+    expect(await db.inventoryProduct.count({ where: { productId: { in: ids }, enabled: true } })).toBe(2)
+  })
+
   it('guarda el costo faltante de una entrada sin reemplazar costos ya registrados', async () => {
     const id = await product()
     await command({ action: 'move', type: 'entrada', warehouseId: a, date: today, reason: 'Entrada con costo', lines: [{ productId: id, quantity: '2', unitCost: '23.123456', costCurrency: 'USD' }] })

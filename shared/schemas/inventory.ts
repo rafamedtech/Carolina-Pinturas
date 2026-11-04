@@ -10,15 +10,19 @@ const costFields = { unitCost: inventoryCost.optional(), costCurrency: z.enum(['
 const line = z.object({ productId: z.uuid(), quantity: inventoryPositive, ...costFields })
 const lines = z.array(line).min(1).max(100).refine(v => new Set(v.map(i => i.productId)).size === v.length, 'No repitas productos.')
 export const inventoryTypes = ['inicial', 'entrada', 'salida', 'traspaso', 'devolucion_cliente', 'devolucion_proveedor', 'ajuste', 'surtido', 'recepcion', 'reversion'] as const
+const trackingState = z.enum(['enabled', 'disabled'])
+const trackingFilters = z.object({ search: z.string().trim().max(200).default(''), productId: z.uuid().optional(), tracking: trackingState.optional() })
+  .refine(v => Boolean(v.search || v.productId || v.tracking), 'Aplica una búsqueda o un filtro de producto antes de cambiar el control interno.')
 export const inventoryQuery = z.object({
   page: z.coerce.number().int().min(1).default(1), page_size: z.coerce.number().int().min(1).max(100).default(25),
   search: z.string().trim().max(200).default(''), warehouseId: z.uuid().optional(), productId: z.uuid().optional(),
-  from: purchaseDate.optional(), to: purchaseDate.optional(), type: z.enum(inventoryTypes).optional(), low: z.enum(['true', 'false']).optional(), controlledOnly: z.enum(['true', 'false']).optional()
+  from: purchaseDate.optional(), to: purchaseDate.optional(), type: z.enum(inventoryTypes).optional(), low: z.enum(['true', 'false']).optional(), controlledOnly: z.enum(['true', 'false']).optional(), tracking: trackingState.optional()
 })
 export const inventoryCommand = z.object({
   requestId: z.uuid(),
   command: z.discriminatedUnion('action', [
     z.object({ action: z.literal('warehouse'), id: z.uuid().optional(), version: z.number().int().positive().optional(), code: z.string().trim().min(1).max(64), name: z.string().trim().min(1).max(200), address: z.string().trim().max(1000).default(''), active: z.boolean().default(true) }),
+    z.object({ action: z.literal('trackingFiltered'), enabled: z.boolean(), filters: trackingFilters }),
     z.object({ action: z.literal('tracking'), productId: z.uuid(), enabled: z.boolean(), version: z.number().int().positive() }),
     z.object({ action: z.literal('minimum'), warehouseId: z.uuid(), productId: z.uuid(), minimum: inventoryQuantity, version: z.number().int().positive() }),
     z.object({ action: z.literal('activate'), version: z.number().int().positive() }),

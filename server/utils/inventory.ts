@@ -196,10 +196,10 @@ async function returnMovement(tx: Tx, c: Extract<InventoryCommand['command'], {
 }
 async function mutate(tx: Tx, input: InventoryCommand, user: AppUser) {
   const c = input.command
-  const admin = ['warehouse', 'tracking', 'minimum', 'activate', 'reverse', 'countApply'].includes(c.action) || (c.action === 'move' && c.type === 'inicial')
+  const admin = ['warehouse', 'tracking', 'trackingFiltered', 'minimum', 'activate', 'reverse', 'countApply'].includes(c.action) || (c.action === 'move' && c.type === 'inicial')
   if (admin && user.role !== 'admin') throw createError({ statusCode: 403, statusMessage: 'Esta operación requiere administrador.' })
   if (!INVENTORY_WRITE_ROLES.includes(user.role as 'admin' | 'mostrador')) throw createError({ statusCode: 403, statusMessage: 'No tienes permiso para operar inventario.' })
-  const settings = await inventorySettings(tx, ['warehouse', 'tracking', 'activate'].includes(c.action))
+  const settings = await inventorySettings(tx, ['warehouse', 'tracking', 'trackingFiltered', 'activate'].includes(c.action))
   if (c.action === 'warehouse') {
     const data = { code: c.code.toUpperCase(), name: c.name, address: c.address || null, active: c.active }
     if (c.id) {
@@ -222,6 +222,23 @@ async function mutate(tx: Tx, input: InventoryCommand, user: AppUser) {
     inventoryAssert(await tx.inventoryWarehouse.count({ where: { active: true } }), 'Crea al menos un almacén activo.')
     inventoryAssert(!await tx.inventoryCount.count({ where: { status: { in: ['borrador', 'pendiente'] } } }), 'Aplica o cancela los conteos pendientes antes de activar.')
     return tx.inventorySettings.update({ where: { id: 1 }, data: { enabledAt: new Date(), version: { increment: 1 } } })
+  }
+  if (c.action === 'trackingFiltered') {
+    inventoryAssert(c.filters.search.trim() || c.filters.productId || c.filters.tracking, 'Aplica una búsqueda o un filtro de producto antes de cambiar el control interno.')
+    await lockCompositions(tx, true)
+    const products = await tx.siigoProduct.findMany({ where: inventoryProductFilter(c.filters), include: { inventoryProduct: true }, orderBy: { id: 'asc' } })
+    let updated = 0
+    for (const product of products) {
+      if (product.inventoryProduct?.enabled === c.enabled) continue
+      inventoryAssert(product.inventoryProduct, `La configuración de ${product.code} cambió. Recarga antes de continuar.`)
+      try {
+        await mutate(tx, { requestId: input.requestId, command: { action: 'tracking', productId: product.id, enabled: c.enabled, version: product.inventoryProduct.version } }, user)
+      } catch (error) {
+        throw createError({ statusCode: (error as { statusCode?: number }).statusCode ?? 409, statusMessage: `${product.code}: ${(error as { statusMessage?: string }).statusMessage ?? 'No se pudo cambiar el control interno.'}` })
+      }
+      updated++
+    }
+    return { updated }
   }
   if (c.action === 'tracking') {
     await lockCompositions(tx, true)
@@ -361,6 +378,14 @@ export function stockView(b: Prisma.InventoryBalanceGetPayload<{
   const available = d(b.quantity.toString()).minus(b.reserved.toString())
   return { productId: b.productId, warehouseId: b.warehouseId, code: b.product.code, name: b.product.name, unit: b.product.unitName ?? b.product.unitCode, warehouse: b.warehouse.name, quantity: b.quantity.toString(), reserved: b.reserved.toString(), available: available.toString(), minimum: b.minimum.toString(), low: available.lt(b.minimum.toString()), version: b.version, unitCost: b.product.unitCost?.toString() ?? null, costCurrency: b.product.costCurrency }
 }
+function inventoryProductFilter(filters: { search: string, productId?: string, tracking?: 'enabled' | 'disabled' }): Prisma.SiigoProductWhereInput {
+  return {
+    internalKind: 'product',
+    ...(filters.productId ? { id: filters.productId } : {}),
+    ...(filters.search ? { OR: [{ code: { contains: filters.search, mode: 'insensitive' } }, { name: { contains: filters.search, mode: 'insensitive' } }] } : {}),
+    ...(filters.tracking ? { inventoryProduct: { enabled: filters.tracking === 'enabled' } } : {})
+  }
+}
 export async function listInventory(resource: string, q: InventoryQuery) {
   const db = usePrisma()
   const skip = (q.page - 1) * q.page_size
@@ -372,7 +397,7 @@ export async function listInventory(resource: string, q: InventoryQuery) {
     return { results: rows, pagination: pagination(q, total) }
   }
   if (resource === 'products') {
-    const where = { ...productFilter, internalKind: 'product', ...(q.controlledOnly === 'true' ? { inventoryProduct: { enabled: true }, AND: [{ OR: [{ active: true }, { active: null }] }, { OR: [{ type: 'Product' }, { type: null }] }] } : {}) }
+    const where = { ...inventoryProductFilter(q), ...(q.controlledOnly === 'true' ? { inventoryProduct: { enabled: true }, AND: [{ OR: [{ active: true }, { active: null }] }, { OR: [{ type: 'Product' }, { type: null }] }] } : {}) }
     const [rows, total] = await Promise.all([db.siigoProduct.findMany({ where, include: { inventoryProduct: true }, orderBy: [{ code: 'asc' }, { id: 'asc' }], skip, take: q.page_size }), db.siigoProduct.count({ where })])
     return { results: rows.map(p => ({ id: p.id, code: p.code, name: p.name, reference: p.reference ?? undefined, additional_fields: { barcode: p.barcode ?? undefined }, unit: p.unitName ?? p.unitCode, unitCost: p.unitCost?.toString() ?? null, costCurrency: p.costCurrency, initialUnitCost: p.initialUnitCost?.toString() ?? null, initialCostCurrency: p.initialCostCurrency, enabled: p.inventoryProduct?.enabled ?? false, version: p.inventoryProduct?.version ?? 1 })), pagination: pagination(q, total) }
   }
