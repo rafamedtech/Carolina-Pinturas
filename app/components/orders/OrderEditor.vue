@@ -4,6 +4,7 @@ import * as z from 'zod'
 import type { FormSubmitEvent } from '@nuxt/ui'
 import type { OrderSaleType, OrderStatus, SalesOrderDetail } from '~/types/orders'
 import type { SiigoCustomer, SiigoProduct } from '~/types/siigo'
+import type { InventoryWarehouse } from '#shared/types/inventory'
 import { submittedOrderStatusKey, canManageOrderLogistics } from '~/utils/roleAccess'
 import { DEFAULT_PAYMENT_STATUS, paymentMethodLabel } from '~/utils/orderPayment'
 import { discountAmountOf } from '~/utils/orderDiscount'
@@ -151,6 +152,18 @@ const state = reactive<Schema>({
   discountValue: 0,
   observations: ''
 })
+const { data: inventoryContext } = useFetch<{ warehouses: InventoryWarehouse[] }>('/api/orders/inventory-context', {
+  lazy: true,
+  server: false,
+  immediate: !isEditing.value
+})
+
+watch(() => inventoryContext.value?.warehouses, (warehouses) => {
+  if (isEditing.value || state.warehouseId) return
+  const warehouse = warehouses?.find(w => w.name.trim().toLowerCase() === 'mostrador')
+  if (warehouse) state.warehouseId = warehouse.id
+}, { immediate: true })
+
 const saving = shallowRef(false)
 const submissionIntent = shallowRef<'draft' | 'save' | 'save-and-pay' | null>(null)
 const initialPaymentRequestId = shallowRef('')
@@ -680,7 +693,11 @@ function submitReview(intent: OrderReviewSubmissionIntent) {
         class="contents"
         @submit="reviewOrder"
       >
-        <InventoryWarehousePicker v-model="state.warehouseId" :disabled="formDisabled" />
+        <InventoryWarehousePicker
+          v-if="isEditing"
+          v-model="state.warehouseId"
+          :disabled="formDisabled"
+        />
         <div class="grid gap-4 lg:grid-cols-2">
           <OrdersOrderCustomerFields
             v-model:customer-id="state.customerId"
