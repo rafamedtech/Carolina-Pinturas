@@ -12,7 +12,9 @@ describe('costos de inventario inicial', () => {
     for (const unitCost of ['0', '-1', '12.1234567', '1000000000', 'NaN']) expect(valid({ ...move, lines: [{ ...move.lines[0], unitCost }] })).toBe(false)
     expect(valid({ ...move, lines: [{ ...move.lines[0], costCurrency: 'EUR' }] })).toBe(false)
   })
-  it('las entradas posteriores no requieren costo ni alteran el costo de compra', () => {
+  it('las entradas permiten omitir el costo o capturarlo con su moneda', () => {
+    expect(valid({ ...move, type: 'entrada' })).toBe(true)
+    expect(valid({ ...move, type: 'entrada', lines: [{ ...move.lines[0], costCurrency: undefined }] })).toBe(false)
     expect(valid({ ...move, type: 'entrada', lines: [{ productId: move.lines[0]!.productId, quantity: '1' }] })).toBe(true)
   })
 })

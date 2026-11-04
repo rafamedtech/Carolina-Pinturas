@@ -36,6 +36,9 @@ export const inventoryCommand = z.object({
   ])
 }).superRefine((input, ctx) => {
   const c = input.command
+  if (c.action === 'move' && c.type === 'entrada') c.lines.forEach((line, index) => {
+    if (line.unitCost !== undefined && line.costCurrency === undefined) ctx.addIssue({ code: 'custom', path: ['command', 'lines', index, 'costCurrency'], message: 'Captura la moneda del costo unitario.' })
+  })
   if (c.action === 'move' && c.type === 'inicial') c.lines.forEach((line, index) => {
     for (const key of ['unitCost', 'costCurrency'] as const) if (line[key] === undefined) ctx.addIssue({ code: 'custom', path: ['command', 'lines', index, key], message: 'Captura el costo unitario y su moneda.' })
   })

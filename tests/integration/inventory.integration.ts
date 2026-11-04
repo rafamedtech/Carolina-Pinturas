@@ -120,6 +120,19 @@ suite('inventario: PostgreSQL aislado, sin conexión Siigo', () => {
     await command({ action: 'countApply', id: count.id, version: count.version })
     await command({ action: 'activate', version: 1 })
   })
+  it('guarda el costo faltante de una entrada sin reemplazar costos ya registrados', async () => {
+    const id = await product()
+    await command({ action: 'move', type: 'entrada', warehouseId: a, date: today, reason: 'Entrada con costo', lines: [{ productId: id, quantity: '2', unitCost: '23.123456', costCurrency: 'USD' }] })
+    const current = () => db.siigoProduct.findUniqueOrThrow({ where: { id } })
+    expect((await current()).unitCost?.toString()).toBe('23.123456')
+    expect((await current()).costCurrency).toBe('USD')
+    const catalog = await listInventory('products', { page: 1, page_size: 100, search: '', productId: id }) as { results: Array<{ unitCost: string, costCurrency: string }> }
+    expect(catalog.results[0]).toMatchObject({ unitCost: '23.123456', costCurrency: 'USD' })
+    await command({ action: 'move', type: 'entrada', warehouseId: b, date: today, reason: 'Entrada posterior', lines: [{ productId: id, quantity: '1', unitCost: '99', costCurrency: 'MXN' }] })
+    expect((await current()).unitCost?.toString()).toBe('23.123456')
+    expect((await current()).costCurrency).toBe('USD')
+  })
+
   it('conserva el costo inicial hasta recibir compras; respeta fechas y restaura costos al anular', async () => {
     const currentCost = () => db.siigoProduct.findUniqueOrThrow({ where: { id: initialProduct } })
     expect((await currentCost()).unitCost?.toString()).toBe('8.123456')

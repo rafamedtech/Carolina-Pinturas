@@ -23,9 +23,20 @@ function add() {
   if (!selected.value || props.busy || (!props.source && (error.value || loadingProducts.value)) || form.lines.some(l => l.productId === selected.value)) return
   labels[selected.value] = items.value.find(p => p.value === selected.value)?.label ?? selected.value
   const product = enabledProducts.value.find(p => p.id === selected.value)
-  form.lines.push({ productId: selected.value, quantity: '', unitCost: product?.initialUnitCost ?? undefined, costCurrency: (product?.initialCostCurrency as 'MXN' | 'USD') ?? 'MXN' })
+  form.lines.push({ productId: selected.value, quantity: '', unitCost: (form.type === 'inicial' ? product?.initialUnitCost : product?.unitCost) ?? undefined, costCurrency: ((form.type === 'inicial' ? product?.initialCostCurrency : product?.costCurrency) as 'MXN' | 'USD') ?? 'MXN' })
   selected.value = ''
 }
+const showCosts = computed(() => !props.source && ['inicial', 'entrada'].includes(form.type))
+function hasRegisteredCost(productId: string) {
+  return form.type === 'entrada' && Boolean(enabledProducts.value.find(p => p.id === productId)?.unitCost)
+}
+watch(() => form.type, () => {
+  for (const line of form.lines) {
+    const product = enabledProducts.value.find(p => p.id === line.productId)
+    line.unitCost = (form.type === 'inicial' ? product?.initialUnitCost : product?.unitCost) ?? undefined
+    line.costCurrency = ((form.type === 'inicial' ? product?.initialCostCurrency : product?.costCurrency) as 'MXN' | 'USD') ?? 'MXN'
+  }
+})
 function submit() {
   if (props.source) emit('submit', { action: 'return', sourceMovementId: props.source.id, warehouseId: form.warehouseId, date: form.date, reason: form.reason, lines: form.lines })
   else emit('submit', { action: 'move', ...form, type: form.type as 'inicial' | 'entrada' | 'salida' | 'traspaso', destinationId: form.destinationId || undefined })
@@ -116,6 +127,9 @@ const warehouseOptions = computed(() => props.warehouses.filter(w => w.active).m
       <p v-if="form.type === 'inicial' && !source" class="text-sm text-muted">
         Captura el costo unitario con impuestos. Se usará hasta recibir una compra y debe coincidir en todos los almacenes.
       </p>
+      <p v-if="form.type === 'entrada' && !source" class="text-sm text-muted">
+        Se muestra el último costo registrado con impuestos. Si el producto no tiene costo, puedes capturarlo junto con su moneda.
+      </p>
       <ul class="divide-y divide-default">
         <li v-for="(line, index) in form.lines" :key="line.productId" class="flex flex-wrap items-center gap-3 py-3">
           <span class="min-w-48 flex-1 text-sm">{{ labels[line.productId] }}</span><UInput
@@ -126,7 +140,7 @@ const warehouseOptions = computed(() => props.warehouses.filter(w => w.active).m
             required
             class="w-36"
           />
-          <UFormField v-if="form.type === 'inicial' && !source" label="Costo unitario (con impuestos)" required>
+          <UFormField v-if="showCosts" label="Costo unitario (con impuestos)" :required="form.type === 'inicial'">
             <UInputNumber
               :model-value="line.unitCost ? Number(line.unitCost) : undefined"
               :min="0"
@@ -136,18 +150,18 @@ const warehouseOptions = computed(() => props.warehouses.filter(w => w.active).m
               :format-options="{ maximumFractionDigits: 6 }"
               :increment="false"
               :decrement="false"
-              :disabled="busy"
+              :disabled="busy || hasRegisteredCost(line.productId)"
               :aria-label="`Costo unitario de ${labels[line.productId]}`"
               placeholder="0.00"
               class="w-44"
               @update:model-value="line.unitCost = $event === undefined ? undefined : String($event)"
             />
           </UFormField>
-          <UFormField v-if="form.type === 'inicial' && !source" label="Moneda">
+          <UFormField v-if="showCosts" label="Moneda">
             <USelect
               v-model="line.costCurrency"
               :items="['MXN', 'USD']"
-              :disabled="busy"
+              :disabled="busy || hasRegisteredCost(line.productId)"
               :aria-label="`Moneda de ${labels[line.productId]}`"
             />
           </UFormField>

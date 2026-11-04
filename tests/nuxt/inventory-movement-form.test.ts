@@ -14,7 +14,7 @@ const search = {
   template: '<button type="button" data-testid="search" :disabled="disabled" @click="$emit(\'update:modelValue\', products[0].id)">{{ loading ? "Cargando" : products.map(p => p.name).join(", ") }}</button>'
 }
 const props = { warehouses: [{ id: 'warehouse-1', code: 'A', name: 'Principal', address: null, active: true, version: 1 }], activated: false, admin: true, busy: false }
-const mountForm = (source?: InventoryMovement) => mountSuspended(InventoryMovementForm, { props: { ...props, source }, global: { stubs: { ProductsProductSearch: search } } })
+const mountForm = (source?: InventoryMovement, activated = false) => mountSuspended(InventoryMovementForm, { props: { ...props, source, activated }, global: { stubs: { ProductsProductSearch: search } } })
 
 beforeEach(() => {
   clearNuxtData('inventory-movement-products')
@@ -41,6 +41,35 @@ describe('apertura del formulario de movimientos', () => {
     await add.trigger('click')
     expect(wrapper.get('input[aria-label="Costo unitario de P-1 · Pintura blanca"]').attributes('aria-valuenow')).toBe('12.123456')
     expect(wrapper.text()).toContain('USD')
+    wrapper.unmount()
+  })
+
+  it('muestra el último costo de compra en las entradas y conserva su moneda', async () => {
+    mocks.fetchAllPages.mockResolvedValue([{ ...product, unitCost: '48.654321', costCurrency: 'MXN' }])
+    const wrapper = await mountForm(undefined, true)
+    await flushPromises()
+    await wrapper.get('[data-testid="search"]').trigger('click')
+    await wrapper.findAll('button').find(b => b.text() === 'Agregar producto')!.trigger('click')
+    const cost = wrapper.get('input[aria-label="Costo unitario de P-1 · Pintura blanca"]')
+    expect(cost.attributes('aria-valuenow')).toBe('48.654321')
+    expect(cost.attributes('disabled')).toBeDefined()
+    await wrapper.get('form').trigger('submit')
+    expect(wrapper.emitted('submit')?.[0]?.[0]).toMatchObject({ type: 'entrada', lines: [{ unitCost: '48.654321', costCurrency: 'MXN' }] })
+    wrapper.unmount()
+  })
+
+  it('permite capturar el costo de una entrada cuando el producto no tiene uno', async () => {
+    mocks.fetchAllPages.mockResolvedValue([{ ...product, initialUnitCost: null, initialCostCurrency: null, unitCost: null, costCurrency: null }])
+    const wrapper = await mountForm(undefined, true)
+    await flushPromises()
+    await wrapper.get('[data-testid="search"]').trigger('click')
+    await wrapper.findAll('button').find(b => b.text() === 'Agregar producto')!.trigger('click')
+    const cost = wrapper.get('input[aria-label="Costo unitario de P-1 · Pintura blanca"]')
+    expect(cost.attributes('disabled')).toBeUndefined()
+    await cost.setValue('25.123456')
+    await cost.trigger('blur')
+    await wrapper.get('form').trigger('submit')
+    expect(wrapper.emitted('submit')?.[0]?.[0]).toMatchObject({ type: 'entrada', lines: [{ unitCost: '25.123456', costCurrency: 'MXN' }] })
     wrapper.unmount()
   })
 

@@ -271,6 +271,16 @@ async function mutate(tx: Tx, input: InventoryCommand, user: AppUser) {
     }
     const movement = await postInventoryMovement(tx, { type: c.type, originKey: input.requestId, date: c.date, reason: c.reason }, deltas, user)
     if (c.type === 'inicial') await refreshProductCosts(tx, c.lines.map(l => l.productId), c.lines)
+    if (c.type === 'entrada') {
+      const costLines = c.lines.filter(l => l.unitCost)
+      if (costLines.length) {
+        const ids = costLines.map(l => l.productId).sort()
+        await tx.$queryRaw(Prisma.sql`SELECT id FROM siigo_products WHERE id IN (${Prisma.join(ids)}) ORDER BY id FOR NO KEY UPDATE`)
+        const products = await tx.siigoProduct.findMany({ where: { id: { in: ids } } })
+        const missingCosts = costLines.filter(l => products.some(p => p.id === l.productId && p.unitCost === null))
+        if (missingCosts.length) await refreshProductCosts(tx, missingCosts.map(l => l.productId), missingCosts)
+      }
+    }
     return movement
   }
   if (c.action === 'countCreate') {
@@ -364,7 +374,7 @@ export async function listInventory(resource: string, q: InventoryQuery) {
   if (resource === 'products') {
     const where = { ...productFilter, internalKind: 'product', ...(q.controlledOnly === 'true' ? { inventoryProduct: { enabled: true }, AND: [{ OR: [{ active: true }, { active: null }] }, { OR: [{ type: 'Product' }, { type: null }] }] } : {}) }
     const [rows, total] = await Promise.all([db.siigoProduct.findMany({ where, include: { inventoryProduct: true }, orderBy: [{ code: 'asc' }, { id: 'asc' }], skip, take: q.page_size }), db.siigoProduct.count({ where })])
-    return { results: rows.map(p => ({ id: p.id, code: p.code, name: p.name, reference: p.reference ?? undefined, additional_fields: { barcode: p.barcode ?? undefined }, unit: p.unitName ?? p.unitCode, initialUnitCost: p.initialUnitCost?.toString() ?? null, initialCostCurrency: p.initialCostCurrency, enabled: p.inventoryProduct?.enabled ?? false, version: p.inventoryProduct?.version ?? 1 })), pagination: pagination(q, total) }
+    return { results: rows.map(p => ({ id: p.id, code: p.code, name: p.name, reference: p.reference ?? undefined, additional_fields: { barcode: p.barcode ?? undefined }, unit: p.unitName ?? p.unitCode, unitCost: p.unitCost?.toString() ?? null, costCurrency: p.costCurrency, initialUnitCost: p.initialUnitCost?.toString() ?? null, initialCostCurrency: p.initialCostCurrency, enabled: p.inventoryProduct?.enabled ?? false, version: p.inventoryProduct?.version ?? 1 })), pagination: pagination(q, total) }
   }
   if (resource === 'stocks') {
     const where = { ...(q.warehouseId ? { warehouseId: q.warehouseId } : {}), ...(q.productId ? { productId: q.productId } : {}), product: { ...productFilter, inventoryProduct: { enabled: true } } }
