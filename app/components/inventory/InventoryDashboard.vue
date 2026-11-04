@@ -47,7 +47,7 @@ const countRows = computed(() => (result.value?.results ?? []) as InventoryCount
 const productRows = computed(() => (result.value?.results ?? []) as InventoryProduct[])
 const reservationRows = computed(() => (result.value?.results ?? []) as Array<Extract<Row, { orderId: string }>>)
 const tabs = computed(() => [{ label: 'Existencias', value: 'stocks', icon: 'i-lucide-package' }, { label: 'Kardex', value: 'kardex', icon: 'i-lucide-list' }, { label: 'Reservas', value: 'reservations', icon: 'i-lucide-bookmark' }, ...(operational.value ? [{ label: 'Movimientos', value: 'movements', icon: 'i-lucide-arrow-left-right' }, { label: 'Conteos', value: 'counts', icon: 'i-lucide-clipboard-check' }] : []), ...(admin.value ? [{ label: 'Almacenes y configuración', value: 'warehouses', icon: 'i-lucide-warehouse' }] : [])])
-const warehouseOpen = shallowRef(false), movementOpen = shallowRef(false), countOpen = shallowRef(false), countCreateOpen = shallowRef(false), minimumOpen = shallowRef(false), reverseOpen = shallowRef(false), activateOpen = shallowRef(false)
+const warehouseOpen = shallowRef(false), movementOpen = shallowRef(false), countOpen = shallowRef(false), countCreateOpen = shallowRef(false), minimumOpen = shallowRef(false), reverseOpen = shallowRef(false)
 const editingWarehouse = shallowRef<InventoryWarehouse>(), source = shallowRef<InventoryMovement>(), selectedCount = shallowRef<InventoryCount>(), minimumStock = shallowRef<InventoryStock>(), reversal = shallowRef<InventoryMovement>()
 const minimumValue = shallowRef('')
 const countDraft = reactive({ warehouseId: '', date: mexicoToday(), reason: '' })
@@ -62,7 +62,6 @@ async function save(command: InventoryCommand['command']) {
     countCreateOpen.value = false
     minimumOpen.value = false
     reverseOpen.value = false
-    activateOpen.value = false
     if (command.action === 'countCreate') countOpen.value = true
   }
 }
@@ -207,24 +206,6 @@ const reservationColumns: TableColumn<Extract<Row, { orderId: string }>>[] = [
           {{ settings?.enabledAt ? `Activo desde ${formatDateTime(settings.enabledAt)}` : 'Preparando inventario inicial' }}
         </UBadge>
       </div>
-      <UAlert
-        v-if="!settings?.enabledAt"
-        title="Carga las existencias reales antes de activar"
-        description="Crea almacenes, registra el saldo inicial o aplica un conteo. Al activar, los pedidos nuevos reservarán y descontarán inventario; los documentos históricos conservarán su comportamiento."
-        color="warning"
-        class="shrink-0"
-      >
-        <template #actions>
-          <UButton
-            v-if="admin"
-            label="Activar inventario"
-            color="neutral"
-            variant="solid"
-            class="bg-black text-white hover:bg-zinc-800 dark:bg-black dark:text-white dark:hover:bg-zinc-800"
-            @click="activateOpen = true"
-          />
-        </template>
-      </UAlert>
       <UAlert v-if="error" :title="error" color="error" />
       <div v-if="productId" class="flex items-center gap-2 text-sm">
         <span>Kardex de producto seleccionado</span><UButton
@@ -472,18 +453,6 @@ const reservationColumns: TableColumn<Extract<Row, { orderId: string }>>[] = [
               :loading="busy"
             />
           </form>
-        </template>
-      </UModal>
-      <UModal v-model:open="activateOpen" title="Activar inventario interno">
-        <template #body>
-          <div class="space-y-4">
-            <UAlert v-if="error" :title="error" color="error" /><p>Confirma que los almacenes y sus existencias iniciales corresponden al conteo real. Desde este momento, los pedidos nuevos tendrán control de inventario. Los pedidos anteriores quedarán como históricos.</p><UButton
-              v-if="settings"
-              label="Confirmar activación"
-              :loading="busy"
-              @click="save({ action: 'activate', version: settings.version })"
-            />
-          </div>
         </template>
       </UModal>
     </template>
