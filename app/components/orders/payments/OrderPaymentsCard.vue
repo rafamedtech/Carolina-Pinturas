@@ -136,10 +136,10 @@ async function createPayment(input: CreateOrderPaymentInput) {
     }
 
     toast.add({
-      title: payment.provider === 'siigo' ? 'Pago registrado y enviado a Siigo' : 'Pago registrado',
+      title: payment.provider === 'siigo' ? 'Pago registrado y enviado a Siigo' : 'El pago fue registrado',
       description: payment.provider === 'siigo'
         ? payment.siigo?.voucherName || 'La recepción quedó vinculada.'
-        : 'El pago quedó guardado en PostgreSQL.',
+        : undefined,
       color: 'success',
       icon: 'i-lucide-circle-check'
     })
