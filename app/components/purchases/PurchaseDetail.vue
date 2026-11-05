@@ -3,6 +3,7 @@ import { tableReturnPath } from '~/utils/tableQuery'
 import type { PurchaseView } from '~/types/purchases'
 import { formatMexicoDateTime } from '~/utils/datetime'
 import { purchaseDateLabel, purchaseMoney, purchaseQuantity, purchaseStatus, receiptStatus } from '~/utils/purchaseFormat'
+import { createPurchaseSupplierPdf } from '~/utils/purchaseSupplierPdf'
 
 const route = useRoute()
 const backPath = computed(() => tableReturnPath(route.query.returnTo, '/compras', ['/compras', '/compras/cuentas-por-pagar']))
@@ -13,6 +14,26 @@ const { busy, error, run } = usePurchaseAction(() => order.value!, (value) => {
 })
 const confirmOpen = shallowRef(false)
 const cancelOpen = shallowRef(false)
+const downloading = shallowRef(false)
+const toast = useToast()
+
+async function downloadWithoutPrices() {
+  if (!order.value || downloading.value) return
+  downloading.value = true
+  try {
+    const { folio, date, status, providerName, providerRfc, items } = order.value
+    const pdf = await createPurchaseSupplierPdf({
+      folio, date, status, providerName, providerRfc,
+      items: items.map(({ code, name, quantity }) => ({ code, name, quantity }))
+    })
+    await pdf.save(`OC-${folio}-sin-precios.pdf`, { returnPromise: true })
+  } catch {
+    toast.add({ title: 'No se pudo descargar la orden sin precios.', color: 'error' })
+  } finally {
+    downloading.value = false
+  }
+}
+
 function print() {
   window.print()
 }
@@ -108,6 +129,17 @@ const timeline = computed(() => [...(order.value?.events ?? [])].reverse())
             :ui="{ label: 'hidden sm:inline' }"
             :disabled="!order"
             @click="print"
+          />
+          <UButton
+            label="Descargar sin precios"
+            icon="i-lucide-download"
+            color="neutral"
+            variant="outline"
+            aria-label="Descargar orden de compra sin precios"
+            :ui="{ label: 'hidden sm:inline' }"
+            :disabled="!order"
+            :loading="downloading"
+            @click="downloadWithoutPrices"
           />
         </template>
       </UDashboardNavbar>
