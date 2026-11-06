@@ -65,18 +65,21 @@ const documentNounCapitalized = computed(() =>
   documentNoun.value.charAt(0).toUpperCase() + documentNoun.value.slice(1))
 const documentWithArticle = computed(() => isQuoteMode.value ? 'la cotización' : 'el pedido')
 const documentOf = computed(() => isQuoteMode.value ? 'de la cotización' : 'del pedido')
+const completedAsQuote = computed(() => createdOrder.value?.status.key === 'borrador')
 const completionTitle = computed(() =>
-  isQuoteMode.value ? 'Cotización creada' : 'Pedido enviado'
+  completedAsQuote.value ? 'Cotización creada' : 'Pedido enviado'
 )
 const completionMessage = computed(() =>
-  isQuoteMode.value ? '¡Creada con éxito!' : '¡Enviado con éxito!'
+  completedAsQuote.value ? '¡Creada con éxito!' : '¡Enviado con éxito!'
 )
 const completionDetail = computed(() => createdOrder.value
-  ? `${documentNounCapitalized.value} ${createdOrder.value.number} guardad${isQuoteMode.value ? 'a' : 'o'}.`
+  ? completedAsQuote.value
+    ? `Cotización ${createdOrder.value.number} guardada.`
+    : `Pedido ${createdOrder.value.number} guardado.`
   : ''
 )
 const viewDocumentLabel = computed(() =>
-  isQuoteMode.value ? 'Ver cotización' : 'Ver pedido'
+  completedAsQuote.value ? 'Ver cotización' : 'Ver pedido'
 )
 const pageTitle = computed(() => isEditing.value
   ? isQuoteMode.value ? 'Editar cotización' : 'Editar pedido'
@@ -166,7 +169,7 @@ watch(() => inventoryContext.value?.warehouses, (warehouses) => {
 
 const saving = shallowRef(false)
 const submissionIntent = shallowRef<'draft' | 'save' | 'save-and-pay' | null>(null)
-const initialPaymentRequestId = shallowRef('')
+const orderRequestId = shallowRef('')
 // Los catálogos de clientes/productos se cargan con `server: false` (evita
 // un hydration mismatch cuando el SSR no alcanza a paginar todo el catálogo
 // de Siigo). Eso hace que `status` pase a 'pending' apenas se monta en el
@@ -528,7 +531,6 @@ async function addSelectedProduct(product: SiigoProduct, quantity: number) {
 
 function reviewOrder(event: FormSubmitEvent<Schema>) {
   if (reviewDisabled.value) return
-  if (!initialPaymentRequestId.value) initialPaymentRequestId.value = crypto.randomUUID()
   pendingSubmission.value = event.data
   modalPhase.value = 'review'
   createdOrder.value = null
@@ -566,12 +568,14 @@ async function confirmSubmit(
   }
 
   const data = { ...pendingSubmission.value, statusKey }
+  const wasReviewOpen = summaryOpen.value
   saving.value = true
   submissionIntent.value = intent
   modalPhase.value = 'sending'
   summaryOpen.value = true
 
   try {
+    if (!isEditing.value && !orderRequestId.value) orderRequestId.value = crypto.randomUUID()
     // El precio sólo viaja cuando el usuario lo editó; si no, el servidor usa
     // el precio de lista vigente en Siigo.
     const requestLines = lineRequestPayload.value
@@ -600,7 +604,7 @@ async function confirmSubmit(
           method: 'POST',
           body: {
             ...data,
-            requestId: initialPaymentRequestId.value,
+            requestId: orderRequestId.value,
             warehouseId: data.warehouseId || null,
             repartidorId: data.repartidorId || null,
             promisedDate: data.promisedDate || null,
@@ -610,7 +614,7 @@ async function confirmSubmit(
             ...(intent === 'save-and-pay'
               ? {
                   initialPayment: {
-                    requestId: initialPaymentRequestId.value,
+                    requestId: orderRequestId.value,
                     paymentMethod: data.paymentMethod,
                     date: data.paymentDate || mexicoToday()
                   }
@@ -638,10 +642,11 @@ async function confirmSubmit(
       modalPhase.value = 'done'
     }
   } catch (error: unknown) {
+    summaryOpen.value = wasReviewOpen
     modalPhase.value = 'review'
     const fetchError = error as { data?: { statusMessage?: string }, message?: string }
     toast.add({
-      title: `No se pudo guardar ${documentWithArticle.value}`,
+      title: `No se pudo guardar ${statusKey === 'borrador' ? 'la cotización' : documentWithArticle.value}`,
       description: documentMessage(
         fetchError.data?.statusMessage || fetchError.message || 'Intenta de nuevo.'
       ),
@@ -783,7 +788,9 @@ function submitReview(intent: OrderReviewSubmissionIntent) {
                 ? 'Guardando el pedido y registrando el pago…'
                 : isEditing && isQuoteMode
                   ? 'Actualizando cotización…'
-                  : `Enviando ${documentWithArticle}…` }}
+                  : submissionIntent === 'draft'
+                    ? 'Guardando cotización…'
+                    : `Enviando ${documentWithArticle}…` }}
             </p>
           </div>
           <div v-else-if="modalPhase === 'done'" class="flex flex-col items-center justify-center gap-3 py-10 text-center">

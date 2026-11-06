@@ -2,11 +2,13 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { mockNuxtImport, mountSuspended, registerEndpoint } from '@nuxt/test-utils/runtime'
 import type { VueWrapper } from '@vue/test-utils'
+import { readBody } from 'h3'
 import OrderEditor from '~/components/orders/OrderEditor.vue'
 import OrderCustomerFields from '~/components/orders/OrderCustomerFields.vue'
 import OrderProductPicker from '~/components/orders/OrderProductPicker.vue'
 import NewOrderPage from '~/pages/ventas/nuevo-pedido.vue'
 import type { SiigoCustomer } from '~/types/siigo'
+import { createOrderSchema } from '../../server/utils/order-validation'
 
 const { useAuthMock } = vi.hoisted(() => ({
   useAuthMock: vi.fn(() => {
@@ -63,6 +65,16 @@ registerEndpoint('/api/repartidores', () => [
   { id: 'counter-driver', nombre: 'MOSTRADOR', esMostrador: true, activo: true }
 ])
 registerEndpoint('/api/orders/tags', () => [])
+
+const createQuote = vi.fn()
+registerEndpoint('/api/orders', {
+  method: 'POST',
+  handler: async (event) => {
+    const data = createOrderSchema.parse(await readBody(event))
+    createQuote(data)
+    return { id: 'quote-test', number: 123, status: { key: 'borrador' } }
+  }
+})
 
 let storedQuoteTotal = 38800.08
 registerEndpoint('/api/orders/quote-rounding', () => ({
@@ -154,4 +166,26 @@ describe('OrderEditor · recálculo de cotizaciones', () => {
       })
     }
   )
+})
+
+it('guarda como cotización desde el pedido nuevo con una solicitud válida', async () => {
+  wrapper = await mountSuspended(OrderEditor, { props: { mode: 'order', saleType: 'delivery' } })
+  const fields = wrapper.findComponent(OrderCustomerFields)
+  await vi.waitFor(() => expect(fields.props('customers')).toHaveLength(2))
+
+  fields.vm.$emit('update:customerId', regularCustomer.id)
+  fields.vm.$emit('update:repartidorId', 'ec6c626e-8d6a-4b7d-93e3-eb5aa36a6c73')
+  wrapper.findComponent(OrderProductPicker).vm.$emit('add', {
+    id: 'a5f82d29-09b5-43e9-a771-064a6e148172', code: 'PINTURA', name: 'Pintura de prueba', unit: 'Pieza'
+  }, 2)
+  await nextTick()
+
+  const button = wrapper.findAll('button').find(button => button.text().trim() === 'Guardar como cotización')!
+  expect(button.element.disabled).toBe(false)
+  await button.trigger('click')
+
+  await vi.waitFor(() => expect(createQuote).toHaveBeenCalledExactlyOnceWith(
+    expect.objectContaining({ statusKey: 'borrador', requestId: expect.any(String) })
+  ))
+  await vi.waitFor(() => expect(document.body.textContent).toContain('Cotización 123 guardada.'))
 })
