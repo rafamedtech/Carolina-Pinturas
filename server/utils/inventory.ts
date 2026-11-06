@@ -93,13 +93,15 @@ export async function syncOrderInventory(tx: Tx, orderId: string, user: AppUser,
   if (!settings.enabledAt) return
   const dispatch = await tx.inventoryMovement.findUnique({ where: { originKey: `order:${orderId}:dispatch` } })
   if (dispatch) {
-    inventoryAssert(!['borrador', 'ingresado', 'confirmado'].includes(order.statusKey), 'El pedido ya descontó inventario. Registra una devolución para regresar unidades.')
-    inventoryAssert(previousStatus !== 'cancelado' || order.statusKey === 'cancelado', 'Un pedido cancelado después del surtido no puede reabrirse.')
+    // Los pedidos surtidos antes del cambio ya pueden tener una salida registrada.
+    const returningToSurtido = order.statusKey === 'surtido' && previousStatus !== undefined && previousStatus !== 'surtido'
+    inventoryAssert(!returningToSurtido && !['borrador', 'ingresado', 'confirmado'].includes(order.statusKey), 'El pedido ya descontó inventario. Registra una devolución para regresar unidades.')
+    inventoryAssert(previousStatus !== 'cancelado' || order.statusKey === 'cancelado', 'Un pedido cancelado después de la salida de inventario no puede reabrirse.')
     return
   }
-  const outgoing = ['surtido', 'en_camino', 'entregado'].includes(order.statusKey)
+  const outgoing = ['en_camino', 'entregado'].includes(order.statusKey)
   const prior = await tx.inventoryReservation.findMany({ where: { orderId } })
-  const reserve = order.statusKey === 'confirmado' || (order.statusKey === 'en_espera' && prior.length > 0)
+  const reserve = ['confirmado', 'surtido'].includes(order.statusKey) || (order.statusKey === 'en_espera' && prior.length > 0)
   const wanted = new Map<string, Decimal>()
   if (outgoing || reserve) {
     const required = new Set<string>()
@@ -115,7 +117,7 @@ export async function syncOrderInventory(tx: Tx, orderId: string, user: AppUser,
     const ids = new Set(configs.map(p => p.productId))
     inventoryAssert([...required].every(id => ids.has(id)), 'Todos los componentes del pedido deben conservar su control de inventario interno.')
     for (const item of demand) if (ids.has(item.productId)) wanted.set(item.productId, (wanted.get(item.productId) ?? d(0)).plus(item.quantity))
-    if (wanted.size) inventoryAssert(order.warehouseId, 'Selecciona el almacén del pedido antes de confirmar o surtir.')
+    if (wanted.size) inventoryAssert(order.warehouseId, 'Selecciona el almacén del pedido para reservar unidades o registrar su salida.')
   }
   const pairs = [...prior, ...[...wanted.keys()].map(productId => ({ productId, warehouseId: order.warehouseId! }))]
   await lockInventoryBalances(tx, pairs)
@@ -147,7 +149,7 @@ export async function assertOrderInventoryEditable(tx: Tx, orderId: string, line
   const quantities = (items: typeof lines) => items.map(i => `${i.productId}:${d(i.quantity).toString()}`).sort()
   const before = quantities(order.items.map(i => ({ productId: i.productId, quantity: i.quantity.toString() })))
   const after = quantities(lines)
-  inventoryAssert((warehouseId === undefined || warehouseId === order.warehouseId) && before.length === after.length && before.every((value, index) => value === after[index]), 'Productos, cantidades y almacén no se pueden modificar después del surtido.')
+  inventoryAssert((warehouseId === undefined || warehouseId === order.warehouseId) && before.length === after.length && before.every((value, index) => value === after[index]), 'Productos, cantidades y almacén no se pueden modificar después de la salida de inventario.')
 }
 export async function receiveInventory(tx: Tx, receiptId: string, warehouseId: string | undefined, user: AppUser) {
   const settings = await inventorySettings(tx)

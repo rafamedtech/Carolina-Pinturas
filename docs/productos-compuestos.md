@@ -12,7 +12,7 @@ Decisiones confirmadas por el usuario el 18/10/2026:
 
 Al crear cada partida se guarda `sales_order_items.inventory_recipe`: identificador, código, nombre, unidad y cantidad por unidad del producto vendido. Esta copia se conserva al editar el pedido y su cantidad. Un producto agregado después recibe su propia copia vigente. Los pedidos anteriores a la migración mantienen su consumo directo; no se les infiere retrospectivamente una composición.
 
-Al confirmar se reservan los componentes, sin descontar aún las existencias. Al surtir, enviar o entregar se libera la reserva y se registra una sola salida de los componentes. Una venta de mostrador que nace entregada aplica el mismo consumo una sola vez. El compuesto permanece como partida comercial y de factura, con su precio propio.
+En Confirmado y Surtido se reservan los componentes. Al pasar a En camino se libera la reserva y se registra la salida de los componentes una sola vez. Si el pedido pasa directo a Entregado, incluida una venta de mostrador, la salida se registra en ese momento. El compuesto permanece como partida comercial y de factura, con su precio propio.
 
 Antes de activar globalmente el inventario se pueden guardar cotizaciones con compuestos. Sus confirmaciones y surtidos (incluyendo la entrega directa de mostrador) se rechazan sin registrar reservas, salidas ni pagos. Esas cotizaciones conservan su obligación de inventario y, después de activarlo, reservan y descuentan su composición original. La misma regla aplica al agregar un compuesto a una cotización anterior. Los pedidos históricos sin compuestos conservan el comportamiento anterior a la activación.
 
@@ -20,7 +20,7 @@ La factura omite `items.warehouse` cuando el producto no tiene control de invent
 
 Las demandas se agrupan por producto base, incluso si aparece en varios compuestos y también se vende directamente. Los saldos se bloquean en el orden existente y el pedido entero se revierte si falta cualquier componente. Los consumos con más de seis decimales se rechazan para evitar redondeos silenciosos. La vista de inventario del pedido muestra los componentes de su copia histórica.
 
-Cancelar antes del surtido libera reservas. Cancelar después del surtido conserva la salida: la devolución explícita existente restituye cantidades de los componentes realmente surtidos. Cambiar una composición no modifica pedidos anteriores. No se puede desactivar el control interno de un producto requerido por una composición o por un pedido compuesto abierto.
+Cancelar antes de la salida de inventario libera las reservas. Si la salida ya se registró, una devolución de cliente permite reponer las cantidades devueltas. Cambiar una composición no modifica pedidos anteriores. No se puede desactivar el control interno de un producto requerido por una composición o por un pedido compuesto abierto.
 
 El tipo de un producto existente se puede cambiar cuando no tiene existencias, reservas, conteos pendientes, compras pendientes de recepción ni pedidos abiertos que dependan de él, y no es componente de otros productos. El control de versión rechaza ediciones obsoletas.
 

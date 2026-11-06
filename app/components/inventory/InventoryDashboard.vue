@@ -9,7 +9,7 @@ import type { InventoryStock, InventoryWarehouse, InventorySettings, InventoryMo
 import type { InventoryCommand } from '#shared/schemas/inventory'
 import type { CsvColumn } from '~/utils/csv'
 import { fetchAllPages } from '~/composables/useCsvExport'
-import { formatDate, formatDateTime, mexicoToday } from '~/utils/datetime'
+import { formatDate, mexicoToday } from '~/utils/datetime'
 
 const { user } = useAuth()
 const admin = computed(() => user.value?.role === 'admin')
@@ -193,19 +193,6 @@ const reservationColumns: TableColumn<Extract<Row, { orderId: string }>>[] = [
       />
     </template>
     <template #before>
-      <div class="flex flex-wrap items-center justify-between gap-4 border-b border-default pb-5">
-        <div>
-          <p class="text-xs font-semibold tracking-widest text-primary uppercase">
-            Control de almacenes
-          </p><h1 class="mt-1 text-2xl font-semibold text-highlighted">
-            Cada unidad, en su lugar
-          </h1><p class="mt-1 text-sm text-muted">
-            Existencias físicas, reservas y movimientos internos.
-          </p>
-        </div><UBadge :color="settings?.enabledAt ? 'success' : 'warning'" variant="subtle" size="lg">
-          {{ settings?.enabledAt ? `Activo desde ${formatDateTime(settings.enabledAt)}` : 'Preparando inventario inicial' }}
-        </UBadge>
-      </div>
       <UAlert v-if="error" :title="error" color="error" />
       <div v-if="productId" class="flex items-center gap-2 text-sm">
         <span>Kardex de producto seleccionado</span><UButton
