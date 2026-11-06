@@ -1,12 +1,12 @@
 <script setup lang="ts">
-import type { InventoryWarehouse, InventoryProduct, InventoryMovement } from '#shared/types/inventory'
+import type { InventoryWarehouse, InventoryProduct, InventoryReturnSource } from '#shared/types/inventory'
 import type { InventoryCommand } from '#shared/schemas/inventory'
 import { fetchAllPages } from '~/composables/useCsvExport'
 import { mexicoToday } from '~/utils/datetime'
 
-const props = defineProps<{ warehouses: InventoryWarehouse[], activated: boolean, admin: boolean, busy: boolean, source?: InventoryMovement }>()
+const props = defineProps<{ warehouses: InventoryWarehouse[], activated: boolean, admin: boolean, busy: boolean, source?: InventoryReturnSource }>()
 const emit = defineEmits<{ submit: [command: InventoryCommand['command']] }>()
-const form = reactive({ type: props.activated ? 'entrada' : 'inicial', warehouseId: props.source?.lines[0]?.warehouseId ?? '', destinationId: '', date: mexicoToday(), reason: '', lines: [] as Array<{ productId: string, quantity: string, unitCost?: string, costCurrency?: 'MXN' | 'USD' }> })
+const form = reactive({ type: props.activated ? 'entrada' : 'inicial', warehouseId: props.warehouses.find(w => w.active && w.id === props.source?.lines[0]?.warehouseId)?.id ?? '', destinationId: '', date: mexicoToday(), reason: '', lines: [] as Array<{ productId: string, quantity: string, unitCost?: string, costCurrency?: 'MXN' | 'USD' }> })
 const selected = shallowRef('')
 const requestFetch = useRequestFetch()
 // Keep setup synchronous so opening the modal never waits for the catalogue.
@@ -17,7 +17,13 @@ const { data: products, status, error, refresh } = useAsyncData('inventory-movem
 const loadingProducts = computed(() => !props.source && status.value === 'pending')
 const enabledProducts = computed(() => (products.value ?? []).filter(p => p.enabled))
 const availableProducts = computed(() => enabledProducts.value.filter(p => !form.lines.some(l => l.productId === p.id)))
-const items = computed(() => props.source ? props.source.lines.map(l => ({ label: `${l.productCode} · ${l.productName}`, value: l.productId })) : enabledProducts.value.map(p => ({ label: `${p.code} · ${p.name}`, value: p.id })))
+const items = computed(() => props.source
+  ? props.source.lines.map(l => ({
+      label: `${l.productCode} · ${l.productName}`,
+      value: l.productId,
+      description: l.remaining === undefined ? undefined : `Pendiente de devolver · ${l.remaining}`
+    }))
+  : enabledProducts.value.map(p => ({ label: `${p.code} · ${p.name}`, value: p.id })))
 const labels = reactive<Record<string, string>>({})
 function add() {
   if (!selected.value || props.busy || (!props.source && (error.value || loadingProducts.value)) || form.lines.some(l => l.productId === selected.value)) return
@@ -90,7 +96,7 @@ const warehouseOptions = computed(() => props.warehouses.filter(w => w.active).m
           <USelectMenu
             v-if="source"
             v-model="selected"
-            :items="items"
+            :items="items.filter(item => !form.lines.some(line => line.productId === item.value))"
             value-key="value"
             :disabled="busy"
             placeholder="Agregar producto"
@@ -139,6 +145,7 @@ const warehouseOptions = computed(() => props.warehouses.filter(w => w.active).m
             aria-label="Cantidad"
             required
             class="w-36"
+            :disabled="busy"
           />
           <UFormField v-if="showCosts" label="Costo unitario (con impuestos)" :required="form.type === 'inicial'">
             <UInputNumber

@@ -74,6 +74,7 @@ const historicalInvoiceOpen = shallowRef(false)
 const checkingSiigoInvoice = shallowRef(false)
 const markingInvoiceRequired = shallowRef(false)
 const cancelOrderOpen = shallowRef(false)
+const returnOrderOpen = shallowRef(false)
 const mayManageLogistics = computed(() =>
   Boolean(user.value && canManageOrderLogistics(user.value.role))
 )
@@ -89,6 +90,7 @@ const mayEditOrder = computed(() =>
   Boolean(user.value && canCreateOrders(user.value.role) && !isQuote.value)
 )
 const orderIsDelivered = computed(() => order.value?.status.key === 'entregado')
+const mayReturnOrder = computed(() => orderIsDelivered.value && ['admin', 'mostrador'].includes(user.value?.role ?? ''))
 const mayChangeStatus = computed(() => !isQuote.value && (!orderIsDelivered.value || user.value?.role === 'admin'))
 const mayChangeRepartidor = computed(() => mayManageLogistics.value && !orderIsDelivered.value)
 const mayEditItemAmounts = computed(() => user.value?.role === 'admin')
@@ -123,6 +125,14 @@ const documentOptions = computed<DropdownMenuItem[][]>(() => {
     groups.push([
       { label: 'Imprimir ticket', icon: 'i-lucide-receipt', onSelect: () => { if (order.value) printTicket(order.value) } }
     ])
+  }
+
+  if (mayReturnOrder.value) {
+    groups.push([{
+      label: 'Registrar devolución',
+      icon: 'i-lucide-package-open',
+      onSelect: () => { returnOrderOpen.value = true }
+    }])
   }
 
   if (mayCancelOrder.value) {
@@ -470,6 +480,13 @@ async function convertToPedido() {
               />
             </UDropdownMenu>
             <OrdersPrinterSettingsModal v-if="user?.role === 'admin'" v-model:open="printerSettingsOpen" />
+            <OrdersOrderReturnModal
+              v-if="mayReturnOrder && returnOrderOpen"
+              :key="order.id"
+              v-model:open="returnOrderOpen"
+              :order-id="order.id"
+              :order-number="order.number"
+            />
             <OrdersOrderCancelModal
               v-if="mayCancelOrder"
               v-model:open="cancelOrderOpen"

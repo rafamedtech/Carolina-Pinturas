@@ -27,7 +27,7 @@ export const inventoryCommand = z.object({
     z.object({ action: z.literal('minimum'), warehouseId: z.uuid(), productId: z.uuid(), minimum: inventoryQuantity, version: z.number().int().positive() }),
     z.object({ action: z.literal('activate'), version: z.number().int().positive() }),
     z.object({ action: z.literal('move'), type: z.enum(['inicial', 'entrada', 'salida', 'traspaso']), warehouseId: z.uuid(), destinationId: z.uuid().optional(), date: purchaseDate, reason, lines }),
-    z.object({ action: z.literal('return'), sourceMovementId: z.uuid(), warehouseId: z.uuid(), date: purchaseDate, reason, lines }),
+    z.object({ action: z.literal('return'), orderId: z.uuid().optional(), sourceMovementId: z.uuid(), warehouseId: z.uuid(), date: purchaseDate, reason, lines }),
     z.object({ action: z.literal('reverse'), movementId: z.uuid(), date: purchaseDate, reason }),
     z.object({ action: z.literal('countCreate'), warehouseId: z.uuid(), date: purchaseDate, reason }),
     z.object({ action: z.literal('countAdd'), id: z.uuid(), version: z.number().int().positive(), productId: z.uuid() }),

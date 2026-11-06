@@ -7,3 +7,13 @@ export interface InventoryMovement { id: string, folio: number, type: string, da
 export interface InventoryCount { id: string, warehouseId: string, warehouse: { name: string }, status: string, version: number, date: string, reason: string, createdBy: string, movementId: string | null, lines: Array<{ productId: string, baseVersion: number, unitCost?: string | null, costCurrency?: string | null, expected: string, counted: string | null, product: { code: string, name: string } }> }
 export interface InventoryPage<T> { results: T[], pagination: { page: number, pageSize: number, totalResults: number, totalPages: number } }
 export interface OrderInventoryView { managed: boolean, activationRequired?: boolean, warehouseId: string | null, dispatched: boolean, movements: Array<{ id: string, folio: number, type: string }>, stocks: InventoryStock[] }
+export interface InventoryReturnSource {
+  id: string
+  folio: number
+  lines: Array<Pick<InventoryLine, 'productId' | 'warehouseId' | 'productCode' | 'productName'> & { remaining?: string }>
+}
+export interface OrderReturnContext {
+  source: InventoryReturnSource | null
+  warehouses: InventoryWarehouse[]
+  returns: Array<Pick<InventoryMovement, 'id' | 'folio' | 'date' | 'reason' | 'reversal'>>
+}

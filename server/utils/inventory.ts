@@ -4,7 +4,7 @@ import { createError } from 'h3'
 import { Prisma } from '../../generated/prisma/client'
 import type { AppUser } from '~/types/siigo'
 import type { InventoryCommand, InventoryQuery } from '#shared/schemas/inventory'
-import type { InventoryStock, OrderInventoryView } from '#shared/types/inventory'
+import type { InventoryStock, OrderInventoryView, OrderReturnContext } from '#shared/types/inventory'
 import { mexicoToday } from '#shared/utils/datetime'
 import { usePrisma } from './prisma'
 import { refreshProductCosts } from './product-costs'
@@ -179,18 +179,59 @@ export async function voidReceiptInventory(tx: Tx, receiptId: string, reason: st
   const movement = await tx.inventoryMovement.findUnique({ where: { originKey: `receipt:${receiptId}` } })
   if (movement) await reverseMovement(tx, movement.id, mexicoToday(), reason, `receipt:${receiptId}:void`, user, true)
 }
+const returnSourceInclude = { lines: true, reversal: true, returns: { include: { lines: true, reversal: true }, orderBy: { folio: 'desc' } } } satisfies Prisma.InventoryMovementInclude
+type ReturnSource = Prisma.InventoryMovementGetPayload<{ include: typeof returnSourceInclude }>
+
+function remainingReturnQuantity(source: ReturnSource, productId: string) {
+  const total = source.lines.filter(line => line.productId === productId)
+    .reduce((sum, line) => sum.plus(d(line.delta.toString()).abs()), d(0))
+  const returned = source.returns.filter(movement => !movement.reversal).flatMap(movement => movement.lines)
+    .filter(line => line.productId === productId)
+    .reduce((sum, line) => sum.plus(d(line.delta.toString()).abs()), d(0))
+  return total.minus(returned)
+}
+
+export async function orderReturnContext(orderId: string): Promise<OrderReturnContext> {
+  const db = usePrisma()
+  const source = await db.inventoryMovement.findUnique({
+    where: { originKey: `order:${orderId}:dispatch` },
+    include: returnSourceInclude
+  })
+  if (!source || source.reversal) return { source: null, warehouses: [], returns: [] }
+
+  const lines = [...new Map(source.lines.map(line => [line.productId, line])).values()]
+    .map(({ productId, warehouseId, productCode, productName }) => ({
+      productId, warehouseId, productCode, productName,
+      remaining: remainingReturnQuantity(source, productId).toString()
+    }))
+    .filter(line => d(line.remaining).gt(0))
+  const warehouses = lines.length
+    ? await db.inventoryWarehouse.findMany({
+        where: { active: true },
+        orderBy: { code: 'asc' }
+      })
+    : []
+  return {
+    source: { id: source.id, folio: source.folio, lines },
+    warehouses,
+    returns: source.returns.map(({ id, folio, date, reason, reversal }) => ({
+      id, folio, date: date.toISOString().slice(0, 10), reason,
+      reversal: reversal ? { id: reversal.id } : null
+    }))
+  }
+}
+
 async function returnMovement(tx: Tx, c: Extract<InventoryCommand['command'], {
   action: 'return' }>, originKey: string, user: AppUser) {
   await tx.$queryRaw`SELECT id FROM inventory_movements WHERE id = ${c.sourceMovementId}::uuid FOR UPDATE`
-  const source = await tx.inventoryMovement.findUnique({ where: { id: c.sourceMovementId }, include: { lines: true, reversal: true, returns: { include: { lines: true, reversal: true } } } })
+  const source = await tx.inventoryMovement.findUnique({ where: { id: c.sourceMovementId }, include: returnSourceInclude })
   inventoryAssert(source && ['surtido', 'recepcion'].includes(source.type) && !source.reversal, 'Selecciona un surtido o recepción vigente.')
+  if (c.orderId) inventoryAssert(source.originKey === `order:${c.orderId}:dispatch` && source.orderId === c.orderId && source.type === 'surtido', 'Selecciona la salida de inventario de este pedido.')
   const customer = source.type === 'surtido'
   const deltas: Delta[] = []
   for (const line of c.lines) {
     const originals = source.lines.filter(l => l.productId === line.productId)
-    const total = originals.reduce((s, l) => s.plus(d(l.delta.toString()).abs()), d(0))
-    const returned = source.returns.filter(r => !r.reversal).flatMap(r => r.lines).filter(l => l.productId === line.productId).reduce((s, l) => s.plus(d(l.delta.toString()).abs()), d(0))
-    inventoryAssert(total.gt(0) && total.minus(returned).gte(line.quantity), 'La devolución supera las unidades pendientes de devolver.')
+    inventoryAssert(originals.length && remainingReturnQuantity(source, line.productId).gte(line.quantity), 'La devolución supera las unidades pendientes de devolver.')
     if (!customer) inventoryAssert(originals.every(l => l.warehouseId === c.warehouseId), 'Devuelve al proveedor desde el almacén de la recepción.')
     deltas.push({ warehouseId: c.warehouseId, productId: line.productId, delta: d(line.quantity).mul(customer ? 1 : -1).toString() })
   }
@@ -201,6 +242,11 @@ async function mutate(tx: Tx, input: InventoryCommand, user: AppUser) {
   const admin = ['warehouse', 'tracking', 'trackingFiltered', 'minimum', 'activate', 'reverse', 'countApply'].includes(c.action) || (c.action === 'move' && c.type === 'inicial')
   if (admin && user.role !== 'admin') throw createError({ statusCode: 403, statusMessage: 'Esta operación requiere administrador.' })
   if (!INVENTORY_WRITE_ROLES.includes(user.role as 'admin' | 'mostrador')) throw createError({ statusCode: 403, statusMessage: 'No tienes permiso para operar inventario.' })
+  if (c.action === 'return' && c.orderId) {
+    await tx.$queryRaw`SELECT id FROM sales_orders WHERE id = ${c.orderId}::uuid FOR UPDATE`
+    const order = await tx.salesOrder.findUnique({ where: { id: c.orderId }, select: { statusKey: true } })
+    inventoryAssert(order?.statusKey === 'entregado', 'Solo puedes registrar una devolución desde un pedido entregado.')
+  }
   const settings = await inventorySettings(tx, ['warehouse', 'tracking', 'trackingFiltered', 'activate'].includes(c.action))
   if (c.action === 'warehouse') {
     const data = { code: c.code.toUpperCase(), name: c.name, address: c.address || null, active: c.active }
