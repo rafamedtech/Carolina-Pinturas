@@ -270,13 +270,9 @@ const reservationColumns: TableColumn<Extract<Row, { orderId: string }>>[] = [
         </div><UCard>
           <template #header>
             <div class="flex flex-wrap items-center justify-between gap-3">
-              <div>
-                <h2 class="font-semibold">
-                  Control interno por producto
-                </h2><p class="text-sm text-muted">
-                  Esta configuración pertenece al inventario interno y es independiente del catálogo fiscal.
-                </p>
-              </div>
+              <h2 class="font-semibold">
+                Control interno por producto
+              </h2>
               <UDropdownMenu :items="filteredTrackingActions">
                 <UButton
                   label="Acciones sobre filtrados"
@@ -288,8 +284,8 @@ const reservationColumns: TableColumn<Extract<Row, { orderId: string }>>[] = [
                 />
               </UDropdownMenu>
             </div>
-            <p class="mt-2 text-sm text-muted">
-              {{ hasProductFilters ? `Se aplicará a todos los resultados filtrados (${result?.pagination.totalResults ?? 0}), incluidas las demás páginas.` : 'Aplica una búsqueda o un filtro de control interno para habilitar las acciones.' }}
+            <p v-if="hasProductFilters" class="mt-2 text-sm text-muted">
+              Se aplicará a todos los resultados filtrados ({{ result?.pagination.totalResults ?? 0 }}), incluidas las demás páginas.
             </p>
           </template><ul class="divide-y divide-default">
             <li v-for="p in productRows" :key="p.id" class="flex items-center justify-between gap-4 py-3">
