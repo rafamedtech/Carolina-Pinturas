@@ -428,6 +428,7 @@ export function stockView(b: Prisma.InventoryBalanceGetPayload<{
 }
 function inventoryProductFilter(filters: { search: string, productId?: string, tracking?: 'enabled' | 'disabled' }): Prisma.SiigoProductWhereInput {
   return {
+    active: true,
     internalKind: 'product',
     ...(filters.productId ? { id: filters.productId } : {}),
     ...(filters.search ? { OR: [{ code: { contains: filters.search, mode: 'insensitive' } }, { name: { contains: filters.search, mode: 'insensitive' } }] } : {}),
@@ -437,7 +438,7 @@ function inventoryProductFilter(filters: { search: string, productId?: string, t
 export async function listInventory(resource: string, q: InventoryQuery) {
   const db = usePrisma()
   const skip = (q.page - 1) * q.page_size
-  const productFilter = { ...(q.productId ? { id: q.productId } : {}), ...(q.search ? { OR: [{ code: { contains: q.search, mode: 'insensitive' as const } }, { name: { contains: q.search, mode: 'insensitive' as const } }] } : {}) }
+  const productFilter = { active: true, ...(q.productId ? { id: q.productId } : {}), ...(q.search ? { OR: [{ code: { contains: q.search, mode: 'insensitive' as const } }, { name: { contains: q.search, mode: 'insensitive' as const } }] } : {}) }
   if (resource === 'settings') return db.inventorySettings.findUniqueOrThrow({ where: { id: 1 } })
   if (resource === 'warehouses') {
     const where: Prisma.InventoryWarehouseWhereInput = { ...(q.warehouseId ? { id: q.warehouseId } : {}), ...(q.search ? { OR: [{ name: { contains: q.search, mode: 'insensitive' } }, { code: { contains: q.search, mode: 'insensitive' } }] } : {}) }
@@ -445,17 +446,17 @@ export async function listInventory(resource: string, q: InventoryQuery) {
     return { results: rows, pagination: pagination(q, total) }
   }
   if (resource === 'products') {
-    const where = { ...inventoryProductFilter(q), ...(q.controlledOnly === 'true' ? { inventoryProduct: { enabled: true }, AND: [{ OR: [{ active: true }, { active: null }] }, { OR: [{ type: 'Product' }, { type: null }] }] } : {}) }
+    const where = { ...inventoryProductFilter(q), ...(q.controlledOnly === 'true' ? { inventoryProduct: { enabled: true }, AND: [{ OR: [{ type: 'Product' }, { type: null }] }] } : {}) }
     const [rows, total] = await Promise.all([db.siigoProduct.findMany({ where, include: { inventoryProduct: true }, orderBy: [{ code: 'asc' }, { id: 'asc' }], skip, take: q.page_size }), db.siigoProduct.count({ where })])
     return { results: rows.map(p => ({ id: p.id, code: p.code, name: p.name, reference: p.reference ?? undefined, additional_fields: { barcode: p.barcode ?? undefined }, unit: p.unitName ?? p.unitCode, unitCost: p.unitCost?.toString() ?? null, costCurrency: p.costCurrency, initialUnitCost: p.initialUnitCost?.toString() ?? null, initialCostCurrency: p.initialCostCurrency, enabled: p.inventoryProduct?.enabled ?? false, version: p.inventoryProduct?.version ?? 1 })), pagination: pagination(q, total) }
   }
   if (resource === 'stocks') {
     const where = { ...(q.warehouseId ? { warehouseId: q.warehouseId } : {}), ...(q.productId ? { productId: q.productId } : {}), product: { ...productFilter, inventoryProduct: { enabled: true } } }
     if (q.low === 'true') {
-      const filter = Prisma.sql`FROM inventory_balances b JOIN siigo_products p ON p.id = b.product_id JOIN inventory_products c ON c.product_id = p.id WHERE c.enabled AND b.quantity - b.reserved < b.minimum AND (${q.warehouseId ?? null}::uuid IS NULL OR b.warehouse_id = ${q.warehouseId ?? null}::uuid) AND (${q.productId ?? null}::uuid IS NULL OR b.product_id = ${q.productId ?? null}::uuid) AND (p.code ILIKE ${'%' + q.search + '%'} OR p.name ILIKE ${'%' + q.search + '%'})`
+      const filter = Prisma.sql`FROM inventory_balances b JOIN siigo_products p ON p.id = b.product_id JOIN inventory_products c ON c.product_id = p.id WHERE c.enabled AND p.active IS TRUE AND b.quantity - b.reserved < b.minimum AND (${q.warehouseId ?? null}::uuid IS NULL OR b.warehouse_id = ${q.warehouseId ?? null}::uuid) AND (${q.productId ?? null}::uuid IS NULL OR b.product_id = ${q.productId ?? null}::uuid) AND (p.code ILIKE ${'%' + q.search + '%'} OR p.name ILIKE ${'%' + q.search + '%'})`
       const ids = await db.$queryRaw<Array<{ warehouse_id: string, product_id: string }>>(Prisma.sql`SELECT b.warehouse_id, b.product_id ${filter} ORDER BY b.product_id, b.warehouse_id LIMIT ${q.page_size} OFFSET ${skip}`)
       const total = await db.$queryRaw<Array<{ total: number }>>(Prisma.sql`SELECT COUNT(*)::int AS total ${filter}`)
-      const rows = ids.length ? await db.inventoryBalance.findMany({ where: { OR: ids.map(i => ({ warehouseId: i.warehouse_id, productId: i.product_id })) }, include: { product: true, warehouse: true }, orderBy: [{ productId: 'asc' }, { warehouseId: 'asc' }] }) : []
+      const rows = ids.length ? await db.inventoryBalance.findMany({ where: { product: { active: true }, OR: ids.map(i => ({ warehouseId: i.warehouse_id, productId: i.product_id })) }, include: { product: true, warehouse: true }, orderBy: [{ productId: 'asc' }, { warehouseId: 'asc' }] }) : []
       return { results: rows.map(stockView), pagination: pagination(q, total[0]?.total ?? 0) }
     }
     const rows = await db.inventoryBalance.findMany({ where, include: { warehouse: true, product: true }, orderBy: [{ productId: 'asc' }, { warehouseId: 'asc' }], skip, take: q.page_size })

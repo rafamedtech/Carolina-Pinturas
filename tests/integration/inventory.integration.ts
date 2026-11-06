@@ -536,6 +536,29 @@ suite('inventario: PostgreSQL aislado, sin conexión Siigo', () => {
     await expect(command({ action: 'warehouse', id: a, version: w.version, code: w.code, name: w.name, address: '', active: false })).rejects.toThrow()
     await expect(command({ action: 'move', type: 'entrada', warehouseId: a, date: today, reason: 'Sin permiso', lines: [{ productId: id, quantity: '1' }] }, { ...user, role: 'vendedor' })).rejects.toThrow()
   })
+  it('excluye productos inactivos de las listas y los totales del inventario actual', async () => {
+    const id = await product()
+    await entry(id, '2')
+    const old = await balance(id)
+    await command({ action: 'minimum', warehouseId: a, productId: id, minimum: '3', version: old.version })
+    await sale(id, 1)
+    const query = { page: 1, page_size: 25, search: '', warehouseId: a, productId: id }
+    const lists = [
+      ['products', query],
+      ['products', { ...query, controlledOnly: 'true' }],
+      ['stocks', query],
+      ['stocks', { ...query, low: 'true' }],
+      ['reservations', query]
+    ] as const
+    for (const [resource, filters] of lists) {
+      expect(await listInventory(resource, filters)).toMatchObject({ pagination: { totalResults: 1 } })
+    }
+
+    await db.siigoProduct.update({ where: { id }, data: { active: false } })
+    for (const [resource, filters] of lists) {
+      expect(await listInventory(resource, filters)).toMatchObject({ results: [], pagination: { totalResults: 0 } })
+    }
+  })
   it('permite operar compuestos sin mover existencias antes de activar y después usa la receta original', async () => {
     const base = await product()
     await entry(base, '20')
