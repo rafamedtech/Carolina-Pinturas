@@ -93,7 +93,7 @@ useSeoMeta({ title: () => productName.value })
       <UDashboardToolbar>
         <UBreadcrumb
           :items="[
-            { label: 'Productos', icon: 'i-lucide-package', to: backPath },
+            { label: 'PRODUCTOS', icon: 'i-lucide-package', to: backPath },
             { label: product?.name || 'Detalle' }
           ]"
         />
