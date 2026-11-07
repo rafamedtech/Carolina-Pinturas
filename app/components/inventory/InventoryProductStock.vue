@@ -40,6 +40,12 @@ const warehouseFields = computed(() => {
     { label: 'Costo unitario', value: row.unitCost ? `${row.unitCost} ${row.costCurrency || ''}` : 'Sin costo' }
   ]
 })
+function warehouseColor(row: InventoryStock) {
+  const quantity = new Decimal(row.quantity)
+  if (quantity.lte(0)) return 'error'
+  return quantity.lte(row.minimum) ? 'warning' : 'primary'
+}
+
 function openWarehouse(row: InventoryStock) {
   selectedWarehouseId.value = row.warehouseId
   modalOpen.value = true
@@ -50,13 +56,12 @@ function showKardex(row: InventoryStock) {
 </script>
 
 <template>
-  <UCard>
-    <template #header>
-      <h2 class="font-semibold text-primary">
-        Existencias del producto
-      </h2>
-    </template>
-
+  <UPageCard
+    title="Existencias del producto"
+    description="Suma de todos los almacenes."
+    variant="naked"
+    :ui="{ title: 'text-lg font-semibold' }"
+  >
     <UAlert v-if="error" title="No se pudo cargar el inventario interno." color="error" />
     <div
       v-else-if="['idle', 'pending'].includes(status)"
@@ -69,51 +74,38 @@ function showKardex(row: InventoryStock) {
       <span class="sr-only">Cargando inventario…</span>
     </div>
     <div v-else-if="stocks?.length" class="space-y-5">
-      <div class="grid grid-cols-2 items-center gap-4 rounded-lg bg-primary/5 p-4 ring-1 ring-inset ring-primary/15">
-        <div class="min-w-0">
-          <p class="text-sm font-medium text-highlighted">
-            Existencia total
-          </p>
-          <p class="mt-1 break-words text-3xl font-semibold text-primary tabular-nums">
-            {{ totals.quantity }} <span class="text-xs font-normal text-muted">{{ totals.unit }}</span>
-          </p>
-          <p class="mt-1 text-xs text-muted">
-            Suma de todos los almacenes
-          </p>
-        </div>
-        <dl class="grid min-w-0 gap-3 border-l border-primary/15 pl-4 text-sm">
-          <div class="min-w-0">
-            <dt class="text-xs text-muted">
-              Reservado
-            </dt>
-            <dd class="mt-1 break-words font-medium tabular-nums">
-              {{ totals.reserved }}
-            </dd>
-          </div>
-          <div class="min-w-0">
-            <dt class="text-xs text-muted">
-              Disponible
-            </dt>
-            <dd class="mt-1 break-words font-semibold text-primary tabular-nums">
-              {{ totals.available }}
-            </dd>
-          </div>
-        </dl>
-      </div>
+      <UPageGrid class="gap-2 sm:grid-cols-3 sm:gap-px">
+        <UPageCard
+          v-for="stat in [
+            { title: 'Existencia total', value: totals.quantity, icon: 'i-lucide-package' },
+            { title: 'Reservado', value: totals.reserved, icon: 'i-lucide-bookmark' },
+            { title: 'Disponible', value: totals.available, icon: 'i-lucide-package-check' }
+          ]"
+          :key="stat.title"
+          :title="stat.title"
+          :icon="stat.icon"
+          variant="subtle"
+          :ui="{ container: 'gap-y-2 p-4 sm:p-4', title: 'text-xs font-normal text-muted uppercase' }"
+          class="sm:rounded-none sm:first:rounded-l-lg sm:last:rounded-r-lg"
+        >
+          <span class="text-2xl font-semibold text-highlighted tabular-nums">{{ stat.value }}</span>
+          <span class="ml-1 text-xs text-muted">{{ totals.unit }}</span>
+        </UPageCard>
+      </UPageGrid>
 
       <div>
         <p class="mb-2 text-xs font-medium text-muted">
           Detalle por almacén
         </p>
-        <div class="grid grid-cols-2 gap-2">
+        <div class="flex flex-wrap gap-2">
           <UButton
             v-for="row in stocks"
             :key="row.warehouseId"
-            :label="row.warehouse"
+            :label="`${row.warehouse} (${row.quantity})`"
             icon="i-lucide-warehouse"
-            :color="row.low ? 'warning' : 'neutral'"
+            :color="warehouseColor(row)"
             variant="outline"
-            class="min-w-0 w-full"
+            class="min-w-0 max-w-full"
             :ui="{ label: 'whitespace-normal text-left break-words' }"
             aria-haspopup="dialog"
             @click="openWarehouse(row)"
@@ -124,7 +116,7 @@ function showKardex(row: InventoryStock) {
     <p v-else class="text-sm text-muted">
       Sin existencias registradas. Crea un almacén y registra el conteo inicial.
     </p>
-  </UCard>
+  </UPageCard>
 
   <UModal v-model:open="modalOpen" :title="selectedStock?.warehouse || 'Detalle del almacén'" :description="selectedStock ? `${selectedStock.code} · ${selectedStock.name}` : undefined">
     <template #body>
