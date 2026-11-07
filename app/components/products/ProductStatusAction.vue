@@ -28,7 +28,7 @@ async function confirm() {
     :title="`${label} producto`"
     :description="`${product.code} · ${product.name}`"
   >
-    <UButton :label="label" color="neutral" variant="outline" />
+    <UButton :label="label" :icon="product.active === false ? 'i-lucide-circle-check' : 'i-lucide-ban'" color="neutral" variant="outline" />
     <template #body>
       <div class="space-y-4">
         <p>{{ product.active === false ? 'El producto volverá a estar disponible para pedidos nuevos.' : 'El producto dejará de estar disponible para pedidos nuevos. Los pedidos anteriores se conservan.' }}</p>

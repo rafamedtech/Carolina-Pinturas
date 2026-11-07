@@ -115,7 +115,7 @@ useSeoMeta({ title: () => productName.value })
               />
               <span class="min-w-0">
                 <USkeleton v-if="initialLoading" class="mb-2 h-4 w-20" />
-                <span v-else class="mb-1 block font-mono text-sm font-normal text-muted">{{ product?.code }}</span>
+                <span v-else class="mb-1 block font-mono text-sm font-normal text-primary">{{ product?.code }}</span>
                 <USkeleton v-if="initialLoading" class="h-7 w-64 max-w-full" />
                 <span v-else class="block break-words">{{ product?.name }}</span>
               </span>

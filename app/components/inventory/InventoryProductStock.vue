@@ -48,7 +48,7 @@ const warehouseFields = computed(() => {
     { label: 'Existencia física', value: row.quantity },
     { label: 'Reservado', value: row.reserved },
     { label: 'Mínimo', value: row.minimum },
-    { label: 'Costo unitario', value: row.unitCost ? `${row.unitCost} ${row.costCurrency || ''}` : 'Sin costo' }
+    { label: 'Costo unitario', value: row.unitCost ? `${new Decimal(row.unitCost).toFixed(2)} ${row.costCurrency || ''}` : 'Sin costo' }
   ]
 })
 function warehouseColor(row: InventoryStock) {
@@ -126,6 +126,11 @@ function showKardex(row: InventoryStock) {
   </UPageCard>
 
   <UModal v-model:open="modalOpen" :title="selectedStock?.warehouse || 'Detalle del almacén'" :description="selectedStock ? `${selectedStock.code} · ${selectedStock.name}` : undefined">
+    <template #description>
+      <template v-if="selectedStock">
+        <span class="text-primary">{{ selectedStock.code }}</span> · {{ selectedStock.name }}
+      </template>
+    </template>
     <template #body>
       <div v-if="selectedStock" class="space-y-5">
         <UBadge v-if="selectedStock.low" color="warning" variant="subtle">
@@ -135,7 +140,14 @@ function showKardex(row: InventoryStock) {
           <p class="text-xs text-muted">
             Disponible
           </p>
-          <p class="mt-1 break-words text-3xl font-semibold tabular-nums" :class="selectedStock.low ? 'text-warning' : 'text-primary'">
+          <p
+            class="mt-1 break-words text-3xl font-semibold tabular-nums"
+            :class="{
+              'text-primary': warehouseColor(selectedStock) === 'primary',
+              'text-warning': warehouseColor(selectedStock) === 'warning',
+              'text-error': warehouseColor(selectedStock) === 'error'
+            }"
+          >
             {{ selectedStock.available }} <span class="text-sm font-normal text-muted">{{ selectedStock.unit || 'Unidad' }}</span>
           </p>
         </div>
@@ -153,12 +165,6 @@ function showKardex(row: InventoryStock) {
     </template>
     <template #footer>
       <div class="flex w-full flex-wrap justify-end gap-2">
-        <UButton
-          label="Cerrar"
-          color="neutral"
-          variant="outline"
-          @click="modalOpen = false"
-        />
         <UButton
           v-if="selectedStock"
           label="Ver Kardex"
