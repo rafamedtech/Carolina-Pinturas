@@ -50,8 +50,8 @@ function formatQuantity(value?: number) {
 </script>
 
 <template>
-  <UPageGrid class="gap-4 lg:grid-cols-3">
-    <div class="flex flex-col gap-4 lg:col-span-2">
+  <UPageGrid class="grid-cols-2 gap-4 lg:grid-cols-3">
+    <div class="col-span-2 flex flex-col gap-4">
       <UPageCard v-if="product?.internal?.composition?.kind === 'composite'" title="Componentes por unidad" variant="subtle">
         <ul class="divide-y divide-default">
           <li v-for="component in product?.internal.composition.components" :key="component.productId" class="flex items-center justify-between gap-3 py-3 text-sm">
@@ -66,7 +66,7 @@ function formatQuantity(value?: number) {
         </p>
       </UPageCard>
       <UPageCard title="Información general" icon="i-lucide-info" variant="subtle">
-        <dl class="grid gap-4 sm:grid-cols-2">
+        <dl class="grid grid-cols-2 gap-4">
           <div
             v-for="field in generalFields"
             :key="field.label"
@@ -98,10 +98,10 @@ function formatQuantity(value?: number) {
       </UPageCard>
     </div>
 
-    <div class="flex flex-col gap-4">
+    <div class="col-span-2 flex flex-col gap-4 lg:col-span-1">
       <UPageCard title="Datos fiscales" icon="i-lucide-file-check" variant="subtle">
-        <dl class="grid gap-4">
-          <div v-for="field in fiscalFields" :key="field.label" class="min-w-0">
+        <dl class="grid grid-cols-2 gap-4">
+          <div v-for="field in fiscalFields" :key="field.label" class="min-w-0 first:col-span-2">
             <dt class="text-sm text-muted">
               {{ field.label }}
             </dt>
@@ -119,6 +119,7 @@ function formatQuantity(value?: number) {
       title="Listas de precios"
       icon="i-lucide-tags"
       class="lg:col-span-2"
+      :class="{ 'col-span-2': !showPurchaseCost }"
       variant="subtle"
     >
       <div

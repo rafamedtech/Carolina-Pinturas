@@ -44,7 +44,7 @@ function selectSection(value: string | number) {
     <div class="flex items-start justify-between gap-3">
       <UPageCard
         variant="naked"
-        description="Historial de operaciones registradas en Carolina Pinturas."
+        description="Historial de operaciones registradas"
         :ui="{ container: 'gap-1', title: 'text-lg' }"
       >
         <template #title>

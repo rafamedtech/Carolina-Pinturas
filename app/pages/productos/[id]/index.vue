@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import type { DropdownMenuItem } from '@nuxt/ui'
 import { tableReturnPath } from '~/utils/tableQuery'
 import type { SiigoProduct } from '~/types/siigo'
 import { canManageProducts } from '~/utils/roleAccess'
@@ -14,6 +15,30 @@ const { data: product, status, error, refresh } = useLazyFetch<SiigoProduct>(
 )
 
 const syncing = shallowRef(false)
+const statusOpen = shallowRef(false)
+const productActions = computed<DropdownMenuItem[]>(() => [
+  {
+    label: 'Duplicar',
+    icon: 'i-lucide-copy',
+    to: { path: '/productos/nuevo', query: { duplicar: productId.value, returnTo: backPath.value } }
+  },
+  product.value?.internal?.syncPending
+    ? {
+        label: 'Resolver guardado pendiente',
+        icon: 'i-lucide-circle-alert',
+        to: { path: `/productos/${productId.value}/editar`, query: { returnTo: backPath.value } }
+      }
+    : {
+        label: product.value?.active === false ? 'Activar' : 'Desactivar',
+        icon: product.value?.active === false ? 'i-lucide-circle-check' : 'i-lucide-ban',
+        onSelect: () => { statusOpen.value = true }
+      },
+  {
+    label: 'Editar',
+    icon: 'i-lucide-pencil',
+    to: { path: `/productos/${productId.value}/editar`, query: { returnTo: backPath.value } }
+  }
+])
 const toast = useToast()
 async function syncProduct() {
   if (syncing.value) return
@@ -104,21 +129,34 @@ useSeoMeta({ title: () => productName.value })
           color="neutral"
         />
 
-        <UPageHeader :title="product?.name" :ui="{ root: 'pt-0 pb-5', title: 'text-xl sm:text-2xl font-semibold' }">
+        <UPageHeader :title="product?.name" :ui="{ root: 'pt-0 pb-5', title: 'min-w-0 flex-1 text-xl sm:text-2xl font-semibold', links: 'hidden sm:flex' }">
           <template #title>
-            <span class="flex min-w-0 items-center gap-3">
+            <span class="flex w-full min-w-0 items-center gap-3">
               <UAvatar
                 :src="product?.internal?.image?.url"
                 icon="i-lucide-package"
                 size="3xl"
                 :ui="{ image: 'object-contain' }"
               />
-              <span class="min-w-0">
+              <span class="min-w-0 flex-1">
                 <USkeleton v-if="initialLoading" class="mb-2 h-4 w-20" />
                 <span v-else class="mb-1 block font-mono text-sm font-normal text-primary">{{ product?.code }}</span>
                 <USkeleton v-if="initialLoading" class="h-7 w-64 max-w-full" />
                 <span v-else class="block break-words">{{ product?.name }}</span>
               </span>
+              <UDropdownMenu
+                v-if="product && canManageProducts(user?.role) && isManaged"
+                :items="productActions"
+                :content="{ align: 'end' }"
+                class="shrink-0 sm:hidden"
+              >
+                <UButton
+                  icon="i-lucide-settings-2"
+                  color="neutral"
+                  variant="outline"
+                  aria-label="Acciones del producto"
+                />
+              </UDropdownMenu>
             </span>
           </template>
           <template #description>
@@ -147,9 +185,20 @@ useSeoMeta({ title: () => productName.value })
               icon="i-lucide-copy"
               color="neutral"
               variant="outline"
+              class="hidden sm:inline-flex"
             />
-            <ProductsProductStatusAction :product="product" @changed="refresh" />
-            <UButton :to="{ path: `/productos/${productId}/editar`, query: { returnTo: backPath } }" label="Editar" icon="i-lucide-pencil" />
+            <ProductsProductStatusAction
+              v-model:open="statusOpen"
+              :product="product"
+              trigger-class="hidden sm:inline-flex"
+              @changed="refresh"
+            />
+            <UButton
+              :to="{ path: `/productos/${productId}/editar`, query: { returnTo: backPath } }"
+              label="Editar"
+              icon="i-lucide-pencil"
+              class="hidden sm:inline-flex"
+            />
           </template>
         </UPageHeader>
         <ProductsProductDetailFields

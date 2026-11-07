@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import type { SiigoProduct } from '~/types/siigo'
 
-const props = defineProps<{ product: SiigoProduct }>()
+const props = defineProps<{ product: SiigoProduct, triggerClass?: string }>()
 const emit = defineEmits<{ changed: [] }>()
-const open = shallowRef(false)
+const open = defineModel<boolean>('open', { default: false })
 const { saving, errorMessage, ambiguous, checking, lookupResults, save, check } = useProductMutation()
 const label = computed(() => props.product.active === false ? 'Activar' : 'Desactivar')
 async function confirm() {
@@ -19,6 +19,7 @@ async function confirm() {
     v-if="product.internal?.syncPending"
     :to="`/productos/${product.id}/editar`"
     label="Resolver guardado pendiente"
+    :class="triggerClass"
     color="neutral"
     variant="outline"
   />
@@ -28,7 +29,13 @@ async function confirm() {
     :title="`${label} producto`"
     :description="`${product.code} · ${product.name}`"
   >
-    <UButton :label="label" :icon="product.active === false ? 'i-lucide-circle-check' : 'i-lucide-ban'" color="neutral" variant="outline" />
+    <UButton
+      :label="label"
+      :icon="product.active === false ? 'i-lucide-circle-check' : 'i-lucide-ban'"
+      :class="triggerClass"
+      color="neutral"
+      variant="outline"
+    />
     <template #body>
       <div class="space-y-4">
         <p>{{ product.active === false ? 'El producto volverá a estar disponible para pedidos nuevos.' : 'El producto dejará de estar disponible para pedidos nuevos. Los pedidos anteriores se conservan.' }}</p>
