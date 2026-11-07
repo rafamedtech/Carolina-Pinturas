@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { reportDailyAverage, reportWeeks } from '../../app/utils/reportPeriods'
 
 const mocks = vi.hoisted(() => ({
-  orders: vi.fn(), expenses: vi.fn(), invoices: vi.fn(), payments: vi.fn(), previousPayments: vi.fn()
+  orders: vi.fn(), expenses: vi.fn(), invoices: vi.fn(), payments: vi.fn(), previousPayments: vi.fn(), stock: vi.fn()
 }))
 vi.mock('../../server/utils/auth', () => ({ requireRole: vi.fn() }))
 vi.mock('../../server/utils/prisma', () => ({
@@ -10,6 +10,7 @@ vi.mock('../../server/utils/prisma', () => ({
     salesOrder: { findMany: mocks.orders },
     expense: { findMany: mocks.expenses },
     purchaseInvoice: { findMany: mocks.invoices },
+    inventoryBalance: { findMany: mocks.stock },
     salesOrderPayment: { findMany: mocks.payments, aggregate: mocks.previousPayments }
   })
 }))
@@ -25,12 +26,32 @@ beforeEach(() => {
   mocks.orders.mockResolvedValue([])
   mocks.expenses.mockResolvedValue([])
   mocks.invoices.mockResolvedValue([])
+  mocks.stock.mockResolvedValue([])
   mocks.payments.mockResolvedValue([])
   mocks.previousPayments.mockResolvedValue({ _sum: { amount: null } })
 })
 afterEach(() => vi.useRealTimers())
 
 describe('report summary cards', () => {
+  it('values stock across warehouses at the latest unit cost, separately by currency', async () => {
+    const balance = (productId: string, quantity: string, unitCost: string | null, costCurrency: string | null) => ({
+      productId, quantity, product: { unitCost, costCurrency }
+    })
+    mocks.stock.mockResolvedValue([
+      balance('p1', '2.5', '10.50', 'MXN'),
+      balance('p1', '1.5', '10.50', 'MXN'),
+      balance('p2', '3', '4', 'USD'),
+      balance('p3', '1', null, null),
+      balance('p3', '3', null, null)
+    ])
+    const result = await summary(event)
+    expect(result.inventoryValuation).toEqual({
+      totals: [{ currencyCode: 'MXN', amount: 42 }, { currencyCode: 'USD', amount: 12 }],
+      productsWithoutCost: 1
+    })
+    expect(mocks.stock).toHaveBeenCalledWith(expect.objectContaining({ where: { quantity: { gt: 0 } } }))
+  })
+
   it('separates internal customers from seller sales in every period without changing total sales', async () => {
     const order = (name: string, total: number, internal: boolean) => ({
       id: name, orderDate: new Date('2026-10-01'), total: total + total * 0.16, taxTotal: total * 0.16, discountTotal: 0,

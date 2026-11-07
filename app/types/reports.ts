@@ -88,7 +88,13 @@ export interface ReportRankingItem {
   percentage: number
 }
 
+export interface ReportInventoryValuation {
+  totals: { currencyCode: string, amount: number }[]
+  productsWithoutCost: number
+}
+
 export interface BusinessReportSummary {
+  inventoryValuation: ReportInventoryValuation
   period: ReportPeriod
   metrics: ReportMetrics
   dailyMovements: ReportDailyMovement[]
