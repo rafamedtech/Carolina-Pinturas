@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { reportDailyAverage, reportWeeks } from '../../app/utils/reportPeriods'
 
 const mocks = vi.hoisted(() => ({
-  orders: vi.fn(), expenses: vi.fn(), invoices: vi.fn(), payments: vi.fn(), previousPayments: vi.fn(), stock: vi.fn()
+  orders: vi.fn(), expenses: vi.fn(), invoices: vi.fn(), payments: vi.fn(), previousPayments: vi.fn(), warehouses: vi.fn()
 }))
 vi.mock('../../server/utils/auth', () => ({ requireRole: vi.fn() }))
 vi.mock('../../server/utils/prisma', () => ({
@@ -10,7 +10,7 @@ vi.mock('../../server/utils/prisma', () => ({
     salesOrder: { findMany: mocks.orders },
     expense: { findMany: mocks.expenses },
     purchaseInvoice: { findMany: mocks.invoices },
-    inventoryBalance: { findMany: mocks.stock },
+    inventoryWarehouse: { findMany: mocks.warehouses },
     salesOrderPayment: { findMany: mocks.payments, aggregate: mocks.previousPayments }
   })
 }))
@@ -26,7 +26,7 @@ beforeEach(() => {
   mocks.orders.mockResolvedValue([])
   mocks.expenses.mockResolvedValue([])
   mocks.invoices.mockResolvedValue([])
-  mocks.stock.mockResolvedValue([])
+  mocks.warehouses.mockResolvedValue([])
   mocks.payments.mockResolvedValue([])
   mocks.previousPayments.mockResolvedValue({ _sum: { amount: null } })
 })
@@ -37,19 +37,27 @@ describe('report summary cards', () => {
     const balance = (productId: string, quantity: string, unitCost: string | null, costCurrency: string | null) => ({
       productId, quantity, product: { unitCost, costCurrency }
     })
-    mocks.stock.mockResolvedValue([
-      balance('p1', '2.5', '10.50', 'MXN'),
-      balance('p1', '1.5', '10.50', 'MXN'),
-      balance('p2', '3', '4', 'USD'),
-      balance('p3', '1', null, null),
-      balance('p3', '3', null, null)
+    const centro = { id: 'w1', code: 'CTR', name: 'Centro' }
+    const norte = { id: 'w2', code: 'NTE', name: 'Norte' }
+    const sur = { id: 'w3', code: 'SUR', name: 'Sur' }
+    mocks.warehouses.mockResolvedValue([
+      { ...centro, balances: [balance('p1', '2.5', '10.50', 'MXN'), balance('p3', '1', null, null)] },
+      { ...norte, balances: [balance('p1', '1.5', '10.50', 'MXN'), balance('p2', '3', '4', 'USD'), balance('p3', '3', null, null)] },
+      { ...sur, balances: [] }
     ])
     const result = await summary(event)
     expect(result.inventoryValuation).toEqual({
       totals: [{ currencyCode: 'MXN', amount: 42 }, { currencyCode: 'USD', amount: 12 }],
-      productsWithoutCost: 1
+      productsWithoutCost: 1,
+      warehouses: [
+        { ...centro, totals: [{ currencyCode: 'MXN', amount: 26.25 }], productsWithoutCost: 1 },
+        { ...norte, totals: [{ currencyCode: 'MXN', amount: 15.75 }, { currencyCode: 'USD', amount: 12 }], productsWithoutCost: 1 },
+        { ...sur, totals: [], productsWithoutCost: 0 }
+      ]
     })
-    expect(mocks.stock).toHaveBeenCalledWith(expect.objectContaining({ where: { quantity: { gt: 0 } } }))
+    expect(mocks.warehouses).toHaveBeenCalledWith(expect.objectContaining({
+      select: expect.objectContaining({ balances: expect.objectContaining({ where: { quantity: { gt: 0 } } }) })
+    }))
   })
 
   it('separates internal customers from seller sales in every period without changing total sales', async () => {

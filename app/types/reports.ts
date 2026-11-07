@@ -88,9 +88,13 @@ export interface ReportRankingItem {
   percentage: number
 }
 
-export interface ReportInventoryValuation {
+interface ReportInventoryTotals {
   totals: { currencyCode: string, amount: number }[]
   productsWithoutCost: number
+}
+
+export interface ReportInventoryValuation extends ReportInventoryTotals {
+  warehouses: (ReportInventoryTotals & { id: string, code: string, name: string })[]
 }
 
 export interface BusinessReportSummary {
