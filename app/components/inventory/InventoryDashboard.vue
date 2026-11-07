@@ -236,7 +236,7 @@ const reservationColumns: TableColumn<Extract<Row, { orderId: string }>>[] = [
       />
     </template>
     <template #before>
-      <DetailSectionHeading :title="activeView.title" :description="activeView.description" />
+      <DetailSectionHeading :title="activeView.title" :description="activeView.description" hide-title-on-mobile />
       <UAlert v-if="error" :title="error" color="error" />
       <div v-if="productId && tab !== 'valuation'" class="flex items-center gap-2 text-sm">
         <span>Kardex de producto seleccionado</span><UButton
