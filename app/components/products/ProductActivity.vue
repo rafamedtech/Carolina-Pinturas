@@ -80,17 +80,18 @@ function selectSection(value: string | number) {
           <p v-if="composite && ['movements', 'reservations'].includes(section)" class="text-sm text-muted">
             Las reservas y salidas de un producto compuesto se registran en las fichas de sus componentes.
           </p>
-          <div v-if="['idle', 'pending'].includes(status)" role="status" aria-busy="true">
-            <USkeleton class="h-24 w-full" />
-            <span class="sr-only">Cargando actividad…</span>
-          </div>
           <UAlert
-            v-else-if="error"
+            v-if="error"
             color="error"
             variant="subtle"
             title="No se pudo cargar esta sección."
           />
-          <ProductsProductActivityTable v-else :rows="data?.results ?? []" :section="section" />
+          <ProductsProductActivityTable
+            v-else
+            :rows="data?.results ?? []"
+            :section="section"
+            :loading="['idle', 'pending'].includes(status)"
+          />
           <footer v-if="status === 'success' && (data?.pagination.totalResults || page > 1)" class="flex flex-wrap items-center justify-between gap-3 text-sm text-muted">
             <span>{{ recordCount }} {{ recordLabel }}</span>
             <UPagination

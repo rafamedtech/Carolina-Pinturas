@@ -2,7 +2,7 @@
 import type { SiigoProduct } from '~/types/siigo'
 import { formatDateTime } from '~/utils/datetime'
 
-const props = defineProps<{ product: SiigoProduct, showPurchaseCost: boolean }>()
+const props = defineProps<{ product?: SiigoProduct | null, productId: string, loading?: boolean, showPurchaseCost: boolean }>()
 
 const unit = computed(() => {
   const value = props.product?.unit
@@ -14,23 +14,21 @@ const prices = computed(() => props.product?.prices?.flatMap(price =>
 
 const generalFields = computed(() => {
   const item = props.product
-  if (!item) return []
   return [
-    { label: 'Creado', value: formatDateTime(item.metadata?.created) },
-    { label: 'Última actualización', value: formatDateTime(item.metadata?.last_updated) },
-    { label: 'Grupo', value: item.account_group?.name },
-    { label: 'Tipo', value: item.internal?.composition?.kind === 'composite' ? 'Producto compuesto' : item.type === 'Product' || !item.type ? 'Producto' : item.type },
-    { label: 'Marca', value: item.additional_fields?.brand },
-    { label: 'Control de inventario', value: item.internal?.composition?.kind === 'composite' ? 'Control por componentes' : item.internal?.inventory?.tracked ? 'Controlado' : 'Sin control' }
+    { label: 'Creado', value: formatDateTime(item?.metadata?.created) },
+    { label: 'Última actualización', value: formatDateTime(item?.metadata?.last_updated) },
+    { label: 'Grupo', value: item?.account_group?.name },
+    { label: 'Tipo', value: item?.internal?.composition?.kind === 'composite' ? 'Producto compuesto' : item?.type === 'Product' || !item?.type ? 'Producto' : item?.type },
+    { label: 'Marca', value: item?.additional_fields?.brand },
+    { label: 'Control de inventario', value: item?.internal?.composition?.kind === 'composite' ? 'Control por componentes' : item?.internal?.inventory?.tracked ? 'Controlado' : 'Sin control' }
   ]
 })
 const fiscalFields = computed(() => {
   const item = props.product
-  if (!item) return []
   return [
-    { label: 'Clave SAT', value: joinParts(item.key?.code, item.key?.name) },
+    { label: 'Clave SAT', value: joinParts(item?.key?.code, item?.key?.name) },
     { label: 'Unidad SAT', value: joinParts(unit.value?.code, unit.value?.name) },
-    { label: 'Impuestos incluidos', value: item.tax_included === undefined ? undefined : item.tax_included ? 'Sí' : 'No' }
+    { label: 'Impuestos incluidos', value: item?.tax_included === undefined ? undefined : item?.tax_included ? 'Sí' : 'No' }
   ]
 })
 
@@ -54,9 +52,9 @@ function formatQuantity(value?: number) {
 <template>
   <UPageGrid class="gap-4 lg:grid-cols-3">
     <div class="flex flex-col gap-4 lg:col-span-2">
-      <UPageCard v-if="product.internal?.composition?.kind === 'composite'" title="Componentes por unidad" variant="subtle">
+      <UPageCard v-if="product?.internal?.composition?.kind === 'composite'" title="Componentes por unidad" variant="subtle">
         <ul class="divide-y divide-default">
-          <li v-for="component in product.internal.composition.components" :key="component.productId" class="flex items-center justify-between gap-3 py-3 text-sm">
+          <li v-for="component in product?.internal.composition.components" :key="component.productId" class="flex items-center justify-between gap-3 py-3 text-sm">
             <ULink :to="`/productos/${component.productId}`" class="text-primary underline underline-offset-2">
               {{ component.code }} · {{ component.name ?? component.productId }}
             </ULink>
@@ -78,15 +76,18 @@ function formatQuantity(value?: number) {
               {{ field.label }}
             </dt>
             <dd class="mt-1 font-medium break-words">
-              {{ field.value || '—' }}
+              <USkeleton v-if="loading" class="h-5 w-32 max-w-full" />
+              <template v-else>
+                {{ field.value || '—' }}
+              </template>
             </dd>
           </div>
         </dl>
       </UPageCard>
 
-      <UPageCard v-if="product.components?.length" title="Componentes" variant="subtle">
+      <UPageCard v-if="product?.components?.length" title="Componentes" variant="subtle">
         <ul class="space-y-3">
-          <li v-for="component in product.components" :key="component.id || component.name" class="flex items-center justify-between gap-3 text-sm">
+          <li v-for="component in product?.components" :key="component.id || component.name" class="flex items-center justify-between gap-3 text-sm">
             <span class="min-w-0">
               <span class="block">{{ component.name || component.id }}</span>
               <span v-if="component.name && component.id" class="block text-xs text-muted">ID {{ component.id }}</span>
@@ -105,14 +106,33 @@ function formatQuantity(value?: number) {
               {{ field.label }}
             </dt>
             <dd class="mt-1 font-medium break-words">
-              {{ field.value || '—' }}
+              <USkeleton v-if="loading" class="h-5 w-32 max-w-full" />
+              <template v-else>
+                {{ field.value || '—' }}
+              </template>
             </dd>
           </div>
         </dl>
       </UPageCard>
     </div>
-    <UPageCard title="Listas de precios" icon="i-lucide-tags" class="lg:col-span-2" variant="subtle">
-      <div v-if="prices.length" class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+    <UPageCard
+      title="Listas de precios"
+      icon="i-lucide-tags"
+      class="lg:col-span-2"
+      variant="subtle"
+    >
+      <div
+        v-if="loading"
+        class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3"
+        aria-label="Cargando listas de precios"
+        aria-busy="true"
+      >
+        <div v-for="index in 2" :key="index" class="space-y-2 border-t border-default pt-3">
+          <USkeleton class="h-4 w-28" />
+          <USkeleton class="h-7 w-24" />
+        </div>
+      </div>
+      <div v-else-if="prices.length" class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         <div v-for="price in prices" :key="`${price.currency}-${price.position}`" class="border-t border-default pt-3">
           <p class="text-sm text-muted">
             {{ price.name || `Lista ${price.position ?? '—'}` }}
@@ -127,6 +147,6 @@ function formatQuantity(value?: number) {
         Sin precios registrados.
       </p>
     </UPageCard>
-    <ProductsProductPurchaseCost v-if="showPurchaseCost" :product-id="product.id" />
+    <ProductsProductPurchaseCost v-if="showPurchaseCost" :product-id="productId" />
   </UPageGrid>
 </template>

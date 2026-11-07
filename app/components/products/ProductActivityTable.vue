@@ -4,7 +4,7 @@ import type { ProductActivityRow, ProductActivitySection } from '#shared/types/p
 import { formatDate } from '~/utils/datetime'
 import { purchaseMoney, purchaseQuantity } from '~/utils/purchaseFormat'
 
-const props = defineProps<{ rows: ProductActivityRow[], section: ProductActivitySection }>()
+const props = defineProps<{ rows: ProductActivityRow[], section: ProductActivitySection, loading?: boolean }>()
 const showQuantity = computed(() => props.section !== 'expenses')
 const showBalance = computed(() => props.section === 'movements' || props.section === 'counts')
 const showAmount = computed(() => ['sales', 'purchases', 'expenses'].includes(props.section))
@@ -43,7 +43,9 @@ const columns = computed<TableColumn<ProductActivityRow>[]>(() => {
 </script>
 
 <template>
+  <ListLoading v-if="loading" />
   <UTable
+    v-else
     :data="rows"
     :columns="columns"
     :get-row-id="row => row.id"

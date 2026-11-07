@@ -22,6 +22,7 @@ const { data: stocks, error, status } = useAsyncData(
     return rows
   }, { lazy: true, server: false }
 )
+const loading = computed(() => ['idle', 'pending'].includes(status.value))
 const selectedWarehouseId = shallowRef<string | null>(null)
 const modalOpen = shallowRef(false)
 const selectedStock = computed(() => stocks.value?.find(row => row.warehouseId === selectedWarehouseId.value))
@@ -63,17 +64,7 @@ function showKardex(row: InventoryStock) {
     :ui="{ title: 'text-lg font-semibold' }"
   >
     <UAlert v-if="error" title="No se pudo cargar el inventario interno." color="error" />
-    <div
-      v-else-if="['idle', 'pending'].includes(status)"
-      class="space-y-4"
-      role="status"
-      aria-busy="true"
-    >
-      <USkeleton class="h-32 w-full rounded-lg" />
-      <USkeleton class="h-20 w-full rounded-lg" />
-      <span class="sr-only">Cargando inventario…</span>
-    </div>
-    <div v-else-if="stocks?.length" class="space-y-5">
+    <div v-else-if="loading || stocks?.length" class="space-y-5" :aria-busy="loading">
       <UPageGrid class="gap-2 sm:grid-cols-3 sm:gap-px">
         <UPageCard
           v-for="stat in [
@@ -88,8 +79,11 @@ function showKardex(row: InventoryStock) {
           :ui="{ container: 'gap-y-2 p-4 sm:p-4', title: 'text-xs font-normal text-muted uppercase' }"
           class="sm:rounded-none sm:first:rounded-l-lg sm:last:rounded-r-lg"
         >
-          <span class="text-2xl font-semibold text-highlighted tabular-nums">{{ stat.value }}</span>
-          <span class="ml-1 text-xs text-muted">{{ totals.unit }}</span>
+          <USkeleton v-if="loading" class="h-8 w-24" />
+          <template v-else>
+            <span class="text-2xl font-semibold text-highlighted tabular-nums">{{ stat.value }}</span>
+            <span class="ml-1 text-xs text-muted">{{ totals.unit }}</span>
+          </template>
         </UPageCard>
       </UPageGrid>
 
@@ -97,7 +91,10 @@ function showKardex(row: InventoryStock) {
         <p class="mb-2 text-xs font-medium text-muted">
           Detalle por almacén
         </p>
-        <div class="flex flex-wrap gap-2">
+        <div v-if="loading" class="flex flex-wrap gap-2" aria-label="Cargando almacenes">
+          <USkeleton v-for="index in 3" :key="index" class="h-8 w-32" />
+        </div>
+        <div v-else class="flex flex-wrap gap-2">
           <UButton
             v-for="row in stocks"
             :key="row.warehouseId"
