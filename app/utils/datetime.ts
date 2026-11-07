@@ -1,6 +1,7 @@
 export {
   MEXICO_TIME_ZONE,
   formatDate,
+  formatMonth,
   formatDateTime,
   formatDateRange,
   formatDate as formatMexicoDate,

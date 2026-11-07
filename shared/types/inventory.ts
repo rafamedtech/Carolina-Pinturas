@@ -17,3 +17,12 @@ export interface OrderReturnContext {
   warehouses: InventoryWarehouse[]
   returns: Array<Pick<InventoryMovement, 'id' | 'folio' | 'date' | 'reason' | 'reversal'>>
 }
+
+interface InventoryValuationTotals {
+  totals: { currencyCode: string, amount: number }[]
+  productsWithoutCost: number
+}
+
+export interface InventoryValuation extends InventoryValuationTotals {
+  warehouses: (InventoryValuationTotals & { id: string, code: string, name: string })[]
+}

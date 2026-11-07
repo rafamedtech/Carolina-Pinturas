@@ -116,13 +116,12 @@ const columns = computed<TableColumn<ProductActivityRow>[]>(() => {
         </UCard>
       </li>
     </ul>
-    <UTable
+    <DetailTable
       :data="rows"
       :columns="columns"
       :get-row-id="row => row.id"
       aria-label="Actividad registrada para el producto"
-      class="hidden min-w-0 border-y border-default sm:block"
-      :ui="{ td: 'align-top', empty: 'p-0' }"
+      class="hidden sm:block"
     >
       <template #reference-cell="{ row: { original } }">
         <div class="flex flex-col items-start gap-1">
@@ -165,6 +164,6 @@ const columns = computed<TableColumn<ProductActivityRow>[]>(() => {
         {{ amount ? purchaseMoney(Number(amount.value), amount.currency) : '—' }}
         <span v-if="amount" class="text-xs text-muted">{{ amount.currency }}</span>
       </template>
-    </UTable>
+    </DetailTable>
   </template>
 </template>

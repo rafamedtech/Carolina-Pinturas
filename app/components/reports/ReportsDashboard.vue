@@ -133,8 +133,6 @@ function plural(count: number, singular: string, pluralLabel: string) {
         </div>
       </section>
 
-      <ReportsInventoryValuation :valuation="data.inventoryValuation" />
-
       <section aria-labelledby="reports-operating" class="space-y-3">
         <SectionHeading
           id="reports-operating"

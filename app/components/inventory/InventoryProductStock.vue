@@ -76,7 +76,7 @@ function showKardex(row: InventoryStock) {
     <UAlert v-if="error" title="No se pudo cargar el inventario interno." color="error" />
     <div v-else-if="loading || stocks?.length" class="space-y-5" :aria-busy="loading">
       <UPageGrid class="grid-cols-3 gap-2 sm:gap-px">
-        <UPageCard
+        <DetailStatCard
           v-for="stat in [
             { title: 'Total', value: totals.quantity, icon: 'i-lucide-package' },
             { title: 'Reservado', value: totals.reserved, icon: 'i-lucide-bookmark' },
@@ -85,16 +85,11 @@ function showKardex(row: InventoryStock) {
           :key="stat.title"
           :title="stat.title"
           :icon="stat.icon"
-          variant="subtle"
-          :ui="{ container: 'gap-y-2 p-3 sm:p-4', title: 'text-xs font-normal text-muted uppercase' }"
+          :value="stat.value"
+          :unit="totals.unit"
+          :loading="loading"
           class="sm:rounded-none sm:first:rounded-l-lg sm:last:rounded-r-lg"
-        >
-          <USkeleton v-if="loading" class="h-8 w-24 max-w-full" />
-          <template v-else>
-            <span class="text-2xl font-semibold break-words text-highlighted tabular-nums">{{ stat.value }}</span>
-            <span class="ml-1 text-xs text-muted">{{ totals.unit }}</span>
-          </template>
-        </UPageCard>
+        />
       </UPageGrid>
 
       <div>

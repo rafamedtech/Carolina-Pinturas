@@ -1,5 +1,4 @@
 import type { Prisma } from '../../../generated/prisma/client'
-import Decimal from 'decimal.js'
 import type {
   BusinessReportSummary,
   ReportBreakdownItem,
@@ -32,11 +31,6 @@ function expenseAmount(expense: { amount: { toString(): string } | number, excha
   return reportNumeric(expense.amount) * reportNumeric(expense.exchangeRate)
 }
 
-function valuationTotals(totals: Map<string, Decimal>) {
-  return [...totals].sort(([a], [b]) => a.localeCompare(b))
-    .map(([currencyCode, amount]) => ({ currencyCode, amount: amount.toNumber() }))
-}
-
 export default eventHandler(async (event) => {
   await requireRole(event, ['admin'])
 
@@ -50,7 +44,7 @@ export default eventHandler(async (event) => {
     orderDate: { gte: start, lt: cutoff }
   } satisfies Prisma.SalesOrderWhereInput
 
-  const [orders, previousSalesResult, collections, previousCollectionsResult, expenses, previousExpenses, purchaseInvoices, warehouses] = await Promise.all([
+  const [orders, previousSalesResult, collections, previousCollectionsResult, expenses, previousExpenses, purchaseInvoices] = await Promise.all([
     prisma.salesOrder.findMany({
       where: salesWhere,
       select: {
@@ -113,41 +107,8 @@ export default eventHandler(async (event) => {
         date: { gte: previousStart, lt: cutoff }
       },
       select: { date: true, amount: true, order: { select: { currencyCode: true } } }
-    }),
-    prisma.inventoryWarehouse.findMany({
-      orderBy: [{ name: 'asc' }, { code: 'asc' }],
-      select: {
-        id: true,
-        code: true,
-        name: true,
-        balances: {
-          where: { quantity: { gt: 0 } },
-          select: { productId: true, quantity: true, product: { select: { unitCost: true, costCurrency: true } } }
-        }
-      }
     })
   ] as const)
-
-  const inventoryTotals = new Map<string, Decimal>()
-  const productsWithoutCost = new Set<string>()
-  const warehouseValuations = warehouses.map(({ id, code, name, balances }) => {
-    const totals = new Map<string, Decimal>()
-    let missingCosts = 0
-    for (const { productId, quantity, product } of balances) {
-      const { unitCost, costCurrency } = product
-      if (unitCost === null || !costCurrency) {
-        productsWithoutCost.add(productId)
-        missingCosts++
-        continue
-      }
-      const value = new Decimal(quantity.toString()).times(unitCost.toString())
-      totals.set(costCurrency, (totals.get(costCurrency) ?? new Decimal(0)).plus(value))
-    }
-    for (const [currencyCode, amount] of totals) {
-      inventoryTotals.set(currencyCode, (inventoryTotals.get(currencyCode) ?? new Decimal(0)).plus(amount))
-    }
-    return { id, code, name, totals: valuationTotals(totals), productsWithoutCost: missingCosts }
-  })
 
   const grossSales = orders.reduce((sum, order) => sum + reportNumeric(order.total), 0)
   const sales = orders.reduce((sum, order) => sum + reportSalesBeforeTax(order), 0)
@@ -359,11 +320,6 @@ export default eventHandler(async (event) => {
     - (paymentMethodOrder.get(b.key as typeof PAYMENT_METHODS[number]['key']) ?? 99))
 
   const result: BusinessReportSummary = {
-    inventoryValuation: {
-      totals: valuationTotals(inventoryTotals),
-      productsWithoutCost: productsWithoutCost.size,
-      warehouses: warehouseValuations
-    },
     period: {
       label: formatDateRange(reportDateOnly(start), reportDateOnly(new Date(end.getTime() - dayInMs))),
       start: reportDateOnly(start),

@@ -73,31 +73,16 @@ useSeoMeta({ title: () => productName.value })
 <template>
   <UDashboardPanel id="product-detail">
     <template #header>
-      <UDashboardNavbar title="Detalle del producto">
-        <template #leading>
-          <UDashboardSidebarCollapse />
-        </template>
-        <template #right>
-          <UButton
-            label="Actualizar"
-            aria-label="Actualizar producto desde Siigo"
-            :ui="{ label: 'hidden sm:inline' }"
-            icon="i-lucide-refresh-cw"
-            color="neutral"
-            variant="outline"
-            :loading="syncing || ['idle', 'pending'].includes(status)"
-            @click="syncProduct"
-          />
-        </template>
-      </UDashboardNavbar>
-      <UDashboardToolbar>
-        <UBreadcrumb
-          :items="[
-            { label: 'PRODUCTOS', icon: 'i-lucide-package', to: backPath },
-            { label: product?.name || 'Detalle' }
-          ]"
-        />
-      </UDashboardToolbar>
+      <DetailHeader
+        title="Detalle del producto"
+        :breadcrumbs="[
+          { label: 'Productos', icon: 'i-lucide-package', to: backPath },
+          { label: product?.name || 'Detalle' }
+        ]"
+        refresh-label="Actualizar producto desde Siigo"
+        :loading="syncing || ['idle', 'pending'].includes(status)"
+        @refresh="syncProduct"
+      />
     </template>
 
     <template #body>

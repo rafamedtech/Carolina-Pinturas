@@ -16,6 +16,7 @@ vi.mock('../../server/utils/prisma', () => ({
 }))
 vi.stubGlobal('eventHandler', (handler: unknown) => handler)
 vi.stubGlobal('getQuery', () => ({ month: '2026-10' }))
+const valuation = (await import('../../server/api/inventory/valuation.get')).default
 const summary = (await import('../../server/api/reports/summary.get')).default
 const event = {} as Parameters<typeof summary>[0]
 
@@ -45,8 +46,8 @@ describe('report summary cards', () => {
       { ...norte, balances: [balance('p1', '1.5', '10.50', 'MXN'), balance('p2', '3', '4', 'USD'), balance('p3', '3', null, null)] },
       { ...sur, balances: [] }
     ])
-    const result = await summary(event)
-    expect(result.inventoryValuation).toEqual({
+    const result = await valuation(event)
+    expect(result).toEqual({
       totals: [{ currencyCode: 'MXN', amount: 42 }, { currencyCode: 'USD', amount: 12 }],
       productsWithoutCost: 1,
       warehouses: [

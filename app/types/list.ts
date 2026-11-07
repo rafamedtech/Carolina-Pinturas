@@ -1,4 +1,4 @@
-import type { ButtonProps, DropdownMenuItem } from '@nuxt/ui'
+import type { BreadcrumbItem, ButtonProps, DropdownMenuItem } from '@nuxt/ui'
 
 export type ListFilterValue = string | boolean
 export type ListFilterValues = Record<string, ListFilterValue>
@@ -27,6 +27,7 @@ export interface ListCreateAction {
 }
 
 export interface ListLayoutConfig {
+  breadcrumbs?: BreadcrumbItem[]
   id: string
   title: string
   empty: string

@@ -88,17 +88,7 @@ export interface ReportRankingItem {
   percentage: number
 }
 
-interface ReportInventoryTotals {
-  totals: { currencyCode: string, amount: number }[]
-  productsWithoutCost: number
-}
-
-export interface ReportInventoryValuation extends ReportInventoryTotals {
-  warehouses: (ReportInventoryTotals & { id: string, code: string, name: string })[]
-}
-
 export interface BusinessReportSummary {
-  inventoryValuation: ReportInventoryValuation
   period: ReportPeriod
   metrics: ReportMetrics
   dailyMovements: ReportDailyMovement[]

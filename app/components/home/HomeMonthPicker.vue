@@ -1,15 +1,14 @@
 <script setup lang="ts">
 import { CalendarDate } from '@internationalized/date'
 import type { DateValue } from '@internationalized/date'
-import { formatDateRange } from '~/utils/datetime'
+import { formatMonth } from '~/utils/datetime'
 
 const selectedMonth = defineModel<DateValue>({ required: true })
 const open = ref(false)
 
 const label = computed(() => {
   const start = new CalendarDate(selectedMonth.value.year, selectedMonth.value.month, 1)
-  const end = start.add({ months: 1 }).subtract({ days: 1 })
-  return formatDateRange(start.toString(), end.toString())
+  return formatMonth(start.toString())
 })
 
 watch(selectedMonth, () => {

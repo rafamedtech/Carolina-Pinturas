@@ -42,17 +42,7 @@ function selectSection(value: string | number) {
 <template>
   <section aria-label="Actividad del producto" class="min-w-0 space-y-3">
     <div class="flex items-start justify-between gap-3">
-      <UPageCard
-        variant="naked"
-        description="Historial de operaciones registradas"
-        :ui="{ container: 'gap-1', title: 'text-lg' }"
-      >
-        <template #title>
-          <h2 class="font-semibold">
-            Actividad del producto
-          </h2>
-        </template>
-      </UPageCard>
+      <DetailSectionHeading title="Actividad del producto" description="Historial de operaciones registradas" />
       <UTooltip text="Recargar actividad">
         <UButton
           icon="i-lucide-refresh-cw"
@@ -64,18 +54,11 @@ function selectSection(value: string | number) {
         />
       </UTooltip>
     </div>
-    <UTabs
+    <DetailTabs
       :model-value="section"
       :items="tabs"
-      variant="link"
-      :ui="{ list: 'flex-wrap gap-y-1', trigger: 'flex-1 justify-center', content: 'min-w-0' }"
       @update:model-value="selectSection"
     >
-      <template #default="{ item }">
-        <UTooltip :text="item.description" :content="{ side: 'top' }">
-          <span>{{ item.label }}</span>
-        </UTooltip>
-      </template>
       <template #content>
         <div class="space-y-4 pt-2">
           <p v-if="composite && ['movements', 'reservations'].includes(section)" class="text-sm text-muted">
@@ -105,6 +88,6 @@ function selectSection(value: string | number) {
           </footer>
         </div>
       </template>
-    </UTabs>
+    </DetailTabs>
   </section>
 </template>

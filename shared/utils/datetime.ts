@@ -49,6 +49,18 @@ export function formatDate(value: DateInput): string {
   return `${part('day')}/${part('month')}/${part('year').padStart(4, '0')}`
 }
 
+/** Nombre del mes y año para selectores de reportes mensuales. */
+export function formatMonth(value: DateInput): string {
+  const parsed = parseDisplayDate(value)
+  if (!parsed) return '—'
+
+  return new Intl.DateTimeFormat('es-MX', {
+    month: 'long',
+    year: 'numeric',
+    timeZone: parsed.formatter.resolvedOptions().timeZone
+  }).format(parsed.date)
+}
+
 /** DD/MM/AAAA, HH:mm para los registros que también necesitan mostrar la hora. */
 export function formatDateTime(value: DateInput): string {
   const parsed = parseDisplayDate(value)

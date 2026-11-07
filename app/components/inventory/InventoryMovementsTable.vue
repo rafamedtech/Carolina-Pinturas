@@ -1,10 +1,14 @@
 <script setup lang="ts">
 import type { TableColumn } from '@nuxt/ui'
+import type { VisibilityState } from '@tanstack/table-core'
 import type { InventoryMovement } from '#shared/types/inventory'
 import { formatDate, formatDateTime } from '~/utils/datetime'
 
 defineProps<{ rows: InventoryMovement[], admin: boolean, operational: boolean, kardex?: boolean }>()
 const emit = defineEmits<{ return: [row: InventoryMovement], reverse: [row: InventoryMovement] }>()
+const tables = useTemplateRef('tables')
+const columnVisibility = ref<VisibilityState>({})
+defineExpose({ getColumns: () => tables.value?.[0]?.getColumns() ?? [] })
 const lineColumns: TableColumn<InventoryMovement['lines'][number]>[] = [
   { id: 'product', header: 'Producto', cell: ({ row }) => `${row.original.productCode} · ${row.original.productName}` },
   { accessorKey: 'warehouseName', header: 'Almacén' },
@@ -27,7 +31,13 @@ const lineColumns: TableColumn<InventoryMovement['lines'][number]>[] = [
           </div><span class="text-sm text-muted">{{ formatDate(row.date) }}</span>
         </div>
       </template>
-      <ListTable :data="row.lines" :columns="lineColumns" empty="Sin partidas." />
+      <DetailTable
+        ref="tables"
+        v-model:column-visibility="columnVisibility"
+        :data="row.lines"
+        :columns="lineColumns"
+        empty="Sin partidas."
+      />
       <template #footer>
         <div class="flex flex-wrap items-center justify-between gap-3">
           <div class="text-sm">

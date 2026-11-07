@@ -1,5 +1,5 @@
 <script setup lang="ts" generic="T">
-import type { TableColumn, TableRow } from '@nuxt/ui'
+import type { TableColumn, TableRow, TabsProps } from '@nuxt/ui'
 import type { SortingState, TableMeta, VisibilityState } from '@tanstack/table-core'
 import type { ListFilterValues, ListLayoutConfig } from '~/types/list'
 import type { OrderDateRange } from '~/types/orders'
@@ -16,6 +16,9 @@ const props = defineProps<{
   filteredTotal?: number
   meta?: TableMeta<T>
   embedded?: boolean
+  toolbarBelowTabs?: boolean
+  tabsVariant?: TabsProps['variant']
+  tabsFullWidth?: boolean
   onSelect?: (event: Event, row: TableRow<T>) => void
 }>()
 const emit = defineEmits<{ refresh: [], create: [], clear: [] }>()
@@ -52,12 +55,13 @@ function applyFilters(value: ListFilterValues) {
 }
 
 defineSlots<{
-  actions(): unknown
-  mobile(props: { rows: T[] }): unknown
-  content(props: { rows: T[] }): unknown
-  before(): unknown
-  after(): unknown
-  overlays(): unknown
+  'actions'(): unknown
+  'toolbar-actions'(): unknown
+  'mobile'(props: { rows: T[] }): unknown
+  'content'(props: { rows: T[] }): unknown
+  'before'(): unknown
+  'after'(): unknown
+  'overlays'(): unknown
 }>()
 </script>
 
@@ -65,7 +69,9 @@ defineSlots<{
   <ListPage
     :id="config.id"
     :title="config.title"
+    :breadcrumbs="config.breadcrumbs"
     :embedded="embedded"
+    :views-before-toolbar="toolbarBelowTabs"
     :loading="loading"
     :error="error"
     :error-title="errorTitle"
@@ -97,10 +103,12 @@ defineSlots<{
           />
         </template>
         <template #actions>
-          <ListColumnPicker
-            :columns="listTable?.getColumns() ?? []"
-            :class="{ 'hidden md:inline-flex': $slots.mobile }"
-          />
+          <slot name="toolbar-actions">
+            <ListColumnPicker
+              :columns="listTable?.getColumns() ?? []"
+              :class="{ 'hidden md:inline-flex': $slots.mobile }"
+            />
+          </slot>
           <ListCreateButton v-if="config.create" :action="config.create" @create="emit('create')" />
         </template>
       </ListToolbar>
@@ -110,6 +118,8 @@ defineSlots<{
         v-if="config.tabs?.length"
         v-model="tab"
         :items="config.tabs"
+        :variant="tabsVariant"
+        :full-width="tabsFullWidth"
         :label="`Filtrar ${config.title.toLowerCase()} por estado`"
       />
     </template>

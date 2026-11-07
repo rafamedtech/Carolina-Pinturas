@@ -5,7 +5,7 @@ import { inventoryTypes } from '#shared/schemas/inventory'
 import type { ListLayoutConfig } from '~/types/list'
 import type { OrderDateRange } from '~/types/orders'
 import { tableQueryField, tableQueryText, tableQueryBoolean, tableQueryPage, tableQueryDate } from '~/utils/tableQuery'
-import type { InventoryStock, InventoryWarehouse, InventorySettings, InventoryMovement, InventoryCount, InventoryProduct, InventoryPage } from '#shared/types/inventory'
+import type { InventoryStock, InventoryWarehouse, InventorySettings, InventoryMovement, InventoryCount, InventoryProduct, InventoryPage, InventoryValuation } from '#shared/types/inventory'
 import type { InventoryCommand } from '#shared/schemas/inventory'
 import type { CsvColumn } from '~/utils/csv'
 import { fetchAllPages } from '~/composables/useCsvExport'
@@ -14,7 +14,11 @@ import { formatDate, mexicoToday } from '~/utils/datetime'
 const { user } = useAuth()
 const admin = computed(() => user.value?.role === 'admin')
 const operational = computed(() => admin.value || user.value?.role === 'mostrador')
-const tab = shallowRef('stocks')
+const stockTable = useTemplateRef('stockTable')
+const reservationsTable = useTemplateRef('reservationsTable')
+const movementsTable = useTemplateRef('movementsTable')
+const defaultTab = computed(() => admin.value ? 'valuation' : 'stocks')
+const tab = shallowRef(defaultTab.value)
 const search = shallowRef(''), warehouse = shallowRef(''), type = shallowRef(''), from = shallowRef(''), to = shallowRef(''), productId = shallowRef('')
 const tracking = shallowRef('all')
 const low = shallowRef(false), pageNumber = shallowRef(1)
@@ -22,8 +26,8 @@ const query = computed(() => ({ page: pageNumber.value, page_size: 25, search: s
 const { returnTo } = useTableQuery([
   tableQueryField('productId', productId, tableQueryText()),
   tableQueryField('tab', tab, {
-    parse: value => tableQueryText(productId.value ? 'kardex' : 'stocks', ['stocks', 'kardex', 'reservations', 'movements', 'counts', 'warehouses']).parse(value),
-    serialize: value => value === 'stocks' && !productId.value ? undefined : value
+    parse: value => tableQueryText(productId.value ? 'kardex' : defaultTab.value, [...(admin.value ? ['valuation'] : []), 'stocks', 'kardex', 'reservations', 'movements', 'counts', 'warehouses']).parse(value),
+    serialize: value => value === defaultTab.value && !productId.value ? undefined : value
   }),
   tableQueryField('search', search, tableQueryText()),
   tableQueryField('warehouseId', warehouse, tableQueryText()),
@@ -38,21 +42,46 @@ const requestFetch = useRequestFetch()
 const { data: warehouseData, refresh: refreshWarehouses, error: warehouseError } = useAsyncData('inventory-warehouses', async () => ({ results: await fetchAllPages<InventoryWarehouse>('/api/inventory/warehouses', {}, 100, requestFetch) }), { lazy: true, server: false })
 const { data: settings, refresh: refreshSettings } = useFetch<InventorySettings>('/api/inventory/settings', { lazy: true, server: false })
 type Row = InventoryStock | InventoryMovement | InventoryCount | InventoryProduct | { orderId: string, productId: string, quantity: string, order: { folio: number }, product: { code: string, name: string }, warehouse: { name: string } }
-const resource = computed(() => tab.value === 'warehouses' ? 'products' : tab.value)
+const resource = computed(() => tab.value === 'warehouses' ? 'products' : tab.value === 'valuation' ? 'stocks' : tab.value)
 const endpoint = computed(() => `/api/inventory/${resource.value}`)
-const { data: result, error: loadError, status, refresh } = useFetch<InventoryPage<Row>>(endpoint, { lazy: true, server: false, query })
+const { data: result, error: loadError, status, refresh } = useFetch<InventoryPage<Row>>(endpoint, { lazy: true, server: false, query, immediate: false, watch: false })
+watch([endpoint, query], () => {
+  if (tab.value !== 'valuation') void refresh()
+}, { immediate: true })
+const { data: valuation, status: valuationStatus, error: valuationError, refresh: refreshValuation } = useFetch<InventoryValuation>('/api/inventory/valuation', { lazy: true, server: false, immediate: false, watch: false })
+watch(tab, (value) => {
+  if (value === 'valuation') void refreshValuation()
+}, { immediate: true })
+async function refreshCurrentTab() {
+  if (tab.value === 'valuation') await refreshValuation()
+  else await refresh()
+}
 const stockRows = computed(() => (result.value?.results ?? []) as InventoryStock[])
 const movementRows = computed(() => (result.value?.results ?? []) as InventoryMovement[])
 const countRows = computed(() => (result.value?.results ?? []) as InventoryCount[])
 const productRows = computed(() => (result.value?.results ?? []) as InventoryProduct[])
 const reservationRows = computed(() => (result.value?.results ?? []) as Array<Extract<Row, { orderId: string }>>)
-const tabs = computed(() => [{ label: 'Existencias', value: 'stocks', icon: 'i-lucide-package' }, { label: 'Kardex', value: 'kardex', icon: 'i-lucide-list' }, { label: 'Reservas', value: 'reservations', icon: 'i-lucide-bookmark' }, ...(operational.value ? [{ label: 'Movimientos', value: 'movements', icon: 'i-lucide-arrow-left-right' }, { label: 'Conteos', value: 'counts', icon: 'i-lucide-clipboard-check' }] : []), ...(admin.value ? [{ label: 'Almacenes y configuración', value: 'warehouses', icon: 'i-lucide-warehouse' }] : [])])
+const tabs = computed(() => [...(admin.value ? [{ label: 'Valor de la mercancía', value: 'valuation', icon: 'i-lucide-banknote' }] : []), { label: 'Existencias', value: 'stocks', icon: 'i-lucide-package' }, { label: 'Kardex', value: 'kardex', icon: 'i-lucide-list' }, { label: 'Reservas', value: 'reservations', icon: 'i-lucide-bookmark' }, ...(operational.value ? [{ label: 'Movimientos', value: 'movements', icon: 'i-lucide-arrow-left-right' }, { label: 'Conteos', value: 'counts', icon: 'i-lucide-clipboard-check' }] : []), ...(admin.value ? [{ label: 'Almacenes y configuración', value: 'warehouses', icon: 'i-lucide-warehouse' }] : [])])
+const tabDescriptions: Record<string, string> = {
+  valuation: 'Existencias físicas de todos los almacenes, incluidas las reservas, al último costo unitario registrado.',
+  stocks: 'Existencias físicas, reservas y cantidades disponibles por producto y almacén.',
+  kardex: 'Historial de entradas, salidas y existencias resultantes por almacén.',
+  reservations: 'Mercancía apartada en pedidos activos.',
+  movements: 'Entradas, salidas, traspasos y ajustes de inventario.',
+  counts: 'Conteos físicos y conciliación de existencias por almacén.',
+  warehouses: 'Almacenes y control interno de inventario por producto.'
+}
+const activeView = computed(() => ({
+  title: tabs.value.find(item => item.value === tab.value)?.label || 'Inventario',
+  description: tabDescriptions[tab.value]
+}))
+
 const warehouseOpen = shallowRef(false), movementOpen = shallowRef(false), countOpen = shallowRef(false), countCreateOpen = shallowRef(false), minimumOpen = shallowRef(false), reverseOpen = shallowRef(false)
 const editingWarehouse = shallowRef<InventoryWarehouse>(), source = shallowRef<InventoryMovement>(), selectedCount = shallowRef<InventoryCount>(), minimumStock = shallowRef<InventoryStock>(), reversal = shallowRef<InventoryMovement>()
 const minimumValue = shallowRef('')
 const countDraft = reactive({ warehouseId: '', date: mexicoToday(), reason: '' })
 const { busy, error, run } = useInventoryAction(async (result, command) => {
-  await Promise.all([refresh(), refreshSettings(), refreshWarehouses()])
+  await Promise.all([refreshCurrentTab(), refreshSettings(), refreshWarehouses()])
   if (command.action.startsWith('count')) selectedCount.value = result as InventoryCount
 })
 async function save(command: InventoryCommand['command']) {
@@ -114,19 +143,25 @@ const dateRange = computed<OrderDateRange | null>({
 })
 const listConfig = computed<ListLayoutConfig>(() => ({
   id: 'inventory', title: 'Inventario', empty: 'Sin registros para estos filtros.',
-  search: { placeholder: 'Buscar código o producto' }, tabs: tabs.value, defaultTab: 'stocks',
-  dateFilter: ['movements', 'kardex', 'counts'].includes(tab.value) ? { subject: 'movimientos de inventario' } : undefined,
-  filters: [
-    ...(tab.value === 'warehouses' ? [{ key: 'tracking', label: 'Control interno', type: 'select' as const, defaultValue: 'all', items: [{ label: 'Todos los productos', value: 'all' }, { label: 'Activo', value: 'enabled' }, { label: 'Inactivo', value: 'disabled' }] }] : [{ key: 'warehouse', label: 'Almacén', type: 'select' as const, defaultValue: 'all', items: [{ label: 'Todos los almacenes', value: 'all' }, ...(warehouseData.value?.results ?? []).map(w => ({ label: w.name, value: w.id }))] }]),
-    ...(['movements', 'kardex'].includes(tab.value) ? [{ key: 'type', label: 'Movimiento', type: 'select' as const, defaultValue: 'all', items: [{ label: 'Todos', value: 'all' }, ...inventoryTypes.map(value => ({ label: value.replaceAll('_', ' '), value }))] }] : []),
-    ...(tab.value === 'stocks' ? [{ key: 'low', label: 'Bajo mínimo', type: 'checkbox' as const, defaultValue: false }] : [])
+  breadcrumbs: [
+    { label: 'Inventario', icon: 'i-lucide-warehouse', to: '/inventario' },
+    { label: tabs.value.find(item => item.value === tab.value)?.label || 'Inventario' }
   ],
+  search: tab.value === 'valuation' ? undefined : { placeholder: 'Buscar código o producto' }, tabs: tabs.value, defaultTab: defaultTab.value,
+  dateFilter: ['movements', 'kardex', 'counts'].includes(tab.value) ? { subject: 'movimientos de inventario' } : undefined,
+  filters: tab.value === 'valuation'
+    ? []
+    : [
+        ...(tab.value === 'warehouses' ? [{ key: 'tracking', label: 'Control interno', type: 'select' as const, defaultValue: 'all', items: [{ label: 'Todos los productos', value: 'all' }, { label: 'Activo', value: 'enabled' }, { label: 'Inactivo', value: 'disabled' }] }] : [{ key: 'warehouse', label: 'Almacén', type: 'select' as const, defaultValue: 'all', items: [{ label: 'Todos los almacenes', value: 'all' }, ...(warehouseData.value?.results ?? []).map(w => ({ label: w.name, value: w.id }))] }]),
+        ...(['movements', 'kardex'].includes(tab.value) ? [{ key: 'type', label: 'Movimiento', type: 'select' as const, defaultValue: 'all', items: [{ label: 'Todos', value: 'all' }, ...inventoryTypes.map(value => ({ label: value.replaceAll('_', ' '), value }))] }] : []),
+        ...(tab.value === 'stocks' ? [{ key: 'low', label: 'Bajo mínimo', type: 'checkbox' as const, defaultValue: false }] : [])
+      ],
   create: operational.value && (settings.value?.enabledAt || admin.value) && ['stocks', 'movements'].includes(tab.value)
     ? { label: settings.value?.enabledAt ? 'Nuevo movimiento' : 'Cargar saldo inicial' }
     : operational.value && tab.value === 'counts'
       ? { label: 'Nuevo conteo' }
       : admin.value && tab.value === 'warehouses' ? { label: 'Nuevo almacén' } : undefined,
-  pagination: result.value?.pagination ? { mode: 'server', label: 'registros', pageSize: 25 } : undefined
+  pagination: tab.value !== 'valuation' && result.value?.pagination ? { mode: 'server', label: 'registros', pageSize: 25 } : undefined
 }))
 function createInventoryRecord() {
   if (tab.value === 'counts') countCreateOpen.value = true
@@ -175,14 +210,22 @@ const reservationColumns: TableColumn<Extract<Row, { orderId: string }>>[] = [
     :config="listConfig"
     :data="result?.results ?? []"
     :columns="[]"
-    :loading="['idle', 'pending'].includes(status)"
-    :error="Boolean(loadError || warehouseError)"
-    :error-message="loadError?.data?.statusMessage || (warehouseError ? 'No se pudieron cargar los almacenes.' : undefined)"
+    toolbar-below-tabs
+    tabs-variant="link"
+    tabs-full-width
+    :loading="['idle', 'pending'].includes(tab === 'valuation' ? valuationStatus : status)"
+    :error="tab === 'valuation' ? Boolean(valuationError) : Boolean(loadError || warehouseError)"
+    :error-message="tab === 'valuation' ? (valuationError?.data?.statusMessage || 'No se pudo cargar el valor de la mercancía.') : loadError?.data?.statusMessage || (warehouseError ? 'No se pudieron cargar los almacenes.' : undefined)"
     :total-results="result?.pagination?.totalResults"
-    @refresh="refresh()"
+    @refresh="refreshCurrentTab()"
     @create="createInventoryRecord"
     @clear="clearInventoryFilters"
   >
+    <template #toolbar-actions>
+      <ListColumnPicker v-if="tab === 'stocks'" :columns="stockTable?.getColumns() ?? []" />
+      <ListColumnPicker v-else-if="tab === 'reservations'" :columns="reservationsTable?.getColumns() ?? []" />
+      <ListColumnPicker v-else-if="['movements', 'kardex'].includes(tab)" :columns="movementsTable?.getColumns() ?? []" />
+    </template>
     <template #actions>
       <AppCsvExportButton
         v-if="['stocks', 'movements', 'kardex'].includes(tab)"
@@ -193,8 +236,9 @@ const reservationColumns: TableColumn<Extract<Row, { orderId: string }>>[] = [
       />
     </template>
     <template #before>
+      <DetailSectionHeading :title="activeView.title" :description="activeView.description" />
       <UAlert v-if="error" :title="error" color="error" />
-      <div v-if="productId" class="flex items-center gap-2 text-sm">
+      <div v-if="productId && tab !== 'valuation'" class="flex items-center gap-2 text-sm">
         <span>Kardex de producto seleccionado</span><UButton
           label="Quitar filtro de producto"
           size="sm"
@@ -204,8 +248,10 @@ const reservationColumns: TableColumn<Extract<Row, { orderId: string }>>[] = [
       </div>
     </template>
     <template #content>
+      <InventoryValuation v-if="tab === 'valuation' && valuation" :valuation="valuation" />
       <InventoryStockTable
-        v-if="tab === 'stocks'"
+        v-else-if="tab === 'stocks'"
+        ref="stockTable"
         :rows="stockRows"
         :admin="admin"
         @minimum="setMinimum"
@@ -213,6 +259,7 @@ const reservationColumns: TableColumn<Extract<Row, { orderId: string }>>[] = [
       />
       <InventoryMovementsTable
         v-else-if="['movements', 'kardex'].includes(tab)"
+        ref="movementsTable"
         :rows="movementRows"
         :admin="admin"
         :operational="operational"
@@ -221,7 +268,7 @@ const reservationColumns: TableColumn<Extract<Row, { orderId: string }>>[] = [
         @reverse="reverse"
       />
       <div v-else-if="tab === 'counts'" class="space-y-3">
-        <UCard v-for="row in countRows" :key="row.id">
+        <UPageCard v-for="row in countRows" :key="row.id" variant="subtle">
           <div class="flex flex-wrap items-center justify-between gap-3">
             <div>
               <p class="font-semibold">
@@ -235,19 +282,25 @@ const reservationColumns: TableColumn<Extract<Row, { orderId: string }>>[] = [
               </UBadge><UButton label="Abrir conteo" variant="outline" @click="selectedCount = row; countOpen = true" />
             </div>
           </div>
-        </UCard><p v-if="!countRows.length" class="p-8 text-center text-muted">
-          Sin conteos registrados.
-        </p>
+        </UPageCard>
+        <UEmpty
+          v-if="!countRows.length"
+          icon="i-lucide-clipboard-check"
+          title="Sin conteos registrados"
+          description="Registra un conteo físico para conciliar las existencias del almacén."
+          variant="naked"
+        />
       </div>
-      <ListTable
+      <DetailTable
         v-else-if="tab === 'reservations'"
+        ref="reservationsTable"
         :data="reservationRows"
         :columns="reservationColumns"
         empty="Sin reservas activas."
       />
       <div v-else-if="tab === 'warehouses'" class="space-y-5">
         <div class="grid gap-3 md:grid-cols-2">
-          <UCard v-for="w in warehouseData?.results" :key="w.id">
+          <UPageCard v-for="w in warehouseData?.results" :key="w.id" variant="subtle">
             <div class="flex items-start justify-between gap-3">
               <div>
                 <p class="text-sm text-muted">
@@ -266,8 +319,8 @@ const reservationColumns: TableColumn<Extract<Row, { orderId: string }>>[] = [
                 @click="openWarehouse(w)"
               />
             </div>
-          </UCard>
-        </div><UCard>
+          </UPageCard>
+        </div><UCard variant="subtle">
           <template #header>
             <div class="flex flex-wrap items-center justify-between gap-3">
               <h2 class="font-semibold">

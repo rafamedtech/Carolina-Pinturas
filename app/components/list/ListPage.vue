@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { createReusableTemplate } from '@vueuse/core'
+import type { BreadcrumbItem } from '@nuxt/ui'
 
 defineProps<{
   embedded?: boolean
@@ -9,6 +10,8 @@ defineProps<{
   error?: boolean
   errorTitle?: string
   errorMessage?: string
+  viewsBeforeToolbar?: boolean
+  breadcrumbs?: BreadcrumbItem[]
 }>()
 
 const [DefineBody, ReuseBody] = createReusableTemplate()
@@ -26,8 +29,9 @@ defineSlots<{
 
 <template>
   <DefineBody>
+    <slot v-if="viewsBeforeToolbar" name="views" />
     <slot name="toolbar" />
-    <slot name="views" />
+    <slot v-if="!viewsBeforeToolbar" name="views" />
     <UAlert
       v-if="error"
       color="warning"
@@ -64,24 +68,17 @@ defineSlots<{
   </section>
   <UDashboardPanel v-else :id="id">
     <template #header>
-      <UDashboardNavbar :title="title">
-        <template #leading>
-          <UDashboardSidebarCollapse />
-        </template>
-        <template #right>
+      <DetailHeader
+        :title="title"
+        :breadcrumbs="breadcrumbs"
+        :refresh-label="`Actualizar ${title.toLowerCase()}`"
+        :loading="loading"
+        @refresh="emit('refresh')"
+      >
+        <template #actions>
           <slot name="actions" />
-          <UButton
-            label="Actualizar"
-            icon="i-lucide-refresh-cw"
-            color="neutral"
-            variant="outline"
-            :aria-label="`Actualizar ${title.toLowerCase()}`"
-            :ui="{ label: 'hidden sm:inline' }"
-            :loading="loading"
-            @click="emit('refresh')"
-          />
         </template>
-      </UDashboardNavbar>
+      </DetailHeader>
     </template>
 
     <template #body>
