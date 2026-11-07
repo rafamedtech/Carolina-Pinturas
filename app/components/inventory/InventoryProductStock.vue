@@ -104,7 +104,7 @@ function showKardex(row: InventoryStock) {
             :label="`${row.warehouse} (${row.quantity})`"
             icon="i-lucide-warehouse"
             :color="warehouseColor(row)"
-            variant="outline"
+            variant="subtle"
             class="min-w-0 max-w-full"
             :ui="{ label: 'whitespace-normal text-left break-words' }"
             aria-haspopup="dialog"
