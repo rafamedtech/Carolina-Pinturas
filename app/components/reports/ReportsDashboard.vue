@@ -54,8 +54,6 @@ function plural(count: number, singular: string, pluralLabel: string) {
     </template>
 
     <template v-else-if="data && !error">
-      <ReportsInventoryValuation :valuation="data.inventoryValuation" />
-
       <section aria-labelledby="reports-summary" class="space-y-3">
         <div class="flex flex-wrap items-baseline justify-between gap-2">
           <h2 id="reports-summary" class="text-lg font-semibold tracking-tight text-highlighted">
@@ -134,6 +132,8 @@ function plural(count: number, singular: string, pluralLabel: string) {
           <ReportsPurchaseInvoices :totals="data.metrics.purchaseInvoiceTotals" />
         </div>
       </section>
+
+      <ReportsInventoryValuation :valuation="data.inventoryValuation" />
 
       <section aria-labelledby="reports-operating" class="space-y-3">
         <SectionHeading

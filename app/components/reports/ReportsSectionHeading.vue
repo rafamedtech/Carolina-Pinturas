@@ -5,7 +5,7 @@ defineProps<{
   id: string
   title: string
   marker: string
-  amount: number
+  amount?: number
 }>()
 </script>
 
@@ -15,7 +15,7 @@ defineProps<{
       <span class="h-4 w-1 rounded-full" :class="marker" aria-hidden="true" />
       {{ title }}
     </h2>
-    <p class="text-sm font-semibold tabular-nums text-muted">
+    <p v-if="amount !== undefined" class="text-sm font-semibold tabular-nums text-muted">
       {{ reportCurrency.format(amount) }}
     </p>
   </div>
