@@ -23,6 +23,16 @@ const { data: stocks, error, status } = useAsyncData(
   }, { lazy: true, server: false }
 )
 const loading = computed(() => ['idle', 'pending'].includes(status.value))
+const warehouseOrder = new Map([
+  ['almacén principal', 0],
+  ['mostrador', 1],
+  ['igualaciones', 2],
+  ['carro ventas', 3]
+])
+const orderedStocks = computed(() => [...(stocks.value ?? [])].sort((a, b) =>
+  (warehouseOrder.get(a.warehouse.trim().toLocaleLowerCase('es-MX')) ?? warehouseOrder.size)
+  - (warehouseOrder.get(b.warehouse.trim().toLocaleLowerCase('es-MX')) ?? warehouseOrder.size)
+))
 const selectedWarehouseId = shallowRef<string | null>(null)
 const modalOpen = shallowRef(false)
 const selectedStock = computed(() => stocks.value?.find(row => row.warehouseId === selectedWarehouseId.value))
@@ -96,7 +106,7 @@ function showKardex(row: InventoryStock) {
         </div>
         <div v-else class="flex flex-wrap gap-2">
           <UButton
-            v-for="row in stocks"
+            v-for="row in orderedStocks"
             :key="row.warehouseId"
             :label="`${row.warehouse} (${row.quantity})`"
             icon="i-lucide-warehouse"
