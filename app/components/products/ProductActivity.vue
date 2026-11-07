@@ -21,7 +21,6 @@ const tabs = computed(() => sections.filter(({ value }) => {
 }))
 const section = shallowRef<ProductActivitySection>('sales')
 const page = shallowRef(1)
-const current = computed(() => sections.find(tab => tab.value === section.value))
 const recordCount = computed(() => data.value?.pagination.totalResults ?? 0)
 const recordLabel = computed(() => section.value === 'movements'
   ? (recordCount.value === 1 ? 'movimiento' : 'movimientos')
@@ -69,14 +68,16 @@ function selectSection(value: string | number) {
       :model-value="section"
       :items="tabs"
       variant="link"
-      :ui="{ list: 'justify-start flex-wrap gap-y-1', trigger: 'shrink-0', content: 'min-w-0' }"
+      :ui="{ list: 'flex-wrap gap-y-1', trigger: 'flex-1 justify-center', content: 'min-w-0' }"
       @update:model-value="selectSection"
     >
+      <template #default="{ item }">
+        <UTooltip :text="item.description" :content="{ side: 'top' }">
+          <span>{{ item.label }}</span>
+        </UTooltip>
+      </template>
       <template #content>
         <div class="space-y-4 pt-2">
-          <p class="text-sm text-muted">
-            {{ current?.description }}
-          </p>
           <p v-if="composite && ['movements', 'reservations'].includes(section)" class="text-sm text-muted">
             Las reservas y salidas de un producto compuesto se registran en las fichas de sus componentes.
           </p>
