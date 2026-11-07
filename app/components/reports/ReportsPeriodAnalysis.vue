@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { tableQueryField, tableQueryText } from '~/utils/tableQuery'
-import { reportCurrency, reportDailyAverage, reportShortDate, reportWeeks } from '~/utils/reportPeriods'
+import { reportCurrency, reportDailyAverage, reportWeeks } from '~/utils/reportPeriods'
 import type { BusinessReportSummary } from '~/types/reports'
 import { dashboardNumber } from '~/utils/dashboardFormatters'
 
@@ -12,7 +12,6 @@ const views = [
   { label: 'Promedio diario', value: 'daily' }
 ]
 const weeks = computed(() => reportWeeks(props.report.dailyMovements))
-const maxWeekly = computed(() => Math.max(1, ...weeks.value.map(week => week.sales)))
 const comparisons = computed(() => {
   const m = props.report.metrics
   return [
@@ -37,95 +36,60 @@ function format(value: number, money: boolean) {
 </script>
 
 <template>
-  <UCard>
+  <UCard id="reports-sales-pace">
     <template #header>
-      <h2 class="text-base font-semibold text-highlighted">
-        Ritmo de venta
-      </h2>
-      <p class="mt-1 text-sm text-muted">
-        {{ report.period.elapsedDays }} días del mes seleccionado frente a {{ report.metrics.previousDays }} días del mes anterior completo.
-      </p>
-    </template>
-    <div class="mb-5 flex flex-wrap gap-2" role="group" aria-label="Vista del reporte">
-      <UButton
-        v-for="item in views"
-        :key="item.value"
-        size="sm"
-        :label="item.label"
-        :variant="view === item.value ? 'solid' : 'outline'"
-        :color="view === item.value ? 'primary' : 'neutral'"
-        :aria-pressed="view === item.value"
-        @click="view = item.value"
-      />
-    </div>
-    <template v-if="view === 'weekly'">
-      <p class="mb-5 text-sm text-muted">
-        Semanas de lunes a domingo, limitadas a los días transcurridos del mes seleccionado. Las semanas parciales indican sus días incluidos.
-      </p>
-      <div v-if="weeks.length" class="space-y-4">
-        <div v-for="week in weeks" :key="week.start">
-          <div class="mb-2 flex flex-wrap justify-between gap-2 text-sm">
-            <span class="text-default">{{ reportShortDate(week.start) }} – {{ reportShortDate(week.end) }} <span class="text-muted">· {{ week.days }} {{ week.days === 1 ? 'día' : 'días' }}</span></span>
-            <span class="font-semibold tabular-nums">{{ reportCurrency.format(week.sales) }} · {{ week.orderCount }} ventas</span>
-          </div>
-          <div class="flex h-5 overflow-hidden rounded bg-elevated" role="img" :aria-label="`Mostrador ${reportCurrency.format(week.counterSales)}; vendedor ${reportCurrency.format(week.sellerSales)}; clientes internos ${reportCurrency.format(week.internalSales)}`">
-            <div class="bg-primary" :style="{ width: `${week.counterSales / maxWeekly * 100}%` }" />
-            <div class="bg-success" :style="{ width: `${week.sellerSales / maxWeekly * 100}%` }" />
-            <div class="bg-warning" :style="{ width: `${week.internalSales / maxWeekly * 100}%` }" />
-          </div>
-          <div class="mt-2 flex flex-wrap gap-x-5 gap-y-1 text-xs text-muted">
-            <span>Mostrador: {{ reportCurrency.format(week.counterSales) }}</span>
-            <span>Vendedor: {{ reportCurrency.format(week.sellerSales) }}</span>
-            <span>Clientes internos: {{ reportCurrency.format(week.internalSales) }}</span>
-            <span>Material: {{ reportCurrency.format(week.materialPurchases) }}</span>
-            <span>Operativos: {{ reportCurrency.format(week.operatingExpenses) }}</span>
-            <span :class="week.netProfit < 0 ? 'text-error' : ''">Utilidad: {{ reportCurrency.format(week.netProfit) }}</span>
-            <span>Venta diaria: {{ reportCurrency.format(reportDailyAverage(week.sales, week.days)) }}</span>
-          </div>
+      <div class="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <h2 class="text-base font-semibold text-highlighted">
+            Ritmo de venta
+          </h2>
+          <p class="mt-1 text-sm text-muted">
+            {{ view === 'weekly' ? 'Cuánto vendes cada semana, de un vistazo.' : 'Compara el promedio por día con el mes anterior.' }}
+          </p>
+        </div>
+        <div class="inline-flex rounded-lg bg-elevated p-1" role="group" aria-label="Vista del ritmo de venta">
+          <UButton
+            v-for="item in views"
+            :key="item.value"
+            size="sm"
+            :label="item.label"
+            :variant="view === item.value ? 'solid' : 'ghost'"
+            :color="view === item.value ? 'primary' : 'neutral'"
+            :aria-pressed="view === item.value"
+            @click="view = item.value"
+          />
         </div>
       </div>
-      <UEmpty v-else title="Sin días transcurridos" icon="i-lucide-calendar" />
     </template>
+
+    <ReportsWeeklySales v-if="view === 'weekly'" :weeks="weeks" />
     <template v-else>
-      <p class="mb-4 text-sm text-muted">
-        Totales divididos entre días calendario, incluidos los días sin actividad. El mes actual usa únicamente días transcurridos.
-      </p>
-      <div class="overflow-x-auto">
-        <table class="w-full text-sm">
-          <caption class="sr-only">
-            Promedios diarios comparados con el mes anterior
-          </caption>
-          <thead class="border-b border-default text-xs text-muted">
-            <tr>
-              <th class="py-3 text-left font-medium">
-                Indicador
-              </th><th class="px-3 py-3 text-right font-medium">
-                Actual / día
-              </th><th class="px-3 py-3 text-right font-medium">
-                Anterior / día
-              </th><th class="py-3 text-right font-medium">
-                Variación
-              </th>
-            </tr>
-          </thead>
-          <tbody class="divide-y divide-default">
-            <tr v-for="row in rows" :key="row.label">
-              <th class="py-3 text-left font-medium text-default">
-                {{ row.label }}
-              </th>
-              <td class="px-3 py-3 text-right font-semibold whitespace-nowrap tabular-nums">
-                {{ format(row.current, row.money) }}
-              </td>
-              <td class="px-3 py-3 text-right whitespace-nowrap tabular-nums text-muted">
-                {{ format(row.previous, row.money) }}
-              </td>
-              <td class="py-3 text-right whitespace-nowrap tabular-nums text-muted">
-                {{ row.change === null ? 'Sin base' : `${row.change > 0 ? '+' : ''}${dashboardNumber.format(row.change)}%` }}
-              </td>
-            </tr>
-          </tbody>
-        </table>
+      <div class="mb-5 flex flex-wrap gap-x-5 gap-y-2 text-xs text-muted">
+        <span class="inline-flex items-center gap-2">
+          <span class="size-2 rounded-full bg-primary" aria-hidden="true" />
+          Mes seleccionado · {{ report.period.elapsedDays }} días
+        </span>
+        <span class="inline-flex items-center gap-2">
+          <span class="size-2 rounded-full bg-neutral-400 dark:bg-neutral-500" aria-hidden="true" />
+          Mes anterior · {{ report.metrics.previousDays }} días
+        </span>
       </div>
+      <UEmpty v-if="!report.period.elapsedDays" title="Sin días transcurridos" icon="i-lucide-calendar" />
+      <div v-else class="grid gap-4 lg:grid-cols-2">
+        <ReportsPaceComparison
+          v-for="row in rows"
+          :key="row.label"
+          :label="row.label"
+          :current="row.current"
+          :previous="row.previous"
+          :current-label="format(row.current, row.money)"
+          :previous-label="format(row.previous, row.money)"
+          :change="row.change"
+        />
+      </div>
+      <p class="mt-4 text-xs text-muted">
+        Promedios por día calendario, incluidos los días sin actividad. Cada indicador tiene su propia escala.
+      </p>
     </template>
   </UCard>
 </template>
