@@ -86,7 +86,9 @@ function plural(count: number, singular: string, pluralLabel: string) {
           :amount="data.metrics.sales"
         />
         <ReportsSalesChannels :channels="data.salesChannels" :metrics="data.metrics" />
+        <!-- Ritmo de venta oculto temporalmente. Para reactivarlo:
         <ReportsPeriodAnalysis :report="data" />
+        -->
         <div class="grid gap-4 xl:grid-cols-3">
           <ReportsBreakdownCard
             title="Ventas por línea"
