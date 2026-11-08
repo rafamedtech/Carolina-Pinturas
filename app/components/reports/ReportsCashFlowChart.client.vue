@@ -31,6 +31,15 @@ const maximum = computed(() => Math.max(
   0
 ))
 const hasMovements = computed(() => maximum.value > 0)
+const trendPoints = computed(() => movements.value.map((movement, index) => ({
+  date: movement.date,
+  x: (index + 0.5) / movements.value.length * 100,
+  y: maximum.value > 0 ? (1 - movement.sales / maximum.value) * 256 : 256
+})))
+const trendLine = computed(() => trendPoints.value.map(point => `${point.x * 10},${point.y}`).join(' '))
+const columns = computed(() => ({
+  gridTemplateColumns: `repeat(${movements.value.length}, minmax(${props.annual ? 80 : 128}px, 1fr))`
+}))
 
 const hoveredDate = shallowRef<string | null>(null)
 const hoveredDay = computed(() => movements.value.find(day => day.date === hoveredDate.value) ?? null)
@@ -105,6 +114,13 @@ function dayLabel(day: ChartMovement) {
       </div>
     </template>
 
+    <p v-if="!annual && hasMovements" class="mb-3 flex items-center gap-2 text-xs text-muted">
+      <span class="relative h-0.5 w-6 bg-primary" aria-hidden="true">
+        <span class="absolute -top-1 left-2 size-2.5 rounded-full border-2 border-primary bg-default" />
+      </span>
+      Tendencia de ventas semanales
+    </p>
+
     <div v-if="hasMovements" class="flex gap-3">
       <div class="flex h-64 w-14 shrink-0 flex-col justify-between text-right text-[10px] leading-none text-dimmed tabular-nums">
         <span v-for="tick in axisTicks" :key="tick.ratio">{{ tick.label }}</span>
@@ -122,12 +138,36 @@ function dayLabel(day: ChartMovement) {
         </div>
 
         <div class="overflow-x-auto pb-1" @mouseleave="hoveredDate = null">
-          <div class="flex min-w-full items-end gap-1.5">
+          <div class="relative grid w-max min-w-full items-start" :style="columns">
+            <template v-if="!annual">
+              <svg
+                class="pointer-events-none absolute inset-x-0 top-1 z-10 h-64 w-full overflow-visible text-primary"
+                viewBox="0 0 1000 256"
+                preserveAspectRatio="none"
+                aria-hidden="true"
+              >
+                <polyline
+                  :points="trendLine"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linejoin="round"
+                  stroke-linecap="round"
+                  vector-effect="non-scaling-stroke"
+                />
+              </svg>
+              <span
+                v-for="point in trendPoints"
+                :key="point.date"
+                class="pointer-events-none absolute z-10 size-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-primary bg-default"
+                :style="{ left: `${point.x}%`, top: `${point.y + 4}px` }"
+                aria-hidden="true"
+              />
+            </template>
             <div
               v-for="day in movements"
               :key="day.date"
-              class="group flex flex-1 flex-col rounded-md px-0.5 pt-1 transition-colors hover:bg-elevated/60"
-              :class="annual ? 'min-w-20' : 'min-w-32'"
+              class="group flex min-w-0 flex-col rounded-md px-0.5 pt-1 transition-colors hover:bg-elevated/60"
               :aria-label="dayLabel(day)"
               role="img"
               tabindex="0"
@@ -139,7 +179,7 @@ function dayLabel(day: ChartMovement) {
                 <div
                   v-for="serie in series"
                   :key="serie.key"
-                  class="w-1.5 rounded-t-[3px] transition-opacity"
+                  class="w-3 rounded-t-[3px] transition-opacity"
                   :class="[serie.bar, hoveredDate && hoveredDate !== day.date ? 'opacity-35' : 'opacity-90']"
                   :style="{ height: barHeight(day[serie.key]) }"
                 />
