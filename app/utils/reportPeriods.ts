@@ -18,6 +18,23 @@ export function reportMonths(days: ReportDailyMovement[]) {
   return [...months.values()]
 }
 
+// Hide long inactive stretches only in annual visualizations; keep the source data for calculations.
+export function reportVisibleMonths(days: ReportDailyMovement[]) {
+  const months = reportMonths(days)
+  const fields = ['sales', 'orderCount', 'counterSales', 'sellerSales', 'internalSales', 'collections', 'expenses', 'netCashFlow', 'materialPurchases', 'operatingExpenses', 'netProfit'] as const
+  const hidden = new Set<string>()
+  let runStart = 0
+  for (let index = 0; index <= months.length; index++) {
+    const month = months[index]
+    if (month && fields.every(field => month[field] === 0)) continue
+    if (index - runStart >= 6) {
+      for (let empty = runStart; empty < index; empty++) hidden.add(months[empty]!.date)
+    }
+    runStart = index + 1
+  }
+  return months.filter(month => !hidden.has(month.date))
+}
+
 export function reportWeeks(days: ReportDailyMovement[]) {
   const weeks: { start: string, end: string, days: number, sales: number, orderCount: number, counterSales: number, sellerSales: number, internalSales: number, expenses: number, materialPurchases: number, operatingExpenses: number, netProfit: number }[] = []
   for (const day of days) {

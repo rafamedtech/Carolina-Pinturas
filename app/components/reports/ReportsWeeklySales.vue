@@ -10,7 +10,7 @@ const hasSales = computed(() => props.weeks.some(week => week.sales !== 0 || wee
 </script>
 
 <template>
-  <UEmpty v-if="!weeks.length" title="Sin días transcurridos" icon="i-lucide-calendar" />
+  <UEmpty v-if="!weeks.length" :title="annual ? 'Sin actividad en este periodo' : 'Sin días transcurridos'" icon="i-lucide-calendar" />
   <UEmpty
     v-else-if="!hasSales"
     title="Sin ventas en este periodo"
@@ -44,7 +44,7 @@ const hasSales = computed(() => props.weeks.some(week => week.sales !== 0 || wee
       </div>
     </div>
     <figcaption class="mt-5 border-t border-default pt-3 text-xs text-muted">
-      {{ annual ? 'Cada barra muestra la venta total de un mes. El mes en curso incluye solo los días transcurridos; los meses futuros no se incluyen.' : 'Cada barra muestra la venta total de una semana, de lunes a domingo. Las semanas parciales incluyen solo los días transcurridos del mes.' }}
+      {{ annual ? 'Cada barra muestra la venta total de un mes. El mes en curso incluye solo los días transcurridos; los meses futuros no se incluyen. Se ocultan los bloques de seis o más meses consecutivos sin actividad.' : 'Cada barra muestra la venta total de una semana, de lunes a domingo. Las semanas parciales incluyen solo los días transcurridos del mes.' }}
     </figcaption>
   </figure>
 </template>

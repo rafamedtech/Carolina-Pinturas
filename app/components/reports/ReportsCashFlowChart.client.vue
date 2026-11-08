@@ -1,14 +1,14 @@
 <script setup lang="ts">
 import type { ReportDailyMovement } from '~/types/reports'
 import { dashboardCompactCurrency, dashboardCurrency } from '~/utils/dashboardFormatters'
-import { reportMonths } from '~/utils/reportPeriods'
+import { reportVisibleMonths } from '~/utils/reportPeriods'
 
 const props = defineProps<{
   data: ReportDailyMovement[]
   annual?: boolean
 }>()
 
-const movements = computed(() => props.annual ? reportMonths(props.data) : props.data)
+const movements = computed(() => props.annual ? reportVisibleMonths(props.data) : props.data)
 
 const totals = computed(() => movements.value.reduce((result, day) => ({
   sales: result.sales + day.sales,

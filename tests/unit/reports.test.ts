@@ -1,4 +1,4 @@
-import { reportDailyAverage, reportWeeks, reportMonths } from '../../app/utils/reportPeriods'
+import { reportDailyAverage, reportWeeks, reportMonths, reportVisibleMonths } from '../../app/utils/reportPeriods'
 import { describe, expect, it } from 'vitest'
 import {
   reportDateOnly,
@@ -40,6 +40,34 @@ describe('report calculations', () => {
 })
 
 describe('business report periods', () => {
+  const emptyMovement = { label: '', sales: 0, orderCount: 0, counterSales: 0, sellerSales: 0, internalSales: 0, collections: 0, expenses: 0, netCashFlow: 0, materialPurchases: 0, operatingExpenses: 0, netProfit: 0 }
+  const annualDays = () => Array.from({ length: 12 }, (_, index) => ({ ...emptyMovement, date: `2026-${String(index + 1).padStart(2, '0')}-01` }))
+
+  it('hides January through June when activity starts in July, preserving shorter empty stretches', () => {
+    const days = annualDays()
+    days[6]!.sales = 100
+    expect(reportVisibleMonths(days).map(month => month.date)).toEqual(days.slice(6).map(day => day.date))
+    expect(reportMonths(days)).toHaveLength(12)
+    expect(reportVisibleMonths(days).reduce((sum, month) => sum + month.sales, 0)).toBe(100)
+  })
+
+  it('hides runs longer than six months, including trailing and entirely empty runs', () => {
+    const days = annualDays()
+    days[0]!.sales = 50
+    expect(reportVisibleMonths(days).map(month => month.date)).toEqual(['2026-01-01'])
+    expect(reportVisibleMonths(annualDays())).toEqual([])
+    expect(reportVisibleMonths([])).toEqual([])
+  })
+
+  it('retains months with expenses, collections, or orders even when sales are zero', () => {
+    for (const field of ['expenses', 'collections', 'orderCount', 'netProfit'] as const) {
+      const days = annualDays()
+      days[5]![field] = field === 'netProfit' ? -10 : 10
+      // Five empty months precede June; six empty months follow it.
+      expect(reportVisibleMonths(days).map(month => month.date)).toEqual(days.slice(0, 6).map(day => day.date))
+    }
+  })
+
   it('builds calendar years, including leap days, and excludes future days', () => {
     const now = new Date('2026-03-01T12:00:00Z')
     const current = reportYearBounds('2026', now)

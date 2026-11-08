@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { tableQueryField, tableQueryText } from '~/utils/tableQuery'
-import { reportCurrency, reportDailyAverage, reportWeeks, reportMonths } from '~/utils/reportPeriods'
+import { reportCurrency, reportDailyAverage, reportWeeks, reportVisibleMonths } from '~/utils/reportPeriods'
 import type { BusinessReportSummary } from '~/types/reports'
 import { dashboardNumber } from '~/utils/dashboardFormatters'
 
@@ -12,7 +12,7 @@ const views = computed(() => [
   { label: annual.value ? 'Mensual' : 'Semanal', value: 'weekly' },
   { label: 'Promedio diario', value: 'daily' }
 ])
-const weeks = computed(() => annual.value ? reportMonths(props.report.dailyMovements) : reportWeeks(props.report.dailyMovements))
+const weeks = computed(() => annual.value ? reportVisibleMonths(props.report.dailyMovements) : reportWeeks(props.report.dailyMovements))
 const comparisons = computed(() => {
   const m = props.report.metrics
   return [
