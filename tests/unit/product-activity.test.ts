@@ -18,8 +18,8 @@ beforeEach(() => {
 describe('actividad del producto', () => {
   it('suma las partidas del producto y conserva el día del pedido', async () => {
     mocks.findMany.mockResolvedValue([{
-      id: 'order-1', folio: 22, orderDate: date, currencyCode: 'MXN', customerNameSnapshot: 'Cliente',
-      status: { key: 'entregado', label: 'Entregado' },
+      id: 'order-1', folio: 22, orderDate: date, currencyCode: 'MXN', customerId: 'customer-1', customerNameSnapshot: 'Cliente',
+      status: { key: 'entregado', label: 'Entregado', color: 'success' },
       items: [{ quantity: '0.1', total: '20.10' }, { quantity: '0.2', total: '10.20' }]
     }])
 
@@ -27,11 +27,17 @@ describe('actividad del producto', () => {
 
     expect(results[0]).toMatchObject({
       date: '2026-10-27', reference: 'PED-000022', quantity: '0.3',
+      status: 'Entregado', statusColor: 'success',
+      context: 'Cliente', contextHref: '/clientes/customer-1',
       amount: { value: '30.3', currency: 'MXN' }
     })
     expect(mocks.findMany).toHaveBeenCalledWith(expect.objectContaining({
       where: { items: { some: { productId } } },
-      select: expect.objectContaining({ items: { where: { productId }, select: { quantity: true, total: true } } })
+      select: expect.objectContaining({
+        customerId: true,
+        status: { select: { key: true, label: true, color: true } },
+        items: { where: { productId }, select: { quantity: true, total: true } }
+      })
     }))
   })
 

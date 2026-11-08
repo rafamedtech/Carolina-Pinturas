@@ -30,6 +30,7 @@ const productActions = computed<DropdownMenuItem[]>(() => [
       }
     : {
         label: product.value?.active === false ? 'Activar' : 'Desactivar',
+        color: product.value?.active === false ? 'neutral' : 'error',
         icon: product.value?.active === false ? 'i-lucide-circle-check' : 'i-lucide-ban',
         onSelect: () => { statusOpen.value = true }
       },
@@ -104,7 +105,7 @@ useSeoMeta({ title: () => productName.value })
           color="warning"
         >
           <template v-if="canManageProducts(user?.role)" #actions>
-            <UButton :to="{ path: `/productos/${productId}/editar`, query: { returnTo: backPath } }" label="Resolver guardado pendiente" icon="i-lucide-arrow-right" />
+            <AppButton :to="{ path: `/productos/${productId}/editar`, query: { returnTo: backPath } }" label="Resolver guardado pendiente" icon="i-lucide-arrow-right" />
           </template>
         </UAlert>
         <UAlert
@@ -114,7 +115,7 @@ useSeoMeta({ title: () => productName.value })
           color="neutral"
         />
 
-        <UPageHeader :title="product?.name" :ui="{ root: 'pt-0 pb-5', title: 'min-w-0 flex-1 text-xl sm:text-2xl font-semibold', links: 'hidden sm:flex' }">
+        <DetailPageHeader :title="product?.name">
           <template #title>
             <span class="flex w-full min-w-0 items-center gap-3">
               <UAvatar
@@ -135,10 +136,9 @@ useSeoMeta({ title: () => productName.value })
                 :content="{ align: 'end' }"
                 class="shrink-0 sm:hidden"
               >
-                <UButton
+                <AppButton
                   icon="i-lucide-settings-2"
-                  color="neutral"
-                  variant="outline"
+                  intent="secondary"
                   aria-label="Acciones del producto"
                 />
               </UDropdownMenu>
@@ -164,12 +164,12 @@ useSeoMeta({ title: () => productName.value })
             </div>
           </template>
           <template v-if="product && canManageProducts(user?.role) && isManaged" #links>
-            <UButton
+            <AppButton
               :to="{ path: '/productos/nuevo', query: { duplicar: productId, returnTo: backPath } }"
               label="Duplicar"
               icon="i-lucide-copy"
-              color="neutral"
-              variant="outline"
+              intent="secondary"
+              variant="subtle"
               class="hidden sm:inline-flex"
             />
             <ProductsProductStatusAction
@@ -178,14 +178,15 @@ useSeoMeta({ title: () => productName.value })
               trigger-class="hidden sm:inline-flex"
               @changed="refresh"
             />
-            <UButton
+            <AppButton
               :to="{ path: `/productos/${productId}/editar`, query: { returnTo: backPath } }"
               label="Editar"
               icon="i-lucide-pencil"
+              variant="subtle"
               class="hidden sm:inline-flex"
             />
           </template>
-        </UPageHeader>
+        </DetailPageHeader>
         <ProductsProductDetailFields
           :product="product"
           :product-id="productId"

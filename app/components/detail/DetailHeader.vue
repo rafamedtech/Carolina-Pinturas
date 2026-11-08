@@ -12,13 +12,12 @@ const emit = defineEmits<{ refresh: [] }>()
     </template>
     <template #right>
       <slot name="actions" />
-      <UButton
+      <AppButton
         label="Actualizar"
         :aria-label="refreshLabel"
         :ui="{ label: 'hidden sm:inline' }"
         icon="i-lucide-refresh-cw"
-        color="neutral"
-        variant="outline"
+        intent="secondary"
         :loading="loading"
         @click="emit('refresh')"
       />

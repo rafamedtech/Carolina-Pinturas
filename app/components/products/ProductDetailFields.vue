@@ -26,7 +26,7 @@ const generalFields = computed(() => {
 const fiscalFields = computed(() => {
   const item = props.product
   return [
-    { label: 'Clave SAT', value: joinParts(item?.key?.code, item?.key?.name) },
+    { label: 'Clave SAT', fullWidth: true, value: joinParts(item?.key?.code, item?.key?.name) },
     { label: 'Unidad SAT', value: joinParts(unit.value?.code, unit.value?.name) },
     { label: 'Impuestos incluidos', value: item?.tax_included === undefined ? undefined : item?.tax_included ? 'Sí' : 'No' }
   ]
@@ -52,7 +52,7 @@ function formatQuantity(value?: number) {
 <template>
   <UPageGrid class="grid-cols-2 gap-4 lg:grid-cols-3">
     <div class="col-span-2 flex flex-col gap-4">
-      <UPageCard v-if="product?.internal?.composition?.kind === 'composite'" title="Componentes por unidad" variant="subtle">
+      <DetailCard v-if="product?.internal?.composition?.kind === 'composite'" title="Componentes por unidad">
         <ul class="divide-y divide-default">
           <li v-for="component in product?.internal.composition.components" :key="component.productId" class="flex items-center justify-between gap-3 py-3 text-sm">
             <ULink :to="`/productos/${component.productId}`" class="text-primary underline underline-offset-2">
@@ -64,28 +64,12 @@ function formatQuantity(value?: number) {
         <p class="mt-3 text-sm text-muted">
           Se reserva al confirmar el pedido y se descuenta al surtir. Este producto no tiene existencias propias.
         </p>
-      </UPageCard>
-      <UPageCard title="Información general" icon="i-lucide-info" variant="subtle">
-        <dl class="grid grid-cols-2 gap-4">
-          <div
-            v-for="field in generalFields"
-            :key="field.label"
-            class="min-w-0"
-          >
-            <dt class="text-sm text-muted">
-              {{ field.label }}
-            </dt>
-            <dd class="mt-1 font-medium break-words">
-              <USkeleton v-if="loading" class="h-5 w-32 max-w-full" />
-              <template v-else>
-                {{ field.value || '—' }}
-              </template>
-            </dd>
-          </div>
-        </dl>
-      </UPageCard>
+      </DetailCard>
+      <DetailCard title="Información general" icon="i-lucide-info">
+        <DetailFields :fields="generalFields" :loading="loading" />
+      </DetailCard>
 
-      <UPageCard v-if="product?.components?.length" title="Componentes" variant="subtle">
+      <DetailCard v-if="product?.components?.length" title="Componentes">
         <ul class="space-y-3">
           <li v-for="component in product?.components" :key="component.id || component.name" class="flex items-center justify-between gap-3 text-sm">
             <span class="min-w-0">
@@ -95,32 +79,19 @@ function formatQuantity(value?: number) {
             <span class="font-medium">{{ formatQuantity(component.quantity) }}</span>
           </li>
         </ul>
-      </UPageCard>
+      </DetailCard>
     </div>
 
     <div class="col-span-2 flex flex-col gap-4 lg:col-span-1">
-      <UPageCard title="Datos fiscales" icon="i-lucide-file-check" variant="subtle">
-        <dl class="grid grid-cols-2 gap-4">
-          <div v-for="field in fiscalFields" :key="field.label" class="min-w-0 first:col-span-2">
-            <dt class="text-sm text-muted">
-              {{ field.label }}
-            </dt>
-            <dd class="mt-1 font-medium break-words">
-              <USkeleton v-if="loading" class="h-5 w-32 max-w-full" />
-              <template v-else>
-                {{ field.value || '—' }}
-              </template>
-            </dd>
-          </div>
-        </dl>
-      </UPageCard>
+      <DetailCard title="Datos fiscales" icon="i-lucide-file-check">
+        <DetailFields :fields="fiscalFields" :loading="loading" />
+      </DetailCard>
     </div>
-    <UPageCard
+    <DetailCard
       title="Listas de precios"
       icon="i-lucide-tags"
       class="lg:col-span-2"
       :class="{ 'col-span-2': !showPurchaseCost }"
-      variant="subtle"
     >
       <div
         v-if="loading"
@@ -147,7 +118,7 @@ function formatQuantity(value?: number) {
       <p v-else class="text-sm text-muted">
         Sin precios registrados.
       </p>
-    </UPageCard>
+    </DetailCard>
     <ProductsProductPurchaseCost v-if="showPurchaseCost" :product-id="productId" />
   </UPageGrid>
 </template>

@@ -44,10 +44,9 @@ function selectSection(value: string | number) {
     <div class="flex items-start justify-between gap-3">
       <DetailSectionHeading title="Actividad del producto" description="Historial de operaciones registradas" />
       <UTooltip text="Recargar actividad">
-        <UButton
+        <AppButton
           icon="i-lucide-refresh-cw"
-          color="neutral"
-          variant="ghost"
+          intent="quiet"
           aria-label="Recargar actividad"
           :loading="status === 'pending'"
           @click="refresh()"

@@ -3,7 +3,7 @@ defineProps<{ title: string, icon?: string, value?: string | number, unit?: stri
 </script>
 
 <template>
-  <UPageCard
+  <DetailCard
     :title="title"
     :icon="icon"
     variant="subtle"
@@ -15,5 +15,5 @@ defineProps<{ title: string, icon?: string, value?: string | number, unit?: stri
       <span v-if="unit" class="ml-1 text-xs text-muted">{{ unit }}</span>
     </div>
     <slot />
-  </UPageCard>
+  </DetailCard>
 </template>

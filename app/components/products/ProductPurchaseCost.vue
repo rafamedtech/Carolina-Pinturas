@@ -10,15 +10,14 @@ const { data: cost, status, error } = useFetch<{ value: string | null, currency:
 </script>
 
 <template>
-  <UPageCard icon="i-lucide-receipt" variant="subtle">
+  <DetailCard icon="i-lucide-receipt" variant="subtle">
     <template #title>
       <div class="flex items-center gap-1">
         <span>Costo de compra</span>
         <UPopover :mode="canHover ? 'hover' : 'click'" :content="{ side: 'top' }" arrow>
-          <UButton
+          <AppButton
             icon="i-lucide-info"
-            color="neutral"
-            variant="ghost"
+            intent="quiet"
             size="xs"
             aria-label="Información del costo de compra"
             class="size-6 shrink-0 justify-center p-0"
@@ -45,5 +44,5 @@ const { data: cost, status, error } = useFetch<{ value: string | null, currency:
     <p v-else class="text-sm text-muted">
       Sin costo de compra registrado.
     </p>
-  </UPageCard>
+  </DetailCard>
 </template>

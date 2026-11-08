@@ -3,6 +3,7 @@ import type { TableColumn } from '@nuxt/ui'
 import type { ProductActivityRow, ProductActivitySection } from '#shared/types/product-activity'
 import { formatDate } from '~/utils/datetime'
 import { purchaseMoney, purchaseQuantity } from '~/utils/purchaseFormat'
+import { orderStatusBadgeColor } from '~/utils/orderStatus'
 
 const props = defineProps<{ rows: ProductActivityRow[], section: ProductActivitySection, loading?: boolean }>()
 const showQuantity = computed(() => props.section !== 'expenses')
@@ -56,9 +57,9 @@ const columns = computed<TableColumn<ProductActivityRow>[]>(() => {
   <template v-else>
     <ul class="min-w-0 space-y-3 sm:hidden" aria-label="Actividad registrada para el producto">
       <li v-for="row in rows" :key="row.id" class="min-w-0">
-        <UCard :ui="{ body: 'space-y-3 p-4' }">
+        <DetailCard :ui="{ container: 'gap-y-3' }">
           <div class="flex items-start justify-between gap-3">
-            <div class="min-w-0 space-y-1">
+            <div class="min-w-0" :class="section === 'sales' ? 'flex items-center gap-2' : 'space-y-1'">
               <ULink v-if="row.href" :to="row.href" class="block text-sm font-medium break-words text-primary">
                 {{ row.reference }}
               </ULink>
@@ -67,7 +68,7 @@ const columns = computed<TableColumn<ProductActivityRow>[]>(() => {
               </p>
               <UBadge
                 v-if="row.status"
-                color="neutral"
+                :color="orderStatusBadgeColor(row.statusColor ?? 'neutral')"
                 variant="subtle"
                 size="sm"
                 class="max-w-full whitespace-normal"
@@ -78,9 +79,19 @@ const columns = computed<TableColumn<ProductActivityRow>[]>(() => {
             <span class="shrink-0 text-xs text-muted tabular-nums">{{ formatDate(row.date) }}</span>
           </div>
           <div class="min-w-0 text-sm break-words">
-            <p class="font-medium text-highlighted">
-              {{ row.context }}
-            </p>
+            <div class="flex items-center gap-1">
+              <span class="min-w-0 font-medium text-highlighted">{{ row.context }}</span>
+              <AppButton
+                v-if="row.contextHref"
+                :to="row.contextHref"
+                icon="i-lucide-external-link"
+                intent="quiet"
+                size="xs"
+                :ui="{ leadingIcon: 'size-5' }"
+                class="shrink-0"
+                :aria-label="`Abrir perfil de ${row.context}`"
+              />
+            </div>
             <p v-if="row.detail" class="mt-1 text-xs text-muted">
               {{ row.detail }}
             </p>
@@ -108,12 +119,12 @@ const columns = computed<TableColumn<ProductActivityRow>[]>(() => {
                 Importe
               </dt>
               <dd class="mt-1 font-medium break-words tabular-nums">
-                {{ row.amount ? purchaseMoney(Number(row.amount.value), row.amount.currency) : '—' }}
+                <span class="font-semibold text-primary">{{ row.amount ? purchaseMoney(Number(row.amount.value), row.amount.currency) : '—' }}</span>
                 <span v-if="row.amount" class="text-xs text-muted">{{ row.amount.currency }}</span>
               </dd>
             </div>
           </dl>
-        </UCard>
+        </DetailCard>
       </li>
     </ul>
     <DetailTable
@@ -124,14 +135,14 @@ const columns = computed<TableColumn<ProductActivityRow>[]>(() => {
       class="hidden sm:block"
     >
       <template #reference-cell="{ row: { original } }">
-        <div class="flex flex-col items-start gap-1">
+        <div class="flex items-center gap-2">
           <ULink v-if="original.href" :to="original.href" class="font-medium text-primary hover:underline">
             {{ original.reference }}
           </ULink>
           <span v-else class="font-medium text-highlighted">{{ original.reference }}</span>
           <UBadge
             v-if="original.status"
-            color="neutral"
+            :color="orderStatusBadgeColor(original.statusColor ?? 'neutral')"
             variant="subtle"
             size="sm"
           >
@@ -144,9 +155,19 @@ const columns = computed<TableColumn<ProductActivityRow>[]>(() => {
       </template>
       <template #context-cell="{ row: { original } }">
         <div class="min-w-32 whitespace-normal">
-          <p class="font-medium text-highlighted">
-            {{ original.context }}
-          </p>
+          <div class="flex items-center gap-1">
+            <span class="min-w-0 font-medium text-highlighted">{{ original.context }}</span>
+            <AppButton
+              v-if="original.contextHref"
+              :to="original.contextHref"
+              icon="i-lucide-external-link"
+              intent="quiet"
+              size="xs"
+              :ui="{ leadingIcon: 'size-5' }"
+              class="shrink-0"
+              :aria-label="`Abrir perfil de ${original.context}`"
+            />
+          </div>
           <p v-if="original.detail" class="text-xs text-muted">
             {{ original.detail }}
           </p>
@@ -161,7 +182,7 @@ const columns = computed<TableColumn<ProductActivityRow>[]>(() => {
         {{ balance === undefined ? '—' : purchaseQuantity(Number(balance)) }}
       </template>
       <template #amount-cell="{ row: { original: { amount } } }">
-        {{ amount ? purchaseMoney(Number(amount.value), amount.currency) : '—' }}
+        <span class="font-semibold text-primary">{{ amount ? purchaseMoney(Number(amount.value), amount.currency) : '—' }}</span>
         <span v-if="amount" class="text-xs text-muted">{{ amount.currency }}</span>
       </template>
     </DetailTable>

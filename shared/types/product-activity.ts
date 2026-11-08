@@ -9,8 +9,10 @@ export interface ProductActivityRow {
   reference: string
   href?: string
   context: string
+  contextHref?: string
   detail?: string
   status?: string
+  statusColor?: string
   quantity?: string
   balance?: string
   amount?: { value: string, currency: string }

@@ -15,13 +15,12 @@ async function confirm() {
 </script>
 
 <template>
-  <UButton
+  <AppButton
     v-if="product.internal?.syncPending"
     :to="`/productos/${product.id}/editar`"
     label="Resolver guardado pendiente"
     :class="triggerClass"
-    color="neutral"
-    variant="outline"
+    intent="secondary"
   />
   <UModal
     v-else
@@ -29,35 +28,36 @@ async function confirm() {
     :title="`${label} producto`"
     :description="`${product.code} · ${product.name}`"
   >
-    <UButton
+    <AppButton
       :label="label"
       :icon="product.active === false ? 'i-lucide-circle-check' : 'i-lucide-ban'"
       :class="triggerClass"
-      color="neutral"
-      variant="outline"
+      class="cursor-pointer"
+      intent="secondary"
+      :color="product.active === false ? 'neutral' : 'error'"
+      variant="subtle"
     />
     <template #body>
       <div class="space-y-4">
         <p>{{ product.active === false ? 'El producto volverá a estar disponible para pedidos nuevos.' : 'El producto dejará de estar disponible para pedidos nuevos. Los pedidos anteriores se conservan.' }}</p>
         <UAlert v-if="errorMessage" :title="errorMessage" color="error" />
         <template v-if="ambiguous">
-          <UButton :to="`/productos/${product.id}/editar`" label="Resolver guardado pendiente" />
-          <UButton label="Consultar resultado en Siigo" :loading="checking" @click="check(product.id)" />
+          <AppButton :to="`/productos/${product.id}/editar`" label="Resolver guardado pendiente" />
+          <AppButton label="Consultar resultado en Siigo" :loading="checking" @click="check(product.id)" />
           <p v-for="result in lookupResults" :key="result.id">
             Estado actual: {{ result.active ? 'Activo' : 'Inactivo' }}
           </p>
         </template>
         <div class="flex justify-end gap-3">
-          <UButton
+          <AppButton
             label="Cerrar"
-            color="neutral"
-            variant="outline"
+            intent="secondary"
             :disabled="saving"
             @click="open = false"
           />
-          <UButton
+          <AppButton
             :label="label"
-            :color="product.active === false ? 'primary' : 'warning'"
+            :color="product.active === false ? 'primary' : 'error'"
             :disabled="ambiguous || saving"
             :loading="saving"
             @click="confirm"

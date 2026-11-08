@@ -142,7 +142,7 @@ const dateRange = computed<OrderDateRange | null>({
   }
 })
 const listConfig = computed<ListLayoutConfig>(() => ({
-  id: 'inventory', title: activeView.value.title, empty: 'Sin registros para estos filtros.',
+  id: 'inventory', title: 'Control de inventario', empty: 'Sin registros para estos filtros.',
   breadcrumbs: [
     { label: 'Inventario', icon: 'i-lucide-warehouse', to: '/inventario' },
     { label: activeView.value.title }

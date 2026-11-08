@@ -67,7 +67,7 @@ function showKardex(row: InventoryStock) {
 </script>
 
 <template>
-  <UPageCard
+  <DetailCard
     title="Existencias del producto"
     description="Suma de todos los almacenes."
     variant="naked"
@@ -93,19 +93,17 @@ function showKardex(row: InventoryStock) {
       </UPageGrid>
 
       <div>
-        <p class="mb-2 text-xs font-medium text-muted">
-          Detalle por almacén
-        </p>
+        <DetailSectionHeading title="Detalle por almacén" class="mb-2" />
         <div v-if="loading" class="flex flex-wrap gap-2" aria-label="Cargando almacenes">
           <USkeleton v-for="index in 3" :key="index" class="h-8 w-32" />
         </div>
         <div v-else class="flex flex-wrap gap-2">
-          <UButton
+          <AppButton
             v-for="row in orderedStocks"
             :key="row.warehouseId"
             :label="`${row.warehouse} (${row.quantity})`"
             icon="i-lucide-warehouse"
-            :color="warehouseColor(row)"
+            :color="warehouseColor(row) === 'primary' ? 'neutral' : warehouseColor(row)"
             variant="subtle"
             class="min-w-0 max-w-full"
             :ui="{ label: 'whitespace-normal text-left break-words' }"
@@ -118,7 +116,7 @@ function showKardex(row: InventoryStock) {
     <p v-else class="text-sm text-muted">
       Sin existencias registradas. Crea un almacén y registra el conteo inicial.
     </p>
-  </UPageCard>
+  </DetailCard>
 
   <UModal v-model:open="modalOpen" :title="selectedStock?.warehouse || 'Detalle del almacén'" :description="selectedStock ? `${selectedStock.code} · ${selectedStock.name}` : undefined">
     <template #description>
@@ -160,7 +158,7 @@ function showKardex(row: InventoryStock) {
     </template>
     <template #footer>
       <div class="flex w-full flex-wrap justify-end gap-2">
-        <UButton
+        <AppButton
           v-if="selectedStock"
           label="Ver Kardex"
           icon="i-lucide-history"

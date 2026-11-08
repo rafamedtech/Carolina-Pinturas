@@ -34,8 +34,8 @@ export async function listProductActivity(productId: string, section: ProductAct
         db.salesOrder.findMany({
           where, ...window, orderBy: [{ orderDate: 'desc' }, { folio: 'desc' }],
           select: {
-            id: true, folio: true, orderDate: true, customerNameSnapshot: true, currencyCode: true,
-            status: { select: { key: true, label: true } },
+            id: true, folio: true, orderDate: true, customerId: true, customerNameSnapshot: true, currencyCode: true,
+            status: { select: { key: true, label: true, color: true } },
             siigoInvoice: { select: { siigoInvoiceName: true, siigoInvoiceId: true } },
             items: { where: product, select: { quantity: true, total: true } }
           }
@@ -45,6 +45,8 @@ export async function listProductActivity(productId: string, section: ProductAct
       return result(rows.map(row => ({
         id: row.id, date: calendarDate(row.orderDate), reference: orderNumber(row.folio), href: `/ventas/${row.id}`,
         context: row.customerNameSnapshot, status: row.status.key === 'borrador' ? 'Cotización' : row.status.label,
+        contextHref: `/clientes/${row.customerId}`,
+        statusColor: row.status.color,
         detail: row.siigoInvoice?.siigoInvoiceId ? row.siigoInvoice.siigoInvoiceName || 'Factura vinculada' : undefined,
         quantity: sum(row.items, item => item.quantity),
         amount: { value: sum(row.items, item => item.total), currency: row.currencyCode }

@@ -1,6 +1,18 @@
 @import "tailwindcss" theme(static);
 @import "@nuxt/ui";
 
+@theme inline {
+  --color-card: var(--app-card-bg);
+}
+
+:root {
+  --app-card-bg: #fcfcfc;
+}
+
+.dark {
+  --app-card-bg: #1c1b1e;
+}
+
 @theme static {
   --font-sans: 'Public Sans', sans-serif;
 

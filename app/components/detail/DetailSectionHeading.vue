@@ -3,7 +3,7 @@ defineProps<{ title: string, description?: string, hideTitleOnMobile?: boolean }
 </script>
 
 <template>
-  <UPageCard
+  <DetailCard
     variant="naked"
     :description="description"
     :ui="{ container: 'gap-1', title: hideTitleOnMobile ? 'hidden text-lg sm:block' : 'text-lg' }"
@@ -13,5 +13,5 @@ defineProps<{ title: string, description?: string, hideTitleOnMobile?: boolean }
         {{ title }}
       </h2>
     </template>
-  </UPageCard>
+  </DetailCard>
 </template>
