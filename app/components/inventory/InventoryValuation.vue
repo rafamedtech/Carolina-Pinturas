@@ -3,7 +3,8 @@ import type { TableColumn } from '@nuxt/ui'
 import type { InventoryValuation } from '#shared/types/inventory'
 import { purchaseMoney } from '~/utils/purchaseFormat'
 
-defineProps<{ valuation: InventoryValuation }>()
+const props = defineProps<{ valuation: InventoryValuation }>()
+const warehouses = computed(() => [...props.valuation.warehouses].sort((a, b) => a.code.localeCompare(b.code, 'es', { numeric: true })))
 const columns: TableColumn<InventoryValuation['warehouses'][number]>[] = [
   { accessorKey: 'name', header: 'Almacén' },
   { id: 'value', header: 'Valor de la mercancía', meta: { class: { th: 'text-right', td: 'text-right tabular-nums' } } }
@@ -36,7 +37,7 @@ const columns: TableColumn<InventoryValuation['warehouses'][number]>[] = [
     <div class="min-w-0 space-y-3">
       <DetailSectionHeading title="Detalle por almacén" description="Valor de las existencias separado por moneda." />
       <DetailTable
-        :data="valuation.warehouses"
+        :data="warehouses"
         :columns="columns"
         aria-label="Valor de la mercancía por almacén"
         empty="Sin almacenes registrados"
