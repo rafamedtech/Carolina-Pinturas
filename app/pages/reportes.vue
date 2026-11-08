@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { tableQueryField, tableQueryDate } from '~/utils/tableQuery'
 import { CalendarDate } from '@internationalized/date'
+import ReportsPeriodControls from '~/components/reports/ReportsPeriodControls.vue'
 
 const now = new Date()
 const view = shallowRef<'monthly' | 'annual'>('monthly')
@@ -30,16 +31,7 @@ const month = computed(() => `${selectedMonth.value.year}-${String(selectedMonth
         </template>
 
         <template #right>
-          <HomeMonthPicker v-model="selectedMonth" :type="view === 'annual' ? 'year' : 'month'" />
-          <UButton
-            :label="view === 'annual' ? 'Anual' : 'Mensual'"
-            icon="i-lucide-calendar-range"
-            :color="view === 'annual' ? 'primary' : 'neutral'"
-            :variant="view === 'annual' ? 'soft' : 'outline'"
-            :aria-pressed="view === 'annual'"
-            :aria-label="view === 'annual' ? 'Cambiar a vista mensual' : 'Cambiar a vista anual'"
-            @click="view = view === 'annual' ? 'monthly' : 'annual'"
-          />
+          <ReportsPeriodControls v-model:month="selectedMonth" v-model:view="view" />
         </template>
       </UDashboardNavbar>
     </template>

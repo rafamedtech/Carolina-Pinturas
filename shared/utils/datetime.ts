@@ -69,10 +69,19 @@ export function formatDateTime(value: DateInput): string {
   return `${formatDate(value)}, ${timeFormatter.format(parsed.date)}`
 }
 
-export function formatDateRange(start: DateInput, end: DateInput): string {
+/** Rango numérico por defecto; short usa «31 Jul - 4 Ago» para gráficas compactas. */
+export function formatDateRange(start: DateInput, end: DateInput, format: 'numeric' | 'short' = 'numeric'): string {
   const from = formatDate(start)
   const to = formatDate(end)
   if (from === '—' || to === '—') return '—'
+  if (format === 'short') {
+    const months = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic']
+    const compact = (value: string) => {
+      const [day, month] = value.split('/')
+      return `${Number(day)} ${months[Number(month) - 1]}`
+    }
+    return from === to ? compact(from) : `${compact(from)} - ${compact(to)}`
+  }
   return from === to ? from : `${from} – ${to}`
 }
 

@@ -13,10 +13,10 @@ type ChartMovement = Pick<ReportDailyMovement, 'date' | 'label' | 'sales' | 'mat
 
 const movements = computed<ChartMovement[]>(() => props.annual
   ? reportVisibleMonths(props.data)
-  : reportWeeks(props.data).map((week, index) => ({
+  : reportWeeks(props.data).map(week => ({
       ...week,
       date: week.start,
-      label: `Semana ${index + 1} · ${formatDateRange(week.start, week.end)}`
+      label: formatDateRange(week.start, week.end, 'short')
     })))
 
 const totals = computed(() => movements.value.reduce((result, day) => ({

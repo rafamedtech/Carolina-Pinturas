@@ -62,4 +62,11 @@ describe('formato compartido de fechas', () => {
     vi.setSystemTime(new Date('2026-01-01T02:05:00Z'))
     expect(mexicoToday()).toBe('2025-12-31')
   })
+
+  it('formatea rangos compactos para gráficas sin desplazar fechas sin hora', () => {
+    expect(formatDateRange('2026-07-31', '2026-08-04', 'short')).toBe('31 Jul - 4 Ago')
+    expect(formatDateRange('2026-08-04', '2026-08-04', 'short')).toBe('4 Ago')
+    expect(formatDateRange('2026-08-04', null, 'short')).toBe('—')
+    expect(formatDateRange('2026-08-01T02:00:00Z', '2026-08-04T12:00:00Z', 'short')).toBe('31 Jul - 4 Ago')
+  })
 })
