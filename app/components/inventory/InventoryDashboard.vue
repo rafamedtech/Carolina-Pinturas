@@ -142,10 +142,10 @@ const dateRange = computed<OrderDateRange | null>({
   }
 })
 const listConfig = computed<ListLayoutConfig>(() => ({
-  id: 'inventory', title: 'Inventario', empty: 'Sin registros para estos filtros.',
+  id: 'inventory', title: activeView.value.title, empty: 'Sin registros para estos filtros.',
   breadcrumbs: [
     { label: 'Inventario', icon: 'i-lucide-warehouse', to: '/inventario' },
-    { label: tabs.value.find(item => item.value === tab.value)?.label || 'Inventario' }
+    { label: activeView.value.title }
   ],
   search: tab.value === 'valuation' ? undefined : { placeholder: 'Buscar código o producto' }, tabs: tabs.value, defaultTab: defaultTab.value,
   dateFilter: ['movements', 'kardex', 'counts'].includes(tab.value) ? { subject: 'movimientos de inventario' } : undefined,
@@ -236,7 +236,9 @@ const reservationColumns: TableColumn<Extract<Row, { orderId: string }>>[] = [
       />
     </template>
     <template #before>
-      <DetailSectionHeading :title="activeView.title" :description="activeView.description" hide-title-on-mobile />
+      <p class="text-base leading-relaxed text-toned">
+        {{ activeView.description }}
+      </p>
       <UAlert v-if="error" :title="error" color="error" />
       <div v-if="productId && tab !== 'valuation'" class="flex items-center gap-2 text-sm">
         <span>Kardex de producto seleccionado</span><UButton

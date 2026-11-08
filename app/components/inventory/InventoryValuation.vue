@@ -19,6 +19,7 @@ const columns: TableColumn<InventoryValuation['warehouses'][number]>[] = [
         :key="total.currencyCode"
         :title="`Total general · ${total.currencyCode}`"
         :value="purchaseMoney(total.amount, total.currencyCode)"
+        value-color="primary"
         icon="i-lucide-package"
       />
       <DetailStatCard
@@ -51,7 +52,7 @@ const columns: TableColumn<InventoryValuation['warehouses'][number]>[] = [
           </p>
         </template>
         <template #value-cell="{ row: { original } }">
-          <div v-for="total in original.totals" :key="total.currencyCode" class="whitespace-nowrap">
+          <div v-for="total in original.totals" :key="total.currencyCode" class="whitespace-nowrap text-primary">
             {{ purchaseMoney(total.amount, total.currencyCode) }}
             <span class="text-xs text-muted">{{ total.currencyCode }}</span>
           </div>
