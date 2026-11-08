@@ -10,6 +10,24 @@ const channelColors: Record<string, string> = {
   seller: 'bg-success',
   internal: 'bg-warning'
 }
+const channelFills: Record<string, string> = {
+  counter: 'fill-primary',
+  seller: 'fill-success',
+  internal: 'fill-warning'
+}
+const slices = computed(() => {
+  let angle = -Math.PI / 2
+  return props.channels.filter(channel => channel.amount > 0).map((channel) => {
+    const start = angle
+    angle += channel.amount / total.value * Math.PI * 2
+    const middle = (start + angle) / 2
+    const point = (value: number) => `${100 + 90 * Math.cos(value)} ${100 + 90 * Math.sin(value)}`
+    return {
+      ...channel,
+      path: `M 100 100 L ${point(start)} A 90 90 0 0 1 ${point(middle)} A 90 90 0 0 1 ${point(angle)} Z`
+    }
+  })
+})
 const rows = computed(() => props.channels.map((channel) => {
   const previous = channel.key === 'counter'
     ? props.metrics.previousCounterSales
@@ -19,7 +37,7 @@ const rows = computed(() => props.channels.map((channel) => {
 </script>
 
 <template>
-  <UCard>
+  <UCard id="reports-sales-channels">
     <template #header>
       <h2 class="text-base font-semibold text-highlighted">
         Ventas por canal
@@ -29,40 +47,55 @@ const rows = computed(() => props.channels.map((channel) => {
       </p>
     </template>
 
-    <div
-      class="flex h-3 overflow-hidden rounded-full bg-elevated"
-      role="img"
-      :aria-label="channels.map(item => `${item.label}: ${reportCurrency.format(item.amount)}, ${item.percentage}%`).join('. ')"
-    >
-      <div
-        v-for="channel in channels"
-        :key="channel.key"
-        :class="channelColors[channel.key]"
-        :style="{ width: `${total > 0 ? channel.amount / total * 100 : 0}%` }"
-      />
-    </div>
+    <div class="flex flex-col items-center gap-6 lg:flex-row">
+      <svg
+        viewBox="0 0 200 200"
+        class="size-48 shrink-0"
+        role="img"
+        :aria-label="total > 0 ? channels.map(item => `${item.label}: ${reportCurrency.format(item.amount)}, ${item.percentage}%`).join('. ') : 'Sin ventas en este periodo'"
+      >
+        <circle
+          v-if="!total"
+          cx="100"
+          cy="100"
+          r="90"
+          class="fill-elevated"
+        />
+        <path
+          v-for="slice in slices"
+          :key="slice.key"
+          :d="slice.path"
+          :class="channelFills[slice.key]"
+          class="stroke-default"
+          stroke-width="2"
+          stroke-linejoin="round"
+        >
+          <title>{{ slice.label }}: {{ reportCurrency.format(slice.amount) }} · {{ slice.percentage }}%</title>
+        </path>
+      </svg>
 
-    <dl class="mt-5 grid gap-4 sm:grid-cols-3">
-      <div v-for="channel in rows" :key="channel.key">
-        <dt class="flex items-center gap-2 text-sm text-muted">
-          <span class="size-2.5 rounded-full" :class="channelColors[channel.key]" />
-          {{ channel.label }}
-          <span class="ml-auto tabular-nums">{{ channel.percentage }}%</span>
-        </dt>
-        <dd class="mt-1">
-          <p class="text-lg font-semibold tabular-nums text-highlighted">
-            {{ reportCurrency.format(channel.amount) }}
-          </p>
-          <p class="mt-0.5 text-xs text-muted tabular-nums">
-            {{ channel.count }} {{ channel.count === 1 ? 'venta' : 'ventas' }}
-            · ant. {{ reportCurrency.format(channel.previous) }}
-            <span v-if="channel.change !== null" :class="channel.change >= 0 ? 'text-success' : 'text-error'">
-              ({{ channel.change > 0 ? '+' : '' }}{{ dashboardNumber.format(channel.change) }}%)
-            </span>
-          </p>
-        </dd>
-      </div>
-    </dl>
+      <dl class="grid w-full min-w-0 gap-4 sm:grid-cols-3">
+        <div v-for="channel in rows" :key="channel.key">
+          <dt class="flex items-center gap-2 text-sm text-muted">
+            <span class="size-2.5 rounded-full" :class="channelColors[channel.key]" />
+            {{ channel.label }}
+            <span class="ml-auto tabular-nums">{{ channel.percentage }}%</span>
+          </dt>
+          <dd class="mt-1">
+            <p class="text-lg font-semibold tabular-nums text-highlighted">
+              {{ reportCurrency.format(channel.amount) }}
+            </p>
+            <p class="mt-0.5 text-xs text-muted tabular-nums">
+              {{ channel.count }} {{ channel.count === 1 ? 'venta' : 'ventas' }}
+              · ant. {{ reportCurrency.format(channel.previous) }}
+              <span v-if="channel.change !== null" :class="channel.change >= 0 ? 'text-success' : 'text-error'">
+                ({{ channel.change > 0 ? '+' : '' }}{{ dashboardNumber.format(channel.change) }}%)
+              </span>
+            </p>
+          </dd>
+        </div>
+      </dl>
+    </div>
 
     <p v-if="!total" class="mt-5 text-sm text-muted">
       Sin ventas en este periodo.
