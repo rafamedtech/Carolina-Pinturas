@@ -130,6 +130,40 @@ useSeoMeta({ title: () => productName.value })
                 <USkeleton v-if="initialLoading" class="h-7 w-64 max-w-full" />
                 <span v-else class="block break-words">{{ product?.name }}</span>
               </span>
+            </span>
+          </template>
+          <template #description>
+            <div
+              v-if="initialLoading"
+              class="mt-3 flex flex-wrap items-center gap-2"
+              aria-label="Cargando disponibilidad del producto"
+              aria-busy="true"
+            >
+              <USkeleton
+                v-for="width in ['w-20', 'w-28', 'w-16']"
+                :key="width"
+                class="h-8"
+                :class="width"
+              />
+            </div>
+            <div v-else-if="product" class="mt-3 flex items-center gap-2 text-sm">
+              <div class="flex min-w-0 flex-1 flex-wrap items-center gap-2">
+                <span v-if="product.reference">Ref. {{ product.reference }}</span>
+                <UBadge v-if="product.active === false" color="neutral" variant="subtle">
+                  Inactivo
+                </UBadge>
+                <template v-if="isManaged">
+                  <UBadge
+                    v-for="{ key, label } in availabilityFields"
+                    :key="key"
+                    :color="product.internal?.availability?.[key] === false ? 'neutral' : 'success'"
+                    :aria-label="`${label}: ${product.internal?.availability?.[key] === false ? 'No disponible' : 'Disponible'}`"
+                    variant="subtle"
+                  >
+                    {{ label }}
+                  </UBadge>
+                </template>
+              </div>
               <UDropdownMenu
                 v-if="product && canManageProducts(user?.role) && isManaged"
                 :items="productActions"
@@ -142,25 +176,6 @@ useSeoMeta({ title: () => productName.value })
                   aria-label="Acciones del producto"
                 />
               </UDropdownMenu>
-            </span>
-          </template>
-          <template #description>
-            <div v-if="product" class="mt-3 flex flex-wrap items-center gap-2 text-sm">
-              <span v-if="product.reference">Ref. {{ product.reference }}</span>
-              <UBadge v-if="product.active === false" color="neutral" variant="subtle">
-                Inactivo
-              </UBadge>
-              <template v-if="isManaged">
-                <UBadge
-                  v-for="{ key, label } in availabilityFields"
-                  :key="key"
-                  :color="product.internal?.availability?.[key] === false ? 'neutral' : 'success'"
-                  :aria-label="`${label}: ${product.internal?.availability?.[key] === false ? 'No disponible' : 'Disponible'}`"
-                  variant="subtle"
-                >
-                  {{ label }}
-                </UBadge>
-              </template>
             </div>
           </template>
           <template v-if="product && canManageProducts(user?.role) && isManaged" #links>
