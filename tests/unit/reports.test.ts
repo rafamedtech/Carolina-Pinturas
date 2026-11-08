@@ -111,13 +111,15 @@ describe('business report periods', () => {
     const days = Array.from({ length: 7 }, (_, index) => ({
       date: `2026-09-0${index + 1}`, label: '', sales: index === 0 ? 100 : 0,
       orderCount: index === 0 ? 2 : 0, counterSales: index === 0 ? 25 : 0,
-      sellerSales: index === 0 ? 75 : 0, internalSales: index === 6 ? 50 : 0, collections: 0, expenses: index === 6 ? 20 : 0, netCashFlow: 0
+      sellerSales: index === 0 ? 75 : 0, internalSales: index === 6 ? 50 : 0, collections: 0, expenses: index === 6 ? 20 : 0, netCashFlow: 0,
+      materialPurchases: index === 6 ? 12 : 0, operatingExpenses: index === 6 ? 8 : 0,
+      netProfit: index === 0 ? 100 : index === 6 ? -20 : 0
     }))
     const weeks = reportWeeks(days)
     expect(weeks).toHaveLength(2)
-    expect(weeks[0]).toMatchObject({ start: '2026-09-01', end: '2026-09-06', days: 6, sales: 100, orderCount: 2, counterSales: 25, sellerSales: 75 })
+    expect(weeks[0]).toMatchObject({ start: '2026-09-01', end: '2026-09-06', days: 6, sales: 100, orderCount: 2, counterSales: 25, sellerSales: 75, materialPurchases: 0, operatingExpenses: 0, netProfit: 100 })
     expect(weeks[0]?.internalSales).toBe(0)
-    expect(weeks[1]).toMatchObject({ start: '2026-09-07', end: '2026-09-07', days: 1, sales: 0, internalSales: 50, expenses: 20 })
+    expect(weeks[1]).toMatchObject({ start: '2026-09-07', end: '2026-09-07', days: 1, sales: 0, internalSales: 50, expenses: 20, materialPurchases: 12, operatingExpenses: 8, netProfit: -20 })
     expect(reportWeeks([])).toEqual([])
   })
 

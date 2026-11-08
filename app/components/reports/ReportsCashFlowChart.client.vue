@@ -1,14 +1,23 @@
 <script setup lang="ts">
 import type { ReportDailyMovement } from '~/types/reports'
 import { dashboardCompactCurrency, dashboardCurrency } from '~/utils/dashboardFormatters'
-import { reportVisibleMonths } from '~/utils/reportPeriods'
+import { reportVisibleMonths, reportWeeks } from '~/utils/reportPeriods'
+import { formatDateRange } from '~/utils/datetime'
 
 const props = defineProps<{
   data: ReportDailyMovement[]
   annual?: boolean
 }>()
 
-const movements = computed(() => props.annual ? reportVisibleMonths(props.data) : props.data)
+type ChartMovement = Pick<ReportDailyMovement, 'date' | 'label' | 'sales' | 'materialPurchases' | 'operatingExpenses' | 'netProfit'>
+
+const movements = computed<ChartMovement[]>(() => props.annual
+  ? reportVisibleMonths(props.data)
+  : reportWeeks(props.data).map((week, index) => ({
+      ...week,
+      date: week.start,
+      label: `Semana ${index + 1} · ${formatDateRange(week.start, week.end)}`
+    })))
 
 const totals = computed(() => movements.value.reduce((result, day) => ({
   sales: result.sales + day.sales,
@@ -53,7 +62,7 @@ function barHeight(value: number) {
   return `${Math.max((value / maximum.value) * 100, 2)}%`
 }
 
-function dayLabel(day: ReportDailyMovement) {
+function dayLabel(day: ChartMovement) {
   return `${day.label}: ventas ${dashboardCurrency.format(day.sales)}, compras de material ${dashboardCurrency.format(day.materialPurchases)}, gastos operativos ${dashboardCurrency.format(day.operatingExpenses)}`
 }
 </script>
@@ -64,10 +73,10 @@ function dayLabel(day: ReportDailyMovement) {
       <div class="flex flex-wrap items-start justify-between gap-x-6 gap-y-3">
         <div>
           <h2 class="text-base font-semibold text-highlighted">
-            Venta y costo por {{ annual ? 'mes' : 'día' }}
+            Venta y costo por {{ annual ? 'mes' : 'semana' }}
           </h2>
           <p class="mt-1 text-sm text-muted">
-            {{ hoveredDay ? hoveredDay.label : 'Cuánto se vendió y cuánto se gastó en material y operación.' }}
+            {{ hoveredDay ? hoveredDay.label : annual ? 'Cuánto se vendió y cuánto se gastó en material y operación.' : 'Totales de lunes a domingo, incluyendo solo los días transcurridos del mes.' }}
           </p>
         </div>
 
@@ -113,12 +122,12 @@ function dayLabel(day: ReportDailyMovement) {
         </div>
 
         <div class="overflow-x-auto pb-1" @mouseleave="hoveredDate = null">
-          <div class="flex min-w-max items-end gap-1.5" :class="annual ? 'min-w-full' : ''">
+          <div class="flex min-w-full items-end gap-1.5">
             <div
               v-for="day in movements"
               :key="day.date"
-              class="group flex w-20 flex-col rounded-md px-0.5 pt-1 transition-colors hover:bg-elevated/60"
-              :class="annual ? 'flex-1' : ''"
+              class="group flex flex-1 flex-col rounded-md px-0.5 pt-1 transition-colors hover:bg-elevated/60"
+              :class="annual ? 'min-w-20' : 'min-w-32'"
               :aria-label="dayLabel(day)"
               role="img"
               tabindex="0"
@@ -149,7 +158,7 @@ function dayLabel(day: ReportDailyMovement) {
       v-else
       icon="i-lucide-chart-column"
       title="Sin movimientos en este periodo"
-      :description="`La tendencia ${annual ? 'mensual' : 'diaria'} aparecerá cuando se registren ventas, compras o gastos.`"
+      :description="`La tendencia ${annual ? 'mensual' : 'semanal'} aparecerá cuando se registren ventas, compras o gastos.`"
       class="h-72"
     />
   </UCard>
