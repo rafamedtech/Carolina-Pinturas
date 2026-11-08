@@ -5,6 +5,8 @@ import { dashboardNumber } from '~/utils/dashboardFormatters'
 
 const props = defineProps<{ report: BusinessReportSummary }>()
 
+const annual = computed(() => props.report.period.mode === 'annual')
+
 const pace = computed(() => {
   const { period, metrics } = props.report
   const dailySales = reportDailyAverage(metrics.sales, period.elapsedDays)
@@ -36,7 +38,7 @@ function change(value: number | null) {
   <UCard>
     <template #header>
       <h2 class="text-base font-semibold text-highlighted">
-        {{ pace.inProgress ? 'Proyección de cierre' : 'Cierre del mes' }}
+        {{ !report.period.elapsedDays ? 'Periodo sin iniciar' : pace.inProgress ? 'Proyección de cierre' : annual ? 'Cierre del año' : 'Cierre del mes' }}
       </h2>
       <p class="mt-1 text-sm text-muted">
         Día {{ report.period.elapsedDays }} de {{ report.period.totalDays }}
@@ -47,14 +49,14 @@ function change(value: number | null) {
 
     <div class="mt-4">
       <p class="text-xs text-muted">
-        {{ pace.inProgress ? 'Venta estimada al cierre' : 'Venta del mes' }}
+        {{ pace.inProgress ? 'Venta estimada al cierre' : annual ? 'Venta del año' : 'Venta del mes' }}
       </p>
       <p class="mt-1 text-2xl font-semibold tracking-tight tabular-nums text-highlighted">
         {{ reportCurrency.format(pace.projected) }}
       </p>
       <p class="mt-1 text-xs text-muted tabular-nums">
         <span :class="changeClass(pace.projectedChange)">{{ change(pace.projectedChange) }}</span>
-        vs. {{ reportCurrency.format(report.metrics.previousSales) }} del mes anterior
+        vs. {{ reportCurrency.format(report.metrics.previousSales) }} del {{ annual ? 'año' : 'mes' }} anterior
       </p>
     </div>
 
@@ -70,7 +72,7 @@ function change(value: number | null) {
       </div>
       <div>
         <dt class="text-muted">
-          Mes anterior / día
+          {{ annual ? 'Año anterior' : 'Mes anterior' }} / día
         </dt>
         <dd class="mt-0.5 font-semibold tabular-nums text-highlighted">
           {{ reportCurrency.format(pace.previousDailySales) }}
@@ -78,7 +80,7 @@ function change(value: number | null) {
       </div>
     </dl>
     <p v-if="pace.inProgress" class="mt-3 text-xs text-dimmed">
-      Estimación lineal: venta diaria promedio × días del mes.
+      Estimación lineal: venta diaria promedio × días del {{ annual ? 'año' : 'mes' }}.
     </p>
   </UCard>
 </template>

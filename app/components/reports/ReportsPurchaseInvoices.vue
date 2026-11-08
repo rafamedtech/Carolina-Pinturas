@@ -3,7 +3,7 @@ import type { ReportMetrics } from '~/types/reports'
 import { dashboardNumber } from '~/utils/dashboardFormatters'
 import { purchaseMoney } from '~/utils/purchaseFormat'
 
-const props = defineProps<{ totals: ReportMetrics['purchaseInvoiceTotals'] }>()
+const props = defineProps<{ totals: ReportMetrics['purchaseInvoiceTotals'], annual?: boolean }>()
 
 const visible = computed(() => {
   const active = props.totals.filter(total => total.amount !== 0 || total.previousAmount !== 0)
@@ -20,7 +20,7 @@ const visible = computed(() => {
             Facturas de compras
           </h2>
           <p class="mt-1 text-sm text-muted">
-            Facturado por proveedores en el mes, por moneda. Puede diferir de lo pagado.
+            Facturado por proveedores en el {{ annual ? 'año' : 'mes' }}, por moneda. Puede diferir de lo pagado.
           </p>
         </div>
         <span class="flex size-8 shrink-0 items-center justify-center rounded-lg bg-violet-500/10 text-violet-500">
@@ -39,7 +39,7 @@ const visible = computed(() => {
             {{ purchaseMoney(total.amount, total.currencyCode) }}
           </p>
           <p class="mt-0.5 text-xs text-muted tabular-nums">
-            Ant. {{ purchaseMoney(total.previousAmount, total.currencyCode) }}
+            {{ annual ? 'Año anterior' : 'Mes anterior' }} {{ purchaseMoney(total.previousAmount, total.currencyCode) }}
             <template v-if="total.changePercentage !== null">
               · {{ total.changePercentage > 0 ? '+' : '' }}{{ dashboardNumber.format(total.changePercentage) }}%
             </template>

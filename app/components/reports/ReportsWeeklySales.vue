@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import type { reportWeeks } from '~/utils/reportPeriods'
 import { reportCurrency, reportDailyAverage } from '~/utils/reportPeriods'
-import { formatDateRange } from '~/utils/datetime'
+import { formatDateRange, formatMonth } from '~/utils/datetime'
 import { dashboardNumber } from '~/utils/dashboardFormatters'
 
-const props = defineProps<{ weeks: ReturnType<typeof reportWeeks> }>()
+const props = defineProps<{ weeks: ReturnType<typeof reportWeeks>, annual?: boolean }>()
 const maximum = computed(() => Math.max(1, ...props.weeks.map(week => week.sales)))
 const hasSales = computed(() => props.weeks.some(week => week.sales !== 0 || week.orderCount > 0))
 </script>
@@ -14,16 +14,16 @@ const hasSales = computed(() => props.weeks.some(week => week.sales !== 0 || wee
   <UEmpty
     v-else-if="!hasSales"
     title="Sin ventas en este periodo"
-    description="Aquí podrás comparar las ventas de cada semana cuando se registren pedidos."
+    :description="`Aquí podrás comparar las ventas de cada ${annual ? 'mes' : 'semana'} cuando se registren pedidos.`"
     icon="i-lucide-chart-no-axes-column"
   />
-  <figure v-else aria-label="Ventas totales por semana">
+  <figure v-else :aria-label="annual ? 'Ventas totales por mes' : 'Ventas totales por semana'">
     <div class="space-y-5">
       <div v-for="(week, index) in weeks" :key="week.start" class="grid gap-2 sm:grid-cols-[minmax(180px,1fr)_2fr] sm:gap-5">
         <div>
           <p class="text-sm font-medium text-highlighted">
-            Semana {{ index + 1 }}
-            <span v-if="week.days < 7" class="ml-1 text-xs font-normal text-muted">· {{ week.days }} {{ week.days === 1 ? 'día' : 'días' }}</span>
+            {{ annual ? formatMonth(week.start) : `Semana ${index + 1}` }}
+            <span v-if="!annual && week.days < 7" class="ml-1 text-xs font-normal text-muted">· {{ week.days }} {{ week.days === 1 ? 'día' : 'días' }}</span>
           </p>
           <p class="mt-1 text-xs text-muted">
             {{ formatDateRange(week.start, week.end) }}
@@ -44,7 +44,7 @@ const hasSales = computed(() => props.weeks.some(week => week.sales !== 0 || wee
       </div>
     </div>
     <figcaption class="mt-5 border-t border-default pt-3 text-xs text-muted">
-      Cada barra muestra la venta total de una semana, de lunes a domingo. Las semanas parciales incluyen solo los días transcurridos del mes.
+      {{ annual ? 'Cada barra muestra la venta total de un mes. El mes en curso incluye solo los días transcurridos; los meses futuros no se incluyen.' : 'Cada barra muestra la venta total de una semana, de lunes a domingo. Las semanas parciales incluyen solo los días transcurridos del mes.' }}
     </figcaption>
   </figure>
 </template>

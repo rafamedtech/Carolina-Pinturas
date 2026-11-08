@@ -1,17 +1,18 @@
 <script setup lang="ts">
 import { tableQueryField, tableQueryText } from '~/utils/tableQuery'
-import { reportCurrency, reportDailyAverage, reportWeeks } from '~/utils/reportPeriods'
+import { reportCurrency, reportDailyAverage, reportWeeks, reportMonths } from '~/utils/reportPeriods'
 import type { BusinessReportSummary } from '~/types/reports'
 import { dashboardNumber } from '~/utils/dashboardFormatters'
 
 const props = defineProps<{ report: BusinessReportSummary }>()
+const annual = computed(() => props.report.period.mode === 'annual')
 const view = shallowRef('weekly')
 useTableQuery([tableQueryField('analysis_view', view, tableQueryText('weekly', ['weekly', 'daily']))])
-const views = [
-  { label: 'Semanal', value: 'weekly' },
+const views = computed(() => [
+  { label: annual.value ? 'Mensual' : 'Semanal', value: 'weekly' },
   { label: 'Promedio diario', value: 'daily' }
-]
-const weeks = computed(() => reportWeeks(props.report.dailyMovements))
+])
+const weeks = computed(() => annual.value ? reportMonths(props.report.dailyMovements) : reportWeeks(props.report.dailyMovements))
 const comparisons = computed(() => {
   const m = props.report.metrics
   return [
@@ -44,7 +45,7 @@ function format(value: number, money: boolean) {
             Ritmo de venta
           </h2>
           <p class="mt-1 text-sm text-muted">
-            {{ view === 'weekly' ? 'Cuánto vendes cada semana, de un vistazo.' : 'Compara el promedio por día con el mes anterior.' }}
+            {{ view === 'weekly' ? `Cuánto vendes cada ${annual ? 'mes' : 'semana'}, de un vistazo.` : `Compara el promedio por día con el ${annual ? 'año' : 'mes'} anterior.` }}
           </p>
         </div>
         <div class="inline-flex rounded-lg bg-elevated p-1" role="group" aria-label="Vista del ritmo de venta">
@@ -62,16 +63,16 @@ function format(value: number, money: boolean) {
       </div>
     </template>
 
-    <ReportsWeeklySales v-if="view === 'weekly'" :weeks="weeks" />
+    <ReportsWeeklySales v-if="view === 'weekly'" :weeks="weeks" :annual="annual" />
     <template v-else>
       <div class="mb-5 flex flex-wrap gap-x-5 gap-y-2 text-xs text-muted">
         <span class="inline-flex items-center gap-2">
           <span class="size-2 rounded-full bg-primary" aria-hidden="true" />
-          Mes seleccionado · {{ report.period.elapsedDays }} días
+          {{ annual ? 'Año seleccionado' : 'Mes seleccionado' }} · {{ report.period.elapsedDays }} días
         </span>
         <span class="inline-flex items-center gap-2">
           <span class="size-2 rounded-full bg-neutral-400 dark:bg-neutral-500" aria-hidden="true" />
-          Mes anterior · {{ report.metrics.previousDays }} días
+          {{ annual ? 'Año anterior' : 'Mes anterior' }} · {{ report.metrics.previousDays }} días
         </span>
       </div>
       <UEmpty v-if="!report.period.elapsedDays" title="Sin días transcurridos" icon="i-lucide-calendar" />
@@ -85,6 +86,7 @@ function format(value: number, money: boolean) {
           :current-label="format(row.current, row.money)"
           :previous-label="format(row.previous, row.money)"
           :change="row.change"
+          :annual="annual"
         />
       </div>
       <p class="mt-4 text-xs text-muted">

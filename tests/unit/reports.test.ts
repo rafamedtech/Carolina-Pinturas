@@ -1,4 +1,4 @@
-import { reportDailyAverage, reportWeeks } from '../../app/utils/reportPeriods'
+import { reportDailyAverage, reportWeeks, reportMonths } from '../../app/utils/reportPeriods'
 import { describe, expect, it } from 'vitest'
 import {
   reportDateOnly,
@@ -6,6 +6,7 @@ import {
   reportIsCounterSale,
   reportSalesChannel,
   reportMonthBounds,
+  reportYearBounds,
   reportPercentage,
   reportPercentageChange
 } from '../../server/utils/reports'
@@ -39,6 +40,29 @@ describe('report calculations', () => {
 })
 
 describe('business report periods', () => {
+  it('builds calendar years, including leap days, and excludes future days', () => {
+    const now = new Date('2026-03-01T12:00:00Z')
+    const current = reportYearBounds('2026', now)
+    expect(current).toMatchObject({ start: new Date('2026-01-01'), end: new Date('2027-01-01'), previousStart: new Date('2025-01-01'), totalDays: 365, elapsedDays: 60 })
+    expect(reportYearBounds('2024', now)).toMatchObject({ totalDays: 366, elapsedDays: 366 })
+    expect(reportYearBounds('2027', now).elapsedDays).toBe(0)
+    expect(reportYearBounds(undefined, now)).toEqual(current)
+    for (const year of ['', '26', '2026-01', '0000', '9999']) expect(() => reportYearBounds(year, now)).toThrow()
+  })
+
+  it('groups annual movements by month, preserving expenses and months without activity', () => {
+    const empty = { label: '', sales: 0, orderCount: 0, counterSales: 0, sellerSales: 0, internalSales: 0, collections: 0, expenses: 0, netCashFlow: 0, materialPurchases: 0, operatingExpenses: 0, netProfit: 0 }
+    const months = reportMonths([
+      { ...empty, date: '2026-01-01', sales: 100, orderCount: 1, collections: 50, netCashFlow: 50, netProfit: 100 },
+      { ...empty, date: '2026-01-02', materialPurchases: 20, operatingExpenses: 10, expenses: 30, netProfit: -30, netCashFlow: -30 },
+      { ...empty, date: '2026-02-01' }
+    ])
+    expect(months).toHaveLength(2)
+    expect(months[0]).toMatchObject({ start: '2026-01-01', end: '2026-01-02', days: 2, sales: 100, orderCount: 1, expenses: 30, materialPurchases: 20, operatingExpenses: 10, netProfit: 70, netCashFlow: 20 })
+    expect(months[1]).toMatchObject({ start: '2026-02-01', days: 1, sales: 0 })
+    expect(reportMonths([])).toEqual([])
+  })
+
   it('does not include future days', () => {
     expect(reportMonthBounds('2026-10', new Date('2026-09-07T12:00:00Z')).elapsedDays).toBe(0)
   })

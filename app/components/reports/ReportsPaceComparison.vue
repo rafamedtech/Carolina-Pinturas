@@ -8,6 +8,7 @@ const props = defineProps<{
   currentLabel: string
   previousLabel: string
   change: number | null
+  annual?: boolean
 }>()
 const scale = computed(() => {
   const minimum = Math.min(0, props.current, props.previous)
@@ -16,8 +17,8 @@ const scale = computed(() => {
   return { minimum, range, zero: -minimum / range * 100 }
 })
 const bars = computed(() => [
-  { label: 'Mes seleccionado', value: props.current, amount: props.currentLabel, color: 'bg-primary' },
-  { label: 'Mes anterior', value: props.previous, amount: props.previousLabel, color: 'bg-neutral-400 dark:bg-neutral-500' }
+  { label: props.annual ? 'Año seleccionado' : 'Mes seleccionado', value: props.current, amount: props.currentLabel, color: 'bg-primary' },
+  { label: props.annual ? 'Año anterior' : 'Mes anterior', value: props.previous, amount: props.previousLabel, color: 'bg-neutral-400 dark:bg-neutral-500' }
 ].map(bar => ({
   ...bar,
   style: {

@@ -49,7 +49,7 @@ watch(pages, (total) => {
       <div class="mb-4 flex flex-wrap items-center justify-between gap-4">
         <div>
           <p class="mt-1 text-sm text-muted tabular-nums">
-            {{ filtered.length }} {{ filtered.length === 1 ? 'registro' : 'registros' }} · {{ reportCurrency.format(total) }} MXN{{ search || kind !== 'all' ? ' en resultados' : ' en el mes' }}
+            {{ filtered.length }} {{ filtered.length === 1 ? 'registro' : 'registros' }} · {{ reportCurrency.format(total) }} MXN{{ search || kind !== 'all' ? ' en resultados' : ' en el periodo' }}
           </p>
         </div>
         <div class="flex w-full flex-wrap items-center gap-2 sm:w-auto">
@@ -78,7 +78,7 @@ watch(pages, (total) => {
       <div v-if="visible.length" class="overflow-x-auto">
         <table class="w-full text-sm">
           <caption class="sr-only">
-            Gastos del mes, con importes convertidos a pesos mexicanos
+            Gastos del periodo, con importes convertidos a pesos mexicanos
           </caption>
           <thead class="border-b border-default text-xs text-muted">
             <tr>
@@ -130,7 +130,7 @@ watch(pages, (total) => {
           </tbody>
         </table>
       </div>
-      <UEmpty v-else icon="i-lucide-receipt" :title="search || kind !== 'all' ? 'Sin egresos que coincidan' : 'Sin egresos en este mes'" />
+      <UEmpty v-else icon="i-lucide-receipt" :title="search || kind !== 'all' ? 'Sin egresos que coincidan' : 'Sin egresos en este periodo'" />
     </template>
     <template v-if="pages > 1" #footer>
       <div class="flex w-full items-center justify-between gap-3">

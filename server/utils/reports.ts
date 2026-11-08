@@ -48,6 +48,25 @@ export function reportMonthBounds(selectedMonth: string | undefined, now = new D
   return { start, end, previousStart, totalDays, elapsedDays, dayInMs: DAY_IN_MS }
 }
 
+export function reportYearBounds(selectedYear: string | undefined, now = new Date()) {
+  if (selectedYear !== undefined && (!/^\d{4}$/.test(selectedYear) || Number(selectedYear) < 1000 || Number(selectedYear) > 9998)) {
+    throw createError({ statusCode: 400, statusMessage: 'El año seleccionado no es válido.' })
+  }
+
+  const year = selectedYear === undefined ? now.getUTCFullYear() : Number(selectedYear)
+  const start = new Date(Date.UTC(year, 0, 1))
+  const end = new Date(Date.UTC(year + 1, 0, 1))
+  const previousStart = new Date(Date.UTC(year - 1, 0, 1))
+  const totalDays = Math.round((end.getTime() - start.getTime()) / DAY_IN_MS)
+  const elapsedDays = start > now
+    ? 0
+    : year === now.getUTCFullYear()
+      ? Math.floor((now.getTime() - start.getTime()) / DAY_IN_MS) + 1
+      : totalDays
+
+  return { start, end, previousStart, totalDays, elapsedDays, dayInMs: DAY_IN_MS }
+}
+
 // Match the customer-based classification used by the order list.
 export function reportIsCounterSale(customerName: string) {
   return ['MOSTRADOR', 'MOSTRADOR .'].includes(customerName.toUpperCase())

@@ -1,12 +1,15 @@
 <script setup lang="ts">
 import { dashboardNumber } from '~/utils/dashboardFormatters'
 import { reportCurrency } from '~/utils/reportPeriods'
+import { formatDate } from '~/utils/datetime'
 
 const props = defineProps<{
   month: string
+  view: 'monthly' | 'annual'
 }>()
 
-const { data, status, error, refresh } = useBusinessReports(toRef(props, 'month'))
+const { data, status, error, refresh } = useBusinessReports(toRef(props, 'month'), toRef(props, 'view'))
+const annual = computed(() => data.value?.period.mode === 'annual')
 const errorMessage = computed(() =>
   error.value?.data?.statusMessage || 'No fue posible generar los reportes del periodo.'
 )
@@ -57,18 +60,22 @@ function plural(count: number, singular: string, pluralLabel: string) {
       <section aria-labelledby="reports-summary" class="space-y-3">
         <div class="flex flex-wrap items-baseline justify-between gap-2">
           <h2 id="reports-summary" class="text-lg font-semibold tracking-tight text-highlighted">
-            Resultado del mes
+            Resultado del {{ annual ? 'año' : 'mes' }}
           </h2>
           <p class="text-xs text-muted">
             {{ data.period.label }} · importes en MXN antes de IVA
           </p>
         </div>
-        <ReportsSummaryCards :metrics="data.metrics" />
+        <p v-if="annual" class="text-xs text-muted">
+          {{ data.period.elapsedDays ? `Acumulado al ${formatDate(data.dailyMovements.at(-1)?.date)}.` : 'El año seleccionado aún no inicia.' }}
+          Las variaciones se comparan con el año anterior completo.
+        </p>
+        <ReportsSummaryCards :metrics="data.metrics" :annual="annual" />
         <div class="grid gap-4 xl:grid-cols-3">
-          <ReportsProfitStatement :metrics="data.metrics" class="xl:col-span-2" />
+          <ReportsProfitStatement :annual="annual" :metrics="data.metrics" class="xl:col-span-2" />
           <ReportsMonthPace :report="data" />
         </div>
-        <ReportsCashFlowChart :data="data.dailyMovements" />
+        <ReportsCashFlowChart :data="data.dailyMovements" :annual="annual" />
       </section>
 
       <section aria-labelledby="reports-sales" class="space-y-3">
@@ -120,16 +127,16 @@ function plural(count: number, singular: string, pluralLabel: string) {
         <div class="grid gap-4 xl:grid-cols-3">
           <ReportsRankingCard
             title="Proveedores de material"
-            description="Pagos a proveedores registrados en el mes."
+            :description="`Pagos a proveedores registrados en el ${annual ? 'año' : 'mes'}.`"
             icon="i-lucide-truck"
-            empty="Sin compras de material en este mes"
+            :empty="`Sin compras de material en este ${annual ? 'año' : 'mes'}`"
             :items="data.topMaterialProviders"
             :count-label="count => plural(count, 'pago', 'pagos')"
             color="material"
             exact-amounts
             class="xl:col-span-2"
           />
-          <ReportsPurchaseInvoices :totals="data.metrics.purchaseInvoiceTotals" />
+          <ReportsPurchaseInvoices :annual="annual" :totals="data.metrics.purchaseInvoiceTotals" />
         </div>
       </section>
 
@@ -166,9 +173,9 @@ function plural(count: number, singular: string, pluralLabel: string) {
         <div class="grid gap-4 xl:grid-cols-2">
           <ReportsRankingCard
             title="Saldo por cobrar"
-            description="Saldo vigente de pedidos del mes."
+            :description="`Saldo vigente de pedidos del ${annual ? 'año' : 'mes'}.`"
             icon="i-lucide-hourglass"
-            empty="Sin clientes con adeudo en este mes"
+            :empty="`Sin clientes con adeudo en este ${annual ? 'año' : 'mes'}`"
             :items="data.topDebtors"
             :count-label="count => plural(count, 'pedido con saldo', 'pedidos con saldo')"
             exact-amounts
@@ -201,7 +208,7 @@ function plural(count: number, singular: string, pluralLabel: string) {
                 </div>
               </dl>
               <p class="mb-4 text-xs text-muted tabular-nums">
-                {{ dashboardNumber.format(data.metrics.collectionCoveragePercentage) }}% de los pedidos del mes ya está cubierto. El flujo neto resta todos los egresos a lo cobrado.
+                {{ dashboardNumber.format(data.metrics.collectionCoveragePercentage) }}% de los pedidos del {{ annual ? 'año' : 'mes' }} ya está cubierto. El flujo neto resta todos los egresos a lo cobrado.
               </p>
               <p v-if="data.topDebtors.length" class="mb-2 text-xs font-medium text-muted">
                 Clientes con mayor adeudo

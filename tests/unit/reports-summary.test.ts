@@ -22,6 +22,7 @@ const event = {} as Parameters<typeof summary>[0]
 
 beforeEach(() => {
   vi.resetAllMocks()
+  vi.stubGlobal('getQuery', () => ({ month: '2026-10' }))
   vi.useFakeTimers()
   vi.setSystemTime(new Date('2026-10-02T18:00:00Z'))
   mocks.orders.mockResolvedValue([])
@@ -34,6 +35,31 @@ beforeEach(() => {
 afterEach(() => vi.useRealTimers())
 
 describe('report summary cards', () => {
+  it('queries the entire selected year and compares it with the previous calendar year', async () => {
+    vi.stubGlobal('getQuery', () => ({ view: 'annual', year: '2024' }))
+    const result = await summary(event)
+    const currentRange = { gte: new Date('2024-01-01'), lt: new Date('2025-01-01') }
+    const previousRange = { gte: new Date('2023-01-01'), lt: new Date('2024-01-01') }
+    expect(mocks.orders).toHaveBeenNthCalledWith(1, expect.objectContaining({ where: expect.objectContaining({ orderDate: currentRange }) }))
+    expect(mocks.orders).toHaveBeenNthCalledWith(2, expect.objectContaining({ where: expect.objectContaining({ orderDate: previousRange }) }))
+    expect(mocks.payments).toHaveBeenCalledWith(expect.objectContaining({ where: { paymentDate: currentRange } }))
+    expect(mocks.previousPayments).toHaveBeenCalledWith(expect.objectContaining({ where: { paymentDate: previousRange } }))
+    expect(mocks.expenses).toHaveBeenNthCalledWith(1, expect.objectContaining({ where: { expenseDate: currentRange } }))
+    expect(mocks.expenses).toHaveBeenNthCalledWith(2, expect.objectContaining({ where: { expenseDate: previousRange } }))
+    expect(mocks.invoices).toHaveBeenCalledWith(expect.objectContaining({ where: expect.objectContaining({ date: { gte: new Date('2023-01-01'), lt: new Date('2025-01-01') } }) }))
+    expect(result.period).toMatchObject({ mode: 'annual', start: '2024-01-01', end: '2024-12-31', elapsedDays: 366, totalDays: 366 })
+    expect(result.metrics.previousDays).toBe(365)
+    expect(result.dailyMovements).toHaveLength(366)
+    expect(reportWeeks(result.dailyMovements).reduce((sum, week) => sum + week.days, 0)).toBe(366)
+  })
+
+  it('limits the current annual report to elapsed days', async () => {
+    vi.stubGlobal('getQuery', () => ({ view: 'annual', year: '2026' }))
+    const result = await summary(event)
+    expect(result.dailyMovements.at(-1)?.date).toBe('2026-10-02')
+    expect(mocks.orders).toHaveBeenNthCalledWith(1, expect.objectContaining({ where: expect.objectContaining({ orderDate: { gte: new Date('2026-01-01'), lt: new Date('2026-10-03') } }) }))
+  })
+
   it('values stock across warehouses at the latest unit cost, separately by currency', async () => {
     const balance = (productId: string, quantity: string, unitCost: string | null, costCurrency: string | null) => ({
       productId, quantity, product: { unitCost, costCurrency }

@@ -4,14 +4,19 @@ import type { DateValue } from '@internationalized/date'
 import { formatMonth } from '~/utils/datetime'
 
 const selectedMonth = defineModel<DateValue>({ required: true })
+const props = withDefaults(defineProps<{ type?: 'month' | 'year' }>(), { type: 'month' })
 const open = ref(false)
 
 const label = computed(() => {
+  if (props.type === 'year') return String(selectedMonth.value.year)
   const start = new CalendarDate(selectedMonth.value.year, selectedMonth.value.month, 1)
   return formatMonth(start.toString())
 })
 
 watch(selectedMonth, () => {
+  open.value = false
+})
+watch(() => props.type, () => {
   open.value = false
 })
 </script>
@@ -28,8 +33,9 @@ watch(selectedMonth, () => {
 
     <template #content>
       <UCalendar
+        :key="type"
         v-model="selectedMonth"
-        type="month"
+        :type="type"
         locale="es-MX"
         class="p-2"
       />

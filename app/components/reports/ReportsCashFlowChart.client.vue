@@ -1,12 +1,16 @@
 <script setup lang="ts">
 import type { ReportDailyMovement } from '~/types/reports'
 import { dashboardCompactCurrency, dashboardCurrency } from '~/utils/dashboardFormatters'
+import { reportMonths } from '~/utils/reportPeriods'
 
 const props = defineProps<{
   data: ReportDailyMovement[]
+  annual?: boolean
 }>()
 
-const totals = computed(() => props.data.reduce((result, day) => ({
+const movements = computed(() => props.annual ? reportMonths(props.data) : props.data)
+
+const totals = computed(() => movements.value.reduce((result, day) => ({
   sales: result.sales + day.sales,
   materialPurchases: result.materialPurchases + day.materialPurchases,
   operatingExpenses: result.operatingExpenses + day.operatingExpenses,
@@ -14,13 +18,13 @@ const totals = computed(() => props.data.reduce((result, day) => ({
 }), { sales: 0, materialPurchases: 0, operatingExpenses: 0, netProfit: 0 }))
 
 const maximum = computed(() => Math.max(
-  ...props.data.flatMap(day => [day.sales, day.materialPurchases, day.operatingExpenses]),
+  ...movements.value.flatMap(day => [day.sales, day.materialPurchases, day.operatingExpenses]),
   0
 ))
 const hasMovements = computed(() => maximum.value > 0)
 
 const hoveredDate = shallowRef<string | null>(null)
-const hoveredDay = computed(() => props.data.find(day => day.date === hoveredDate.value) ?? null)
+const hoveredDay = computed(() => movements.value.find(day => day.date === hoveredDate.value) ?? null)
 
 const series = computed(() => [{
   key: 'sales' as const,
@@ -60,7 +64,7 @@ function dayLabel(day: ReportDailyMovement) {
       <div class="flex flex-wrap items-start justify-between gap-x-6 gap-y-3">
         <div>
           <h2 class="text-base font-semibold text-highlighted">
-            Venta y costo por día
+            Venta y costo por {{ annual ? 'mes' : 'día' }}
           </h2>
           <p class="mt-1 text-sm text-muted">
             {{ hoveredDay ? hoveredDay.label : 'Cuánto se vendió y cuánto se gastó en material y operación.' }}
@@ -109,11 +113,12 @@ function dayLabel(day: ReportDailyMovement) {
         </div>
 
         <div class="overflow-x-auto pb-1" @mouseleave="hoveredDate = null">
-          <div class="flex min-w-max items-end gap-1.5">
+          <div class="flex min-w-max items-end gap-1.5" :class="annual ? 'min-w-full' : ''">
             <div
-              v-for="day in data"
+              v-for="day in movements"
               :key="day.date"
               class="group flex w-20 flex-col rounded-md px-0.5 pt-1 transition-colors hover:bg-elevated/60"
+              :class="annual ? 'flex-1' : ''"
               :aria-label="dayLabel(day)"
               role="img"
               tabindex="0"
@@ -144,7 +149,7 @@ function dayLabel(day: ReportDailyMovement) {
       v-else
       icon="i-lucide-chart-column"
       title="Sin movimientos en este periodo"
-      description="La tendencia diaria aparecerá cuando se registren ventas, compras o gastos."
+      :description="`La tendencia ${annual ? 'mensual' : 'diaria'} aparecerá cuando se registren ventas, compras o gastos.`"
       class="h-72"
     />
   </UCard>

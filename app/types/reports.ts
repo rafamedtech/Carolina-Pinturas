@@ -1,4 +1,5 @@
 export interface ReportPeriod {
+  mode: 'monthly' | 'annual'
   label: string
   start: string
   end: string

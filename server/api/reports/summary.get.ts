@@ -14,6 +14,7 @@ import {
   reportSalesChannel,
   reportSalesBeforeTax,
   reportMonthBounds,
+  reportYearBounds,
   reportNumeric,
   reportMargin,
   reportPercentage,
@@ -37,7 +38,16 @@ export default eventHandler(async (event) => {
   const prisma = usePrisma()
   const query = getQuery(event)
   const selectedMonth = typeof query.month === 'string' ? query.month : undefined
-  const { start, end, previousStart, totalDays, elapsedDays, dayInMs } = reportMonthBounds(selectedMonth)
+  if (query.view !== undefined && query.view !== 'monthly' && query.view !== 'annual') {
+    throw createError({ statusCode: 400, statusMessage: 'La vista seleccionada no es válida.' })
+  }
+  if (query.year !== undefined && typeof query.year !== 'string') {
+    throw createError({ statusCode: 400, statusMessage: 'El año seleccionado no es válido.' })
+  }
+  const mode = query.view === 'annual' ? 'annual' : 'monthly'
+  const { start, end, previousStart, totalDays, elapsedDays, dayInMs } = mode === 'annual'
+    ? reportYearBounds(query.year as string | undefined)
+    : reportMonthBounds(selectedMonth)
   const cutoff = new Date(start.getTime() + elapsedDays * dayInMs)
   const salesWhere = {
     statusKey: { notIn: EXCLUDED_SALES_STATUSES },
@@ -321,6 +331,7 @@ export default eventHandler(async (event) => {
 
   const result: BusinessReportSummary = {
     period: {
+      mode,
       label: formatDateRange(reportDateOnly(start), reportDateOnly(new Date(end.getTime() - dayInMs))),
       start: reportDateOnly(start),
       end: reportDateOnly(new Date(end.getTime() - dayInMs)),

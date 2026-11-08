@@ -4,6 +4,7 @@ import type { ReportMetrics } from '~/types/reports'
 import { dashboardNumber } from '~/utils/dashboardFormatters'
 
 const props = defineProps<{
+  annual?: boolean
   metrics: ReportMetrics
 }>()
 
@@ -31,7 +32,7 @@ function marginPoints(current: number | null, previous: number | null) {
 
 function shareOfSales(amount: number) {
   const sales = props.metrics.sales
-  return sales > 0 ? `${dashboardNumber.format(Math.round(amount / sales * 1000) / 10)}% de la venta` : 'Sin ventas en el mes'
+  return sales > 0 ? `${dashboardNumber.format(Math.round(amount / sales * 1000) / 10)}% de la venta` : `Sin ventas en el ${props.annual ? 'año' : 'mes'}`
 }
 
 const toneClasses: Record<Tone, string> = {
@@ -101,7 +102,7 @@ const margin = computed(() => {
           <UIcon :name="card.comparison.icon" class="size-3.5" />
           {{ card.comparison.label }}
         </span>
-        <span class="text-muted">vs. {{ card.previous }}</span>
+        <span class="text-muted">vs. {{ card.previous }} del {{ annual ? 'año' : 'mes' }} anterior</span>
       </p>
 
       <p class="mt-auto pt-4 text-xs text-muted tabular-nums">
@@ -129,7 +130,7 @@ const margin = computed(() => {
           <UIcon :name="margin.comparison.icon" class="size-3.5" />
           {{ margin.comparison.label }}
         </span>
-        <span class="text-muted">vs. {{ margin.previous }}</span>
+        <span class="text-muted">vs. {{ margin.previous }} del {{ annual ? 'año' : 'mes' }} anterior</span>
       </p>
 
       <p class="mt-auto pt-4 text-xs text-muted">

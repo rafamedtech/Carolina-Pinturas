@@ -1,4 +1,22 @@
 import type { ReportDailyMovement } from '~/types/reports'
+import { formatMonth } from './datetime'
+
+export function reportMonths(days: ReportDailyMovement[]) {
+  const months = new Map<string, ReportDailyMovement & { start: string, end: string, days: number }>()
+  const fields = ['sales', 'orderCount', 'counterSales', 'sellerSales', 'internalSales', 'collections', 'expenses', 'netCashFlow', 'materialPurchases', 'operatingExpenses', 'netProfit'] as const
+  for (const day of days) {
+    const key = day.date.slice(0, 7)
+    const month = months.get(key)
+    if (month) {
+      month.end = day.date
+      month.days++
+      for (const field of fields) month[field] += day[field]
+    } else {
+      months.set(key, { ...day, date: `${key}-01`, label: formatMonth(`${key}-01`), start: day.date, end: day.date, days: 1 })
+    }
+  }
+  return [...months.values()]
+}
 
 export function reportWeeks(days: ReportDailyMovement[]) {
   const weeks: { start: string, end: string, days: number, sales: number, orderCount: number, counterSales: number, sellerSales: number, internalSales: number, expenses: number, materialPurchases: number, operatingExpenses: number, netProfit: number }[] = []

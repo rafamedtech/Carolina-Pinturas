@@ -3,7 +3,7 @@ import { reportCurrency } from '~/utils/reportPeriods'
 import type { ReportMetrics } from '~/types/reports'
 import { dashboardNumber } from '~/utils/dashboardFormatters'
 
-const props = defineProps<{ metrics: ReportMetrics }>()
+const props = defineProps<{ metrics: ReportMetrics, annual?: boolean }>()
 
 interface StatementRow {
   key: string
@@ -72,7 +72,7 @@ const hundredTotal = computed(() => hundred.value?.reduce((sum, item) => sum + M
             Estado de resultados
           </h2>
           <p class="mt-1 text-sm text-pretty text-muted">
-            De la venta neta a la utilidad, con la variación contra el mes anterior.
+            De la venta neta a la utilidad, con la variación contra el {{ annual ? 'año' : 'mes' }} anterior.
           </p>
         </div>
         <p class="text-xs text-muted tabular-nums">
@@ -86,7 +86,7 @@ const hundredTotal = computed(() => hundred.value?.reduce((sum, item) => sum + M
 
     <table class="w-full text-sm">
       <caption class="sr-only">
-        Estado de resultados del mes en pesos mexicanos, antes de IVA
+        Estado de resultados del {{ annual ? 'año' : 'mes' }} en pesos mexicanos, antes de IVA
       </caption>
       <thead class="sr-only">
         <tr>
