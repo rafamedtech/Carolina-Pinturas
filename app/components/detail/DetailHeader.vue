@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { BreadcrumbItem } from '@nuxt/ui'
 
-defineProps<{ title: string, breadcrumbs?: BreadcrumbItem[], loading?: boolean, refreshLabel: string }>()
+withDefaults(defineProps<{ title: string, breadcrumbs?: BreadcrumbItem[], loading?: boolean, refreshLabel?: string, showRefresh?: boolean }>(), { refreshLabel: 'Actualizar', showRefresh: true })
 const emit = defineEmits<{ refresh: [] }>()
 </script>
 
@@ -13,6 +13,7 @@ const emit = defineEmits<{ refresh: [] }>()
     <template #right>
       <slot name="actions" />
       <AppButton
+        v-if="showRefresh"
         label="Actualizar"
         :aria-label="refreshLabel"
         :ui="{ label: 'hidden sm:inline' }"

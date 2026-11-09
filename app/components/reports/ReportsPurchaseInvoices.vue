@@ -12,29 +12,18 @@ const visible = computed(() => {
 </script>
 
 <template>
-  <UCard :ui="{ header: 'pb-3', body: 'pt-4' }">
-    <template #header>
-      <div class="flex items-start justify-between gap-3">
-        <div>
-          <h2 class="text-base font-semibold text-highlighted">
-            Facturas de compras
-          </h2>
-          <p class="mt-1 text-sm text-muted">
-            Facturado por proveedores en el {{ annual ? 'año' : 'mes' }}, por moneda. Puede diferir de lo pagado.
-          </p>
-        </div>
-        <span class="flex size-8 shrink-0 items-center justify-center rounded-lg bg-violet-500/10 text-violet-500">
-          <UIcon name="i-lucide-receipt-text" class="size-4" />
-        </span>
-      </div>
+  <DetailCard class="min-w-0" :ui="{ container: 'min-w-0' }" icon="i-lucide-receipt-text">
+    <template #title>
+      <DetailSectionHeading
+        title="Facturas de compras"
+        :description="`Facturado por proveedores en el ${annual ? 'año' : 'mes'}, por moneda. Puede diferir de lo pagado.`"
+        :ui="{ title: 'text-base' }"
+      />
     </template>
 
-    <dl class="divide-y divide-default">
-      <div v-for="total in visible" :key="total.currencyCode" class="py-3 first:pt-0 last:pb-0">
-        <dt class="text-xs font-medium tracking-wide text-muted uppercase">
-          {{ total.currencyCode }}
-        </dt>
-        <dd class="mt-1">
+    <DetailFields :fields="visible.map(total => ({ key: total.currencyCode, label: total.currencyCode }))" :columns="1">
+      <template #value="{ field }">
+        <template v-for="total in visible.filter(total => total.currencyCode === field.key)" :key="total.currencyCode">
           <p class="text-xl font-semibold tabular-nums text-highlighted">
             {{ purchaseMoney(total.amount, total.currencyCode) }}
           </p>
@@ -44,8 +33,8 @@ const visible = computed(() => {
               · {{ total.changePercentage > 0 ? '+' : '' }}{{ dashboardNumber.format(total.changePercentage) }}%
             </template>
           </p>
-        </dd>
-      </div>
-    </dl>
-  </UCard>
+        </template>
+      </template>
+    </DetailFields>
+  </DetailCard>
 </template>

@@ -82,20 +82,19 @@ const margin = computed(() => {
 </script>
 
 <template>
-  <div class="grid gap-px overflow-hidden rounded-xl bg-(--ui-border) ring ring-default sm:grid-cols-2 xl:grid-cols-4">
-    <article
+  <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+    <DetailStatCard
       v-for="card in cards"
       :key="card.key"
-      class="flex flex-col bg-default p-5"
+      :title="card.title"
+      :value="card.value"
     >
-      <h3 class="flex items-center gap-2 text-sm font-medium text-muted">
-        <span class="h-3.5 w-1 rounded-full" :class="card.marker" />
-        {{ card.title }}
-      </h3>
-
-      <p class="mt-3 text-[1.65rem] leading-none font-semibold tracking-tight tabular-nums text-highlighted">
-        {{ card.value }}
-      </p>
+      <template #title>
+        <h3 class="flex items-center gap-2 text-xs font-normal text-muted uppercase">
+          <span class="h-3.5 w-1 rounded-full" :class="card.marker" />
+          {{ card.title }}
+        </h3>
+      </template>
 
       <p class="mt-3 flex flex-wrap items-center gap-x-1.5 text-xs tabular-nums">
         <span class="inline-flex items-center gap-0.5 font-medium" :class="toneClasses[card.comparison.tone]">
@@ -108,22 +107,26 @@ const margin = computed(() => {
       <p class="mt-auto pt-4 text-xs text-muted tabular-nums">
         {{ card.detail }}
       </p>
-    </article>
+    </DetailStatCard>
 
-    <article class="flex flex-col p-5" :class="margin.isLoss ? 'bg-error/5' : 'bg-success/5'">
-      <h3 class="flex items-center gap-2 text-sm font-medium text-muted">
-        <span class="h-3.5 w-1 rounded-full" :class="margin.isLoss ? 'bg-error' : 'bg-success'" />
-        Margen de ganancia
-      </h3>
+    <DetailStatCard title="Margen de ganancia" :value="margin.percentage">
+      <template #title>
+        <h3 class="flex items-center gap-2 text-xs font-normal text-muted uppercase">
+          <span class="h-3.5 w-1 rounded-full" :class="margin.isLoss ? 'bg-error' : 'bg-success'" />
+          Margen de ganancia
+        </h3>
+      </template>
 
-      <p class="mt-3 flex items-baseline gap-2">
-        <span class="text-[1.65rem] leading-none font-semibold tracking-tight tabular-nums" :class="margin.isLoss ? 'text-error' : 'text-highlighted'">
-          {{ margin.percentage }}
+      <template #value>
+        <span class="inline-flex flex-wrap items-baseline gap-2">
+          <span class="text-[1.65rem] leading-none font-semibold tracking-tight tabular-nums" :class="margin.isLoss ? 'text-error' : 'text-highlighted'">
+            {{ margin.percentage }}
+          </span>
+          <span class="text-sm font-medium tabular-nums text-muted">
+            {{ reportCurrency.format(metrics.netProfit) }}
+          </span>
         </span>
-        <span class="text-sm font-medium tabular-nums text-muted">
-          {{ reportCurrency.format(metrics.netProfit) }}
-        </span>
-      </p>
+      </template>
 
       <p class="mt-3 flex flex-wrap items-center gap-x-1.5 text-xs tabular-nums">
         <span class="inline-flex items-center gap-0.5 font-medium" :class="toneClasses[margin.comparison.tone]">
@@ -136,6 +139,6 @@ const margin = computed(() => {
       <p class="mt-auto pt-4 text-xs text-muted">
         Utilidad neta sobre ventas
       </p>
-    </article>
+    </DetailStatCard>
   </div>
 </template>

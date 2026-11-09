@@ -25,15 +25,11 @@ const month = computed(() => `${selectedMonth.value.year}-${String(selectedMonth
 <template>
   <UDashboardPanel id="reports">
     <template #header>
-      <UDashboardNavbar :title="title">
-        <template #leading>
-          <UDashboardSidebarCollapse />
-        </template>
-
-        <template #right>
+      <DetailHeader :title="title" :show-refresh="false">
+        <template #actions>
           <ReportsPeriodControls v-model:month="selectedMonth" v-model:view="view" />
         </template>
-      </UDashboardNavbar>
+      </DetailHeader>
     </template>
 
     <template #body>

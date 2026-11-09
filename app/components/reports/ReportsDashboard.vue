@@ -30,7 +30,7 @@ function plural(count: number, singular: string, pluralLabel: string) {
       icon="i-lucide-cloud-alert"
     >
       <template #actions>
-        <UButton
+        <AppButton
           label="Reintentar"
           color="warning"
           variant="soft"
@@ -186,32 +186,19 @@ function plural(count: number, singular: string, pluralLabel: string) {
             exact-amounts
           >
             <template #summary>
-              <dl class="mb-4 grid grid-cols-3 gap-3 rounded-lg bg-elevated/60 p-3">
-                <div>
-                  <dt class="text-xs text-muted">
-                    Pendiente
-                  </dt>
-                  <dd class="mt-0.5 font-semibold tabular-nums text-highlighted">
-                    {{ reportCurrency.format(data.metrics.outstandingBalance) }}
-                  </dd>
-                </div>
-                <div>
-                  <dt class="text-xs text-muted">
-                    Cobrado
-                  </dt>
-                  <dd class="mt-0.5 font-semibold tabular-nums text-highlighted">
-                    {{ reportCurrency.format(data.metrics.collections) }}
-                  </dd>
-                </div>
-                <div>
-                  <dt class="text-xs text-muted">
-                    Flujo neto
-                  </dt>
-                  <dd class="mt-0.5 font-semibold tabular-nums" :class="data.metrics.netCashFlow < 0 ? 'text-error' : 'text-highlighted'">
-                    {{ reportCurrency.format(data.metrics.netCashFlow) }}
-                  </dd>
-                </div>
-              </dl>
+              <DetailFields
+                :fields="[
+                  { key: 'outstanding', label: 'Pendiente', value: reportCurrency.format(data.metrics.outstandingBalance) },
+                  { key: 'collections', label: 'Cobrado', value: reportCurrency.format(data.metrics.collections) },
+                  { key: 'net', label: 'Flujo neto', value: reportCurrency.format(data.metrics.netCashFlow) }
+                ]"
+                :columns="3"
+                class="mb-4 rounded-lg bg-elevated/60 p-3"
+              >
+                <template #value="{ field }">
+                  <span class="tabular-nums" :class="field.key === 'net' && data.metrics.netCashFlow < 0 ? 'text-error' : 'text-highlighted'">{{ field.value }}</span>
+                </template>
+              </DetailFields>
               <p class="mb-4 text-xs text-muted tabular-nums">
                 {{ dashboardNumber.format(data.metrics.collectionCoveragePercentage) }}% de los pedidos del {{ annual ? 'año' : 'mes' }} ya está cubierto. El flujo neto resta todos los egresos a lo cobrado.
               </p>

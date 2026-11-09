@@ -37,14 +37,9 @@ const rows = computed(() => props.channels.map((channel) => {
 </script>
 
 <template>
-  <UCard id="reports-sales-channels">
-    <template #header>
-      <h2 class="text-base font-semibold text-highlighted">
-        Ventas por canal
-      </h2>
-      <p class="mt-1 text-sm text-muted">
-        Mostrador, vendedor y clientes internos, según el cliente del pedido.
-      </p>
+  <DetailCard id="reports-sales-channels" class="min-w-0" :ui="{ container: 'min-w-0' }">
+    <template #title>
+      <DetailSectionHeading title="Ventas por canal" description="Mostrador, vendedor y clientes internos, según el cliente del pedido." :ui="{ title: 'text-base' }" />
     </template>
 
     <div class="flex flex-col items-center gap-6 lg:flex-row">
@@ -74,14 +69,16 @@ const rows = computed(() => props.channels.map((channel) => {
         </path>
       </svg>
 
-      <dl class="grid w-full min-w-0 gap-4 sm:grid-cols-3">
-        <div v-for="channel in rows" :key="channel.key">
-          <dt class="flex items-center gap-2 text-sm text-muted">
+      <DetailFields :fields="rows.map(channel => ({ key: channel.key, label: channel.label }))" :columns="3" class="w-full min-w-0">
+        <template #label="{ field }">
+          <span v-for="channel in rows.filter(channel => channel.key === field.key)" :key="channel.key" class="flex items-center gap-2">
             <span class="size-2.5 rounded-full" :class="channelColors[channel.key]" />
             {{ channel.label }}
             <span class="ml-auto tabular-nums">{{ channel.percentage }}%</span>
-          </dt>
-          <dd class="mt-1">
+          </span>
+        </template>
+        <template #value="{ field }">
+          <template v-for="channel in rows.filter(channel => channel.key === field.key)" :key="channel.key">
             <p class="text-lg font-semibold tabular-nums text-highlighted">
               {{ reportCurrency.format(channel.amount) }}
             </p>
@@ -92,13 +89,13 @@ const rows = computed(() => props.channels.map((channel) => {
                 ({{ channel.change > 0 ? '+' : '' }}{{ dashboardNumber.format(channel.change) }}%)
               </span>
             </p>
-          </dd>
-        </div>
-      </dl>
+          </template>
+        </template>
+      </DetailFields>
     </div>
 
     <p v-if="!total" class="mt-5 text-sm text-muted">
       Sin ventas en este periodo.
     </p>
-  </UCard>
+  </DetailCard>
 </template>

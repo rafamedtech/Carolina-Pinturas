@@ -35,15 +35,13 @@ function change(value: number | null) {
 </script>
 
 <template>
-  <UCard>
-    <template #header>
-      <h2 class="text-base font-semibold text-highlighted">
-        {{ !report.period.elapsedDays ? 'Periodo sin iniciar' : pace.inProgress ? 'Proyección de cierre' : annual ? 'Cierre del año' : 'Cierre del mes' }}
-      </h2>
+  <DetailCard class="min-w-0" :ui="{ container: 'min-w-0' }">
+    <div class="space-y-3">
+      <DetailSectionHeading :title="!report.period.elapsedDays ? 'Periodo sin iniciar' : pace.inProgress ? 'Proyección de cierre' : annual ? 'Cierre del año' : 'Cierre del mes'" :ui="{ title: 'text-base' }" />
       <p class="mt-1 text-sm text-muted">
         Día {{ report.period.elapsedDays }} de {{ report.period.totalDays }}
       </p>
-    </template>
+    </div>
 
     <UProgress :model-value="pace.progress" size="xs" color="primary" />
 
@@ -60,27 +58,20 @@ function change(value: number | null) {
       </p>
     </div>
 
-    <dl class="mt-4 grid grid-cols-2 gap-3 border-t border-default pt-3 text-xs">
-      <div>
-        <dt class="text-muted">
-          Venta diaria
-        </dt>
-        <dd class="mt-0.5 font-semibold tabular-nums text-highlighted">
-          {{ reportCurrency.format(pace.dailySales) }}
-          <span class="font-normal" :class="changeClass(pace.dailyChange)">{{ change(pace.dailyChange) }}</span>
-        </dd>
-      </div>
-      <div>
-        <dt class="text-muted">
-          {{ annual ? 'Año anterior' : 'Mes anterior' }} / día
-        </dt>
-        <dd class="mt-0.5 font-semibold tabular-nums text-highlighted">
-          {{ reportCurrency.format(pace.previousDailySales) }}
-        </dd>
-      </div>
-    </dl>
+    <DetailFields
+      :fields="[
+        { key: 'daily', label: 'Venta diaria', value: reportCurrency.format(pace.dailySales) },
+        { key: 'previous', label: `${annual ? 'Año anterior' : 'Mes anterior'} / día`, value: reportCurrency.format(pace.previousDailySales) }
+      ]"
+      class="mt-4 border-t border-default pt-3"
+    >
+      <template #value="{ field }">
+        <span class="tabular-nums text-highlighted">{{ field.value }}</span>
+        <span v-if="field.key === 'daily'" class="ml-1 font-normal" :class="changeClass(pace.dailyChange)">{{ change(pace.dailyChange) }}</span>
+      </template>
+    </DetailFields>
     <p v-if="pace.inProgress" class="mt-3 text-xs text-dimmed">
       Estimación lineal: venta diaria promedio × días del {{ annual ? 'año' : 'mes' }}.
     </p>
-  </UCard>
+  </DetailCard>
 </template>

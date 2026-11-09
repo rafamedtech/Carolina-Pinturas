@@ -19,21 +19,9 @@ const bar = computed(() => props.color === 'material' ? 'bg-violet-500' : 'bg-pr
 </script>
 
 <template>
-  <UCard :ui="{ header: 'pb-3', body: 'pt-4' }">
-    <template #header>
-      <div class="flex items-start justify-between gap-3">
-        <div>
-          <h2 class="text-base font-semibold text-highlighted">
-            {{ title }}
-          </h2>
-          <p class="mt-1 text-sm text-muted">
-            {{ description }}
-          </p>
-        </div>
-        <span class="flex size-8 shrink-0 items-center justify-center rounded-lg" :class="accent">
-          <UIcon :name="icon" class="size-4" />
-        </span>
-      </div>
+  <DetailCard class="min-w-0" :ui="{ container: 'min-w-0 justify-start lg:flex', wrapper: 'flex-none' }" :icon="icon">
+    <template #title>
+      <DetailSectionHeading :title="title" :description="description" :ui="{ title: 'text-base' }" />
     </template>
 
     <slot name="summary" />
@@ -71,5 +59,5 @@ const bar = computed(() => props.color === 'material' ? 'bg-violet-500' : 'bg-pr
       :title="empty"
       class="py-12"
     />
-  </UCard>
+  </DetailCard>
 </template>

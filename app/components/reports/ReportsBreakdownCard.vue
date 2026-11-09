@@ -14,32 +14,14 @@ const props = withDefaults(defineProps<{
   limit?: number
 }>(), { limit: 8 })
 
-const accents = {
-  primary: 'text-primary bg-primary/10',
-  success: 'text-success bg-success/10',
-  warning: 'text-warning bg-warning/10',
-  info: 'text-info bg-info/10'
-}
 const expanded = shallowRef(false)
 const visible = computed(() => expanded.value ? props.items : props.items.slice(0, props.limit))
 </script>
 
 <template>
-  <UCard :ui="{ header: 'pb-3', body: 'pt-4' }">
-    <template #header>
-      <div class="flex items-start justify-between gap-3">
-        <div>
-          <h2 class="text-base font-semibold text-highlighted">
-            {{ title }}
-          </h2>
-          <p class="mt-1 text-sm text-muted">
-            {{ description }}
-          </p>
-        </div>
-        <span class="flex size-8 shrink-0 items-center justify-center rounded-lg" :class="accents[color]">
-          <UIcon :name="icon" class="size-4" />
-        </span>
-      </div>
+  <DetailCard class="min-w-0" :ui="{ container: 'min-w-0 justify-start lg:flex', wrapper: 'flex-none' }" :icon="icon">
+    <template #title>
+      <DetailSectionHeading :title="title" :description="description" :ui="{ title: 'text-base' }" />
     </template>
 
     <ul v-if="items.length" class="divide-y divide-default">
@@ -72,7 +54,7 @@ const visible = computed(() => expanded.value ? props.items : props.items.slice(
       class="py-12"
     />
 
-    <UButton
+    <AppButton
       v-if="items.length > limit"
       :label="expanded ? 'Ver menos' : `Ver ${items.length - limit} más`"
       color="neutral"
@@ -81,8 +63,8 @@ const visible = computed(() => expanded.value ? props.items : props.items.slice(
       class="mt-3 px-0"
       @click="expanded = !expanded"
     />
-    <template v-if="$slots.footer" #footer>
+    <div v-if="$slots.footer" class="border-t border-default pt-4">
       <slot name="footer" />
-    </template>
-  </UCard>
+    </div>
+  </DetailCard>
 </template>

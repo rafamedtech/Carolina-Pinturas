@@ -77,42 +77,36 @@ function dayLabel(day: ChartMovement) {
 </script>
 
 <template>
-  <UCard :ui="{ header: 'pb-3', body: 'pt-4' }">
-    <template #header>
+  <DetailCard class="min-w-0" :ui="{ container: 'min-w-0' }">
+    <div class="space-y-3">
       <div class="flex flex-wrap items-start justify-between gap-x-6 gap-y-3">
         <div>
-          <h2 class="text-base font-semibold text-highlighted">
-            Venta y costo por {{ annual ? 'mes' : 'semana' }}
-          </h2>
+          <DetailSectionHeading :title="`Venta y costo por ${annual ? 'mes' : 'semana'}`" :ui="{ title: 'text-base' }" />
           <p class="mt-1 text-sm text-muted">
             {{ hoveredDay ? hoveredDay.label : annual ? 'Cuánto se vendió y cuánto se gastó en material y operación.' : 'Totales de lunes a domingo, incluyendo solo los días transcurridos del mes.' }}
           </p>
         </div>
 
-        <dl class="flex flex-wrap gap-x-5 gap-y-2">
-          <div v-for="serie in series" :key="serie.key" class="min-w-24">
-            <dt class="flex items-center gap-1.5 text-xs text-muted">
-              <span class="size-2 rounded-full" :class="serie.dot" />
-              {{ serie.label }}
-            </dt>
-            <dd class="mt-0.5 text-sm font-semibold tabular-nums text-highlighted">
-              {{ dashboardCompactCurrency(hoveredDay ? hoveredDay[serie.key] : totals[serie.key]) }}
-            </dd>
-          </div>
-          <div class="min-w-24 border-l border-default pl-5">
-            <dt class="text-xs text-muted">
-              Resultado
-            </dt>
-            <dd
-              class="mt-0.5 text-sm font-semibold tabular-nums"
-              :class="(hoveredDay ? hoveredDay.netProfit : totals.netProfit) < 0 ? 'text-error' : 'text-success'"
-            >
-              {{ dashboardCompactCurrency(hoveredDay ? hoveredDay.netProfit : totals.netProfit) }}
-            </dd>
-          </div>
-        </dl>
+        <DetailFields
+          :fields="[
+            ...series.map(serie => ({ key: serie.key, label: serie.label, value: dashboardCompactCurrency(hoveredDay ? hoveredDay[serie.key] : totals[serie.key]) })),
+            { key: 'result', label: 'Resultado', value: dashboardCompactCurrency(hoveredDay ? hoveredDay.netProfit : totals.netProfit) }
+          ]"
+          :columns="4"
+          class="gap-x-5 gap-y-2"
+        >
+          <template #label="{ field }">
+            <span class="flex items-center gap-1.5 text-xs">
+              <span v-if="field.key !== 'result'" class="size-2 rounded-full" :class="series.find(serie => serie.key === field.key)?.dot" />
+              {{ field.label }}
+            </span>
+          </template>
+          <template #value="{ field }">
+            <span class="text-sm font-semibold tabular-nums" :class="field.key === 'result' ? (hoveredDay ? hoveredDay.netProfit : totals.netProfit) < 0 ? 'text-error' : 'text-success' : 'text-highlighted'">{{ field.value }}</span>
+          </template>
+        </DetailFields>
       </div>
-    </template>
+    </div>
 
     <p v-if="!annual && hasMovements" class="mb-3 flex items-center gap-2 text-xs text-muted">
       <span class="relative h-0.5 w-6 bg-primary" aria-hidden="true">
@@ -201,5 +195,5 @@ function dayLabel(day: ChartMovement) {
       :description="`La tendencia ${annual ? 'mensual' : 'semanal'} aparecerá cuando se registren ventas, compras o gastos.`"
       class="h-72"
     />
-  </UCard>
+  </DetailCard>
 </template>

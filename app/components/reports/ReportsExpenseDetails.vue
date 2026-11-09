@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import type { TableColumn } from '@nuxt/ui'
 import { tableQueryField, tableQueryText, tableQueryPage } from '~/utils/tableQuery'
 import { reportCurrency, reportShortDate } from '~/utils/reportPeriods'
 import type { ReportExpenseDetail } from '~/types/reports'
@@ -18,6 +19,13 @@ const kinds = computed(() => [
   { label: 'Material', value: 'material', count: props.expenses.filter(expense => expense.kind === 'material').length },
   { label: 'Operativos', value: 'operating', count: props.expenses.filter(expense => expense.kind === 'operating').length }
 ])
+const columns: TableColumn<ReportExpenseDetail>[] = [
+  { accessorKey: 'date', header: 'Fecha', meta: { class: { td: 'whitespace-nowrap text-muted' } } },
+  { accessorKey: 'description', header: 'Concepto / categoría', meta: { class: { td: 'min-w-48' } } },
+  { accessorKey: 'provider', header: 'Proveedor', meta: { class: { td: 'min-w-36 text-muted' } } },
+  { accessorKey: 'paymentMethod', header: 'Pago', meta: { class: { td: 'text-muted' } } },
+  { accessorKey: 'amount', header: 'Importe MXN', meta: { class: { th: 'text-right', td: 'text-right whitespace-nowrap tabular-nums' } } }
+]
 const pageSize = 10
 const filtered = computed(() => {
   const term = search.value.trim().toLocaleLowerCase('es-MX')
@@ -38,7 +46,7 @@ watch(pages, (total) => {
     fullscreen
     :ui="{ header: 'shrink-0 pr-16', body: 'min-h-0', footer: 'shrink-0' }"
   >
-    <UButton
+    <AppButton
       label="Ver egresos a detalle"
       icon="i-lucide-maximize-2"
       color="neutral"
@@ -54,17 +62,18 @@ watch(pages, (total) => {
         </div>
         <div class="flex w-full flex-wrap items-center gap-2 sm:w-auto">
           <div class="flex rounded-lg bg-elevated p-0.5" role="group" aria-label="Tipo de egreso">
-            <button
+            <AppButton
               v-for="item in kinds"
               :key="item.value"
               type="button"
-              class="rounded-md px-2.5 py-1 text-xs font-medium transition-colors focus-visible:outline-2 focus-visible:outline-primary"
-              :class="kind === item.value ? 'bg-default text-highlighted shadow-xs' : 'text-muted hover:text-default'"
+              color="neutral"
+              :variant="kind === item.value ? 'subtle' : 'ghost'"
+              size="xs"
               :aria-pressed="kind === item.value"
               @click="kind = item.value"
             >
               {{ item.label }} <span class="tabular-nums text-dimmed">{{ item.count }}</span>
-            </button>
+            </AppButton>
           </div>
           <UInput
             v-model="search"
@@ -75,75 +84,53 @@ watch(pages, (total) => {
           />
         </div>
       </div>
-      <div v-if="visible.length" class="overflow-x-auto">
-        <table class="w-full text-sm">
-          <caption class="sr-only">
-            Gastos del periodo, con importes convertidos a pesos mexicanos
-          </caption>
-          <thead class="border-b border-default text-xs text-muted">
-            <tr>
-              <th class="py-3 pr-4 text-left font-medium">
-                Fecha
-              </th><th class="py-3 pr-4 text-left font-medium">
-                Concepto / categoría
-              </th><th class="py-3 pr-4 text-left font-medium">
-                Proveedor
-              </th><th class="py-3 pr-4 text-left font-medium">
-                Pago
-              </th><th class="py-3 text-right font-medium">
-                Importe MXN
-              </th>
-            </tr>
-          </thead>
-          <tbody class="divide-y divide-default">
-            <tr v-for="expense in visible" :key="expense.id" class="align-top">
-              <td class="py-4 pr-4 whitespace-nowrap text-muted">
-                {{ reportShortDate(expense.date) }}
-              </td>
-              <td class="min-w-48 py-4 pr-4">
-                <p class="font-medium text-default">
-                  {{ expense.description }}
-                </p>
-                <p class="mt-1 flex items-center gap-1.5 text-xs text-muted">
-                  <span class="size-1.5 rounded-full" :class="expense.kind === 'material' ? 'bg-violet-500' : 'bg-warning'" />
-                  {{ expense.category }}
-                </p>
-                <p v-if="expense.notes" class="mt-1 max-w-sm text-xs text-muted">
-                  {{ expense.notes }}
-                </p>
-              </td>
-              <td class="min-w-36 py-4 pr-4 text-muted">
-                {{ expense.provider }}
-              </td>
-              <td class="py-4 pr-4 text-muted">
-                {{ expense.paymentMethod }}
-              </td>
-              <td class="py-4 text-right whitespace-nowrap tabular-nums">
-                <p class="font-semibold">
-                  {{ reportCurrency.format(expense.amount) }}
-                </p>
-                <p v-if="expense.currencyCode !== 'MXN'" class="mt-1 text-xs text-muted">
-                  {{ dashboardNumber.format(expense.originalAmount) }} {{ expense.currencyCode }} × {{ expense.exchangeRate }}
-                </p>
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-      <UEmpty v-else icon="i-lucide-receipt" :title="search || kind !== 'all' ? 'Sin egresos que coincidan' : 'Sin egresos en este periodo'" />
+      <DetailTable
+        :data="visible"
+        :columns="columns"
+        :get-row-id="expense => expense.id"
+        caption="Gastos del periodo, con importes convertidos a pesos mexicanos"
+        :ui="{ caption: 'sr-only' }"
+      >
+        <template #date-cell="{ row }">
+          {{ reportShortDate(row.original.date) }}
+        </template>
+        <template #description-cell="{ row }">
+          <p class="font-medium text-default">
+            {{ row.original.description }}
+          </p>
+          <p class="mt-1 flex items-center gap-1.5 text-xs text-muted">
+            <span class="size-1.5 rounded-full" :class="row.original.kind === 'material' ? 'bg-violet-500' : 'bg-warning'" />
+            {{ row.original.category }}
+          </p>
+          <p v-if="row.original.notes" class="mt-1 max-w-sm text-xs text-muted">
+            {{ row.original.notes }}
+          </p>
+        </template>
+        <template #amount-cell="{ row }">
+          <p class="font-semibold">
+            {{ reportCurrency.format(row.original.amount) }}
+          </p>
+          <p v-if="row.original.currencyCode !== 'MXN'" class="mt-1 text-xs text-muted">
+            {{ dashboardNumber.format(row.original.originalAmount) }} {{ row.original.currencyCode }} × {{ row.original.exchangeRate }}
+          </p>
+        </template>
+        <template #empty>
+          <UEmpty icon="i-lucide-receipt" :title="search || kind !== 'all' ? 'Sin egresos que coincidan' : 'Sin egresos en este periodo'" />
+        </template>
+      </DetailTable>
     </template>
     <template v-if="pages > 1" #footer>
       <div class="flex w-full items-center justify-between gap-3">
         <span class="text-xs text-muted">Página {{ page }} de {{ pages }}</span>
         <div class="flex gap-2">
-          <UButton
+          <AppButton
             label="Anterior"
             color="neutral"
             variant="outline"
             :disabled="page <= 1"
             @click="page--"
           />
-          <UButton
+          <AppButton
             label="Siguiente"
             color="neutral"
             variant="outline"

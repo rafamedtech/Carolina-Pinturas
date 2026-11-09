@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import type { TableColumn } from '@nuxt/ui'
 import { reportCurrency } from '~/utils/reportPeriods'
 import type { ReportMetrics } from '~/types/reports'
 import { dashboardNumber } from '~/utils/dashboardFormatters'
@@ -27,6 +28,13 @@ const rows = computed<StatementRow[]>(() => {
     { key: 'net', label: 'Utilidad neta', sign: '=', amount: m.netProfit, previous: m.previousNetProfit, bar: m.netProfit < 0 ? 'bg-error' : 'bg-success', total: true }
   ]
 })
+
+const columns: TableColumn<StatementRow>[] = [
+  { accessorKey: 'label', header: 'Concepto' },
+  { accessorKey: 'amount', header: 'Importe', meta: { class: { td: 'text-right whitespace-nowrap tabular-nums' } } },
+  { id: 'share', header: 'Porcentaje de la venta', meta: { class: { th: 'hidden sm:table-cell', td: 'hidden text-right text-xs text-muted tabular-nums sm:table-cell' } } },
+  { id: 'change', header: 'Variación', meta: { class: { td: 'text-right text-xs whitespace-nowrap tabular-nums' } } }
+]
 
 const scale = computed(() => Math.max(props.metrics.sales, props.metrics.materialPurchases + props.metrics.operatingExpenses, 1))
 
@@ -64,13 +72,11 @@ const hundredTotal = computed(() => hundred.value?.reduce((sum, item) => sum + M
 </script>
 
 <template>
-  <UCard :ui="{ body: 'p-0 sm:p-0' }">
-    <template #header>
+  <DetailCard class="min-w-0" :ui="{ container: 'min-w-0' }">
+    <div class="space-y-3">
       <div class="flex flex-wrap items-baseline justify-between gap-2">
         <div>
-          <h2 class="text-base font-semibold text-highlighted">
-            Estado de resultados
-          </h2>
+          <DetailSectionHeading title="Estado de resultados" :ui="{ title: 'text-base' }" />
           <p class="mt-1 text-sm text-pretty text-muted">
             De la venta neta a la utilidad, con la variación contra el {{ annual ? 'año' : 'mes' }} anterior.
           </p>
@@ -82,50 +88,41 @@ const hundredTotal = computed(() => hundred.value?.reduce((sum, item) => sum + M
           </span>
         </p>
       </div>
-    </template>
+    </div>
 
-    <table class="w-full text-sm">
-      <caption class="sr-only">
-        Estado de resultados del {{ annual ? 'año' : 'mes' }} en pesos mexicanos, antes de IVA
-      </caption>
-      <thead class="sr-only">
-        <tr>
-          <th>Concepto</th><th>Importe</th><th>Porcentaje de la venta</th><th>Variación</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr
-          v-for="row in rows"
-          :key="row.key"
-          :class="row.total ? 'bg-elevated/50' : ''"
-          class="border-t border-default first:border-t-0"
-        >
-          <th scope="row" class="w-[42%] py-3 pr-3 pl-4 text-left font-normal sm:pl-6">
-            <div class="flex items-center gap-2">
-              <span class="w-3 shrink-0 text-center font-mono text-xs text-dimmed" aria-hidden="true">{{ row.sign }}</span>
-              <span :class="row.total ? 'font-semibold text-highlighted' : 'text-default'">{{ row.label }}</span>
-            </div>
-            <div class="mt-2 ml-5 h-1.5 rounded-full bg-elevated">
-              <div class="h-full rounded-full transition-[width] duration-500" :class="row.bar" :style="{ width: width(row.amount) }" />
-            </div>
-          </th>
-          <td class="py-3 pr-3 text-right whitespace-nowrap tabular-nums" :class="row.total ? 'font-semibold text-highlighted' : 'font-medium text-default'">
-            <span :class="row.amount < 0 ? 'text-error' : ''">{{ reportCurrency.format(row.amount) }}</span>
-            <p class="mt-0.5 text-xs font-normal text-muted">
-              ant. {{ reportCurrency.format(row.previous) }}
-            </p>
-          </td>
-          <td class="hidden py-3 pr-3 text-right text-xs whitespace-nowrap text-muted tabular-nums sm:table-cell">
-            {{ share(row.amount) }}
-          </td>
-          <td class="py-3 pr-4 text-right text-xs font-medium whitespace-nowrap tabular-nums sm:pr-6" :class="change(row).class">
-            {{ change(row).label }}
-          </td>
-        </tr>
-      </tbody>
-    </table>
+    <DetailTable
+      :data="rows"
+      :columns="columns"
+      :get-row-id="row => row.key"
+      :caption="`Estado de resultados del ${annual ? 'año' : 'mes'} en pesos mexicanos, antes de IVA`"
+      :ui="{ thead: 'sr-only', caption: 'sr-only', td: 'align-top py-3' }"
+    >
+      <template #label-cell="{ row }">
+        <div class="min-w-32" :class="row.original.total ? 'font-semibold text-highlighted' : 'text-default'">
+          <div class="flex items-center gap-2">
+            <span class="w-3 shrink-0 text-center font-mono text-xs text-dimmed" aria-hidden="true">{{ row.original.sign }}</span>
+            <span>{{ row.original.label }}</span>
+          </div>
+          <div class="mt-2 ml-5 h-1.5 rounded-full bg-elevated">
+            <div class="h-full rounded-full transition-[width] duration-500" :class="row.original.bar" :style="{ width: width(row.original.amount) }" />
+          </div>
+        </div>
+      </template>
+      <template #amount-cell="{ row }">
+        <span :class="[row.original.total ? 'font-semibold' : 'font-medium', row.original.amount < 0 ? 'text-error' : 'text-highlighted']">{{ reportCurrency.format(row.original.amount) }}</span>
+        <p class="mt-0.5 text-xs font-normal text-muted">
+          ant. {{ reportCurrency.format(row.original.previous) }}
+        </p>
+      </template>
+      <template #share-cell="{ row }">
+        {{ share(row.original.amount) }}
+      </template>
+      <template #change-cell="{ row }">
+        <span :class="change(row.original).class">{{ change(row.original).label }}</span>
+      </template>
+    </DetailTable>
 
-    <template v-if="hundred" #footer>
+    <div v-if="hundred" class="border-t border-default pt-4">
       <p class="text-xs font-medium text-muted">
         De cada $100 vendidos
       </p>
@@ -141,17 +138,17 @@ const hundredTotal = computed(() => hundred.value?.reduce((sum, item) => sum + M
           :style="{ width: `${Math.abs(item.value) / hundredTotal * 100}%` }"
         />
       </div>
-      <dl class="mt-2 flex flex-wrap gap-x-5 gap-y-1 text-xs">
-        <div v-for="item in hundred" :key="item.key" class="flex items-center gap-1.5">
-          <span class="size-2 rounded-full" :class="item.class" />
-          <dt class="text-muted">
-            {{ item.label }}
-          </dt>
-          <dd class="font-semibold tabular-nums text-highlighted">
-            ${{ dashboardNumber.format(Math.round(item.value * 10) / 10) }}
-          </dd>
-        </div>
-      </dl>
-    </template>
-  </UCard>
+      <DetailFields :fields="hundred.map(item => ({ key: item.key, label: item.label, value: `$${dashboardNumber.format(Math.round(item.value * 10) / 10)}` }))" :columns="3" class="mt-2">
+        <template #label="{ field }">
+          <span class="flex items-center gap-1.5 text-xs">
+            <span class="size-2 rounded-full" :class="hundred.find(item => item.key === field.key)?.class" />
+            {{ field.label }}
+          </span>
+        </template>
+        <template #value="{ field }">
+          <span class="text-xs font-semibold tabular-nums text-highlighted">{{ field.value }}</span>
+        </template>
+      </DetailFields>
+    </div>
+  </DetailCard>
 </template>
