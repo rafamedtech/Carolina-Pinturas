@@ -1,6 +1,6 @@
 <script setup lang="ts">
 defineProps<{
-  fields: Array<{ key?: string, label: string, value?: string | number | null, fullWidth?: boolean }>
+  fields: ReadonlyArray<{ key?: string, label: string, value?: string | number | null, fullWidth?: boolean }>
   loading?: boolean
 }>()
 </script>
@@ -19,7 +19,9 @@ defineProps<{
       <dd class="mt-1 font-medium break-words">
         <USkeleton v-if="loading" class="h-5 w-32 max-w-full" />
         <template v-else>
-          {{ field.value === undefined || field.value === null || field.value === '' ? '—' : field.value }}
+          <slot name="value" :field="field">
+            {{ field.value === undefined || field.value === null || field.value === '' ? '—' : field.value }}
+          </slot>
         </template>
       </dd>
     </div>

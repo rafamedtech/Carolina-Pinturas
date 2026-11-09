@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { formatDate } from '~/utils/datetime'
-import { resolveComponent } from 'vue'
 import type { SalesOrderListItem } from '~/types/orders'
 
 withDefaults(defineProps<{
@@ -16,7 +15,6 @@ const emit = defineEmits<{
   open: [order: SalesOrderListItem]
 }>()
 
-const NuxtLink = resolveComponent('NuxtLink')
 const currency = new Intl.NumberFormat('es-MX', {
   style: 'currency',
   currency: 'MXN'
@@ -32,52 +30,29 @@ function igualacionItems(order: SalesOrderListItem) {
     <ListLoading v-if="loading" />
 
     <template v-else-if="orders.length">
-      <UCard
+      <ListRecordCard
         v-for="order in orders"
         :key="order.id"
-        :as="igualacion ? 'button' : NuxtLink"
+        :title="order.number"
+        :eyebrow="formatDate(order.orderDate)"
         :to="igualacion
           ? undefined
           : {
             path: `/ventas/${encodeURIComponent(order.id)}`,
             query: { returnTo }
           }"
-        :type="igualacion ? 'button' : undefined"
+        :actionable="igualacion"
         :aria-label="`${igualacion ? 'Ver' : 'Abrir'} pedido ${order.number} de ${order.customer.name}`"
-        class="block w-full cursor-pointer text-left transition-[transform,background-color,box-shadow] duration-150 ease-out hover:bg-elevated/50 active:scale-[0.985] active:bg-elevated focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 motion-reduce:transform-none motion-reduce:transition-none"
-        :ui="{ body: 'flex flex-col gap-4 p-4 sm:p-4' }"
-        @click="igualacion && emit('open', order)"
+        :fields="[{ label: 'Cliente', value: order.customer.name, fullWidth: true }]"
+        :summary-label="igualacion ? undefined : 'Total'"
+        :summary-value="currency.format(order.total)"
+        @select="emit('open', order)"
       >
-        <div class="flex items-start justify-between gap-3">
-          <div class="min-w-0">
-            <p class="text-xs font-medium text-muted">
-              {{ formatDate(order.orderDate) }}
-            </p>
-            <p class="text-lg font-semibold text-primary">
-              {{ order.number }}
-            </p>
-          </div>
+        <template #trailing>
           <OrdersOrderStatusBadge :status="order.status" />
-        </div>
-
-        <dl class="grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
-          <div class="col-span-2 min-w-0">
-            <dt class="text-muted">
-              Cliente
-            </dt>
-            <dd class="break-words font-medium text-highlighted">
-              {{ order.customer.name }}
-            </dd>
-          </div>
-          <div v-if="!igualacion" class="col-span-2 flex items-end justify-between gap-4 border-t border-default pt-3">
-            <dt class="text-muted">
-              Total
-            </dt>
-            <dd class="text-base font-semibold text-highlighted">
-              {{ currency.format(order.total) }}
-            </dd>
-          </div>
-          <div v-else class="col-span-2 flex flex-col gap-1 border-t border-default pt-3">
+        </template>
+        <template v-if="igualacion" #summary>
+          <dl class="border-t border-default pt-3 text-sm">
             <dt class="text-muted">
               Igualaciones
             </dt>
@@ -93,9 +68,9 @@ function igualacionItems(order: SalesOrderListItem) {
               <span>{{ item.quantity }} x {{ item.code }}</span>
               <span v-if="item.observations" class="text-sm font-normal text-muted">{{ item.observations }}</span>
             </dd>
-          </div>
-        </dl>
-      </UCard>
+          </dl>
+        </template>
+      </ListRecordCard>
     </template>
 
     <div

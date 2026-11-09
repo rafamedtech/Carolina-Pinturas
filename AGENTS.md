@@ -15,6 +15,8 @@
 
 ## Componentes reutilizables y consistencia visual (obligatorio)
 
+- Para cards de registros en listas móviles (pedidos, pagos, gastos o similares), usa `ListRecordCard`, basada en la card móvil de pedidos. Configura sus props y slots en lugar de duplicar el encabezado, los campos y el resumen. El consumidor controla el breakpoint, la carga, el estado vacío y la lógica de negocio.
+
 - El detalle de producto es la referencia visual del proyecto. Antes de implementar o modificar una interfaz, lee `docs/ui-components.md` y revisa los componentes existentes en `app/components/detail`, `app/components/list` y `App*`.
 - Siempre que una card, título, encabezado, botón, métrica, lista de datos, pestaña o tabla corresponda a un patrón existente, usa su componente compartido (`DetailCard`, `DetailPageHeader`, `DetailSectionHeading`, `AppButton`, `DetailFields`, `DetailStatCard`, `DetailHeader`, `DetailTabs`, `DetailTable` o los componentes `List*`). No dupliques su markup/clases ni crees equivalentes por módulo.
 - Usa props y slots para variar contenido y comportamiento. Si falta una capacidad reutilizable, amplía el componente compartido manteniendo compatibilidad; si surge un patrón transversal nuevo, créalo sobre Nuxt UI y documenta su contrato en `docs/ui-components.md`.

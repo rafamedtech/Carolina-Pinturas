@@ -11,6 +11,36 @@ const showBalance = computed(() => props.section === 'movements' || props.sectio
 const showAmount = computed(() => ['sales', 'purchases', 'expenses'].includes(props.section))
 const quantityLabel = computed(() => props.section === 'counts' ? 'Contado' : props.section === 'movements' ? 'Variación' : 'Cantidad')
 const balanceLabel = computed(() => props.section === 'counts' ? 'Esperado' : 'Existencia resultante')
+const contextLabels: Record<ProductActivitySection, string> = {
+  sales: 'Cliente',
+  purchases: 'Proveedor',
+  receipts: 'Proveedor',
+  movements: 'Almacén',
+  reservations: 'Almacén',
+  counts: 'Almacén',
+  expenses: 'Proveedor'
+}
+const detailLabels: Record<ProductActivitySection, string> = {
+  sales: 'Factura',
+  purchases: 'Detalle',
+  receipts: 'Almacén',
+  movements: 'Motivo',
+  reservations: 'Cliente',
+  counts: 'Motivo',
+  expenses: 'Descripción'
+}
+
+function formattedQuantity(quantity?: string) {
+  return quantity === undefined ? '—' : (quantity.startsWith('+') ? '+' : '') + purchaseQuantity(Number(quantity))
+}
+
+function cardFields(row: ProductActivityRow) {
+  const fields = [{ label: contextLabels[props.section], value: row.context, fullWidth: true }]
+  if (row.detail) fields.push({ label: detailLabels[props.section], value: row.detail, fullWidth: true })
+  if (showBalance.value) fields.push({ label: balanceLabel.value, value: row.balance === undefined ? '—' : purchaseQuantity(Number(row.balance)), fullWidth: false })
+  return fields
+}
+
 const statusLabels: Record<string, string> = {
   inicial: 'Saldo inicial',
   entrada: 'Entrada',
@@ -57,74 +87,62 @@ const columns = computed<TableColumn<ProductActivityRow>[]>(() => {
   <template v-else>
     <ul class="min-w-0 space-y-3 sm:hidden" aria-label="Actividad registrada para el producto">
       <li v-for="row in rows" :key="row.id" class="min-w-0">
-        <DetailCard :ui="{ container: 'gap-y-3' }">
-          <div class="flex items-start justify-between gap-3">
-            <div class="min-w-0" :class="section === 'sales' ? 'flex items-center gap-2' : 'space-y-1'">
-              <ULink v-if="row.href" :to="row.href" class="block text-sm font-medium break-words text-primary">
-                {{ row.reference }}
-              </ULink>
-              <p v-else class="text-sm font-medium break-words text-highlighted">
-                {{ row.reference }}
-              </p>
-              <UBadge
-                v-if="row.status"
-                :color="orderStatusBadgeColor(row.statusColor ?? 'neutral')"
-                variant="subtle"
-                size="sm"
-                class="max-w-full whitespace-normal"
-              >
-                {{ statusLabel(row.status) }}
-              </UBadge>
-            </div>
-            <span class="shrink-0 text-xs text-muted tabular-nums">{{ formatDate(row.date) }}</span>
-          </div>
-          <div class="min-w-0 text-sm break-words">
-            <div class="flex items-center gap-1">
-              <span class="min-w-0 font-medium text-highlighted">{{ row.context }}</span>
+        <ListRecordCard
+          :title="row.reference"
+          :eyebrow="formatDate(row.date)"
+          :title-to="row.href"
+          :aria-label="`Abrir ${row.reference}`"
+          :fields="cardFields(row)"
+          :summary-label="showAmount ? 'Importe' : quantityLabel"
+          :summary-color="showAmount ? 'primary' : 'neutral'"
+        >
+          <template v-if="row.status" #trailing>
+            <UBadge
+              :color="orderStatusBadgeColor(row.statusColor ?? 'neutral')"
+              variant="subtle"
+              size="lg"
+              class="max-w-40 whitespace-normal"
+            >
+              {{ statusLabel(row.status) }}
+            </UBadge>
+          </template>
+          <template #field-value="{ field }">
+            <span v-if="field.label === contextLabels[section]" class="flex items-center gap-1">
+              <span class="min-w-0">{{ field.value || '—' }}</span>
               <AppButton
                 v-if="row.contextHref"
                 :to="row.contextHref"
                 icon="i-lucide-external-link"
                 intent="quiet"
                 size="xs"
-                :ui="{ leadingIcon: 'size-5' }"
                 class="shrink-0"
                 :aria-label="`Abrir perfil de ${row.context}`"
               />
-            </div>
-            <p v-if="row.detail" class="mt-1 text-xs text-muted">
-              {{ row.detail }}
-            </p>
-          </div>
-          <USeparator />
-          <dl class="grid grid-cols-2 gap-3 text-sm">
-            <div v-if="showQuantity" class="min-w-0">
-              <dt class="text-xs text-muted">
+            </span>
+            <template v-else>
+              {{ field.value }}
+            </template>
+          </template>
+          <template v-if="showQuantity && showAmount" #summary-leading>
+            <div class="min-w-0">
+              <dt class="text-muted">
                 {{ quantityLabel }}
               </dt>
-              <dd class="mt-1 font-medium break-words tabular-nums" :class="{ 'text-success': row.quantity?.startsWith('+'), 'text-error': row.quantity?.startsWith('-') }">
-                {{ row.quantity === undefined ? '—' : (row.quantity.startsWith('+') ? '+' : '') + purchaseQuantity(Number(row.quantity)) }}
+              <dd class="text-base font-semibold text-highlighted tabular-nums">
+                {{ formattedQuantity(row.quantity) }}
               </dd>
             </div>
-            <div v-if="showBalance" class="min-w-0">
-              <dt class="text-xs text-muted">
-                {{ balanceLabel }}
-              </dt>
-              <dd class="mt-1 font-medium break-words tabular-nums">
-                {{ row.balance === undefined ? '—' : purchaseQuantity(Number(row.balance)) }}
-              </dd>
-            </div>
-            <div v-if="showAmount" class="min-w-0">
-              <dt class="text-xs text-muted">
-                Importe
-              </dt>
-              <dd class="mt-1 font-medium break-words tabular-nums">
-                <span class="font-semibold text-primary">{{ row.amount ? purchaseMoney(Number(row.amount.value), row.amount.currency) : '—' }}</span>
-                <span v-if="row.amount" class="text-xs text-muted">{{ row.amount.currency }}</span>
-              </dd>
-            </div>
-          </dl>
-        </DetailCard>
+          </template>
+          <template #summary>
+            <template v-if="showAmount">
+              {{ row.amount ? purchaseMoney(Number(row.amount.value), row.amount.currency) : '—' }}
+              <span v-if="row.amount" class="text-xs font-normal text-muted">{{ row.amount.currency }}</span>
+            </template>
+            <span v-else class="tabular-nums" :class="{ 'text-success': row.quantity?.startsWith('+'), 'text-error': row.quantity?.startsWith('-') }">
+              {{ formattedQuantity(row.quantity) }}
+            </span>
+          </template>
+        </ListRecordCard>
       </li>
     </ul>
     <DetailTable

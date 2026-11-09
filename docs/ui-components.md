@@ -6,11 +6,12 @@ Antes de crear o modificar una pantalla, revisa este catálogo y `app/components
 
 | Componente | Uso y contrato |
 | --- | --- |
+| `ListRecordCard` | Card de registro móvil basada en pedidos y construida sobre `DetailCard`. Props: `title`, `eyebrow?` (fecha ya formateada), `to?`, `titleTo?` (enlace solo en el título), `actionable?`, `ariaLabel?`, `fields?` (mismo contrato de campos de `DetailFields`), `summaryLabel?`, `summaryValue?`, `summaryColor?` (`neutral`/`primary`). Slots: `field-value` (`{ field }`) para personalizar valores, `summary-leading` para un dato a la izquierda del resumen, `trailing` para estado, `actions` para controles independientes, `default` para reemplazar los campos y `summary` para un resumen personalizado. Evento `select` en modo `actionable` sin `to`. La tarjeta enlazada usa un enlace nativo; la accionable, un botón nativo. |
 | `DetailHeader` | Barra superior con título, breadcrumbs y botón de actualización. Props: `title`, `breadcrumbs?`, `loading?`, `refreshLabel`. Evento `refresh`; slot `actions`. |
 | `DetailPageHeader` | Título del contenido y acciones de escritorio. Conserva las props y slots de `UPageHeader`: `title`, `description`, `links`, etc. Slots habituales: `title`, `description`, `links`. Usa `#title` para imagen, código y menú móvil. |
 | `DetailCard` | Card informativa basada en `UPageCard`, con `variant="subtle"` por defecto. Conserva sus props, slots y `ui`: `title`, `icon`, `description`, `#title`, `#default`, `#footer`, etc. Usa `variant="naked"` para secciones sin superficie. |
 | `DetailSectionHeading` | Encabezado de sección con `h2`. Props: `title`, `description?`, `hideTitleOnMobile?`, `titleId?` (para `aria-labelledby`), `color?` (`neutral` por defecto o `primary`). Slot `leading` para un marcador decorativo antes del título; conserva `ui` de `DetailCard`. |
-| `DetailFields` | Lista semántica `dl` de etiqueta/valor en dos columnas, con skeletons y `—` para valores vacíos. Props: `fields`, `loading?`. Cada campo acepta `key?`, `label`, `value?` (`string`/`number`/`null`) y `fullWidth?`. Conserva el valor `0`. Entrega fechas y monedas ya formateadas. |
+| `DetailFields` | Lista semántica `dl` de etiqueta/valor en dos columnas, con skeletons y `—` para valores vacíos. Props: `fields`, `loading?`. Cada campo acepta `key?`, `label`, `value?` (`string`/`number`/`null`) y `fullWidth?`. Slot `value` (`{ field }`) para personalizar el valor. Conserva el valor `0`. Entrega fechas y monedas ya formateadas. |
 | `DetailStatCard` | Métrica compacta. Props: `title`, `icon?`, `value?`, `unit?`, `loading?`, `valueColor?` (`primary`/`neutral`). Slot por defecto para contenido adicional. |
 | `DetailTabs` | Pestañas de sección con etiquetas adaptables y tooltip opcional. `v-model` string; `items: { label, value, icon?, description? }[]`, `content?`; slot `content`. |
 | `DetailTable` | Tabla de detalle con estado vacío, visibilidad de columnas y slots de `UTable`. Props: `data`, `columns`, `empty?`, `getRowId?`; `v-model:column-visibility`; expone `getColumns()`. |
@@ -19,6 +20,20 @@ Antes de crear o modificar una pantalla, revisa este catálogo y `app/components
 ## Ejemplo
 
 ```vue
+<ListRecordCard
+  title="PED-000123"
+  :eyebrow="formatDate(order.orderDate)"
+  :to="`/ventas/${order.id}`"
+  :aria-label="`Abrir pedido de ${order.customer.name}`"
+  :fields="[{ label: 'Cliente', value: order.customer.name, fullWidth: true }]"
+  summary-label="Total"
+  :summary-value="formattedTotal"
+>
+  <template #trailing>
+    <OrdersOrderStatusBadge :status="order.status" />
+  </template>
+</ListRecordCard>
+
 <DetailPageHeader title="Detalle del cliente">
   <template #links>
     <AppButton intent="secondary" label="Duplicar" icon="i-lucide-copy" @click="duplicate" />
@@ -35,6 +50,7 @@ Antes de crear o modificar una pantalla, revisa este catálogo y `app/components
 
 ## Criterios de uso
 
+- Para registros en listas móviles usa `ListRecordCard`; el listado decide cuándo ocultarse (`md:hidden`, `sm:hidden`, etc.) y muestra `ListLoading` o su estado vacío. El componente no incluye consultas, permisos ni formatos de moneda o fecha. Usa `to` para navegar o `actionable` + `@select` para abrir una vista/modal. Pon botones o enlaces adicionales en `#actions`, que queda por encima del enlace/botón de la card sin anidar controles interactivos. `OrderListCards` es la referencia de integración, también para igualaciones.
 - Las superficies de las cards usan el token `bg-card`: `#fcfcfc` en modo claro y `#1c1b1e` en oscuro, definido en `app/assets/css/main.css` y aplicado a las variantes `outline`, `soft` y `subtle` de `UPageCard` mediante `app/app.config.ts`.
 - Usa estos componentes siempre que exista un patrón equivalente; no copies sus clases en páginas ni crees variantes específicas por módulo para el mismo patrón.
 - Para listados completos reutiliza `ListPage`, `ListToolbar`, `ListTable`, `ListPagination` y los demás componentes de `app/components/list`.
