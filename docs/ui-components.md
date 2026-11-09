@@ -54,6 +54,7 @@ Antes de crear o modificar una pantalla, revisa este catálogo y `app/components
 - Las superficies de las cards usan el token `bg-card`: `#fcfcfc` en modo claro y `#1c1b1e` en oscuro, definido en `app/assets/css/main.css` y aplicado a las variantes `outline`, `soft` y `subtle` de `UPageCard` mediante `app/app.config.ts`.
 - Usa estos componentes siempre que exista un patrón equivalente; no copies sus clases en páginas ni crees variantes específicas por módulo para el mismo patrón.
 - Para listados completos reutiliza `ListPage`, `ListToolbar`, `ListTable`, `ListPagination` y los demás componentes de `app/components/list`.
+- `ListLayoutConfig.resetTabOnClear` permite conservar la pestaña activa al quitar filtros con `false`; en ese caso, cambiar de pestaña por sí solo no activa «Quitar filtros». Por defecto se conserva la limpieza completa, incluida la pestaña.
 - Usa Nuxt UI directamente cuando el catálogo no cubra el caso (formularios, calendarios, alertas, overlays, etc.). Si aparece un nuevo patrón transversal, extráelo y agrégalo aquí.
 - Personaliza con props/slots y después con `ui`/`class` para necesidades puntuales. Cambia el componente compartido si debe cambiar el patrón en todas las pantallas; el tema general vive en `app/app.config.ts`.
 - `DetailPageHeader` oculta las acciones de `#links` en móvil: proporciona un menú accesible dentro de `#title` o `#description` cuando haya acciones. Verifica escritorio y móvil, nombres accesibles en botones de solo icono, estados de carga y valores vacíos.

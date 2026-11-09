@@ -52,6 +52,26 @@ describe('layout configurable de listados', () => {
     expect(wrapper.emitted('create')).toHaveLength(1)
   })
 
+  it('conserva la pestaña al quitar filtros cuando el listado lo configura', async () => {
+    wrapper = await mountSuspended(Layout, {
+      props: {
+        embedded: true, config: { ...config, resetTabOnClear: false }, data: [], columns,
+        search: 'Pintura', tab: 'active', filters: { hidden: true, method: 'cash' }, page: 2,
+        dateRange: { start: parseDate('2026-10-01'), end: parseDate('2026-10-18') }
+      }
+    })
+    await wrapper.findAll('button').find(button => button.text() === 'Quitar filtros')!.trigger('click')
+    expect(wrapper.emitted('update:tab')).toBeUndefined()
+    expect(wrapper.emitted('update:search')?.[0]).toEqual([''])
+    expect(wrapper.emitted('update:dateRange')?.[0]).toEqual([null])
+    expect(wrapper.emitted('update:filters')?.[0]).toEqual([{ hidden: false, method: 'all' }])
+    expect(wrapper.emitted('update:page')?.[0]).toEqual([1])
+    expect(wrapper.emitted('clear')).toHaveLength(1)
+    await wrapper.setProps({ search: '', dateRange: null, filters: { hidden: false, method: 'all' }, page: 1 })
+    expect(wrapper.text()).not.toContain('Quitar filtros')
+    expect(wrapper.get('[role="tab"][aria-selected="true"]').text()).toBe('Activos')
+  })
+
   it('muestra un único spinner con Cargando y oculta tabla y tarjetas durante la carga', async () => {
     wrapper = await mountSuspended(Layout, {
       props: { embedded: true, config, data: [], columns, loading: true },

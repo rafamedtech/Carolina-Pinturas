@@ -36,6 +36,7 @@ export interface ListLayoutConfig {
   filters?: ListFilterDefinition[]
   tabs?: Array<{ label: string, value: string }>
   defaultTab?: string
+  resetTabOnClear?: boolean
   create?: ListCreateAction
   pagination?: {
     mode: 'client' | 'server' | 'external'

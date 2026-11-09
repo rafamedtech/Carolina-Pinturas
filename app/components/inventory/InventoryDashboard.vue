@@ -142,7 +142,7 @@ const dateRange = computed<OrderDateRange | null>({
   }
 })
 const listConfig = computed<ListLayoutConfig>(() => ({
-  id: 'inventory', title: 'Control de inventario', empty: 'Sin registros para estos filtros.',
+  id: 'inventory', title: 'Control de inventario', empty: 'Sin registros para estos filtros.', resetTabOnClear: false,
   breadcrumbs: [
     { label: 'Inventario', icon: 'i-lucide-warehouse', to: '/inventario' },
     { label: activeView.value.title }
@@ -293,13 +293,36 @@ const reservationColumns: TableColumn<Extract<Row, { orderId: string }>>[] = [
           variant="naked"
         />
       </div>
-      <DetailTable
-        v-else-if="tab === 'reservations'"
-        ref="reservationsTable"
-        :data="reservationRows"
-        :columns="reservationColumns"
-        empty="Sin reservas activas."
-      />
+      <div v-else-if="tab === 'reservations'">
+        <div class="space-y-3 md:hidden">
+          <ListRecordCard
+            v-for="row in reservationRows"
+            :key="`${row.orderId}-${row.productId}-${row.warehouse.name}`"
+            :title="`Pedido ${row.order.folio}`"
+            :title-to="{ path: `/ventas/${row.orderId}`, query: { returnTo } }"
+            :fields="[
+              { label: 'Producto', value: `${row.product.code} · ${row.product.name}`, fullWidth: true },
+              { label: 'Almacén', value: row.warehouse.name, fullWidth: true }
+            ]"
+            summary-label="Reservado"
+            :summary-value="row.quantity"
+            summary-color="primary"
+          />
+          <UEmpty
+            v-if="!reservationRows.length"
+            icon="i-lucide-bookmark"
+            title="Sin reservas activas"
+            variant="naked"
+          />
+        </div>
+        <DetailTable
+          ref="reservationsTable"
+          :data="reservationRows"
+          :columns="reservationColumns"
+          empty="Sin reservas activas."
+          class="hidden md:block"
+        />
+      </div>
       <div v-else-if="tab === 'warehouses'" class="space-y-5">
         <div class="grid gap-3 md:grid-cols-2">
           <UPageCard v-for="w in warehouseData?.results" :key="w.id" variant="subtle">

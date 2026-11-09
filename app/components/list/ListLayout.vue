@@ -38,13 +38,13 @@ const tablePage = computed({
 })
 const hasActiveFilters = computed(() => Boolean(
   search.value || dateRange.value
-  || (props.config.tabs?.length && tab.value !== (props.config.defaultTab ?? 'all'))
+  || (props.config.resetTabOnClear !== false && props.config.tabs?.length && tab.value !== (props.config.defaultTab ?? 'all'))
   || props.config.filters?.some(field => (filters.value[field.key] ?? field.defaultValue) !== field.defaultValue)
 ))
 function clearFilters() {
   search.value = ''
   dateRange.value = null
-  tab.value = props.config.defaultTab ?? 'all'
+  if (props.config.resetTabOnClear !== false) tab.value = props.config.defaultTab ?? 'all'
   filters.value = Object.fromEntries((props.config.filters ?? []).map(field => [field.key, field.defaultValue]))
   page.value = 1
   emit('clear')
