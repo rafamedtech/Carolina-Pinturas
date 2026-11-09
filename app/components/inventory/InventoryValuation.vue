@@ -12,8 +12,8 @@ const columns: TableColumn<InventoryValuation['warehouses'][number]>[] = [
 </script>
 
 <template>
-  <section aria-label="Valor actual de la mercancía" class="min-w-0 space-y-6">
-    <UPageGrid class="grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-2" :class="{ 'xl:grid-cols-3': valuation.totals.length > 1 }">
+  <section aria-label="Valor actual de la mercancía" class="grid min-w-0 grid-cols-1 gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)] lg:items-start lg:gap-x-10">
+    <UPageGrid class="grid-cols-1 gap-3 sm:grid-cols-2 lg:order-2 lg:grid-cols-1 xl:grid-cols-1">
       <DetailStatCard
         v-for="total in valuation.totals"
         :key="total.currencyCode"
@@ -35,7 +35,7 @@ const columns: TableColumn<InventoryValuation['warehouses'][number]>[] = [
       />
     </UPageGrid>
 
-    <div class="min-w-0 space-y-3">
+    <div class="min-w-0 space-y-3 lg:order-1">
       <DetailSectionHeading title="Detalle por almacén" description="Valor de las existencias separado por moneda." />
       <DetailTable
         :data="warehouses"
