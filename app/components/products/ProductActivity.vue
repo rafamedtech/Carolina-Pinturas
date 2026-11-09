@@ -53,40 +53,40 @@ function selectSection(value: string | number) {
         />
       </UTooltip>
     </div>
-    <DetailTabs
+    <ListViews
       :model-value="section"
       :items="tabs"
+      label="Sección de actividad del producto"
+      variant="link"
+      full-width
       @update:model-value="selectSection"
-    >
-      <template #content>
-        <div class="space-y-4 pt-2">
-          <p v-if="composite && ['movements', 'reservations'].includes(section)" class="text-sm text-muted">
-            Las reservas y salidas de un producto compuesto se registran en las fichas de sus componentes.
-          </p>
-          <UAlert
-            v-if="error"
-            color="error"
-            variant="subtle"
-            title="No se pudo cargar esta sección."
-          />
-          <ProductsProductActivityTable
-            v-else
-            :rows="data?.results ?? []"
-            :section="section"
-            :loading="['idle', 'pending'].includes(status)"
-          />
-          <footer v-if="status === 'success' && (data?.pagination.totalResults || page > 1)" class="flex flex-wrap items-center justify-between gap-3 text-sm text-muted">
-            <span>{{ recordCount }} {{ recordLabel }}</span>
-            <UPagination
-              v-if="data && (data.pagination.totalPages > 1 || page > 1)"
-              v-model:page="page"
-              :items-per-page="data.pagination.pageSize"
-              :total="data.pagination.totalResults"
-              :sibling-count="0"
-            />
-          </footer>
-        </div>
-      </template>
-    </DetailTabs>
+    />
+    <div class="space-y-4 pt-2">
+      <p v-if="composite && ['movements', 'reservations'].includes(section)" class="text-sm text-muted">
+        Las reservas y salidas de un producto compuesto se registran en las fichas de sus componentes.
+      </p>
+      <UAlert
+        v-if="error"
+        color="error"
+        variant="subtle"
+        title="No se pudo cargar esta sección."
+      />
+      <ProductsProductActivityTable
+        v-else
+        :rows="data?.results ?? []"
+        :section="section"
+        :loading="['idle', 'pending'].includes(status)"
+      />
+      <footer v-if="status === 'success' && (data?.pagination.totalResults || page > 1)" class="flex flex-wrap items-center justify-between gap-3 text-sm text-muted">
+        <span>{{ recordCount }} {{ recordLabel }}</span>
+        <UPagination
+          v-if="data && (data.pagination.totalPages > 1 || page > 1)"
+          v-model:page="page"
+          :items-per-page="data.pagination.pageSize"
+          :total="data.pagination.totalResults"
+          :sibling-count="0"
+        />
+      </footer>
+    </div>
   </section>
 </template>

@@ -178,28 +178,39 @@ useSeoMeta({ title: () => productName.value })
               </UDropdownMenu>
             </div>
           </template>
-          <template v-if="product && canManageProducts(user?.role) && isManaged" #links>
-            <AppButton
-              :to="{ path: '/productos/nuevo', query: { duplicar: productId, returnTo: backPath } }"
-              label="Duplicar"
-              icon="i-lucide-copy"
-              intent="secondary"
-              variant="subtle"
-              class="hidden sm:inline-flex"
-            />
-            <ProductsProductStatusAction
-              v-model:open="statusOpen"
-              :product="product"
-              trigger-class="hidden sm:inline-flex"
-              @changed="refresh"
-            />
-            <AppButton
-              :to="{ path: `/productos/${productId}/editar`, query: { returnTo: backPath } }"
-              label="Editar"
-              icon="i-lucide-pencil"
-              variant="subtle"
-              class="hidden sm:inline-flex"
-            />
+          <template v-if="canManageProducts(user?.role) && (initialLoading || (product && isManaged))" #links>
+            <template v-if="initialLoading">
+              <USkeleton
+                v-for="width in ['w-28', 'w-32', 'w-24']"
+                :key="width"
+                class="h-8"
+                :class="width"
+                aria-hidden="true"
+              />
+            </template>
+            <template v-else-if="product">
+              <AppButton
+                :to="{ path: '/productos/nuevo', query: { duplicar: productId, returnTo: backPath } }"
+                label="Duplicar"
+                icon="i-lucide-copy"
+                intent="secondary"
+                variant="subtle"
+                class="hidden sm:inline-flex"
+              />
+              <ProductsProductStatusAction
+                v-model:open="statusOpen"
+                :product="product"
+                trigger-class="hidden sm:inline-flex"
+                @changed="refresh"
+              />
+              <AppButton
+                :to="{ path: `/productos/${productId}/editar`, query: { returnTo: backPath } }"
+                label="Editar"
+                icon="i-lucide-pencil"
+                variant="subtle"
+                class="hidden sm:inline-flex"
+              />
+            </template>
           </template>
         </DetailPageHeader>
         <ProductsProductDetailFields

@@ -10,13 +10,14 @@ const props = defineProps<{
 
 const model = defineModel<string>({ required: true })
 const selectedIcon = computed(() => props.items.find(item => item.value === model.value)?.icon)
+const selectItems = computed(() => props.items.map(({ label, value, icon }) => ({ label, value, icon })))
 </script>
 
 <template>
   <USelect
     v-model="model"
     :icon="selectedIcon"
-    :items="items"
+    :items="selectItems"
     :ui="variant === 'link' && fullWidth ? { base: 'py-2', value: 'text-lg font-semibold text-highlighted' } : undefined"
     :aria-label="label"
     class="w-full sm:hidden"
