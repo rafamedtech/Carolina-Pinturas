@@ -7,7 +7,7 @@ import ProductEditor from '~/components/products/ProductEditor.vue'
 import PurchaseDetail from '~/components/purchases/PurchaseDetail.vue'
 import InventoryDashboard from '~/components/inventory/InventoryDashboard.vue'
 
-mockNuxtImport('useAuth', () => () => ({ user: { value: { role: 'admin' } } }))
+mockNuxtImport('useAuth', () => () => ({ user: { value: { role: 'admin' } }, canWrite: { value: true }, disabled: { value: false }, fetchSession: async () => ({ role: 'admin' }) }))
 
 function deferred() {
   let resolve!: (value: unknown) => void
@@ -102,8 +102,8 @@ describe('páginas con datos en segundo plano', () => {
   })
 
   it('permite usar el inventario mientras sus tres consultas independientes están pendientes', async () => {
-    wrapper = await mountSuspended(InventoryDashboard, { global: { stubs } })
-    expect(wrapper.get('h1').text()).toBe('Inventario')
+    wrapper = await mountSuspended(InventoryDashboard, { route: '/inventario?tab=stocks', global: { stubs } })
+    expect(wrapper.get('h1').text()).toBe('Control de inventario')
     expect(wrapper.get('[role="status"]').text()).toContain('Cargando inventario')
     await wrapper.get('input').setValue('Pintura')
     await vi.waitFor(() => expect([...started].sort()).toEqual(['settings', 'stocks', 'warehouses']))

@@ -11,7 +11,7 @@ import { useProductMutation } from '~/composables/useProductMutation'
 import type { SiigoProduct } from '~/types/siigo'
 import { productMutationInput } from '~/utils/siigoProductMutation'
 
-mockNuxtImport('useAuth', () => () => ({ user: { value: { role: 'admin' } } }))
+mockNuxtImport('useAuth', () => () => ({ user: { value: { role: 'admin' } }, canWrite: { value: true } }))
 
 const id = '00000000-0000-4000-8000-000000000001'
 const product: SiigoProduct = {

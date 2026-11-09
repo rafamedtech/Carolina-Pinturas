@@ -7,7 +7,7 @@ import type { CreateExpenseInput, ExpenseListResponse, ExpenseRecord } from '~/t
 import type { CsvColumn } from '~/utils/csv'
 import { canViewExpenseCategory, visibleExpenseCategories } from '~/utils/expense'
 
-const { user } = useAuth()
+const { user, canWrite } = useAuth()
 const categories = computed(() => user.value
   ? visibleExpenseCategories(user.value.role)
   : [])
@@ -121,6 +121,7 @@ watch(modalOpen, (isOpen) => {
 })
 
 function openExpense(expense: ExpenseRecord | null = null) {
+  if (!canWrite.value) return
   if (expense?.purchasePaymentId) {
     toast.add({ title: 'Gasto vinculado a compras', description: 'Consulta o anula el abono desde Compras.', color: 'info' })
     return
@@ -186,7 +187,7 @@ const listConfig = computed<ListLayoutConfig>(() => ({
     { key: 'category', label: 'Categoría', type: 'select', defaultValue: 'all', items: [{ label: 'Todas las categorías', value: 'all' }, ...categories.value.map(value => ({ label: value, value }))] },
     { key: 'paymentMethod', label: 'Método de pago', type: 'select', defaultValue: 'all', items: [{ label: 'Todos los métodos', value: 'all' }, ...PAYMENT_METHODS.map(item => ({ label: item.label, value: item.key }))] }
   ],
-  create: { label: 'Agregar gasto' },
+  create: canWrite.value ? { label: 'Agregar gasto' } : undefined,
   pagination: { mode: 'server', label: 'gastos', totalLabel: 'Total gastado:', pageSize }
 }))
 </script>

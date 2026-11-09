@@ -21,6 +21,7 @@ const { useAuthMock } = vi.hoisted(() => ({
     }
     return {
       user: { value: user },
+      canWrite: { get value() { return user.role !== ('consulta' as string) } },
       disabled: { value: false },
       fetchSession: vi.fn(async () => user)
     }

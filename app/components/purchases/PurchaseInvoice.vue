@@ -4,6 +4,7 @@ import type { PurchaseView, PurchaseInvoiceView } from '~/types/purchases'
 import { PAYMENT_METHODS, paymentMethodLabel } from '~/utils/orderPayment'
 import { invoiceStatus, purchaseDateLabel, purchaseMoney } from '~/utils/purchaseFormat'
 
+const { canWrite } = useAuth()
 const props = defineProps<{ order: PurchaseView, invoice: PurchaseInvoiceView }>()
 const emit = defineEmits<{ saved: [order: PurchaseView] }>()
 const { busy, error, run } = usePurchaseAction(() => props.order, o => emit('saved', o))
@@ -14,8 +15,8 @@ const method = shallowRef<'efectivo' | 'transferencia' | 'tarjeta' | 'cheque' | 
 const mode = shallowRef<'edit' | 'pay'>()
 const voiding = shallowRef<{ kind: 'invoice' } | { kind: 'payment', id: string }>()
 const edit = reactive({ folio: props.invoice.folio, date: props.invoice.date, dueDate: props.invoice.dueDate, amount: props.invoice.amount })
-const canEdit = computed(() => !props.invoice.voidedAt && !props.invoice.payments.some(p => !p.voidedAt))
-const canPay = computed(() => !props.invoice.voidedAt && props.invoice.balance > 0)
+const canEdit = computed(() => canWrite.value && !props.invoice.voidedAt && !props.invoice.payments.some(p => !p.voidedAt))
+const canPay = computed(() => canWrite.value && !props.invoice.voidedAt && props.invoice.balance > 0)
 const status = computed(() => invoiceStatus(props.invoice.status))
 const money = (value: number) => purchaseMoney(value, props.order.currencyCode)
 const paidPercent = computed(() => props.invoice.amount ? Math.round((props.invoice.amount - props.invoice.balance) / props.invoice.amount * 100) : 0)
@@ -240,7 +241,7 @@ async function confirmVoid(reason: string) {
           </p>
         </div>
         <UButton
-          v-if="!payment.voidedAt"
+          v-if="canWrite && !payment.voidedAt"
           label="Anular"
           icon="i-lucide-undo-2"
           color="error"

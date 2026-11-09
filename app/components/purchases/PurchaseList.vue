@@ -137,10 +137,11 @@ const columns: TableColumn<PurchaseView>[] = [{
     row.original.balance === 0 ? 'text-success' : row.original.status === 'vencida' ? 'text-error' : ''
   )
 }]
+const { canWrite } = useAuth()
 const listConfig = computed<ListLayoutConfig>(() => ({
   id: 'purchases', title: 'Compras', empty: 'Sin compras para estos filtros.',
   search: { placeholder: 'Buscar proveedor' }, dateFilter: { subject: 'compras' }, tabs: statusItems,
-  create: { label: 'Nueva compra', to: { path: '/compras/nueva', query: { returnTo: returnTo.value } } },
+  create: canWrite.value ? { label: 'Nueva compra', to: { path: '/compras/nueva', query: { returnTo: returnTo.value } } } : undefined,
   pagination: { mode: 'client', label: 'compras', pageSize }
 }))
 </script>

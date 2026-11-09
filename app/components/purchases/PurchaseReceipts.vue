@@ -4,6 +4,7 @@ import { mexicoToday } from '~/utils/datetime'
 import type { PurchaseView } from '~/types/purchases'
 import { purchaseDateLabel, purchaseQuantity, receiptStatus } from '~/utils/purchaseFormat'
 
+const { canWrite } = useAuth()
 const props = defineProps<{ order: PurchaseView }>()
 const emit = defineEmits<{ saved: [order: PurchaseView] }>()
 const { busy, error, run } = usePurchaseAction(() => props.order, value => emit('saved', value))
@@ -19,7 +20,7 @@ const status = computed(() => receiptStatus(props.order.receiptStatus))
 const pendingItems = computed(() => props.order.items
   .map(item => ({ ...item, pending: Number((item.quantity - item.received).toFixed(6)) }))
   .filter(item => item.pending > 0))
-const canReceive = computed(() => ['confirmada', 'liquidada', 'vencida'].includes(props.order.status) && props.order.receiptStatus !== 'completa')
+const canReceive = computed(() => canWrite.value && ['confirmada', 'liquidada', 'vencida'].includes(props.order.status) && props.order.receiptStatus !== 'completa')
 const hasQuantities = computed(() => Object.values(quantities).some(q => q > 0))
 const itemName = (id: string) => props.order.items.find(i => i.id === id)?.name ?? 'Producto'
 
@@ -164,7 +165,7 @@ async function voidReceipt(reason: string) {
               />
             </div>
             <UButton
-              v-if="!receipt.voidedAt"
+              v-if="canWrite && !receipt.voidedAt"
               label="Anular"
               icon="i-lucide-undo-2"
               color="error"

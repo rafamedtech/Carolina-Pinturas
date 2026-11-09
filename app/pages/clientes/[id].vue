@@ -8,7 +8,7 @@ import { canManageOrderLogistics } from '~/utils/roleAccess'
 
 const route = useRoute()
 const toast = useToast()
-const { user } = useAuth()
+const { user, canWrite } = useAuth()
 const isSupplierContext = route.path.startsWith('/proveedores')
 const entityLabel = isSupplierContext ? 'Proveedor' : 'Cliente'
 const entityLabelLower = entityLabel.toLowerCase()
@@ -387,7 +387,7 @@ useSeoMeta({ title: () => fullName.value })
           :customer-id="customer.id"
         />
 
-        <div v-if="!editing" class="flex flex-wrap gap-2 border-t border-default pt-4">
+        <div v-if="canWrite && !editing" class="flex flex-wrap gap-2 border-t border-default pt-4">
           <UButton :label="`Editar ${entityLabelLower}`" icon="i-lucide-pencil" @click="startEditing()" />
           <UButton
             :label="customer.active === false ? `Activar ${entityLabelLower}` : `Desactivar ${entityLabelLower}`"

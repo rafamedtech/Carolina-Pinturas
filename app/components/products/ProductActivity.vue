@@ -15,6 +15,7 @@ const sections = [
 ] satisfies Array<{ label: string, value: ProductActivitySection, icon: string, description: string }>
 
 const tabs = computed(() => sections.filter(({ value }) => {
+  if (props.role === 'consulta') return true
   if (value === 'purchases' || value === 'receipts') return props.role === 'admin'
   if (value === 'counts') return props.role === 'admin' || props.role === 'mostrador'
   return true

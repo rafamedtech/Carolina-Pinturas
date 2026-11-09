@@ -50,10 +50,11 @@ export function canManageOrderLogistics(role: UserRole) {
 }
 
 export function canEditOrderRemision(role: UserRole) {
-  return role !== 'igualaciones'
+  return role !== 'igualaciones' && role !== 'consulta'
 }
 
 export function editableOrderStatusKeys(role: UserRole): readonly string[] | null {
+  if (role === 'consulta') return []
   if (role === 'repartidor') return REPARTIDOR_STATUS_KEYS
   if (role === 'igualaciones') return IGUALACIONES_STATUS_KEYS
   return null
@@ -66,6 +67,9 @@ export function homePathForRole(role: UserRole) {
 }
 
 export function canAccessAppPath(role: UserRole, path: string) {
+  if (role === 'consulta') {
+    return !(/^\/configuracion(?:\/|$)/.test(path) || /\/(nuevo(?:-pedido)?|nueva(?:-cotizacion)?|editar)(?:\/|$)/.test(path))
+  }
   if (path === '/compras' || path.startsWith('/compras/')) return role === 'admin'
   if (role === 'igualaciones') {
     const isOrderDetail = /^\/ventas\/[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(path)
@@ -83,4 +87,20 @@ export const PRODUCT_MANAGEMENT_ROLES = ['admin'] as const satisfies readonly Us
 
 export function canManageProducts(role: UserRole | undefined) {
   return role === 'admin'
+}
+
+export function canWriteData(role: UserRole | undefined) {
+  return Boolean(role && role !== 'consulta')
+}
+
+export const USER_ROLE_OPTIONS = [
+  { value: 'consulta', label: 'Solo consulta', description: 'Puede consultar la información de todos los módulos. No puede agregar, modificar ni eliminar registros.' },
+  { value: 'mostrador', label: 'Mostrador', description: 'Gestiona pedidos, cobros, clientes, gastos y operaciones de inventario.' },
+  { value: 'vendedor', label: 'Vendedor', description: 'Gestiona pedidos, cobros, clientes y gastos. Consulta inventario.' },
+  { value: 'repartidor', label: 'Repartidor', description: 'Accede a pedidos y actualiza las entregas asignadas.' },
+  { value: 'igualaciones', label: 'Igualaciones', description: 'Consulta la cola de igualaciones y actualiza su preparación.' }
+] as const
+
+export function canReadAllData(role: UserRole | undefined) {
+  return role === 'admin' || role === 'consulta'
 }

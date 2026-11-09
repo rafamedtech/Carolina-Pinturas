@@ -1,6 +1,7 @@
 import type { SiigoListResponse, SiigoProduct } from '~/types/siigo'
 
 export function useProductsCatalog() {
+  const { canWrite } = useAuth()
   const catalog = useState<SiigoListResponse<SiigoProduct> | null>('products-catalog-data', () => null)
   // Initial reads use PostgreSQL. Only refreshCatalog requests a Siigo sync.
   const { data, status, error, refresh } = useFetch<SiigoListResponse<SiigoProduct>>('/api/siigo/products', {
@@ -17,7 +18,7 @@ export function useProductsCatalog() {
   useTrackSiigoLoading(status)
 
   async function refreshCatalog() {
-    await $fetch('/api/siigo/products', { query: { all: 'true', products_only: 'true', usage: 'sale', refresh: 'true' } })
+    await $fetch('/api/siigo/products', { query: { all: 'true', products_only: 'true', usage: 'sale', refresh: canWrite.value ? 'true' : undefined } })
     await refresh()
 
     if (data.value) {

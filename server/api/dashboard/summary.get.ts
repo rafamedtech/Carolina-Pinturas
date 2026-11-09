@@ -7,7 +7,7 @@ import type {
 import { ADMIN_ONLY_EXPENSE_CATEGORIES } from '~/utils/expense'
 import { PAYMENT_STATUSES } from '~/utils/orderPayment'
 import { orderStatusBadgeColor } from '~/utils/orderStatus'
-import { ORDER_LOGISTICS_ROLES } from '~/utils/roleAccess'
+import { canReadAllData, ORDER_LOGISTICS_ROLES } from '~/utils/roleAccess'
 import { requireRole } from '../../utils/auth'
 import { usePrisma } from '../../utils/prisma'
 import { currentWeekBounds } from '../../utils/dashboard-period'
@@ -36,7 +36,7 @@ export default eventHandler(async (event) => {
     orderDate: { gte: start, lt: end }
   } satisfies Prisma.SalesOrderWhereInput
 
-  const hiddenExpenseCategories = user.role === 'admin' ? [] : [...ADMIN_ONLY_EXPENSE_CATEGORIES]
+  const hiddenExpenseCategories = canReadAllData(user.role) ? [] : [...ADMIN_ONLY_EXPENSE_CATEGORIES]
 
   const [orders, previous, expenses] = await Promise.all([
     prisma.salesOrder.findMany({
@@ -74,7 +74,7 @@ export default eventHandler(async (event) => {
     prisma.expense.findMany({
       where: {
         expenseDate: { gte: start, lt: end },
-        ...(user.role !== 'admin' ? { purchasePaymentId: null } : {}),
+        ...(!canReadAllData(user.role) ? { purchasePaymentId: null } : {}),
         ...(hiddenExpenseCategories.length ? { category: { notIn: hiddenExpenseCategories } } : {})
       },
       select: { amount: true, exchangeRate: true }

@@ -4,10 +4,11 @@ export function useCustomersCatalog(options: {
   immediate?: boolean
   customerType?: 'Customer' | 'Supplier'
 } = {}) {
+  const { canWrite } = useAuth()
   const refreshing = shallowRef(false)
   // Siigo es la fuente de verdad. El servidor agrega únicamente las preferencias
   // internas del cliente que pertenecen a la aplicación.
-  const { data, status, error } = useFetch<SiigoListResponse<SiigoCustomer>>('/api/siigo/customers', {
+  const { data, status, error, refresh: reload } = useFetch<SiigoListResponse<SiigoCustomer>>('/api/siigo/customers', {
     lazy: true,
     server: false,
     key: options.customerType
@@ -25,6 +26,10 @@ export function useCustomersCatalog(options: {
   })
 
   async function refreshCatalog() {
+    if (!canWrite.value) {
+      await reload()
+      return
+    }
     refreshing.value = true
     try {
       data.value = await $fetch('/api/siigo/customers/sync', {

@@ -23,7 +23,7 @@ const deletingPayment = shallowRef<OrderPayment | null>(null)
 const historicalOpen = shallowRef(false)
 const historicalPayment = shallowRef<OrderPayment | null>(null)
 const toast = useToast()
-const { user } = useAuth()
+const { user, canWrite } = useAuth()
 const {
   data: context,
   status,
@@ -162,7 +162,7 @@ async function createPayment(input: CreateOrderPaymentInput) {
   <div class="space-y-4">
     <div class="flex justify-end">
       <UButton
-        v-if="context"
+        v-if="canWrite && context"
         label="Agregar pago"
         icon="i-lucide-plus"
         size="md"

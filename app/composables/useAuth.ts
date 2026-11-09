@@ -1,3 +1,4 @@
+import { canWriteData } from '~/utils/roleAccess'
 import type { AppUser } from '~/types/siigo'
 import { clearStaleSupabaseAuthCookies } from '~/utils/supabaseCookies'
 
@@ -99,6 +100,7 @@ export function useAuth() {
 
   return {
     user: readonly(user),
+    canWrite: computed(() => canWriteData(user.value?.role)),
     loaded: readonly(loaded),
     disabled: readonly(disabled),
     fetchSession,

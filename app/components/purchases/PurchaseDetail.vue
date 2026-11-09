@@ -7,6 +7,7 @@ import { createPurchaseSupplierPdf } from '~/utils/purchaseSupplierPdf'
 
 const route = useRoute()
 const backPath = computed(() => tableReturnPath(route.query.returnTo, '/compras', ['/compras', '/compras/cuentas-por-pagar']))
+const { canWrite } = useAuth()
 const props = defineProps<{ id: string }>()
 const { data: order, error: loadError, refresh, status: loadStatus } = useFetch<PurchaseView>(`/api/purchases/${props.id}`, { lazy: true, server: false })
 const { busy, error, run } = usePurchaseAction(() => order.value!, (value) => {
@@ -48,7 +49,7 @@ const received = computed(() => {
   const done = items.reduce((s, i) => s + i.received, 0)
   return { ordered, done, percent: ordered ? Math.min(100, Math.round(done / ordered * 100)) : 0 }
 })
-const canCancel = computed(() => Boolean(order.value)
+const canCancel = computed(() => canWrite.value && Boolean(order.value)
   && order.value!.status !== 'cancelada'
   && !order.value!.receipts.some(r => !r.voidedAt)
   && !order.value!.invoices.some(i => !i.voidedAt))
@@ -180,7 +181,7 @@ const timeline = computed(() => [...(order.value?.events ?? [])].reverse())
                   <span class="inline-flex items-center gap-1"><UIcon name="i-lucide-coins" class="size-4" />{{ order.currencyCode }}</span>
                 </div>
               </div>
-              <div v-if="isDraft" class="flex flex-col gap-2 sm:flex-row">
+              <div v-if="isDraft && canWrite" class="flex flex-col gap-2 sm:flex-row">
                 <UButton
                   v-if="canCancel"
                   label="Cancelar orden"
@@ -255,7 +256,7 @@ const timeline = computed(() => [...(order.value?.events ?? [])].reverse())
           </UCard>
 
           <PurchasesPurchaseDraftForm
-            v-if="isDraft"
+            v-if="isDraft && canWrite"
             :key="order.version"
             :order="order"
             :busy="busy"
@@ -263,7 +264,7 @@ const timeline = computed(() => [...(order.value?.events ?? [])].reverse())
           />
 
           <div class="grid gap-4 lg:items-start" :class="isDraft ? '' : 'lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]'">
-            <div v-if="!isDraft" class="flex min-w-0 flex-col gap-4">
+            <div v-if="!isDraft || !canWrite" class="flex min-w-0 flex-col gap-4">
               <UCard :ui="{ body: 'p-0 sm:p-0' }">
                 <template #header>
                   <div class="flex items-center justify-between gap-3">

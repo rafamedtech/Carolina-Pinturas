@@ -217,3 +217,11 @@ ejecuta las pruebas y elimina esa base al terminar. No toma `DATABASE_URL`, no u
 credenciales de Siigo y no modifica los datos de la aplicación. Cubre concurrencia,
 idempotencia, recepción/anulación, reservas, surtido, devoluciones, traspasos,
 conteos, permisos y reconstrucción del saldo desde el kardex.
+
+### Administración de acceso
+
+En **Configuración → Usuarios y permisos**, el administrador puede cambiar el perfil de cada usuario registrado en Supabase y habilitar o deshabilitar su acceso. Los perfiles disponibles son Mostrador, Vendedor, Repartidor, Igualaciones y Solo consulta; la descripción de cada perfil aparece al seleccionarlo. Los administradores conservan todos los permisos y no se pueden modificar ni desactivar desde esta pantalla. No se permite asignar nuevos administradores desde la API de permisos.
+
+El perfil `consulta` puede leer los módulos de negocio, incluidos reportes, compras y valoración del inventario, sin crear, modificar, eliminar, imprimir tickets con registro de impresión ni ejecutar sincronizaciones explícitas. No accede a la administración de usuarios. Cada petición vuelve a leer el perfil activo de PostgreSQL, por lo que las restricciones no dependen de metadatos editables ni de renovar el JWT. Las tablas internas mantienen RLS y no conceden escritura directa a `anon`/`authenticated`.
+
+La migración `20261109234602_add_consulta_user_role.sql` agrega el rol y asigna a `consulta@cvrtransportinc.com` el perfil Solo consulta cuando existe en `auth.users`. Debe acompañar al despliegue de esta versión; las versiones anteriores no reconocen este rol.

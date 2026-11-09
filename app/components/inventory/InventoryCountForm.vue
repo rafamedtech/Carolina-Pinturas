@@ -3,6 +3,7 @@ import type { InventoryCount } from '#shared/types/inventory'
 import type { InventoryCommand } from '#shared/schemas/inventory'
 import { formatDate } from '~/utils/datetime'
 
+const { canWrite } = useAuth()
 const props = defineProps<{ count: InventoryCount, admin: boolean, busy: boolean, activated?: boolean }>()
 const emit = defineEmits<{ submit: [command: InventoryCommand['command']] }>()
 const costs = reactive<Record<string, number | undefined>>({})
@@ -18,7 +19,7 @@ watch(() => props.count, (c, previous) => {
     if (!old || old.costCurrency !== l.costCurrency) currencies[l.productId] = l.costCurrency === 'USD' ? 'USD' : 'MXN'
   }
 }, { immediate: true })
-const closed = computed(() => ['aplicado', 'cancelado'].includes(props.count.status))
+const closed = computed(() => !canWrite.value || ['aplicado', 'cancelado'].includes(props.count.status))
 const productIds = computed(() => props.count.lines.map(l => l.productId))
 const unsaved = computed(() => props.count.lines.some(l => (amounts[l.productId] ?? '') !== (l.counted ?? '') || (!props.activated && ((costs[l.productId] === undefined ? null : String(costs[l.productId])) !== (l.unitCost ?? null) || (l.unitCost && currencies[l.productId] !== l.costCurrency)))))
 const canSubmit = computed(() => props.count.lines.length > 0 && !unsaved.value && props.count.lines.every(l => l.counted !== null && (props.activated || Number(l.counted) === 0 || Number(l.unitCost) > 0)))
@@ -40,7 +41,7 @@ function action(value: 'countSubmit' | 'countApply' | 'countRefresh' | 'countCan
     </p>
     <UAlert title="Cuenta la existencia física, incluyendo unidades reservadas" description="Guarda las cantidades antes de enviar. Si hubo movimientos, actualiza la base y vuelve a contar las partidas afectadas." color="neutral" />
     <InventoryCountProductPicker
-      v-if="count.status === 'borrador'"
+      v-if="canWrite && count.status === 'borrador'"
       :excluded-ids="productIds"
       :busy="busy"
       @add="changeProduct('countAdd', $event)"
@@ -58,7 +59,7 @@ function action(value: 'countSubmit' | 'countApply' | 'countRefresh' | 'countCan
                 Conteo físico
               </th><th v-if="!activated" class="p-3">
                 Costo unitario (con impuestos)
-              </th><th v-if="count.status === 'borrador'" class="p-3">
+              </th><th v-if="canWrite && count.status === 'borrador'" class="p-3">
                 <span class="sr-only">Acciones</span>
               </th>
             </tr>
@@ -74,7 +75,7 @@ function action(value: 'countSubmit' | 'countApply' | 'countRefresh' | 'countCan
                   :aria-label="`Conteo de ${line.product.name}`"
                   inputmode="decimal"
                   required
-                  :disabled="count.status !== 'borrador' || busy"
+                  :disabled="!canWrite || count.status !== 'borrador' || busy"
                   class="w-36"
                 />
               </td><td v-if="!activated" class="p-3">
@@ -88,7 +89,7 @@ function action(value: 'countSubmit' | 'countApply' | 'countRefresh' | 'countCan
                     :format-options="{ maximumFractionDigits: 6 }"
                     :increment="false"
                     :decrement="false"
-                    :disabled="count.status !== 'borrador' || busy"
+                    :disabled="!canWrite || count.status !== 'borrador' || busy"
                     placeholder="0.00"
                     class="w-44"
                   />
@@ -96,10 +97,10 @@ function action(value: 'countSubmit' | 'countApply' | 'countRefresh' | 'countCan
                     v-model="currencies[line.productId]"
                     :items="['MXN', 'USD']"
                     :aria-label="`Moneda de ${line.product.name}`"
-                    :disabled="count.status !== 'borrador' || busy"
+                    :disabled="!canWrite || count.status !== 'borrador' || busy"
                   />
                 </div>
-              </td><td v-if="count.status === 'borrador'" class="p-3">
+              </td><td v-if="canWrite && count.status === 'borrador'" class="p-3">
                 <UButton
                   icon="i-lucide-x"
                   :aria-label="`Quitar ${line.product.name} del conteo`"
@@ -117,7 +118,7 @@ function action(value: 'countSubmit' | 'countApply' | 'countRefresh' | 'countCan
           </tbody>
         </table>
       </div><UButton
-        v-if="count.status === 'borrador' && count.lines.length"
+        v-if="canWrite && count.status === 'borrador' && count.lines.length"
         type="submit"
         label="Guardar cantidades"
         :loading="busy"
@@ -125,7 +126,7 @@ function action(value: 'countSubmit' | 'countApply' | 'countRefresh' | 'countCan
     </form>
     <div v-if="!closed" class="flex flex-wrap gap-2">
       <UButton
-        v-if="count.status === 'borrador'"
+        v-if="canWrite && count.status === 'borrador'"
         label="Enviar para aprobación"
         :disabled="busy || !canSubmit"
         @click="action('countSubmit')"

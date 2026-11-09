@@ -8,6 +8,7 @@ const emit = defineEmits<{
   save: [requiresInvoice: boolean]
 }>()
 
+const { canWrite } = useAuth()
 const selected = shallowRef(props.requiresInvoice)
 
 watch(() => props.requiresInvoice, (value) => {
@@ -19,8 +20,9 @@ const changed = computed(() => selected.value !== props.requiresInvoice)
 
 <template>
   <div class="flex flex-wrap items-center gap-3">
-    <USwitch v-model="selected" label="Requiere factura" :disabled="saving" />
+    <USwitch v-model="selected" label="Requiere factura" :disabled="saving || !canWrite" />
     <UButton
+      v-if="canWrite"
       label="Guardar facturación"
       icon="i-lucide-save"
       size="sm"

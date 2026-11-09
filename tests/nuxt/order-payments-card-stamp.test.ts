@@ -7,6 +7,7 @@ import type { OrderPaymentContext } from '~/types/siigo-payments'
 
 const { useAuthMock } = vi.hoisted(() => ({
   useAuthMock: vi.fn(() => ({
+    canWrite: { value: true },
     user: { value: { role: 'admin' } }
   }))
 }))

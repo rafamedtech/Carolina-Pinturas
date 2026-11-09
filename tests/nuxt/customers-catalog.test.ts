@@ -1,9 +1,11 @@
 // @vitest-environment nuxt
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { mountSuspended, registerEndpoint } from '@nuxt/test-utils/runtime'
+import { mockNuxtImport, mountSuspended, registerEndpoint } from '@nuxt/test-utils/runtime'
 import { defineComponent, h } from 'vue'
 import { defineEventHandler } from 'h3'
 import { useCustomersCatalog } from '~/composables/useCustomersCatalog'
+
+mockNuxtImport('useAuth', () => () => ({ canWrite: { value: true } }))
 
 let requestCount = 0
 let refreshCount = 0

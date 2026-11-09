@@ -45,7 +45,7 @@ async function syncProduct() {
   if (syncing.value) return
   syncing.value = true
   try {
-    await $fetch(`/api/siigo/products/${encodeURIComponent(productId.value)}`, { query: { refresh: 'true' } })
+    await $fetch(`/api/siigo/products/${encodeURIComponent(productId.value)}`, { query: { refresh: user.value?.role === 'consulta' ? undefined : 'true' } })
     await Promise.all([refresh(), refreshNuxtData(['products-catalog-request', 'product-management-catalog', 'product-brand-options'])])
   } catch (error) {
     toast.add({ title: 'No se pudo actualizar el producto desde Siigo', description: (error as { data?: { statusMessage?: string } }).data?.statusMessage, color: 'error' })
@@ -217,7 +217,7 @@ useSeoMeta({ title: () => productName.value })
           :product="product"
           :product-id="productId"
           :loading="initialLoading"
-          :show-purchase-cost="canManageProducts(user?.role)"
+          :show-purchase-cost="canManageProducts(user?.role) || user?.role === 'consulta'"
         />
         <InventoryProductStock v-if="!isComposite" :product-id="productId" />
         <ProductsProductActivity

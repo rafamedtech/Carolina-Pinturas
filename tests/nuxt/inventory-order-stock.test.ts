@@ -5,7 +5,7 @@ import { clearNuxtData } from '#app'
 import InventoryOrderStock from '~/components/inventory/InventoryOrderStock.vue'
 import type { VueWrapper } from '@vue/test-utils'
 
-mockNuxtImport('useAuth', () => () => ({ user: { value: { role: 'admin' } } }))
+mockNuxtImport('useAuth', () => () => ({ user: { value: { role: 'admin' } }, canWrite: { value: true } }))
 let activationRequired = true
 let wrapper: VueWrapper | undefined
 registerEndpoint('/api/orders/activation-quote/inventory', () => ({ managed: true, activationRequired, warehouseId: null, dispatched: false, movements: [], stocks: [] }))

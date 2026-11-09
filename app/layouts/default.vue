@@ -103,7 +103,7 @@ const allLinks: AppNavigationItem[] = [{
 
 const links = computed(() => [
   allLinks
-    .filter(link => !link.roles || (user.value && link.roles.includes(user.value.role)))
+    .filter(link => !link.roles || (user.value && (link.roles.includes(user.value.role) || user.value.role === 'consulta')))
     .map(({ roles: _roles, ...link }) => link)
 ] satisfies NavigationMenuItem[][])
 

@@ -1,7 +1,7 @@
 import type { ProductImage } from './siigo-products'
 import type { ProductComposition } from '#shared/schemas/product'
 
-export type UserRole = 'admin' | 'mostrador' | 'vendedor' | 'repartidor' | 'igualaciones'
+export type UserRole = 'admin' | 'mostrador' | 'vendedor' | 'repartidor' | 'igualaciones' | 'consulta'
 
 export interface AppUser {
   id: string

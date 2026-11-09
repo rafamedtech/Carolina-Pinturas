@@ -12,6 +12,7 @@ import { fetchAllPages } from '~/composables/useCsvExport'
 import { formatDate, mexicoToday } from '~/utils/datetime'
 
 const { user } = useAuth()
+const canViewValuation = computed(() => ['admin', 'consulta'].includes(user.value?.role ?? ''))
 const admin = computed(() => user.value?.role === 'admin')
 const operational = computed(() => admin.value || user.value?.role === 'mostrador')
 const stockTable = useTemplateRef('stockTable')
@@ -26,7 +27,7 @@ const query = computed(() => ({ page: pageNumber.value, page_size: 25, search: s
 const { returnTo } = useTableQuery([
   tableQueryField('productId', productId, tableQueryText()),
   tableQueryField('tab', tab, {
-    parse: value => tableQueryText(productId.value ? 'kardex' : defaultTab.value, [...(admin.value ? ['valuation'] : []), 'stocks', 'kardex', 'reservations', 'movements', 'counts', 'warehouses']).parse(value),
+    parse: value => tableQueryText(productId.value ? 'kardex' : defaultTab.value, [...(canViewValuation.value ? ['valuation'] : []), 'stocks', 'kardex', 'reservations', 'movements', 'counts', 'warehouses']).parse(value),
     serialize: value => value === defaultTab.value && !productId.value ? undefined : value
   }),
   tableQueryField('search', search, tableQueryText()),
@@ -61,7 +62,7 @@ const movementRows = computed(() => (result.value?.results ?? []) as InventoryMo
 const countRows = computed(() => (result.value?.results ?? []) as InventoryCount[])
 const productRows = computed(() => (result.value?.results ?? []) as InventoryProduct[])
 const reservationRows = computed(() => (result.value?.results ?? []) as Array<Extract<Row, { orderId: string }>>)
-const tabs = computed(() => [...(admin.value ? [{ label: 'Valor de la mercancía', value: 'valuation', icon: 'i-lucide-banknote' }] : []), { label: 'Existencias', value: 'stocks', icon: 'i-lucide-package' }, { label: 'Kardex', value: 'kardex', icon: 'i-lucide-list' }, { label: 'Reservas', value: 'reservations', icon: 'i-lucide-bookmark' }, ...(operational.value ? [{ label: 'Movimientos', value: 'movements', icon: 'i-lucide-arrow-left-right' }, { label: 'Conteos', value: 'counts', icon: 'i-lucide-clipboard-check' }] : []), ...(admin.value ? [{ label: 'Almacenes y configuración', value: 'warehouses', icon: 'i-lucide-warehouse' }] : [])])
+const tabs = computed(() => [...(canViewValuation.value ? [{ label: 'Valor de la mercancía', value: 'valuation', icon: 'i-lucide-banknote' }] : []), { label: 'Existencias', value: 'stocks', icon: 'i-lucide-package' }, { label: 'Kardex', value: 'kardex', icon: 'i-lucide-list' }, { label: 'Reservas', value: 'reservations', icon: 'i-lucide-bookmark' }, ...((operational.value || user.value?.role === 'consulta') ? [{ label: 'Movimientos', value: 'movements', icon: 'i-lucide-arrow-left-right' }, { label: 'Conteos', value: 'counts', icon: 'i-lucide-clipboard-check' }] : []), ...(canViewValuation.value ? [{ label: 'Almacenes y configuración', value: 'warehouses', icon: 'i-lucide-warehouse' }] : [])])
 const tabDescriptions: Record<string, string> = {
   valuation: 'Existencias físicas de todos los almacenes, incluidas las reservas, al último costo unitario registrado.',
   stocks: 'Existencias físicas, reservas y cantidades disponibles por producto y almacén.',
@@ -338,6 +339,7 @@ const reservationColumns: TableColumn<Extract<Row, { orderId: string }>>[] = [
                   {{ w.active ? 'Activo' : 'Inactivo' }}
                 </UBadge>
               </div><UButton
+                v-if="admin"
                 label="Editar"
                 variant="outline"
                 size="sm"
@@ -351,7 +353,7 @@ const reservationColumns: TableColumn<Extract<Row, { orderId: string }>>[] = [
               <h2 class="font-semibold">
                 Control interno por producto
               </h2>
-              <UDropdownMenu :items="filteredTrackingActions">
+              <UDropdownMenu v-if="admin" :items="filteredTrackingActions">
                 <UButton
                   label="Acciones sobre filtrados"
                   icon="i-lucide-list-checks"
@@ -376,7 +378,7 @@ const reservationColumns: TableColumn<Extract<Row, { orderId: string }>>[] = [
               </div><USwitch
                 :model-value="p.enabled"
                 :aria-label="`Control interno de ${p.name}`"
-                :disabled="busy"
+                :disabled="busy || !admin"
                 @update:model-value="enabled => save({ action: 'tracking', productId: p.id, version: p.version, enabled })"
               />
             </li>

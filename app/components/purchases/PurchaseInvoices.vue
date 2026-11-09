@@ -3,6 +3,7 @@ import { mexicoToday } from '~/utils/datetime'
 import type { PurchaseView } from '~/types/purchases'
 import { purchaseMoney } from '~/utils/purchaseFormat'
 
+const { canWrite } = useAuth()
 const props = defineProps<{ order: PurchaseView }>()
 const emit = defineEmits<{ saved: [order: PurchaseView] }>()
 const { busy, error, run } = usePurchaseAction(() => props.order, o => emit('saved', o))
@@ -10,7 +11,7 @@ const formOpen = shallowRef(false)
 const form = reactive({ folio: '', date: mexicoToday(), dueDate: mexicoToday(), amount: 0 })
 const money = (value: number) => purchaseMoney(value, props.order.currencyCode)
 const difference = computed(() => props.order.invoiced - props.order.total)
-const canInvoice = computed(() => ['confirmada', 'liquidada', 'vencida'].includes(props.order.status))
+const canInvoice = computed(() => canWrite.value && ['confirmada', 'liquidada', 'vencida'].includes(props.order.status))
 
 function openForm() {
   form.amount = Math.max(0, Number((props.order.total - props.order.invoiced).toFixed(2)))

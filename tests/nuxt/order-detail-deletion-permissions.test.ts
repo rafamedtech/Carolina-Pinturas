@@ -1,6 +1,7 @@
 // @vitest-environment nuxt
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { mockNuxtImport, mountSuspended, registerEndpoint } from '@nuxt/test-utils/runtime'
+import { computed } from 'vue'
 import type { VueWrapper } from '@vue/test-utils'
 import OrderDetail from '~/components/orders/OrderDetail.vue'
 import OrderDetailItems from '~/components/orders/OrderDetailItems.vue'
@@ -22,6 +23,7 @@ const { useAuthMock, authRole } = vi.hoisted(() => {
       }
       return {
         user: { value: user },
+        canWrite: computed(() => user.role !== 'consulta'),
         disabled: { value: false },
         fetchSession: vi.fn(async () => user)
       }
@@ -155,5 +157,22 @@ describe('OrderDetail · edición después de la entrega', () => {
       .flatMap(menu => menu.props('items').flat())
     const edit = actions.find(action => action.label === 'Editar pedido')
     expect(edit).toMatchObject({ disabled, to: { path: '/ventas/order-invoice/editar' } })
+  })
+})
+
+describe('OrderDetail · solo consulta', () => {
+  it('permite consultar el pedido sin controles de escritura', async () => {
+    authRole.value = 'consulta'
+    wrapper = await mountSuspended(OrderDetail, {
+      props: { orderId: 'order-invoice' },
+      global: { stubs: { OrdersSiigoOrderSiigoInvoiceCard: true } }
+    })
+    await vi.waitFor(() => expect(wrapper?.findComponent(OrderDetailItems).exists()).toBe(true))
+    expect(wrapper.findComponent(OrderDetailItems).props('editable')).toBe(false)
+    expect(wrapper.findComponent(OrderDetailItems).props('deletable')).toBe(false)
+    expect(wrapper.findComponent(OrderStatusPanel).props('editable')).toBe(false)
+    const actions = wrapper.findAllComponents({ name: 'UDropdownMenu' }).flatMap(menu => menu.props('items').flat())
+    expect(actions.some(action => ['Editar pedido', 'Cancelar pedido', 'Registrar devolución', 'Imprimir ticket'].includes(action.label))).toBe(false)
+    expect(actions.some(action => action.label === 'Ver documento')).toBe(true)
   })
 })

@@ -47,7 +47,7 @@ export default eventHandler(async (event) => {
     throw createError({ statusCode: 400, statusMessage: 'Los filtros del listado no son válidos.' })
   }
 
-  if (internalCustomers && user.role !== 'admin') {
+  if (internalCustomers && !['admin', 'consulta'].includes(user.role)) {
     throw createError({ statusCode: 403, statusMessage: 'No tienes permiso para consultar pedidos internos.' })
   }
 

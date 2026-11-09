@@ -5,6 +5,7 @@ import type { TableColumn, TableRow } from '@nuxt/ui'
 import type { Repartidor } from '~/types/orders'
 import type { CsvColumn } from '~/utils/csv'
 
+const { canWrite } = useAuth()
 const filter = ref('')
 const page = shallowRef(1)
 const pageSize = 25
@@ -56,11 +57,11 @@ function openRepartidor(_: Event, row: TableRow<Repartidor>) {
   router.push({ path: `/repartidores/${encodeURIComponent(row.original.id)}`, query: { returnTo: returnTo.value } })
 }
 const createOpen = shallowRef(false)
-const listConfig: ListLayoutConfig = {
+const listConfig = computed<ListLayoutConfig>(() => ({
   id: 'repartidores', title: 'Repartidores', empty: 'No hay repartidores para mostrar.',
-  search: { placeholder: 'Buscar repartidor' }, create: { label: 'Nuevo repartidor' },
+  search: { placeholder: 'Buscar repartidor' }, create: canWrite.value ? { label: 'Nuevo repartidor' } : undefined,
   pagination: { mode: 'client', label: 'repartidores', pageSize }
-}
+}))
 </script>
 
 <template>

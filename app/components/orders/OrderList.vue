@@ -29,7 +29,7 @@ const ORDER_VIEW_KEYS = [
   'internos'
 ] as const
 const IGUALACION_VIEW_KEYS = ['mostrador', 'vendedor']
-const canViewInternal = computed(() => user.value?.role === 'admin')
+const canViewInternal = computed(() => ['admin', 'consulta'].includes(user.value?.role ?? ''))
 function selectionFromQuery(query: typeof route.query) {
   const queryValue = (value: unknown) => typeof value === 'string' ? value : ''
   return props.igualacion
@@ -352,7 +352,7 @@ const listConfig = computed<ListLayoutConfig>(() => ({
   >
     <template #actions>
       <UButton
-        v-if="isInternalCustomersView"
+        v-if="isInternalCustomersView && user?.role === 'admin'"
         label="Gestionar clientes"
         icon="i-lucide-users-round"
         color="neutral"
@@ -378,7 +378,7 @@ const listConfig = computed<ListLayoutConfig>(() => ({
     </template>
     <template #overlays>
       <OrdersOrderListPreviewModal v-model:open="detailOpen" :order="selectedOrder" :return-to="returnTo" />
-      <OrdersInternalOrderCustomersModal v-if="canViewInternal" v-model:open="customerManagerOpen" @saved="refresh()" />
+      <OrdersInternalOrderCustomersModal v-if="user?.role === 'admin'" v-model:open="customerManagerOpen" @saved="refresh()" />
     </template>
   </ListLayout>
 </template>

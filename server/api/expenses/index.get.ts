@@ -1,7 +1,7 @@
 import { Prisma } from '../../../generated/prisma/client'
 import type { ExpenseListResponse } from '~/types/expenses'
 import { ADMIN_ONLY_EXPENSE_CATEGORIES } from '~/utils/expense'
-import { ORDER_LOGISTICS_ROLES } from '~/utils/roleAccess'
+import { canReadAllData, ORDER_LOGISTICS_ROLES } from '~/utils/roleAccess'
 import { requireRole } from '../../utils/auth'
 import { expenseView } from '../../utils/expenses'
 import { usePrisma } from '../../utils/prisma'
@@ -23,7 +23,7 @@ function dateOnly(value: unknown) {
 
 export default eventHandler(async (event): Promise<ExpenseListResponse> => {
   const user = await requireRole(event, ORDER_LOGISTICS_ROLES)
-  const hiddenCategories = user.role === 'admin' ? [] : [...ADMIN_ONLY_EXPENSE_CATEGORIES]
+  const hiddenCategories = canReadAllData(user.role) ? [] : [...ADMIN_ONLY_EXPENSE_CATEGORIES]
   const query = getQuery(event)
   const page = positiveInteger(query.page, 1, 100_000)
   const pageSize = positiveInteger(query.page_size, 25, 100)
@@ -63,7 +63,7 @@ export default eventHandler(async (event): Promise<ExpenseListResponse> => {
     : {}
   const where: Prisma.ExpenseWhereInput = {
     AND: [
-      ...(user.role !== 'admin' ? [{ purchasePaymentId: null }] : []),
+      ...(!canReadAllData(user.role) ? [{ purchasePaymentId: null }] : []),
       searchFilter,
       dateFilter,
       ...(paymentMethod ? [{ paymentMethod }] : []),
@@ -74,7 +74,7 @@ export default eventHandler(async (event): Promise<ExpenseListResponse> => {
   const searchPattern = `%${search.replace(/[\\%_]/g, character => `\\${character}`)}%`
   const totalConditions = [
     Prisma.sql`TRUE`,
-    ...(user.role !== 'admin' ? [Prisma.sql`purchase_payment_id IS NULL`] : []),
+    ...(!canReadAllData(user.role) ? [Prisma.sql`purchase_payment_id IS NULL`] : []),
     ...(search
       ? [Prisma.sql`(
         description ILIKE ${searchPattern}

@@ -7,7 +7,7 @@ export default defineNuxtRouteMiddleware(async (to) => {
   if (path === '/lista-precios') return
 
   const { disabled, fetchSession } = useAuth()
-  const user = await fetchSession()
+  const user = await fetchSession(true)
 
   if (publicPaths.has(path)) {
     if (user) return navigateTo(homePathForRole(user.role))
@@ -29,7 +29,7 @@ export default defineNuxtRouteMiddleware(async (to) => {
     || path === '/pedidos-internos'
     || path.startsWith('/pedidos-internos/')
 
-  if (adminOnlyPath && user.role !== 'admin') {
+  if (adminOnlyPath && user.role !== 'admin' && !(user.role === 'consulta' && !path.startsWith('/configuracion'))) {
     return navigateTo('/')
   }
 })

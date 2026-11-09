@@ -1,3 +1,4 @@
+import { canReadAllData } from '~/utils/roleAccess'
 import type { UserRole } from '~/types/siigo'
 
 export const EXPENSE_CATEGORIES = [
@@ -24,7 +25,7 @@ export const ADMIN_ONLY_EXPENSE_CATEGORIES = [
 ] as const satisfies readonly ExpenseCategory[]
 
 export function canViewExpenseCategory(role: UserRole, category: string) {
-  return role === 'admin'
+  return canReadAllData(role)
     || !ADMIN_ONLY_EXPENSE_CATEGORIES.includes(category as typeof ADMIN_ONLY_EXPENSE_CATEGORIES[number])
 }
 

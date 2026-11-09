@@ -1,8 +1,10 @@
 // @vitest-environment nuxt
 import { describe, expect, it } from 'vitest'
-import { mountSuspended } from '@nuxt/test-utils/runtime'
+import { mockNuxtImport, mountSuspended } from '@nuxt/test-utils/runtime'
 import InventoryCountForm from '~/components/inventory/InventoryCountForm.vue'
 import type { InventoryCount } from '#shared/types/inventory'
+
+mockNuxtImport('useAuth', () => () => ({ canWrite: { value: true } }))
 
 const count: InventoryCount = {
   id: 'count-1', warehouseId: 'warehouse-1', warehouse: { name: 'Principal' }, status: 'borrador', version: 2,

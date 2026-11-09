@@ -1,5 +1,5 @@
 import * as z from 'zod'
-import { ORDER_LOGISTICS_ROLES, PRODUCT_MANAGEMENT_ROLES } from '~/utils/roleAccess'
+import { canReadAllData, ORDER_LOGISTICS_ROLES, PRODUCT_MANAGEMENT_ROLES } from '~/utils/roleAccess'
 import { productActivitySections } from '#shared/types/product-activity'
 import { requireRole } from '../../../utils/auth'
 import { INVENTORY_READ_ROLES, INVENTORY_WRITE_ROLES } from '../../../utils/inventory'
@@ -29,5 +29,5 @@ export default eventHandler(async (event) => {
 
   const { section, page } = query.data
   const user = await requireRole(event, roles[section])
-  return listProductActivity(id.data, section, page, user.role === 'admin')
+  return listProductActivity(id.data, section, page, canReadAllData(user.role))
 })

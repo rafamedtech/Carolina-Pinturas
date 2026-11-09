@@ -25,7 +25,7 @@ const selectedRepartidor = shallowRef('')
 const savingRepartidor = shallowRef(false)
 const hiddenSeguimientoStatusKeys = new Set(['borrador', 'ingresado', 'cancelado'])
 const toast = useToast()
-const { user } = useAuth()
+const { user, canWrite } = useAuth()
 const {
   data: order,
   status,
@@ -91,7 +91,7 @@ const mayEditOrder = computed(() =>
 )
 const orderIsDelivered = computed(() => order.value?.status.key === 'entregado')
 const mayReturnOrder = computed(() => orderIsDelivered.value && ['admin', 'mostrador'].includes(user.value?.role ?? ''))
-const mayChangeStatus = computed(() => !isQuote.value && (!orderIsDelivered.value || user.value?.role === 'admin'))
+const mayChangeStatus = computed(() => canWrite.value && !isQuote.value && (!orderIsDelivered.value || user.value?.role === 'admin'))
 const mayChangeRepartidor = computed(() => mayManageLogistics.value && !orderIsDelivered.value)
 const mayEditItemAmounts = computed(() => user.value?.role === 'admin')
 const mayDeleteOrderItems = computed(() => Boolean(
@@ -121,7 +121,7 @@ const documentOptions = computed<DropdownMenuItem[][]>(() => {
 
   const groups: DropdownMenuItem[][] = [documentActions]
 
-  if (!isQuote.value) {
+  if (canWrite.value && !isQuote.value) {
     groups.push([
       { label: 'Imprimir ticket', icon: 'i-lucide-receipt', onSelect: () => { if (order.value) printTicket(order.value) } }
     ])
@@ -148,6 +148,7 @@ const documentOptions = computed<DropdownMenuItem[][]>(() => {
 })
 
 const mayManagePayment = mayManageLogistics
+const mayViewPayments = computed(() => mayManagePayment.value || user.value?.role === 'consulta')
 const paymentButtonColor = computed(() => {
   if (!order.value) return 'neutral'
   return orderPaymentStatusColor(order.value.paymentStatus, order.value.orderDate)
@@ -454,7 +455,7 @@ async function convertToPedido() {
               @click="startInvoiceFlow"
             />
             <UButton
-              v-if="!isQuote && mayManagePayment"
+              v-if="!isQuote && mayViewPayments"
               :label="orderPaymentStatusLabel(order.paymentStatus)"
               icon="i-lucide-hand-coins"
               :color="paymentButtonColor"
@@ -497,10 +498,10 @@ async function convertToPedido() {
               @failed="() => refresh()"
             />
             <UModal
-              v-if="!isQuote && mayManagePayment"
+              v-if="!isQuote && mayViewPayments"
               v-model:open="paymentsOpen"
               :title="`Pagos · ${order.number}`"
-              description="Consulta los pagos recibidos o registra un nuevo pago para este pedido."
+              :description="canWrite ? 'Consulta los pagos recibidos o registra un nuevo pago para este pedido.' : 'Consulta los pagos recibidos de este pedido.'"
               scrollable
               :ui="{ content: 'max-w-3xl' }"
             >
@@ -679,7 +680,7 @@ async function convertToPedido() {
               :statuses="availableStatuses"
               :saving="savingStatus"
               :entries="order.statusHistory"
-              :editable="!isQuote"
+              :editable="canWrite && !isQuote"
               :disabled="!mayChangeStatus"
             />
           </div>

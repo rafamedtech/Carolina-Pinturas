@@ -6,7 +6,7 @@ import { getQuery, createError } from 'h3'
 import type { VueWrapper } from '@vue/test-utils'
 import ProductCatalog from '~/components/products/ProductCatalog.vue'
 
-mockNuxtImport('useAuth', () => () => ({ user: { value: { role: 'admin' } } }))
+mockNuxtImport('useAuth', () => () => ({ user: { value: { role: 'admin' } }, canWrite: { value: true } }))
 const original = { id: 'product-1', code: 'P001', name: 'Pintura local', type: 'Product', active: true, unit: { code: 'H87', name: 'Pieza' } }
 let rows = [original]
 let syncCount = 0
