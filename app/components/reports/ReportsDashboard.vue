@@ -59,9 +59,12 @@ function plural(count: number, singular: string, pluralLabel: string) {
     <template v-else-if="data && !error">
       <section aria-labelledby="reports-summary" class="space-y-3">
         <div class="flex flex-wrap items-baseline justify-between gap-2">
-          <h2 id="reports-summary" class="text-lg font-semibold tracking-tight text-highlighted">
-            Resultado del {{ annual ? 'año' : 'mes' }}
-          </h2>
+          <DetailSectionHeading
+            title-id="reports-summary"
+            :title="`Resultado del ${annual ? 'año' : 'mes'}`"
+            color="primary"
+            class="tracking-tight"
+          />
           <p class="text-xs text-muted">
             {{ data.period.label }} · importes en MXN antes de IVA
           </p>
@@ -79,7 +82,7 @@ function plural(count: number, singular: string, pluralLabel: string) {
       </section>
 
       <section aria-labelledby="reports-sales" class="space-y-3">
-        <SectionHeading
+        <ReportsSectionHeading
           id="reports-sales"
           title="Ventas"
           marker="bg-primary"
@@ -120,7 +123,7 @@ function plural(count: number, singular: string, pluralLabel: string) {
       </section>
 
       <section aria-labelledby="reports-materials" class="space-y-3">
-        <SectionHeading
+        <ReportsSectionHeading
           id="reports-materials"
           title="Compras de material"
           marker="bg-violet-500"
@@ -143,7 +146,7 @@ function plural(count: number, singular: string, pluralLabel: string) {
       </section>
 
       <section aria-labelledby="reports-operating" class="space-y-3">
-        <SectionHeading
+        <ReportsSectionHeading
           id="reports-operating"
           title="Gastos operativos"
           marker="bg-warning"
@@ -166,7 +169,7 @@ function plural(count: number, singular: string, pluralLabel: string) {
       </section>
 
       <section aria-labelledby="reports-collections" class="space-y-3">
-        <SectionHeading
+        <ReportsSectionHeading
           id="reports-collections"
           title="Cobranza y flujo"
           marker="bg-success"
