@@ -421,8 +421,12 @@ export async function executeInventory(input: InventoryCommand, user: AppUser) {
 function pagination(q: InventoryQuery, total: number) {
   return { page: q.page, pageSize: q.page_size, totalResults: total, totalPages: Math.ceil(total / q.page_size) }
 }
-export function stockView(b: Prisma.InventoryBalanceGetPayload<{
-  include: { product: true, warehouse: true } }>): InventoryStock {
+const stockInclude = {
+  product: { select: { code: true, name: true, unitName: true, unitCode: true, unitCost: true, costCurrency: true } },
+  warehouse: { select: { name: true } }
+} satisfies Prisma.InventoryBalanceInclude
+
+export function stockView(b: Prisma.InventoryBalanceGetPayload<{ include: typeof stockInclude }>): InventoryStock {
   const available = d(b.quantity.toString()).minus(b.reserved.toString())
   return { productId: b.productId, warehouseId: b.warehouseId, code: b.product.code, name: b.product.name, unit: b.product.unitName ?? b.product.unitCode, warehouse: b.warehouse.name, quantity: b.quantity.toString(), reserved: b.reserved.toString(), available: available.toString(), minimum: b.minimum.toString(), low: available.lt(b.minimum.toString()), version: b.version, unitCost: b.product.unitCost?.toString() ?? null, costCurrency: b.product.costCurrency }
 }
@@ -447,7 +451,12 @@ export async function listInventory(resource: string, q: InventoryQuery) {
   }
   if (resource === 'products') {
     const where = { ...inventoryProductFilter(q), ...(q.controlledOnly === 'true' ? { inventoryProduct: { enabled: true }, AND: [{ OR: [{ type: 'Product' }, { type: null }] }] } : {}) }
-    const [rows, total] = await Promise.all([db.siigoProduct.findMany({ where, include: { inventoryProduct: true }, orderBy: [{ code: 'asc' }, { id: 'asc' }], skip, take: q.page_size }), db.siigoProduct.count({ where })])
+    const [rows, total] = await Promise.all([db.siigoProduct.findMany({ where, select: {
+      id: true, code: true, name: true, reference: true, barcode: true,
+      unitName: true, unitCode: true, unitCost: true, costCurrency: true,
+      initialUnitCost: true, initialCostCurrency: true,
+      inventoryProduct: { select: { enabled: true, version: true } }
+    }, orderBy: [{ code: 'asc' }, { id: 'asc' }], skip, take: q.page_size }), db.siigoProduct.count({ where })])
     return { results: rows.map(p => ({ id: p.id, code: p.code, name: p.name, reference: p.reference ?? undefined, additional_fields: { barcode: p.barcode ?? undefined }, unit: p.unitName ?? p.unitCode, unitCost: p.unitCost?.toString() ?? null, costCurrency: p.costCurrency, initialUnitCost: p.initialUnitCost?.toString() ?? null, initialCostCurrency: p.initialCostCurrency, enabled: p.inventoryProduct?.enabled ?? false, version: p.inventoryProduct?.version ?? 1 })), pagination: pagination(q, total) }
   }
   if (resource === 'stocks') {
@@ -456,10 +465,10 @@ export async function listInventory(resource: string, q: InventoryQuery) {
       const filter = Prisma.sql`FROM inventory_balances b JOIN siigo_products p ON p.id = b.product_id JOIN inventory_products c ON c.product_id = p.id WHERE c.enabled AND p.active IS TRUE AND b.quantity - b.reserved < b.minimum AND (${q.warehouseId ?? null}::uuid IS NULL OR b.warehouse_id = ${q.warehouseId ?? null}::uuid) AND (${q.productId ?? null}::uuid IS NULL OR b.product_id = ${q.productId ?? null}::uuid) AND (p.code ILIKE ${'%' + q.search + '%'} OR p.name ILIKE ${'%' + q.search + '%'})`
       const ids = await db.$queryRaw<Array<{ warehouse_id: string, product_id: string }>>(Prisma.sql`SELECT b.warehouse_id, b.product_id ${filter} ORDER BY b.product_id, b.warehouse_id LIMIT ${q.page_size} OFFSET ${skip}`)
       const total = await db.$queryRaw<Array<{ total: number }>>(Prisma.sql`SELECT COUNT(*)::int AS total ${filter}`)
-      const rows = ids.length ? await db.inventoryBalance.findMany({ where: { product: { active: true }, OR: ids.map(i => ({ warehouseId: i.warehouse_id, productId: i.product_id })) }, include: { product: true, warehouse: true }, orderBy: [{ productId: 'asc' }, { warehouseId: 'asc' }] }) : []
+      const rows = ids.length ? await db.inventoryBalance.findMany({ where: { product: { active: true }, OR: ids.map(i => ({ warehouseId: i.warehouse_id, productId: i.product_id })) }, include: stockInclude, orderBy: [{ productId: 'asc' }, { warehouseId: 'asc' }] }) : []
       return { results: rows.map(stockView), pagination: pagination(q, total[0]?.total ?? 0) }
     }
-    const rows = await db.inventoryBalance.findMany({ where, include: { warehouse: true, product: true }, orderBy: [{ productId: 'asc' }, { warehouseId: 'asc' }], skip, take: q.page_size })
+    const rows = await db.inventoryBalance.findMany({ where, include: stockInclude, orderBy: [{ productId: 'asc' }, { warehouseId: 'asc' }], skip, take: q.page_size })
     return { results: rows.map(stockView), pagination: pagination(q, await db.inventoryBalance.count({ where })) }
   }
   if (resource === 'movements' || resource === 'kardex') {

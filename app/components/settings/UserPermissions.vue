@@ -3,7 +3,7 @@ import { USER_ROLE_OPTIONS } from '~/utils/roleAccess'
 import type { UserRole } from '~/types/siigo'
 
 interface UserProfile { userId: string, name: string, email: string, role: UserRole, active: boolean }
-const { data, status, error, refresh } = useFetch<UserProfile[]>('/api/users', { server: false, default: () => [] })
+const { data, status, error, refresh } = useFetch<UserProfile[]>('/api/users', { server: false, lazy: true, default: () => [] })
 const drafts = ref<Record<string, { role: Exclude<UserRole, 'admin'>, active: boolean }>>({})
 const saving = shallowRef<string>()
 const message = shallowRef('')
@@ -37,7 +37,7 @@ async function save(user: UserProfile) {
       </template>
     </UAlert>
     <div
-      v-if="status === 'pending'"
+      v-if="status === 'idle' || status === 'pending'"
       role="status"
       aria-label="Cargando usuarios"
       class="space-y-3"

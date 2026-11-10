@@ -54,9 +54,12 @@ export async function assertNoPendingProductWrites(tx: Tx, products: Array<{ id:
 export async function attachProductCompositions(tx: Tx, products: SiigoProduct[]) {
   if (!products.length) return products
   const [definitions, writes] = await Promise.all([
-    tx.siigoProduct.findMany({ where: { id: { in: products.map(p => p.id) } }, include: { inventoryProduct: true,
+    tx.siigoProduct.findMany({ where: { id: { in: products.map(p => p.id) } }, select: {
+      id: true, internalKind: true, compositionVersion: true,
+      availableForPurchase: true, availableForSale: true, availableForExpense: true,
+      inventoryProduct: { select: { enabled: true } },
       inventoryBalances: { where: { warehouse: { active: true } }, select: { quantity: true, reserved: true } },
-      internalComponents: { include: { component: { select: { code: true, name: true, unitName: true, unitCode: true } } } } } }),
+      internalComponents: { select: { componentId: true, quantity: true, component: { select: { code: true, name: true, unitName: true, unitCode: true } } } } } }),
     tx.productWrite.findMany({ where: { state: { in: ['pending', 'unknown'] }, OR: [{ productId: { in: products.map(p => p.id) } }, { code: { in: products.map(p => p.code) } }] }, select: { id: true, productId: true, code: true } })
   ])
   const byId = new Map(definitions.map(p => [p.id, p]))

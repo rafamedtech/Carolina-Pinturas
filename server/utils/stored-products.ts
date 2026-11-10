@@ -11,6 +11,16 @@ const productSelect = {
 
 type StoredProduct = Prisma.SiigoProductGetPayload<{ select: typeof productSelect }>
 
+// One catalog per database client/process, shared by prices, brands and order
+// selectors. Check a small revision on EVERY read so other Vercel instances'
+// writes invalidate it too. Never cache point reads used to save orders.
+const catalogs = new WeakMap<PrismaClient, {
+  revision: string
+  expiresAt: number
+  products: Promise<SiigoProduct[]>
+}>()
+const CATALOG_MAX_AGE_MS = 60_000
+
 export function storedProductView(row: StoredProduct): SiigoProduct {
   const raw = row.rawPayload && typeof row.rawPayload === 'object' && !Array.isArray(row.rawPayload)
     ? row.rawPayload
@@ -27,6 +37,30 @@ export function storedProductView(row: StoredProduct): SiigoProduct {
 
 export async function getStoredProducts(db: PrismaClient, ids?: string[]) {
   if (ids && !ids.length) return []
+  if (!ids) {
+    const state = await db.siigoProduct.aggregate({ _count: { _all: true }, _max: { updatedAt: true } })
+    const revision = `${state._count._all}:${state._max.updatedAt?.toISOString() ?? ''}`
+    let entry = catalogs.get(db)
+    if (!entry || entry.revision !== revision || entry.expiresAt <= Date.now()) {
+      entry = {
+        revision,
+        expiresAt: Date.now() + CATALOG_MAX_AGE_MS,
+        products: readStoredProducts(db)
+      }
+      catalogs.set(db, entry)
+    }
+    try {
+      // Callers must not mutate the shared snapshot (including nested prices).
+      return structuredClone(await entry.products)
+    } catch (error) {
+      if (catalogs.get(db) === entry) catalogs.delete(db)
+      throw error
+    }
+  }
+  return readStoredProducts(db, ids)
+}
+
+async function readStoredProducts(db: PrismaClient, ids?: string[]) {
   const rows = await db.siigoProduct.findMany({
     where: ids ? { id: { in: [...new Set(ids)] } } : undefined,
     select: productSelect,
