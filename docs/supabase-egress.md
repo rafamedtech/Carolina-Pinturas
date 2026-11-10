@@ -7,6 +7,7 @@ Revisión de solo lectura en el dashboard autenticado de Supabase:
 - Organización `cvrtransportinc's Org`, plan Free: **9.776 GB / 5 GB** en el ciclo 01/11/2026–01/12/2026.
 - Carolina Pinturas: **9.768 GB**; prácticamente todo el consumo de la organización. CVR aporta aproximadamente 0.008 GB por diferencia entre cifras redondeadas.
 - Carolina muestra 2 usuarios activos, 0 mensajes Realtime, 0 invocaciones de Edge Functions y Storage redondeado a 0 GB. Estas cifras no atribuyen por sí solas todo el egress a PostgreSQL.
+- Al inspeccionar el desglose diario de la organización, el panel mostró **Shared Pooler Egress = 100.0%** (redondeado): **1.315 GB el 06/11** y **2.476 GB el 09/11**, frente a 358.468 KB y 436.775 KB de Auth respectivamente. Esto confirma que el tráfico dominante en esos días proviene de la conexión PostgreSQL/pooler utilizada por Prisma.
 - Aviso de periodo de gracia hasta **08/12/2026**. El exceso ya consumido no desaparece al optimizar.
 - Catálogo: **1,388 productos**, con **1,034,316 bytes** de JSON `raw_payload` en total.
 - `pg_stat_statements`: la consulta completa de `getStoredProducts` acumulaba **3,439 llamadas / 4,187,046 filas**. Dos variantes del listado de inventario acumulaban **12,950 / 1,219,319** y **4,940 / 464,795** llamadas/filas.
@@ -43,9 +44,29 @@ from public.siigo_products p;
 - Pruebas de caché: carga concurrente, invalidación por cambios/eliminaciones, caducidad, recuperación de errores, aislamiento de copias y lecturas frescas por IDs.
 - Pruebas de proyecciones: importes y monedas, unidades, disponibles/reservas, mínimos y composición sin `raw_payload` innecesario.
 - Verificación en la sesión existente de Chrome de localhost: catálogo de productos y existencias.
-- Los cambios necesitan desplegarse para reducir el tráfico de producción. La caché vive por proceso; las instancias nuevas descargan su primera copia y la eficacia real depende de la reutilización de instancias y la frecuencia de cambios.
+- Los cambios se desplegaron en producción el 09/11/2026 a las **16:32:49 America/Tijuana**, commit `5f5d1cd142e11b778291b6e23b60fc14a5806b37`, despliegue `dpl_8Fmu4UeahQ9ikUE6TmRodz7YcdUp` (READY). La caché vive por proceso; las instancias nuevas descargan su primera copia y la eficacia real depende de la reutilización de instancias y la frecuencia de cambios.
 - Revisar 48–72 horas de uso normal después del despliegue, con el filtro del proyecto y el desglose **Shared Pooler / Database / Auth / Storage**. El panel puede tardar una hora en actualizarse.
 - Para caber en 5 GB durante un mes de 30 días, el promedio total de la organización debe quedar por debajo de aproximadamente **167 MB/día**, preferentemente con margen. Esto sirve para un ciclo completo: noviembre ya excedió el límite.
 - Si el consumo optimizado sigue por encima o se necesita evitar el riesgo operativo al terminar la gracia, contratar Pro. No se puede garantizar permanecer en Free a partir de esta revisión del código.
 
-Fuentes: [Egress y cuotas](https://supabase.com/docs/guides/platform/manage-your-usage/egress), [precios](https://supabase.com/pricing), [estadísticas de consultas](https://supabase.com/docs/guides/database/extensions/pg_stat_statements).
+## Primera revisión después del despliegue — 09/11/2026, aproximadamente 19:47
+
+| Métrica | Revisión anterior (~16:21) | Revisión actual | Incremento |
+| --- | ---: | ---: | ---: |
+| Egress de la organización | 9.776 GB | 9.834 GB | ~58 MB |
+| Egress de Carolina Pinturas | 9.768 GB | 9.825 GB | ~57 MB |
+| Consulta del catálogo completo: llamadas | 3,439 | 3,445 | 6 |
+| Consulta del catálogo completo: filas | 4,187,046 | 4,195,374 | 8,328 |
+
+La ventana abarca unos minutos previos al despliegue y aproximadamente 3 h 15 min posteriores. Los totales se muestran redondeados y el dashboard puede llevar una hora de retraso: el incremento NO es una medición aislada del despliegue.
+
+Se confirmó en `pg_stat_statements` que producción ejecuta las nuevas proyecciones:
+
+- Inventario controlado: **8 llamadas / 758 filas**, sin `raw_payload`; otra variante del listado: **1 llamada / 25 filas**.
+- Composiciones del catálogo: **4 llamadas / 3,812 filas**, sin `raw_payload` (más 2 lecturas puntuales).
+- Comprobación de revisión del catálogo con `COUNT`/`MAX`: **4 llamadas**. La muestra todavía no permite calcular una tasa fiable de aciertos de caché.
+- Las dos consultas antiguas más voluminosas del listado de inventario permanecen en **12,950 / 1,219,319** y **4,940 / 464,795** llamadas/filas: no crecieron respecto de la revisión anterior.
+
+**Conclusión:** la reducción de columnas está activa y el incremento inicial de tráfico es pequeño, pero la actividad observada es reducida. No existe todavía una comparación de periodos equivalentes con igual carga que permita atribuir un porcentaje de ahorro total, proyectar el mes o garantizar el plan Free. Mantener la comparación de 48–72 horas de actividad normal y el objetivo orientativo de <167 MB/día para un ciclo completo.
+
+Fuentes: [Egress y cuotas](https://supabase.com/docs/guides/platform/manage-your-usage/egress), [precios](https://supabase.com/pricing), [estadísticas de consultas](https://supabase.com/docs/guides/database/extensions/pg_stat_statements), [despliegue verificado](https://carolina-pinturas-4vrr2i70h-rafamedtechs-projects.vercel.app), [uso del proyecto](https://supabase.com/dashboard/org/fmbcmtmoatcgsbkqizfo/usage?projectRef=xirmbnxgaflcnqlzagqc).
