@@ -5,29 +5,28 @@ import { inventoryTypes } from '#shared/schemas/inventory'
 import type { ListLayoutConfig } from '~/types/list'
 import type { OrderDateRange } from '~/types/orders'
 import { tableQueryField, tableQueryText, tableQueryBoolean, tableQueryPage, tableQueryDate } from '~/utils/tableQuery'
-import type { InventoryStock, InventoryWarehouse, InventorySettings, InventoryMovement, InventoryCount, InventoryProduct, InventoryPage, InventoryValuation } from '#shared/types/inventory'
+import type { InventoryStock, InventoryWarehouse, InventorySettings, InventoryMovement, InventoryCount, InventoryPage, InventorySummary as InventorySummaryData } from '#shared/types/inventory'
 import type { InventoryCommand } from '#shared/schemas/inventory'
 import type { CsvColumn } from '~/utils/csv'
 import { fetchAllPages } from '~/composables/useCsvExport'
 import { formatDate, mexicoToday } from '~/utils/datetime'
 
 const { user } = useAuth()
-const canViewValuation = computed(() => ['admin', 'consulta'].includes(user.value?.role ?? ''))
+const canViewSummary = computed(() => ['admin', 'consulta'].includes(user.value?.role ?? ''))
 const admin = computed(() => user.value?.role === 'admin')
 const operational = computed(() => admin.value || user.value?.role === 'mostrador')
 const stockTable = useTemplateRef('stockTable')
 const reservationsTable = useTemplateRef('reservationsTable')
 const movementsTable = useTemplateRef('movementsTable')
-const defaultTab = computed(() => admin.value ? 'valuation' : 'stocks')
+const defaultTab = computed(() => admin.value ? 'summary' : 'stocks')
 const tab = shallowRef(defaultTab.value)
 const search = shallowRef(''), warehouse = shallowRef(''), type = shallowRef(''), from = shallowRef(''), to = shallowRef(''), productId = shallowRef('')
-const tracking = shallowRef('all')
 const low = shallowRef(false), pageNumber = shallowRef(1)
-const query = computed(() => ({ page: pageNumber.value, page_size: 25, search: search.value, warehouseId: warehouse.value || undefined, productId: productId.value || undefined, type: type.value || undefined, from: from.value || undefined, to: to.value || undefined, low: low.value ? 'true' : undefined, tracking: tab.value === 'warehouses' && tracking.value !== 'all' ? tracking.value : undefined }))
+const query = computed(() => ({ page: pageNumber.value, page_size: 25, search: search.value, warehouseId: warehouse.value || undefined, productId: productId.value || undefined, type: type.value || undefined, from: from.value || undefined, to: to.value || undefined, low: low.value ? 'true' : undefined }))
 const { returnTo } = useTableQuery([
   tableQueryField('productId', productId, tableQueryText()),
   tableQueryField('tab', tab, {
-    parse: value => tableQueryText(productId.value ? 'kardex' : defaultTab.value, [...(canViewValuation.value ? ['valuation'] : []), 'stocks', 'kardex', 'reservations', 'movements', 'counts', 'warehouses']).parse(value),
+    parse: value => tableQueryText(productId.value ? 'kardex' : defaultTab.value, [...(canViewSummary.value ? ['summary'] : []), 'stocks', 'kardex', 'reservations', 'movements', 'counts']).parse(value === 'valuation' ? 'summary' : value),
     serialize: value => value === defaultTab.value && !productId.value ? undefined : value
   }),
   tableQueryField('search', search, tableQueryText()),
@@ -35,50 +34,47 @@ const { returnTo } = useTableQuery([
   tableQueryField('type', type, tableQueryText()),
   tableQueryField('from', from, tableQueryDate),
   tableQueryField('to', to, tableQueryDate),
-  tableQueryField('tracking', tracking, tableQueryText('all', ['all', 'enabled', 'disabled'])),
   tableQueryField('low', low, tableQueryBoolean),
   tableQueryField('page', pageNumber, tableQueryPage)
-], { page: pageNumber, resetOn: [tab, search, warehouse, type, from, to, productId, low, tracking] })
+], { page: pageNumber, resetOn: [tab, search, warehouse, type, from, to, productId, low] })
 const requestFetch = useRequestFetch()
 const { data: warehouseData, refresh: refreshWarehouses, error: warehouseError } = useAsyncData('inventory-warehouses', async () => ({ results: await fetchAllPages<InventoryWarehouse>('/api/inventory/warehouses', {}, 100, requestFetch) }), { lazy: true, server: false })
 const { data: settings, refresh: refreshSettings } = useFetch<InventorySettings>('/api/inventory/settings', { lazy: true, server: false })
-type Row = InventoryStock | InventoryMovement | InventoryCount | InventoryProduct | { orderId: string, productId: string, quantity: string, order: { folio: number }, product: { code: string, name: string }, warehouse: { name: string } }
-const resource = computed(() => tab.value === 'warehouses' ? 'products' : tab.value === 'valuation' ? 'stocks' : tab.value)
+type Row = InventoryStock | InventoryMovement | InventoryCount | { orderId: string, productId: string, quantity: string, order: { folio: number }, product: { code: string, name: string }, warehouse: { name: string } }
+const resource = computed(() => tab.value === 'summary' ? 'stocks' : tab.value)
 const endpoint = computed(() => `/api/inventory/${resource.value}`)
 const { data: result, error: loadError, status, refresh } = useFetch<InventoryPage<Row>>(endpoint, { lazy: true, server: false, query, immediate: false, watch: false })
 watch([endpoint, query], () => {
-  if (tab.value !== 'valuation') void refresh()
+  if (tab.value !== 'summary') void refresh()
 }, { immediate: true })
-const { data: valuation, status: valuationStatus, error: valuationError, refresh: refreshValuation } = useFetch<InventoryValuation>('/api/inventory/valuation', { lazy: true, server: false, immediate: false, watch: false })
+const { data: summary, status: summaryStatus, error: summaryError, refresh: refreshSummary } = useFetch<InventorySummaryData>('/api/inventory/summary', { lazy: true, server: false, immediate: false, watch: false })
 watch(tab, (value) => {
-  if (value === 'valuation') void refreshValuation()
+  if (value === 'summary') void refreshSummary()
 }, { immediate: true })
 async function refreshCurrentTab() {
-  if (tab.value === 'valuation') await refreshValuation()
+  if (tab.value === 'summary') await refreshSummary()
   else await refresh()
 }
 const stockRows = computed(() => (result.value?.results ?? []) as InventoryStock[])
 const movementRows = computed(() => (result.value?.results ?? []) as InventoryMovement[])
 const countRows = computed(() => (result.value?.results ?? []) as InventoryCount[])
-const productRows = computed(() => (result.value?.results ?? []) as InventoryProduct[])
 const reservationRows = computed(() => (result.value?.results ?? []) as Array<Extract<Row, { orderId: string }>>)
-const tabs = computed(() => [...(canViewValuation.value ? [{ label: 'Valor de la mercancía', value: 'valuation', icon: 'i-lucide-banknote' }] : []), { label: 'Existencias', value: 'stocks', icon: 'i-lucide-package' }, { label: 'Kardex', value: 'kardex', icon: 'i-lucide-list' }, { label: 'Reservas', value: 'reservations', icon: 'i-lucide-bookmark' }, ...((operational.value || user.value?.role === 'consulta') ? [{ label: 'Movimientos', value: 'movements', icon: 'i-lucide-arrow-left-right' }, { label: 'Conteos', value: 'counts', icon: 'i-lucide-clipboard-check' }] : []), ...(canViewValuation.value ? [{ label: 'Almacenes y configuración', value: 'warehouses', icon: 'i-lucide-warehouse' }] : [])])
+const tabs = computed(() => [...(canViewSummary.value ? [{ label: 'Resumen', value: 'summary', icon: 'i-lucide-layout-dashboard' }] : []), { label: 'Existencias', value: 'stocks', icon: 'i-lucide-package' }, { label: 'Kardex', value: 'kardex', icon: 'i-lucide-list' }, { label: 'Reservas', value: 'reservations', icon: 'i-lucide-bookmark' }, ...((operational.value || user.value?.role === 'consulta') ? [{ label: 'Movimientos', value: 'movements', icon: 'i-lucide-arrow-left-right' }, { label: 'Conteos', value: 'counts', icon: 'i-lucide-clipboard-check' }] : [])])
 const tabDescriptions: Record<string, string> = {
-  valuation: 'Existencias físicas de todos los almacenes, incluidas las reservas, al último costo unitario registrado.',
+  summary: 'Valor de la mercancía, disponibilidad y pendientes de tu inventario en un solo lugar.',
   stocks: 'Existencias físicas, reservas y cantidades disponibles por producto y almacén.',
   kardex: 'Historial de entradas, salidas y existencias resultantes por almacén.',
   reservations: 'Mercancía apartada en pedidos activos.',
   movements: 'Entradas, salidas, traspasos y ajustes de inventario.',
-  counts: 'Conteos físicos y conciliación de existencias por almacén.',
-  warehouses: 'Almacenes y control interno de inventario por producto.'
+  counts: 'Conteos físicos y conciliación de existencias por almacén.'
 }
 const activeView = computed(() => ({
   title: tabs.value.find(item => item.value === tab.value)?.label || 'Inventario',
   description: tabDescriptions[tab.value]
 }))
 
-const warehouseOpen = shallowRef(false), movementOpen = shallowRef(false), countOpen = shallowRef(false), countCreateOpen = shallowRef(false), minimumOpen = shallowRef(false), reverseOpen = shallowRef(false)
-const editingWarehouse = shallowRef<InventoryWarehouse>(), source = shallowRef<InventoryMovement>(), selectedCount = shallowRef<InventoryCount>(), minimumStock = shallowRef<InventoryStock>(), reversal = shallowRef<InventoryMovement>()
+const movementOpen = shallowRef(false), countOpen = shallowRef(false), countCreateOpen = shallowRef(false), minimumOpen = shallowRef(false), reverseOpen = shallowRef(false)
+const source = shallowRef<InventoryMovement>(), selectedCount = shallowRef<InventoryCount>(), minimumStock = shallowRef<InventoryStock>(), reversal = shallowRef<InventoryMovement>()
 const minimumValue = shallowRef('')
 const countDraft = reactive({ warehouseId: '', date: mexicoToday(), reason: '' })
 const { busy, error, run } = useInventoryAction(async (result, command) => {
@@ -87,7 +83,6 @@ const { busy, error, run } = useInventoryAction(async (result, command) => {
 })
 async function save(command: InventoryCommand['command']) {
   if (await run(command)) {
-    warehouseOpen.value = false
     movementOpen.value = false
     countCreateOpen.value = false
     minimumOpen.value = false
@@ -102,10 +97,6 @@ function reverse(row: InventoryMovement) {
 function openMove(row?: InventoryMovement) {
   source.value = row
   movementOpen.value = true
-}
-function openWarehouse(row?: InventoryWarehouse) {
-  editingWarehouse.value = row
-  warehouseOpen.value = true
 }
 function showKardex(row: InventoryStock) {
   productId.value = row.productId
@@ -128,7 +119,7 @@ const warehouseFilter = computed({ get: () => warehouse.value || 'all', set: (va
 const typeFilter = computed({ get: () => type.value || 'all', set: (value: string) => {
   type.value = value === 'all' ? '' : value
 } })
-const filterValues = useListFilterBindings({ warehouse: warehouseFilter, type: typeFilter, low, tracking })
+const filterValues = useListFilterBindings({ warehouse: warehouseFilter, type: typeFilter, low })
 const dateRange = computed<OrderDateRange | null>({
   get: () => {
     try {
@@ -148,12 +139,12 @@ const listConfig = computed<ListLayoutConfig>(() => ({
     { label: 'Inventario', icon: 'i-lucide-warehouse', to: '/inventario' },
     { label: activeView.value.title }
   ],
-  search: tab.value === 'valuation' ? undefined : { placeholder: 'Buscar código o producto' }, tabs: tabs.value, defaultTab: defaultTab.value,
+  search: tab.value === 'summary' ? undefined : { placeholder: 'Buscar código o producto' }, tabs: tabs.value, defaultTab: defaultTab.value,
   dateFilter: ['movements', 'kardex', 'counts'].includes(tab.value) ? { subject: 'movimientos de inventario' } : undefined,
-  filters: tab.value === 'valuation'
+  filters: tab.value === 'summary'
     ? []
     : [
-        ...(tab.value === 'warehouses' ? [{ key: 'tracking', label: 'Control interno', type: 'select' as const, defaultValue: 'all', items: [{ label: 'Todos los productos', value: 'all' }, { label: 'Activo', value: 'enabled' }, { label: 'Inactivo', value: 'disabled' }] }] : [{ key: 'warehouse', label: 'Almacén', type: 'select' as const, defaultValue: 'all', items: [{ label: 'Todos los almacenes', value: 'all' }, ...(warehouseData.value?.results ?? []).map(w => ({ label: w.name, value: w.id }))] }]),
+        { key: 'warehouse', label: 'Almacén', type: 'select' as const, defaultValue: 'all', items: [{ label: 'Todos los almacenes', value: 'all' }, ...(warehouseData.value?.results ?? []).map(w => ({ label: w.name, value: w.id }))] },
         ...(['movements', 'kardex'].includes(tab.value) ? [{ key: 'type', label: 'Movimiento', type: 'select' as const, defaultValue: 'all', items: [{ label: 'Todos', value: 'all' }, ...inventoryTypes.map(value => ({ label: value.replaceAll('_', ' '), value }))] }] : []),
         ...(tab.value === 'stocks' ? [{ key: 'low', label: 'Bajo mínimo', type: 'checkbox' as const, defaultValue: false }] : [])
       ],
@@ -161,36 +152,29 @@ const listConfig = computed<ListLayoutConfig>(() => ({
     ? { label: settings.value?.enabledAt ? 'Nuevo movimiento' : 'Cargar saldo inicial' }
     : operational.value && tab.value === 'counts'
       ? { label: 'Nuevo conteo' }
-      : admin.value && tab.value === 'warehouses' ? { label: 'Nuevo almacén' } : undefined,
-  pagination: tab.value !== 'valuation' && result.value?.pagination ? { mode: 'server', label: 'registros', pageSize: 25 } : undefined
+      : undefined,
+  pagination: tab.value !== 'summary' && result.value?.pagination ? { mode: 'server', label: 'registros', pageSize: 25 } : undefined
 }))
 function createInventoryRecord() {
   if (tab.value === 'counts') countCreateOpen.value = true
-  else if (tab.value === 'warehouses') openWarehouse()
   else openMove()
 }
+function openSummaryView(view: 'stocks' | 'reservations' | 'counts' | 'movements', belowMinimum = false) {
+  search.value = ''
+  productId.value = ''
+  warehouse.value = ''
+  type.value = ''
+  from.value = ''
+  to.value = ''
+  low.value = belowMinimum
+  tab.value = view
+}
 function clearInventoryFilters() {
-  tracking.value = 'all'
   productId.value = ''
   warehouse.value = ''
   type.value = ''
   low.value = false
 }
-
-const hasProductFilters = computed(() => Boolean(search.value.trim() || productId.value || tracking.value !== 'all'))
-const canUpdateFiltered = computed(() => admin.value && tab.value === 'warehouses' && hasProductFilters.value && status.value === 'success' && !loadError.value && Boolean(result.value?.pagination.totalResults) && !busy.value)
-async function setFilteredTracking(enabled: boolean) {
-  if (!canUpdateFiltered.value) return
-  await run({ action: 'trackingFiltered', enabled, filters: {
-    search: search.value.trim(),
-    productId: productId.value || undefined,
-    tracking: tracking.value === 'enabled' || tracking.value === 'disabled' ? tracking.value : undefined
-  } })
-}
-const filteredTrackingActions = computed(() => [
-  { label: 'Activar resultados filtrados', icon: 'i-lucide-toggle-right', onSelect: () => setFilteredTracking(true) },
-  { label: 'Desactivar resultados filtrados', icon: 'i-lucide-toggle-left', onSelect: () => setFilteredTracking(false) }
-])
 
 const NuxtLink = resolveComponent('NuxtLink')
 const reservationColumns: TableColumn<Extract<Row, { orderId: string }>>[] = [
@@ -214,9 +198,9 @@ const reservationColumns: TableColumn<Extract<Row, { orderId: string }>>[] = [
     toolbar-below-tabs
     tabs-variant="link"
     tabs-full-width
-    :loading="['idle', 'pending'].includes(tab === 'valuation' ? valuationStatus : status)"
-    :error="tab === 'valuation' ? Boolean(valuationError) : Boolean(loadError || warehouseError)"
-    :error-message="tab === 'valuation' ? (valuationError?.data?.statusMessage || 'No se pudo cargar el valor de la mercancía.') : loadError?.data?.statusMessage || (warehouseError ? 'No se pudieron cargar los almacenes.' : undefined)"
+    :loading="['idle', 'pending'].includes(tab === 'summary' ? summaryStatus : status)"
+    :error="tab === 'summary' ? Boolean(summaryError) : Boolean(loadError || warehouseError)"
+    :error-message="tab === 'summary' ? (summaryError?.data?.statusMessage || 'No se pudo cargar el resumen de inventario.') : loadError?.data?.statusMessage || (warehouseError ? 'No se pudieron cargar los almacenes.' : undefined)"
     :total-results="result?.pagination?.totalResults"
     @refresh="refreshCurrentTab()"
     @create="createInventoryRecord"
@@ -241,7 +225,7 @@ const reservationColumns: TableColumn<Extract<Row, { orderId: string }>>[] = [
         {{ activeView.description }}
       </p>
       <UAlert v-if="error" :title="error" color="error" />
-      <div v-if="productId && tab !== 'valuation'" class="flex items-center gap-2 text-sm">
+      <div v-if="productId && tab !== 'summary'" class="flex items-center gap-2 text-sm">
         <span>Kardex de producto seleccionado</span><UButton
           label="Quitar filtro de producto"
           size="sm"
@@ -251,7 +235,7 @@ const reservationColumns: TableColumn<Extract<Row, { orderId: string }>>[] = [
       </div>
     </template>
     <template #content>
-      <InventoryValuation v-if="tab === 'valuation' && valuation" :valuation="valuation" />
+      <InventorySummary v-if="tab === 'summary' && summary" :summary="summary" @view="openSummaryView" />
       <InventoryStockTable
         v-else-if="tab === 'stocks'"
         ref="stockTable"
@@ -324,84 +308,8 @@ const reservationColumns: TableColumn<Extract<Row, { orderId: string }>>[] = [
           class="hidden md:block"
         />
       </div>
-      <div v-else-if="tab === 'warehouses'" class="space-y-5">
-        <div class="grid gap-3 md:grid-cols-2">
-          <UPageCard v-for="w in warehouseData?.results" :key="w.id" variant="subtle">
-            <div class="flex items-start justify-between gap-3">
-              <div>
-                <p class="text-sm text-muted">
-                  {{ w.code }}
-                </p><h2 class="font-semibold">
-                  {{ w.name }}
-                </h2><p class="mt-1 text-sm text-muted">
-                  {{ w.address }}
-                </p><UBadge class="mt-2" :color="w.active ? 'success' : 'neutral'">
-                  {{ w.active ? 'Activo' : 'Inactivo' }}
-                </UBadge>
-              </div><UButton
-                v-if="admin"
-                label="Editar"
-                variant="outline"
-                size="sm"
-                @click="openWarehouse(w)"
-              />
-            </div>
-          </UPageCard>
-        </div><UCard variant="subtle">
-          <template #header>
-            <div class="flex flex-wrap items-center justify-between gap-3">
-              <h2 class="font-semibold">
-                Control interno por producto
-              </h2>
-              <UDropdownMenu v-if="admin" :items="filteredTrackingActions">
-                <UButton
-                  label="Acciones sobre filtrados"
-                  icon="i-lucide-list-checks"
-                  trailing-icon="i-lucide-chevron-down"
-                  variant="outline"
-                  :disabled="!canUpdateFiltered"
-                  :loading="busy"
-                />
-              </UDropdownMenu>
-            </div>
-            <p v-if="hasProductFilters" class="mt-2 text-sm text-muted">
-              Se aplicará a todos los resultados filtrados ({{ result?.pagination.totalResults ?? 0 }}), incluidas las demás páginas.
-            </p>
-          </template><ul class="divide-y divide-default">
-            <li v-for="p in productRows" :key="p.id" class="flex items-center justify-between gap-4 py-3">
-              <div>
-                <p class="font-medium">
-                  {{ p.name }}
-                </p><p class="text-sm text-muted">
-                  {{ p.code }} · {{ p.unit }}
-                </p>
-              </div><USwitch
-                :model-value="p.enabled"
-                :aria-label="`Control interno de ${p.name}`"
-                :disabled="busy || !admin"
-                @update:model-value="enabled => save({ action: 'tracking', productId: p.id, version: p.version, enabled })"
-              />
-            </li>
-          </ul>
-        </UCard>
-      </div>
     </template>
     <template #overlays>
-      <UModal v-model:open="warehouseOpen" :title="editingWarehouse ? 'Editar almacén' : 'Nuevo almacén'">
-        <template #body>
-          <UAlert
-            v-if="error"
-            :title="error"
-            color="error"
-            class="mb-4"
-          /><InventoryWarehouseForm
-            :key="editingWarehouse?.id ?? 'new'"
-            :warehouse="editingWarehouse"
-            :busy="busy"
-            @submit="save"
-          />
-        </template>
-      </UModal>
       <UModal
         v-model:open="movementOpen"
         :title="source ? 'Registrar devolución física' : 'Nuevo movimiento'"

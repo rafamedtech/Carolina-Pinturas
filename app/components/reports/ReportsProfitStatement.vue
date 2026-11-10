@@ -109,7 +109,7 @@ const hundredTotal = computed(() => hundred.value?.reduce((sum, item) => sum + M
         </div>
       </template>
       <template #amount-cell="{ row }">
-        <span :class="[row.original.total ? 'font-semibold' : 'font-medium', row.original.amount < 0 ? 'text-error' : 'text-highlighted']">{{ reportCurrency.format(row.original.amount) }}</span>
+        <span :class="[row.original.total ? 'font-semibold' : 'font-medium', row.original.amount < 0 ? 'text-error' : row.original.total && row.original.amount > 0 ? 'text-success' : 'text-highlighted']">{{ reportCurrency.format(row.original.amount) }}</span>
         <p class="mt-0.5 text-xs font-normal text-muted">
           ant. {{ reportCurrency.format(row.original.previous) }}
         </p>

@@ -26,3 +26,14 @@ interface InventoryValuationTotals {
 export interface InventoryValuation extends InventoryValuationTotals {
   warehouses: (InventoryValuationTotals & { id: string, code: string, name: string })[]
 }
+
+export interface InventorySummary {
+  valuation: InventoryValuation
+  trackedProducts: number
+  stockedProducts: number
+  reservedProducts: number
+  lowStockLocations: number
+  pendingCounts: number
+  activeWarehouses: number
+  recentMovements: Array<Pick<InventoryMovement, 'id' | 'folio' | 'type' | 'date' | 'reason' | 'actorName'>>
+}
