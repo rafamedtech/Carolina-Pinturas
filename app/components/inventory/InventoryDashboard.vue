@@ -44,7 +44,8 @@ type Row = InventoryStock | InventoryMovement | InventoryCount | { orderId: stri
 const resource = computed(() => tab.value === 'summary' ? 'stocks' : tab.value)
 const endpoint = computed(() => `/api/inventory/${resource.value}`)
 const { data: result, error: loadError, status, refresh } = useFetch<InventoryPage<Row>>(endpoint, { lazy: true, server: false, query, immediate: false, watch: false })
-watch([endpoint, query], () => {
+// Resumen y existencias comparten endpoint; la pestaña también debe disparar la carga.
+watch([tab, query], () => {
   if (tab.value !== 'summary') void refresh()
 }, { immediate: true })
 const { data: summary, status: summaryStatus, error: summaryError, refresh: refreshSummary } = useFetch<InventorySummaryData>('/api/inventory/summary', { lazy: true, server: false, immediate: false, watch: false })
