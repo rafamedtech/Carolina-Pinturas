@@ -117,8 +117,8 @@ const listConfig: ListLayoutConfig = {
         :disabled="loading"
       />
     </template>
-    <template #mobile>
-      <PaymentsPaymentListCards :payments="payments.results" :return-to="returnTo" />
+    <template #mobile="{ rows }">
+      <PaymentsPaymentListCards :payments="rows" :return-to="returnTo" />
     </template>
   </ListLayout>
 </template>

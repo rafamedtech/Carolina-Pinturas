@@ -1,5 +1,5 @@
 // @vitest-environment nuxt
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { mockNuxtImport, mountSuspended } from '@nuxt/test-utils/runtime'
 import InventoryCountForm from '~/components/inventory/InventoryCountForm.vue'
 import type { InventoryCount } from '#shared/types/inventory'
@@ -15,6 +15,26 @@ const picker = { props: ['excludedIds', 'busy'], emits: ['add'], template: '<but
 const mountForm = (value = count) => mountSuspended(InventoryCountForm, { props: { count: value, admin: true, busy: false, activated: true }, global: { stubs: { InventoryCountProductPicker: picker } } })
 
 describe('Conteo físico selectivo', () => {
+  it('en móvil captura cantidades en la tarjeta con un solo campo obligatorio por producto', async () => {
+    const matchMedia = window.matchMedia.bind(window)
+    const viewport = vi.spyOn(window, 'matchMedia').mockImplementation(query =>
+      matchMedia(query === '(min-width: 48rem)' ? '(max-width: 0px)' : query)
+    )
+    const wrapper = await mountForm()
+    try {
+      expect(wrapper.find('table').exists()).toBe(false)
+      expect(wrapper.findAll('input[required]')).toHaveLength(1)
+      await wrapper.get('article input[required]').setValue('0')
+      await wrapper.get('form').trigger('submit')
+      expect(wrapper.emitted('submit')?.[0]).toEqual([{
+        action: 'countEdit', id: count.id, version: 2, lines: [{ productId: 'product-1', counted: '0' }]
+      }])
+    } finally {
+      wrapper.unmount()
+      viewport.mockRestore()
+    }
+  })
+
   it('captura costo y moneda en el conteo inicial y conserva seis decimales', async () => {
     const initial = { ...count, lines: [{ ...count.lines[0]!, counted: '5', unitCost: '12.123456', costCurrency: 'USD' }] }
     const wrapper = await mountForm(initial)

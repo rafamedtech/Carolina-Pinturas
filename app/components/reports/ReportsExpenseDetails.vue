@@ -117,6 +117,21 @@ watch(pages, (total) => {
         <template #empty>
           <UEmpty icon="i-lucide-receipt" :title="search || kind !== 'all' ? 'Sin egresos que coincidan' : 'Sin egresos en este periodo'" />
         </template>
+        <template #record="{ row }">
+          <ListRecordCard
+            :title="row.description"
+            :eyebrow="reportShortDate(row.date)"
+            :fields="[
+              { label: 'Categoría', value: row.category },
+              { label: 'Pago', value: row.paymentMethod },
+              { label: 'Proveedor', value: row.provider, fullWidth: true },
+              ...(row.notes ? [{ label: 'Notas', value: row.notes, fullWidth: true }] : []),
+              ...(row.currencyCode !== 'MXN' ? [{ label: 'Importe original y tipo de cambio', value: `${dashboardNumber.format(row.originalAmount)} ${row.currencyCode} × ${row.exchangeRate}`, fullWidth: true }] : [])
+            ]"
+            summary-label="Importe MXN"
+            :summary-value="reportCurrency.format(row.amount)"
+          />
+        </template>
       </DetailTable>
     </template>
     <template v-if="pages > 1" #footer>

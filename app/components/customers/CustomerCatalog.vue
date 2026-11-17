@@ -72,10 +72,16 @@ const message = computed(() =>
   error.value?.data?.statusMessage || 'No fue posible cargar los clientes y proveedores.'
 )
 
+function recordPath(record: SiigoCustomer) {
+  const roles = customerCatalogRoles(record)
+  return {
+    path: `${view.value === 'proveedores' || (!roles.customer && roles.supplier) ? '/proveedores' : '/clientes'}/${encodeURIComponent(record.id)}`,
+    query: { returnTo: returnTo.value }
+  }
+}
+
 function openRecord(_: Event, row: TableRow<SiigoCustomer>) {
-  const roles = customerCatalogRoles(row.original)
-  const routeBase = view.value === 'proveedores' || (!roles.customer && roles.supplier) ? '/proveedores' : '/clientes'
-  router.push({ path: `${routeBase}/${encodeURIComponent(row.original.id)}`, query: { returnTo: returnTo.value } })
+  router.push(recordPath(row.original))
 }
 
 async function reloadRecords() {
@@ -127,6 +133,25 @@ const listConfig: ListLayoutConfig = {
         :rows="records"
         :disabled="loading"
       />
+    </template>
+    <template #record="{ row }">
+      <ListRecordCard
+        :title="row.name?.filter(Boolean).join(' ') || '—'"
+        :eyebrow="row.rfc_id || undefined"
+        :to="recordPath(row)"
+        :fields="[
+          { label: 'Tipo', value: customerCatalogRoleLabel(row) },
+          { label: 'Requiere factura', value: row.internal?.requires_invoice === true ? 'Sí' : 'No' },
+          { label: 'Correo', value: row.contacts?.[0]?.email, fullWidth: true },
+          { label: 'Teléfono', value: row.phones?.map(phone => phone.number).filter(Boolean).join(', '), fullWidth: true }
+        ]"
+      >
+        <template #trailing>
+          <UBadge :color="row.active === false ? 'neutral' : 'success'" variant="subtle">
+            {{ row.active === false ? 'Inactivo' : 'Activo' }}
+          </UBadge>
+        </template>
+      </ListRecordCard>
     </template>
   </ListLayout>
 </template>

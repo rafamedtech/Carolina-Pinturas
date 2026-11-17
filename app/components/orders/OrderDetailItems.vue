@@ -306,26 +306,25 @@ const columns: TableColumn<SalesOrderItem>[] = [{
     </template>
 
     <div class="flex flex-col gap-3 p-4 md:hidden">
-      <UCard
+      <ListRecordCard
         v-for="item in items"
         :key="item.id"
-        variant="subtle"
-        :ui="{ body: 'flex flex-col gap-4 p-4 sm:p-4' }"
+        :title="item.name"
+        :eyebrow="item.code"
+        :fields="[
+          { key: 'quantity', label: 'Cantidad', value: `${item.quantity} ${item.unit.name || item.unit.code || ''}` },
+          { key: 'price', label: 'Precio unitario', value: currency.format(item.unitPrice) },
+          ...(item.observations || editable ? [{ key: 'observations', label: 'Observaciones', value: item.observations, fullWidth: true }] : [])
+        ]"
+        summary-label="Total"
+        :summary-value="currency.format(item.total)"
+        summary-color="primary"
       >
-        <div class="flex items-start justify-between gap-3">
-          <div class="min-w-0">
-            <p class="text-xs font-medium uppercase tracking-wide text-muted">
-              {{ item.code }}
-            </p>
-            <div class="flex items-center gap-1">
-              <h3 class="font-semibold text-primary">
-                {{ item.name }}
-              </h3>
-              <OrdersOrderItemComposition :item="item" />
-            </div>
-          </div>
-
-          <div class="flex shrink-0 items-center gap-1">
+        <template #title-extra>
+          <OrdersOrderItemComposition :item="item" />
+        </template>
+        <template v-if="deletable || item.priceHistory.length" #actions>
+          <div class="flex items-center gap-1">
             <UButton
               v-if="deletable"
               icon="i-lucide-trash-2"
@@ -347,79 +346,37 @@ const columns: TableColumn<SalesOrderItem>[] = [{
               @click="openHistory(item)"
             />
           </div>
-        </div>
-
-        <div class="grid grid-cols-2 gap-4 text-sm">
-          <div>
-            <p class="text-muted">
-              Cantidad
-            </p>
-            <div class="flex items-center gap-1">
-              <p class="font-medium text-highlighted">
-                {{ item.quantity }} {{ item.unit.name || item.unit.code || '' }}
-              </p>
-              <UButton
-                v-if="editable && amountsEditable && quantityEditable !== false"
-                icon="i-lucide-pencil"
-                color="neutral"
-                variant="ghost"
-                size="xs"
-                :aria-label="`Editar cantidad de ${item.name}`"
-                @click="openQuantityEdit(item)"
-              />
-            </div>
+        </template>
+        <template #field-value="{ field }">
+          <div class="flex items-start gap-1">
+            <span class="min-w-0 whitespace-pre-wrap wrap-anywhere">{{ field.value || '—' }}</span>
+            <AppButton
+              v-if="field.key === 'quantity' && editable && amountsEditable && quantityEditable !== false"
+              icon="i-lucide-pencil"
+              intent="quiet"
+              size="xs"
+              :aria-label="`Editar cantidad de ${item.name}`"
+              @click="openQuantityEdit(item)"
+            />
+            <AppButton
+              v-if="field.key === 'price' && editable && amountsEditable"
+              icon="i-lucide-pencil"
+              intent="quiet"
+              size="xs"
+              :aria-label="`Editar precio de ${item.name}`"
+              @click="openEdit(item)"
+            />
+            <AppButton
+              v-if="field.key === 'observations' && editable"
+              icon="i-lucide-pencil"
+              intent="quiet"
+              size="xs"
+              :aria-label="`Editar observaciones de ${item.name}`"
+              @click="openObservationsEdit(item)"
+            />
           </div>
-          <div class="text-right">
-            <p class="text-muted">
-              Precio unitario
-            </p>
-            <div class="flex items-center justify-end gap-1">
-              <p class="font-medium text-highlighted">
-                {{ currency.format(item.unitPrice) }}
-              </p>
-              <UButton
-                v-if="editable && amountsEditable"
-                icon="i-lucide-pencil"
-                color="neutral"
-                variant="ghost"
-                size="xs"
-                :aria-label="`Editar precio de ${item.name}`"
-                @click="openEdit(item)"
-              />
-            </div>
-          </div>
-        </div>
-
-        <div class="grid grid-cols-[minmax(0,1fr)_auto] gap-4">
-          <div v-if="item.observations || editable" class="min-w-0">
-            <p class="text-sm text-muted">
-              Observaciones
-            </p>
-            <div class="flex items-start gap-1">
-              <p :class="item.observations ? 'min-w-0 whitespace-pre-wrap break-words text-sm' : 'text-sm text-muted'">
-                {{ item.observations || '—' }}
-              </p>
-              <UButton
-                v-if="editable"
-                icon="i-lucide-pencil"
-                color="neutral"
-                variant="ghost"
-                size="xs"
-                :aria-label="`Editar observaciones de ${item.name}`"
-                @click="openObservationsEdit(item)"
-              />
-            </div>
-          </div>
-          <div class="col-start-2 text-right">
-            <p class="text-sm text-muted">
-              Total
-            </p>
-            <p class="text-base font-semibold text-primary">
-              {{ currency.format(item.total) }}
-            </p>
-          </div>
-        </div>
-      </UCard>
+        </template>
+      </ListRecordCard>
 
       <div
         v-if="items.length === 0"

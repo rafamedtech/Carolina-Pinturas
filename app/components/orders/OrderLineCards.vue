@@ -26,34 +26,29 @@ const currency = new Intl.NumberFormat('es-MX', {
 
 <template>
   <div class="flex flex-col gap-3 p-4 md:hidden">
-    <UCard
+    <ListRecordCard
       v-for="line in lines"
       :key="line.productId"
-      variant="subtle"
-      :ui="{ body: 'flex flex-col gap-4 p-4 sm:p-4' }"
+      :title="line.name"
+      :eyebrow="line.code"
+      summary-label="Importe"
+      :summary-value="currency.format(draftLineTotal(line))"
     >
-      <div class="flex items-start justify-between gap-3">
-        <div class="min-w-0">
-          <p class="text-xs font-medium uppercase tracking-wide text-muted">
-            {{ line.code }}
-          </p>
-          <h3 class="font-semibold text-highlighted">
-            {{ line.name }}
-          </h3>
-          <p class="text-sm text-muted">
-            Unidad: {{ line.unit.name || line.unit.code || '—' }}
-          </p>
-        </div>
-
-        <UButton
+      <template #title-extra>
+        <p class="text-sm text-muted">
+          Unidad: {{ line.unit.name || line.unit.code || '—' }}
+        </p>
+      </template>
+      <template #actions>
+        <AppButton
           icon="i-lucide-trash-2"
           color="error"
-          variant="ghost"
+          intent="quiet"
           size="sm"
           :aria-label="`Quitar ${line.name}`"
           @click="emit('remove', line.productId)"
         />
-      </div>
+      </template>
 
       <div class="grid grid-cols-2 items-end gap-4">
         <UFormField label="Cantidad">
@@ -114,17 +109,6 @@ const currency = new Intl.NumberFormat('es-MX', {
         </div>
       </UFormField>
 
-      <dl class="text-sm">
-        <div class="col-span-2 flex items-end justify-between gap-4 border-t border-default pt-3">
-          <dt class="text-muted">
-            Importe
-          </dt>
-          <dd class="text-base font-semibold text-highlighted">
-            {{ currency.format(draftLineTotal(line)) }}
-          </dd>
-        </div>
-      </dl>
-
       <UFormField label="Observaciones">
         <UInput
           :model-value="line.observations"
@@ -135,7 +119,7 @@ const currency = new Intl.NumberFormat('es-MX', {
           @update:model-value="emit('observations', line.productId, $event)"
         />
       </UFormField>
-    </UCard>
+    </ListRecordCard>
 
     <div
       v-if="lines.length === 0"

@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { navigationIcons } from '~/utils/navigationIcons'
 import type { DropdownMenuItem } from '@nuxt/ui'
 
 defineProps<{
@@ -24,7 +23,7 @@ const items = computed<DropdownMenuItem[][]>(() => [
   ...(user.value?.role === 'admin'
     ? [[{
         label: 'Configuración',
-        icon: navigationIcons['/configuracion'],
+        icon: 'i-lucide-settings',
         to: '/configuracion'
       }]]
     : []),

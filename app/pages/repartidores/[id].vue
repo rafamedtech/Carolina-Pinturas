@@ -36,8 +36,12 @@ const columns: TableColumn<RepartidorDelivery>[] = [{
   cell: ({ row }) => currency.format(row.original.total)
 }]
 
+function orderPath(order: RepartidorDelivery) {
+  return { path: `/ventas/${encodeURIComponent(order.id)}`, query: { returnTo: route.fullPath } }
+}
+
 function openOrder(_: Event, row: TableRow<RepartidorDelivery>) {
-  router.push({ path: `/ventas/${encodeURIComponent(row.original.id)}`, query: { returnTo: route.fullPath } })
+  router.push(orderPath(row.original))
 }
 const deliveryPage = shallowRef(1)
 const deliveryConfig: ListLayoutConfig = { id: 'driver-deliveries', title: 'Pedidos entregados', empty: 'Este repartidor aún no tiene pedidos entregados.', pagination: { mode: 'client', label: 'pedidos', pageSize: 25 } }
@@ -106,7 +110,18 @@ const deliveryConfig: ListLayoutConfig = { id: 'driver-deliveries', title: 'Pedi
           embedded
           @select="openOrder"
           @refresh="refresh()"
-        />
+        >
+          <template #record="{ row }">
+            <ListRecordCard
+              :title="row.number"
+              :eyebrow="formatDate(row.orderDate)"
+              :to="orderPath(row)"
+              :fields="[{ label: 'Cliente', value: row.customerName, fullWidth: true }]"
+              summary-label="Total"
+              :summary-value="currency.format(row.total)"
+            />
+          </template>
+        </ListLayout>
       </template>
 
       <ListLoading v-else-if="['idle', 'pending'].includes(status)" />

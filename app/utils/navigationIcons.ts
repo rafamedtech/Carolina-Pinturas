@@ -4,9 +4,7 @@ export const navigationIcons = {
   '/clientes': 'i-lucide-users',
   '/ventas': 'i-lucide-shopping-cart',
   '/compras': 'i-lucide-package-plus',
-  '/igualaciones': 'i-lucide-palette',
-  '/compras/cuentas-por-pagar': 'i-lucide-wallet',
-  '/configuracion': 'i-lucide-settings'
+  '/igualaciones': 'i-lucide-palette'
 } as const
 
 export function navigationIconForPath(path: string) {

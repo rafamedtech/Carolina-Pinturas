@@ -8,6 +8,11 @@ const emit = defineEmits<{ minimum: [row: InventoryStock], kardex: [row: Invento
 const table = useTemplateRef('table')
 defineExpose({ getColumns: () => table.value?.getColumns() ?? [] })
 const UButton = resolveComponent('UButton')
+function unitCost(row: InventoryStock) {
+  const currency = row.costCurrency || 'MXN'
+  return row.unitCost ? `${purchaseMoney(Number(row.unitCost), currency)} ${currency}` : 'Sin costo'
+}
+
 const numeric = { class: { th: 'text-right', td: 'text-right tabular-nums' } }
 const columns = computed<TableColumn<InventoryStock>[]>(() => [
   { id: 'product', header: 'Producto', cell: ({ row }) => h('div', [h('p', { class: 'font-medium text-highlighted' }, row.original.name), h('p', { class: 'text-xs text-muted' }, `${row.original.code} · ${row.original.unit || 'Unidad'}`)]) },
@@ -15,7 +20,7 @@ const columns = computed<TableColumn<InventoryStock>[]>(() => [
   { accessorKey: 'quantity', header: 'Existencia física', meta: numeric },
   { accessorKey: 'reserved', header: 'Reservado', meta: numeric },
   { accessorKey: 'available', header: 'Disponible', meta: numeric, cell: ({ row }) => h('div', { class: row.original.low ? 'font-semibold text-warning' : 'font-semibold text-primary' }, [row.original.available, row.original.low ? h('span', { class: 'block text-xs' }, 'Bajo mínimo') : null]) },
-  { id: 'cost', header: 'Costo unitario', meta: numeric, cell: ({ row }) => row.original.unitCost ? `${purchaseMoney(Number(row.original.unitCost), row.original.costCurrency || 'MXN')} ${row.original.costCurrency || 'MXN'}` : 'Sin costo' },
+  { id: 'cost', header: 'Costo unitario', meta: numeric, cell: ({ row }) => unitCost(row.original) },
   { accessorKey: 'minimum', header: 'Mínimo', meta: numeric },
   { id: 'actions', header: 'Acciones', cell: ({ row }) => h('div', { class: 'flex justify-end gap-1' }, [
     h(UButton, { label: 'Kardex', size: 'sm', variant: 'ghost', color: 'neutral', onClick: () => emit('kardex', row.original) }),
@@ -29,6 +34,46 @@ const columns = computed<TableColumn<InventoryStock>[]>(() => [
     ref="table"
     :data="rows"
     :columns="columns"
+    :get-row-id="row => `${row.productId}:${row.warehouseId}`"
     empty="Sin existencias para estos filtros. Crea un almacén y registra el conteo inicial."
-  />
+  >
+    <template #record="{ row }">
+      <ListRecordCard
+        :title="row.name"
+        :eyebrow="`${row.code} · ${row.unit || 'Unidad'}`"
+        :fields="[
+          { label: 'Almacén', value: row.warehouse, fullWidth: true },
+          { label: 'Existencia física', value: row.quantity },
+          { label: 'Reservado', value: row.reserved },
+          { label: 'Costo unitario', value: unitCost(row) },
+          { label: 'Mínimo', value: row.minimum }
+        ]"
+        summary-label="Disponible"
+        :summary-value="row.available"
+        summary-color="primary"
+      >
+        <template v-if="row.low" #trailing>
+          <UBadge color="warning" variant="soft" label="Bajo mínimo" />
+        </template>
+        <template #footer>
+          <div class="flex flex-wrap justify-end gap-2">
+            <AppButton
+              label="Kardex"
+              size="sm"
+              intent="quiet"
+              @click="emit('kardex', row)"
+            />
+            <AppButton
+              v-if="admin"
+              label="Mínimo"
+              size="sm"
+              intent="quiet"
+              color="primary"
+              @click="emit('minimum', row)"
+            />
+          </div>
+        </template>
+      </ListRecordCard>
+    </template>
+  </DetailTable>
 </template>

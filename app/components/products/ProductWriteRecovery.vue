@@ -103,7 +103,22 @@ function display(field: string, value: unknown): string {
       <p v-else-if="review?.status === 'unavailable'" class="text-sm text-muted">
         Cuando Siigo responda, pulsa «Comprobar otra vez». Si los datos coinciden, el guardado se completará y el producto se desbloqueará automáticamente.
       </p>
-      <div v-if="review?.differences.length" class="overflow-x-auto rounded-lg border border-default">
+      <section v-if="review?.differences.length" class="space-y-3 md:hidden" aria-label="Comparación de cambios pendientes con los datos actuales de Siigo">
+        <ListRecordCard
+          v-for="difference in review.differences"
+          :key="difference.field"
+          :title="labels[difference.field] || difference.field"
+          :fields="[
+            { label: 'Actual en Siigo', value: display(difference.field, difference.actual) },
+            { label: 'Cambios pendientes', value: display(difference.field, difference.expected) }
+          ]"
+        >
+          <template #field-value="{ field }">
+            <span class="whitespace-pre-wrap wrap-anywhere">{{ field.value }}</span>
+          </template>
+        </ListRecordCard>
+      </section>
+      <div v-if="review?.differences.length" class="hidden overflow-x-auto rounded-lg border border-default md:block">
         <table class="w-full text-left text-sm">
           <caption class="sr-only">
             Comparación de cambios pendientes con los datos actuales de Siigo

@@ -9,60 +9,20 @@ const currency = new Intl.NumberFormat('es-MX', { style: 'currency', currency: '
 <template>
   <div class="flex flex-col gap-3 md:hidden">
     <template v-if="payments.length">
-      <UCard
+      <ListRecordCard
         v-for="payment in payments"
         :key="payment.id"
-        :ui="{ body: 'flex flex-col gap-4 p-4 sm:p-4' }"
-      >
-        <div class="flex items-start justify-between gap-3">
-          <div class="min-w-0">
-            <p class="text-xs font-medium uppercase tracking-wide text-muted">
-              Pedido
-            </p>
-            <NuxtLink
-              :to="{
-                path: `/ventas/${encodeURIComponent(payment.order.id)}`,
-                query: { returnTo }
-              }"
-              class="text-lg font-semibold text-primary hover:underline"
-            >
-              {{ payment.order.number }}
-            </NuxtLink>
-          </div>
-          <p class="text-lg font-semibold text-highlighted">
-            {{ currency.format(payment.amount) }}
-          </p>
-        </div>
-
-        <dl class="grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
-          <div class="col-span-2">
-            <dt class="text-muted">
-              Cliente
-            </dt>
-            <dd class="font-medium text-highlighted">
-              {{ payment.order.customerName }}
-            </dd>
-          </div>
-          <div>
-            <dt class="text-muted">
-              Fecha
-            </dt>
-            <dd>{{ formatDate(payment.paymentDate) }}</dd>
-          </div>
-          <div>
-            <dt class="text-muted">
-              Método
-            </dt>
-            <dd>{{ paymentMethodLabel(payment.paymentMethod) }}</dd>
-          </div>
-          <div v-if="payment.reference || payment.siigoVoucherName" class="col-span-2">
-            <dt class="text-muted">
-              Referencia
-            </dt>
-            <dd>{{ payment.reference || payment.siigoVoucherName }}</dd>
-          </div>
-        </dl>
-      </UCard>
+        :title="payment.order.number"
+        :eyebrow="formatDate(payment.paymentDate)"
+        :title-to="{ path: `/ventas/${encodeURIComponent(payment.order.id)}`, query: { returnTo } }"
+        :fields="[
+          { label: 'Cliente', value: payment.order.customerName, fullWidth: true },
+          { label: 'Método', value: paymentMethodLabel(payment.paymentMethod) },
+          ...(payment.reference || payment.siigoVoucherName ? [{ label: 'Referencia', value: payment.reference || payment.siigoVoucherName }] : [])
+        ]"
+        summary-label="Importe"
+        :summary-value="currency.format(payment.amount)"
+      />
     </template>
 
     <div

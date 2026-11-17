@@ -12,61 +12,22 @@ function formatCurrency(amount: number, currencyCode: string) {
 <template>
   <div class="flex flex-col gap-3 md:hidden">
     <template v-if="expenses.length">
-      <UCard
+      <ListRecordCard
         v-for="expense in expenses"
         :key="expense.id"
-        role="button"
-        tabindex="0"
+        :title="expense.description"
+        :eyebrow="formatDate(expense.date)"
         :aria-label="`${expense.purchasePaymentId ? 'Consultar gasto de compra' : 'Editar gasto'}: ${expense.description}`"
-        class="cursor-pointer focus-visible:outline-2 focus-visible:outline-primary"
-        :ui="{ body: 'flex flex-col gap-4 p-4 sm:p-4' }"
-        @click="emit('select', expense)"
-        @keydown.enter.prevent="emit('select', expense)"
-        @keydown.space.prevent="emit('select', expense)"
-      >
-        <div class="flex items-start justify-between gap-3">
-          <div class="min-w-0">
-            <p class="text-xs font-medium uppercase tracking-wide text-muted">
-              Gasto
-            </p>
-            <p class="truncate text-lg font-semibold text-highlighted">
-              {{ expense.description }}
-            </p>
-          </div>
-          <p class="shrink-0 text-lg font-semibold text-highlighted">
-            {{ formatCurrency(expense.amount, expense.currencyCode) }}
-          </p>
-        </div>
-
-        <dl class="grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
-          <div class="col-span-2">
-            <dt class="text-muted">
-              Proveedor
-            </dt>
-            <dd class="font-medium text-highlighted">
-              {{ expense.provider }}
-            </dd>
-          </div>
-          <div>
-            <dt class="text-muted">
-              Fecha
-            </dt>
-            <dd>{{ formatDate(expense.date) }}</dd>
-          </div>
-          <div>
-            <dt class="text-muted">
-              Método
-            </dt>
-            <dd>{{ paymentMethodLabel(expense.paymentMethod) }}</dd>
-          </div>
-          <div class="col-span-2">
-            <dt class="text-muted">
-              Categoría
-            </dt>
-            <dd>{{ expense.category }}</dd>
-          </div>
-        </dl>
-      </UCard>
+        :fields="[
+          { label: 'Proveedor', value: expense.provider, fullWidth: true },
+          { label: 'Método', value: paymentMethodLabel(expense.paymentMethod) },
+          { label: 'Categoría', value: expense.category }
+        ]"
+        summary-label="Importe"
+        :summary-value="formatCurrency(expense.amount, expense.currencyCode)"
+        actionable
+        @select="emit('select', expense)"
+      />
     </template>
 
     <div

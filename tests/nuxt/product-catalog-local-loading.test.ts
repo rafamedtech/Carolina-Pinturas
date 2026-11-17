@@ -52,6 +52,26 @@ describe('carga local y actualización explícita del catálogo de productos', (
     expect(syncCount).toBe(0)
     expect(detailCount).toBe(0)
   })
+  it('muestra el producto en la tarjeta móvil compartida con un enlace al detalle', async () => {
+    wrapper = await mountSuspended(ProductCatalog, {
+      global: {
+        stubs: {
+          ListLayout: {
+            props: ['data', 'loading'],
+            template: '<section v-if="!loading"><slot v-for="row in data" :key="row.id" name="record" :row="row" /></section>'
+          }
+        }
+      }
+    })
+    await vi.waitFor(() => expect(wrapper?.find('article').exists()).toBe(true))
+    const card = wrapper.get('article')
+    expect(card.get('h3').text()).toBe('Pintura local')
+    expect(card.text()).toContain('P001')
+    expect(card.text()).toContain('Pieza')
+    expect(card.text()).toContain('Precio')
+    expect(card.findAll('a')).toHaveLength(1)
+    expect(card.get('a[aria-label="Abrir producto Pintura local"]').attributes('href')).toMatch(/^\/productos\/product-1\?returnTo=/)
+  })
   it('solo sincroniza al pulsar Actualizar y vuelve a salir del estado de carga', async () => {
     wrapper = await mountSuspended(ProductCatalog, { global: { stubs } })
     await vi.waitFor(() => expect(wrapper?.text()).toContain('Pintura local'))

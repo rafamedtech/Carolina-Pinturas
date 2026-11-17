@@ -3,7 +3,6 @@ import type { ProductActivityPage, ProductActivitySection } from '#shared/types/
 import type { UserRole } from '~/types/siigo'
 
 const props = defineProps<{ productId: string, role?: UserRole, composite: boolean }>()
-const emit = defineEmits<{ 'section-change': [tab: { label: string, icon: string } | undefined] }>()
 
 const sections = [
   { label: 'Ventas', value: 'sales', icon: 'i-lucide-shopping-cart', description: 'Pedidos y cotizaciones con este producto. El importe corresponde a sus partidas.' },
@@ -22,8 +21,6 @@ const tabs = computed(() => sections.filter(({ value }) => {
   return true
 }))
 const section = shallowRef<ProductActivitySection>('sales')
-const activeTab = computed(() => tabs.value.find(tab => tab.value === section.value))
-watch(activeTab, tab => emit('section-change', tab && { label: tab.label, icon: tab.icon }), { immediate: true })
 const page = shallowRef(1)
 const recordCount = computed(() => data.value?.pagination.totalResults ?? 0)
 const recordLabel = computed(() => section.value === 'movements'

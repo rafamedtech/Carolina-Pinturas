@@ -361,9 +361,9 @@ const listConfig = computed<ListLayoutConfig>(() => ({
         :disabled="loading"
       />
     </template>
-    <template #mobile>
+    <template #mobile="{ rows }">
       <OrdersOrderListCards
-        :orders="orders.results"
+        :orders="rows"
         :loading="false"
         :igualacion="igualacion"
         :return-to="returnTo"

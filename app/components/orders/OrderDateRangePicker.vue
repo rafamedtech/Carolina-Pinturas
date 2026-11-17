@@ -86,7 +86,8 @@ function clearRange() {
       icon="i-lucide-calendar-range"
       color="neutral"
       variant="outline"
-      class="w-full justify-start sm:w-auto"
+      class="w-full min-w-0 justify-start sm:w-auto"
+      :ui="{ label: 'text-start max-sm:whitespace-normal' }"
       :aria-label="selectedRange ? `Rango de fechas: ${label}` : `Filtrar ${subject} por rango de fechas`"
     />
 

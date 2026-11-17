@@ -72,9 +72,9 @@ const listConfig: ListLayoutConfig = {
         {{ orders.pagination.totalResults }} {{ orders.pagination.totalResults === 1 ? 'pedido registrado' : 'pedidos registrados' }}
       </p>
     </template>
-    <template #mobile>
+    <template #mobile="{ rows }">
       <OrdersOrderListCards
-        :orders="orders.results"
+        :orders="rows"
         :loading="false"
         :return-to="returnTo"
         @open="openOrder"

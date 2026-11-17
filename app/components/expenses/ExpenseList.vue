@@ -220,8 +220,8 @@ const listConfig = computed<ListLayoutConfig>(() => ({
         :disabled="loading"
       />
     </template>
-    <template #mobile>
-      <ExpensesExpenseListCards :expenses="expenseCatalog.results" @select="openExpense" />
+    <template #mobile="{ rows }">
+      <ExpensesExpenseListCards :expenses="rows" @select="openExpense" />
     </template>
     <template #overlays>
       <ExpensesExpenseAddModal

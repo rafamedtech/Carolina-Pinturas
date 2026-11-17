@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { navigationIcons } from '~/utils/navigationIcons'
 import type { ListLayoutConfig } from '~/types/list'
 import { tableQueryField, tableQueryText, tableQueryRange, tableQuerySorting, tableQueryPage } from '~/utils/tableQuery'
 import { h, resolveComponent } from 'vue'
@@ -85,8 +84,16 @@ const amountFormatter = new Intl.NumberFormat('en-US', {
   useGrouping: true
 })
 
+function purchasePath(order: PurchaseView) {
+  return { path: `/compras/${order.id}`, query: { returnTo: returnTo.value } }
+}
+
+function amountLabel(amount: number, currencyCode: string) {
+  return `$${amountFormatter.format(amount)} ${currencyCode}`
+}
+
 function formatAmount(amount: number, currencyCode: string, colorClass = '') {
-  return h('div', { class: ['text-right font-semibold', colorClass] }, `$${amountFormatter.format(amount)} ${currencyCode}`)
+  return h('div', { class: ['text-right font-semibold', colorClass] }, amountLabel(amount, currencyCode))
 }
 
 const columns: TableColumn<PurchaseView>[] = [{
@@ -98,7 +105,7 @@ const columns: TableColumn<PurchaseView>[] = [{
   header: sortableHeader('Orden'),
   cell: ({ row }) => h(
     NuxtLink,
-    { to: { path: `/compras/${row.original.id}`, query: { returnTo: returnTo.value } }, class: 'font-semibold text-primary underline' },
+    { to: purchasePath(row.original), class: 'font-semibold text-primary underline' },
     () => `OC-${row.original.folio}`
   )
 }, {
@@ -166,12 +173,35 @@ const listConfig = computed<ListLayoutConfig>(() => ({
       <UButton
         to="/compras/cuentas-por-pagar"
         label="Cuentas por pagar"
-        :icon="navigationIcons['/compras/cuentas-por-pagar']"
+        icon="i-lucide-wallet"
         aria-label="Cuentas por pagar"
         color="neutral"
         variant="outline"
         :ui="{ label: 'hidden sm:inline' }"
       />
+    </template>
+    <template #record="{ row }">
+      <ListRecordCard
+        :title="`OC-${row.folio}`"
+        :eyebrow="formatDate(row.date)"
+        :to="purchasePath(row)"
+        :fields="[
+          { label: 'Proveedor', value: row.providerName, fullWidth: true },
+          { label: 'Próximo vencimiento', value: formatDate(nextInvoiceDueDate(row)) },
+          { label: 'Saldo pendiente', value: amountLabel(row.balance, row.currencyCode) }
+        ]"
+        summary-label="Total"
+        :summary-value="amountLabel(row.total, row.currencyCode)"
+      >
+        <template #trailing>
+          <UBadge
+            :color="purchaseStatus(row.status).color"
+            :icon="purchaseStatus(row.status).icon"
+            :label="purchaseStatus(row.status).label"
+            variant="soft"
+          />
+        </template>
+      </ListRecordCard>
     </template>
   </ListLayout>
 </template>

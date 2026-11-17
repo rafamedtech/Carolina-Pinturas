@@ -298,7 +298,28 @@ const timeline = computed(() => [...(order.value?.events ?? [])].reverse())
                 <div class="hidden gap-3 border-b border-default bg-elevated/50 px-4 py-2 text-xs font-medium text-muted uppercase md:grid md:grid-cols-[minmax(0,1fr)_8rem_8rem_9rem_8rem]">
                   <span>Producto</span><span class="text-right">Cantidad</span><span class="text-right">Recibido</span><span class="text-right">Costo unitario</span><span class="text-right">Importe</span>
                 </div>
-                <ul class="divide-y divide-default">
+                <div class="space-y-3 p-4 md:hidden">
+                  <ListRecordCard
+                    v-for="item in order.items"
+                    :key="item.id"
+                    :title="item.name"
+                    :eyebrow="item.code"
+                    :fields="[
+                      { label: 'Cantidad', value: purchaseQuantity(item.quantity) },
+                      { key: 'received', label: 'Recibido', value: purchaseQuantity(item.received) },
+                      { label: 'Costo unitario', value: money(item.unitCost) }
+                    ]"
+                    summary-label="Importe"
+                    :summary-value="money(item.total)"
+                  >
+                    <template #field-value="{ field }">
+                      <span :class="field.key === 'received' ? (item.received >= item.quantity ? 'text-success' : item.received > 0 ? 'text-warning' : 'text-muted') : undefined">
+                        {{ field.value }}
+                      </span>
+                    </template>
+                  </ListRecordCard>
+                </div>
+                <ul class="hidden divide-y divide-default md:block">
                   <li
                     v-for="item in order.items"
                     :key="item.id"
@@ -313,16 +334,16 @@ const timeline = computed(() => [...(order.value?.events ?? [])].reverse())
                       </p>
                     </div>
                     <p class="tabular-nums md:text-right">
-                      <span class="text-muted md:hidden">Cantidad: </span>{{ purchaseQuantity(item.quantity) }}
+                      {{ purchaseQuantity(item.quantity) }}
                     </p>
                     <p class="tabular-nums md:text-right" :class="item.received >= item.quantity ? 'text-success' : item.received > 0 ? 'text-warning' : 'text-muted'">
-                      <span class="text-muted md:hidden">Recibido: </span>{{ purchaseQuantity(item.received) }}
+                      {{ purchaseQuantity(item.received) }}
                     </p>
                     <p class="tabular-nums md:text-right">
-                      <span class="text-muted md:hidden">Costo: </span>{{ money(item.unitCost) }}
+                      {{ money(item.unitCost) }}
                     </p>
                     <p class="font-medium tabular-nums md:text-right">
-                      <span class="font-normal text-muted md:hidden">Importe: </span>{{ money(item.total) }}
+                      {{ money(item.total) }}
                     </p>
                   </li>
                 </ul>

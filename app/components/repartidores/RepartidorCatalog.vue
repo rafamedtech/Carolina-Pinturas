@@ -53,8 +53,12 @@ const columns: TableColumn<Repartidor>[] = [{
 
 const message = computed(() => error.value?.data?.statusMessage || 'No fue posible cargar los repartidores.')
 
+function repartidorPath(record: Repartidor) {
+  return { path: `/repartidores/${encodeURIComponent(record.id)}`, query: { returnTo: returnTo.value } }
+}
+
 function openRepartidor(_: Event, row: TableRow<Repartidor>) {
-  router.push({ path: `/repartidores/${encodeURIComponent(row.original.id)}`, query: { returnTo: returnTo.value } })
+  router.push(repartidorPath(row.original))
 }
 const createOpen = shallowRef(false)
 const listConfig = computed<ListLayoutConfig>(() => ({
@@ -88,6 +92,21 @@ const listConfig = computed<ListLayoutConfig>(() => ({
     </template>
     <template #overlays>
       <OrdersOrderRepartidorAddModal v-model:open="createOpen" hide-trigger @created="addToCatalog" />
+    </template>
+    <template #record="{ row }">
+      <ListRecordCard
+        :title="row.nombre"
+        :to="repartidorPath(row)"
+        :fields="[{ label: 'Teléfono', value: row.telefono }]"
+        summary-label="Pedidos entregados"
+        :summary-value="row.deliveredCount"
+      >
+        <template #trailing>
+          <UBadge :color="row.activo === false ? 'neutral' : 'success'" variant="subtle">
+            {{ row.activo === false ? 'Inactivo' : 'Activo' }}
+          </UBadge>
+        </template>
+      </ListRecordCard>
     </template>
   </ListLayout>
 </template>

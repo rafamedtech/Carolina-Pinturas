@@ -17,7 +17,10 @@ const props = withDefaults(defineProps<{
 const sorting = defineModel<SortingState>('sorting', { default: () => [] })
 const columnVisibility = defineModel<VisibilityState>('columnVisibility', { default: () => ({}) })
 const table = useTemplateRef('table')
-defineExpose({ getColumns: () => table.value?.tableApi?.getAllLeafColumns() ?? [] })
+defineExpose({
+  getColumns: () => table.value?.tableApi?.getAllLeafColumns() ?? [],
+  getRows: () => table.value?.tableApi?.getRowModel().rows
+})
 // Only full local catalogs opt in. Server-paginated lists pass their current rows.
 const page = defineModel<number>('page')
 const pagination = computed<PaginationState>({

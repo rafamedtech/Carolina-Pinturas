@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { createReusableTemplate, useMediaQuery } from '@vueuse/core'
 import { mexicoToday } from '~/utils/datetime'
 import Decimal from 'decimal.js'
 import type { PurchaseDraft } from '#shared/schemas/purchase'
@@ -17,6 +18,10 @@ const { data: products, error: productError, status: productStatus } = useFetch<
   lazy: true,
   server: false
 })
+const desktop = useMediaQuery('(min-width: 48rem)', { ssrWidth: 768 })
+type DraftItem = PurchaseDraft['items'][number]
+const [DefineQuantity, QuantityField] = createReusableTemplate<{ item: DraftItem }>()
+const [DefineCost, CostField] = createReusableTemplate<{ item: DraftItem }>()
 const initialOrder = props.order ?? props.copyFrom
 const draft = reactive<PurchaseDraft>({ providerId: initialOrder?.providerId ?? '', date: props.order?.date ?? mexicoToday(), currencyCode: initialOrder?.currencyCode ?? 'MXN', vatRate: initialOrder?.vatRate ?? 8, notes: initialOrder?.notes ?? '', items: initialOrder?.items.map(i => ({ productId: i.productId, quantity: i.quantity, unitCost: i.unitCost })) ?? [] })
 const catalogError = computed(() => Boolean(supplierError.value || productError.value))
@@ -72,6 +77,38 @@ const blocker = computed(() => {
 
 <template>
   <form class="flex flex-col gap-4" @submit.prevent="!blocker && emit('save', draft)">
+    <DefineCost v-slot="{ item }">
+      <UFormField label="Costo unitario (antes de impuestos)" :ui="{ label: 'md:sr-only' }">
+        <UInputNumber
+          v-model="item.unitCost"
+          :min="0"
+          :step="1"
+          :step-snapping="false"
+          :format-options="{ maximumFractionDigits: 6 }"
+          :increment="false"
+          :decrement="false"
+          :color="item.unitCost > 0 ? 'primary' : 'error'"
+          :highlight="!(item.unitCost > 0)"
+          :disabled="busy"
+          size="sm"
+          class="w-full"
+        />
+      </UFormField>
+    </DefineCost>
+    <DefineQuantity v-slot="{ item }">
+      <UFormField label="Cantidad" :ui="{ label: 'md:sr-only' }">
+        <UInputNumber
+          v-model="item.quantity"
+          :min="0.000001"
+          :step="1"
+          :step-snapping="false"
+          :format-options="{ maximumFractionDigits: 6 }"
+          :disabled="busy"
+          size="sm"
+          class="w-full"
+        />
+      </UFormField>
+    </DefineQuantity>
     <UAlert
       v-if="catalogError"
       color="warning"
@@ -210,7 +247,7 @@ const blocker = computed(() => {
         </p>
       </div>
 
-      <div v-else>
+      <div v-else-if="desktop">
         <div class="hidden gap-3 border-b border-default bg-elevated/50 px-4 py-2 text-xs font-medium text-muted uppercase md:grid md:grid-cols-[minmax(0,1fr)_9rem_11rem_8rem_2.25rem]">
           <span>Producto</span><span>Cantidad</span><span>Costo sin impuestos</span><span class="text-right">Importe</span><span class="sr-only">Acciones</span>
         </div>
@@ -230,46 +267,10 @@ const blocker = computed(() => {
                   <span v-if="lineInfo(item.productId).unit"> · {{ lineInfo(item.productId).unit }}</span>
                 </p>
               </div>
-              <UButton
-                icon="i-lucide-trash-2"
-                aria-label="Quitar partida"
-                color="neutral"
-                variant="ghost"
-                class="md:hidden"
-                :disabled="busy"
-                @click="draft.items.splice(index, 1)"
-              />
             </div>
-            <UFormField label="Cantidad" :ui="{ label: 'md:sr-only' }">
-              <UInputNumber
-                v-model="item.quantity"
-                :min="0.000001"
-                :step="1"
-                :step-snapping="false"
-                :format-options="{ maximumFractionDigits: 6 }"
-                :disabled="busy"
-                size="sm"
-                class="w-full"
-              />
-            </UFormField>
-            <UFormField label="Costo unitario (antes de impuestos)" :ui="{ label: 'md:sr-only' }">
-              <UInputNumber
-                v-model="item.unitCost"
-                :min="0"
-                :step="1"
-                :step-snapping="false"
-                :format-options="{ maximumFractionDigits: 6 }"
-                :increment="false"
-                :decrement="false"
-                :color="item.unitCost > 0 ? 'primary' : 'error'"
-                :highlight="!(item.unitCost > 0)"
-                :disabled="busy"
-                size="sm"
-                class="w-full"
-              />
-            </UFormField>
+            <QuantityField :item="item" />
+            <CostField :item="item" />
             <p class="col-span-2 flex justify-between text-sm md:col-span-1 md:block md:text-right">
-              <span class="text-muted md:hidden">Importe</span>
               <span class="font-medium tabular-nums">{{ money.format(lineTotal(item).toNumber()) }}</span>
             </p>
             <UButton
@@ -283,6 +284,31 @@ const blocker = computed(() => {
             />
           </li>
         </ul>
+      </div>
+
+      <div v-else class="space-y-3 p-4">
+        <ListRecordCard
+          v-for="(item, index) in draft.items"
+          :key="item.productId"
+          :title="lineInfo(item.productId).name"
+          :eyebrow="[lineInfo(item.productId).code, lineInfo(item.productId).unit].filter(Boolean).join(' · ')"
+          summary-label="Importe"
+          :summary-value="money.format(lineTotal(item).toNumber())"
+        >
+          <template #actions>
+            <AppButton
+              icon="i-lucide-trash-2"
+              :aria-label="`Quitar ${lineInfo(item.productId).name}`"
+              intent="quiet"
+              :disabled="busy"
+              @click="draft.items.splice(index, 1)"
+            />
+          </template>
+          <div class="grid grid-cols-2 items-end gap-3">
+            <QuantityField :item="item" />
+            <CostField :item="item" />
+          </div>
+        </ListRecordCard>
       </div>
 
       <template #footer>

@@ -9,6 +9,7 @@ import type { ListLayoutConfig } from '~/types/list'
 import ListLayout from '~/components/list/ListLayout.vue'
 import ListFiltersModal from '~/components/list/ListFiltersModal.vue'
 import ListFilterFields from '~/components/list/ListFilterFields.vue'
+import ListRecordCard from '~/components/list/ListRecordCard.vue'
 import OrderDatePicker from '~/components/orders/OrderDatePicker.vue'
 import { useListFilterBindings } from '~/composables/useListFilterBindings'
 
@@ -86,6 +87,27 @@ describe('layout configurable de listados', () => {
     expect(wrapper.find('[role="status"]').exists()).toBe(false)
     expect(wrapper.text()).toContain('Tarjetas del módulo')
     expect(wrapper.text()).toContain('Pintura azul')
+  })
+
+  it('muestra las mismas filas ordenadas y paginadas en tarjetas y tabla', async () => {
+    wrapper = await mountSuspended(Layout, {
+      props: {
+        embedded: true,
+        config: { ...config, pagination: { mode: 'client', label: 'registros', pageSize: 2 } },
+        data: [{ id: '1', name: 'D' }, { id: '2', name: 'B' }, { id: '3', name: 'A' }, { id: '4', name: 'C' }],
+        columns,
+        page: 2,
+        sorting: [{ id: 'name', desc: false }]
+      },
+      slots: { record: ({ row }: { row: RecordItem }) => h(ListRecordCard, { title: row.name }) }
+    })
+    const cardTitles = () => wrapper!.findAll('article h3').map(card => card.text())
+    const tableValues = () => wrapper!.findAll('tbody td').map(cell => cell.text())
+    expect(cardTitles()).toEqual(['C', 'D'])
+    expect(tableValues()).toEqual(cardTitles())
+    await wrapper.setProps({ page: 1, sorting: [{ id: 'name', desc: true }] })
+    expect(cardTitles()).toEqual(['D', 'C'])
+    expect(tableValues()).toEqual(cardTitles())
   })
 
   it('permite ocultar controles y deshabilitar Nuevo según permisos', async () => {

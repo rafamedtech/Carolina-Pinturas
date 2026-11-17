@@ -142,8 +142,12 @@ const columns: TableColumn<SiigoProduct>[] = [{
 const message = computed(() => error.value?.data?.statusMessage || 'No fue posible cargar el catálogo.')
 const totalProducts = computed(() => filteredProducts.value.length)
 
+function productPath(product: SiigoProduct) {
+  return { path: `/productos/${encodeURIComponent(product.id)}`, query: { returnTo: returnTo.value } }
+}
+
 function openProduct(_: Event, row: TableRow<SiigoProduct>) {
-  router.push({ path: `/productos/${encodeURIComponent(row.original.id)}`, query: { returnTo: returnTo.value } })
+  router.push(productPath(row.original))
 }
 function selectProductTab(tab: string) {
   productTab.value = tab
@@ -215,13 +219,19 @@ const listConfig = computed<ListLayoutConfig>(() => ({
         :disabled="loading"
       />
     </template>
-    <template #mobile>
-      <ProductsProductListCards
-        :products="products"
-        :return-to="returnTo"
-        :loading="false"
-        :unit-for="(product) => siigoProductUnit(product) || '—'"
-        :price-for="formatProductPrice"
+    <template #record="{ row }">
+      <ListRecordCard
+        :title="row.name"
+        :eyebrow="row.code"
+        :to="productPath(row)"
+        :aria-label="`Abrir producto ${row.name}`"
+        :fields="[
+          { label: 'Marca', value: row.additional_fields?.brand },
+          { label: 'Unidad', value: siigoProductUnit(row) },
+          { label: 'Disponible interno', value: row.internal?.composition?.kind === 'composite' ? 'Según componentes' : row.internal?.inventory?.available }
+        ]"
+        summary-label="Precio"
+        :summary-value="formatProductPrice(row)"
       />
     </template>
   </ListLayout>

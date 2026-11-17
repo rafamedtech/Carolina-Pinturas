@@ -15,6 +15,7 @@ withDefaults(defineProps<{
 }>(), { showRefresh: true })
 
 const [DefineBody, ReuseBody] = createReusableTemplate()
+const [DefineContent, ReuseContent] = createReusableTemplate()
 const emit = defineEmits<{ refresh: [] }>()
 
 defineSlots<{
@@ -28,15 +29,7 @@ defineSlots<{
 </script>
 
 <template>
-  <DefineBody>
-    <div v-if="viewsBeforeToolbar" class="flex min-w-0 flex-col gap-3">
-      <slot name="views" />
-      <slot name="toolbar" />
-    </div>
-    <template v-else>
-      <slot name="toolbar" />
-      <slot name="views" />
-    </template>
+  <DefineContent>
     <UAlert
       v-if="error"
       color="warning"
@@ -45,10 +38,20 @@ defineSlots<{
       :description="errorMessage"
       icon="i-lucide-database-zap"
     />
+    <slot v-else />
+  </DefineContent>
+  <DefineBody>
+    <div v-if="viewsBeforeToolbar" class="flex min-w-0 flex-col gap-3">
+      <slot name="views" />
+      <slot name="toolbar" />
+      <ReuseContent />
+    </div>
     <template v-else>
-      <slot />
-      <slot name="pagination" />
+      <slot name="toolbar" />
+      <slot name="views" />
+      <ReuseContent />
     </template>
+    <slot v-if="!error" name="pagination" />
     <slot name="overlays" />
   </DefineBody>
   <section v-if="embedded" class="flex min-w-0 flex-col gap-4">
@@ -75,7 +78,7 @@ defineSlots<{
   <UDashboardPanel
     v-else
     :id="id"
-    :ui="viewsBeforeToolbar ? { body: ['pt-3 sm:pt-0.5', !$slots.toolbar && 'gap-3 sm:gap-3'] } : undefined"
+    :ui="viewsBeforeToolbar ? { body: 'pt-3 sm:pt-0.5' } : undefined"
   >
     <template #header>
       <DetailHeader

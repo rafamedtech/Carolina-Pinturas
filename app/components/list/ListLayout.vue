@@ -1,6 +1,6 @@
 <script setup lang="ts" generic="T">
-import type { TableColumn, TableRow, TabsProps } from '@nuxt/ui'
-import type { SortingState, TableMeta, VisibilityState } from '@tanstack/table-core'
+import type { DropdownMenuItem, TableColumn, TableRow, TabsProps } from '@nuxt/ui'
+import type { Column, SortingState, TableMeta, VisibilityState } from '@tanstack/table-core'
 import type { ListFilterValues, ListLayoutConfig } from '~/types/list'
 import { navigationIconForPath } from '~/utils/navigationIcons'
 import type { OrderDateRange } from '~/types/orders'
@@ -33,13 +33,33 @@ const tab = defineModel<string>('tab', { default: 'all' })
 const page = defineModel<number>('page', { default: 1 })
 const sorting = defineModel<SortingState>('sorting', { default: () => [] })
 const columnVisibility = defineModel<VisibilityState>('columnVisibility', { default: () => ({}) })
-const listTable = useTemplateRef('listTable')
+type MobileRow = Pick<TableRow<T>, 'id' | 'original'>
+const listTable = useTemplateRef<{
+  getColumns: () => Column<T, unknown>[]
+  getRows: () => MobileRow[] | undefined
+}>('listTable')
 const moreFiltersOpen = shallowRef(false)
 const pageSize = computed(() => props.config.pagination?.pageSize ?? 25)
 const tablePage = computed({
   get: () => props.config.pagination?.mode === 'client' ? page.value : undefined,
   set: (value) => { if (value !== undefined) page.value = value }
 })
+const mobileRows = computed(() => {
+  const rows = listTable.value?.getRows()
+  if (rows) return rows
+  const start = ((tablePage.value ?? 1) - 1) * pageSize.value
+  return (tablePage.value === undefined ? props.data : props.data.slice(start, start + pageSize.value))
+    .map((original, index) => ({ id: String(start + index), original }))
+})
+const mobileSortItems = computed<DropdownMenuItem[]>(() => (listTable.value?.getColumns() ?? []).flatMap((column) => {
+  const label = (column.columnDef.header as { columnLabel?: string } | undefined)?.columnLabel
+  if (!label || !column.getCanSort()) return []
+  return {
+    label,
+    icon: column.getIsSorted() === 'asc' ? 'i-lucide-arrow-up' : column.getIsSorted() === 'desc' ? 'i-lucide-arrow-down' : 'i-lucide-arrow-up-down',
+    onSelect: () => column.toggleSorting()
+  }
+}))
 const hasActiveFilters = computed(() => Boolean(
   search.value || dateRange.value || props.hasExtraFilters
   || props.config.filters?.some(field => (filters.value[field.key] ?? field.defaultValue) !== field.defaultValue)
@@ -60,6 +80,7 @@ defineSlots<{
   'actions'(): unknown
   'toolbar-actions'(): unknown
   'mobile'(props: { rows: T[] }): unknown
+  'record'(props: { row: T }): unknown
   'content'(props: { rows: T[] }): unknown
   'before'(): unknown
   'after'(): unknown
@@ -93,22 +114,24 @@ defineSlots<{
         @clear="clearFilters"
       >
         <template #filters>
-          <OrdersOrderDateRangePicker v-if="config.dateFilter" v-model="dateRange" :subject="config.dateFilter.subject" />
-          <UButton
-            v-if="config.filters?.length"
-            label="Más filtros"
-            icon="i-lucide-sliders-horizontal"
-            color="neutral"
-            variant="outline"
-            class="w-full justify-start sm:w-auto sm:justify-center"
-            @click="moreFiltersOpen = true"
-          />
+          <div v-if="config.dateFilter || config.filters?.length" class="flex min-w-0 gap-2 md:contents">
+            <OrdersOrderDateRangePicker v-if="config.dateFilter" v-model="dateRange" :subject="config.dateFilter.subject" />
+            <AppButton
+              v-if="config.filters?.length"
+              label="Más filtros"
+              icon="i-lucide-sliders-horizontal"
+              intent="secondary"
+              class="shrink-0 sm:justify-center"
+              :class="config.dateFilter ? 'justify-center' : 'w-full justify-start sm:w-auto'"
+              @click="moreFiltersOpen = true"
+            />
+          </div>
         </template>
         <template #actions>
           <slot name="toolbar-actions">
             <ListColumnPicker
               :columns="listTable?.getColumns() ?? []"
-              :class="{ 'hidden md:inline-flex': $slots.mobile }"
+              :class="{ 'hidden md:inline-flex': $slots.mobile || $slots.record }"
             />
           </slot>
           <ListCreateButton v-if="config.create" :action="config.create" @create="emit('create')" />
@@ -128,8 +151,25 @@ defineSlots<{
     <ListLoading v-if="loading" />
     <template v-else>
       <slot name="content" :rows="data">
-        <div v-if="$slots.mobile" class="md:hidden">
-          <slot name="mobile" :rows="data" />
+        <div v-if="$slots.mobile || $slots.record" class="md:hidden">
+          <div v-if="$slots.record && mobileRows.length && mobileSortItems.length" class="mb-3 flex justify-end">
+            <UDropdownMenu :items="mobileSortItems" :content="{ align: 'end' }">
+              <AppButton
+                intent="secondary"
+                label="Ordenar"
+                icon="i-lucide-arrow-up-down"
+                size="sm"
+              />
+            </UDropdownMenu>
+          </div>
+          <slot name="mobile" :rows="mobileRows.map(row => row.original)">
+            <div v-if="mobileRows.length" class="space-y-3">
+              <template v-for="row in mobileRows" :key="row.id">
+                <slot name="record" :row="row.original" />
+              </template>
+            </div>
+            <UEmpty v-else icon="i-lucide-inbox" :title="config.empty" />
+          </slot>
         </div>
         <ListTable
           ref="listTable"
@@ -144,7 +184,7 @@ defineSlots<{
           :empty="config.empty"
           :on-select="onSelect"
           :show-column-picker="false"
-          :class="{ 'hidden md:block': $slots.mobile }"
+          :class="{ 'hidden md:block': $slots.mobile || $slots.record }"
         />
       </slot>
     </template>

@@ -13,16 +13,17 @@ defineProps<{
   orders: DashboardRecentOrder[]
 }>()
 
+function orderPath(order: DashboardRecentOrder) {
+  return { path: `/ventas/${encodeURIComponent(order.id)}`, query: { returnTo: '/' } }
+}
+
 const columns: TableColumn<DashboardRecentOrder>[] = [{
   accessorKey: 'number',
   header: 'Pedido',
   cell: ({ row }) => h(
     NuxtLink,
     {
-      'to': {
-        path: `/ventas/${encodeURIComponent(row.original.id)}`,
-        query: { returnTo: '/' }
-      },
+      'to': orderPath(row.original),
       'class': 'font-medium text-primary hover:underline',
       'aria-label': `Abrir pedido ${row.original.number}`
     },
@@ -80,11 +81,12 @@ const columns: TableColumn<DashboardRecentOrder>[] = [{
       </div>
     </template>
 
-    <UTable
+    <DetailTable
       v-if="orders.length"
       :data="orders"
       :columns="columns"
-      class="w-full"
+      :get-row-id="row => row.id"
+      class="w-full border-y-0"
       :ui="{
         root: 'w-full',
         base: 'min-w-full border-separate border-spacing-0',
@@ -94,7 +96,33 @@ const columns: TableColumn<DashboardRecentOrder>[] = [{
         td: 'border-b border-default',
         separator: 'h-0'
       }"
-    />
+    >
+      <template #record="{ row }">
+        <ListRecordCard
+          :title="row.number"
+          :eyebrow="dashboardDate(row.orderDate)"
+          :to="orderPath(row)"
+          :fields="[
+            { label: 'Cliente', value: row.customerName, fullWidth: true },
+            { key: 'payment', label: 'Estado de pago', value: paymentStatusLabel(row.paymentStatus) }
+          ]"
+          summary-label="Total"
+          :summary-value="dashboardCurrency.format(row.total)"
+        >
+          <template #trailing>
+            <OrdersOrderStatusBadge :status="row.status" />
+          </template>
+          <template #field-value="{ field }">
+            <UBadge v-if="field.key === 'payment'" :color="paymentStatusColor(row.paymentStatus)" variant="subtle">
+              {{ field.value }}
+            </UBadge>
+            <template v-else>
+              {{ field.value }}
+            </template>
+          </template>
+        </ListRecordCard>
+      </template>
+    </DetailTable>
 
     <UEmpty
       v-else

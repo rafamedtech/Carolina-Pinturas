@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { navigationIcons } from '~/utils/navigationIcons'
 import { tableQueryField, tableQueryText } from '~/utils/tableQuery'
 
 interface ConnectionStatus { configured: boolean }
@@ -17,7 +16,6 @@ useSeoMeta({ title: 'Configuración' })
   <ListPage
     id="configuration"
     title="Configuración"
-    :title-icon="navigationIcons['/configuracion']"
     :show-refresh="false"
     views-before-toolbar
   >

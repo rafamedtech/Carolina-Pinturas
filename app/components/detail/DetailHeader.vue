@@ -1,14 +1,22 @@
 <script setup lang="ts">
 import type { BreadcrumbItem } from '@nuxt/ui'
 
-withDefaults(defineProps<{ title: string, titleIcon?: string, breadcrumbs?: BreadcrumbItem[], loading?: boolean, refreshLabel?: string, showRefresh?: boolean }>(), { refreshLabel: 'Actualizar', showRefresh: true })
+withDefaults(defineProps<{ title: string, titleIcon?: string, back?: { to: string, label: string }, breadcrumbs?: BreadcrumbItem[], loading?: boolean, refreshLabel?: string, showRefresh?: boolean }>(), { refreshLabel: 'Actualizar', showRefresh: true })
 const emit = defineEmits<{ refresh: [] }>()
 </script>
 
 <template>
   <UDashboardNavbar :title="title">
     <template #leading>
-      <UDashboardSidebarCollapse />
+      <AppButton
+        v-if="back"
+        :to="back.to"
+        :aria-label="back.label"
+        icon="i-lucide-arrow-left"
+        color="neutral"
+        variant="ghost"
+      />
+      <UDashboardSidebarCollapse v-else />
       <UIcon
         v-if="titleIcon"
         :name="titleIcon"

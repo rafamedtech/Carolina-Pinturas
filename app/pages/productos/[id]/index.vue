@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { navigationIcons } from '~/utils/navigationIcons'
 import { productCatalogTabs } from '~/utils/productCatalogTabs'
 import type { DropdownMenuItem } from '@nuxt/ui'
 import { tableReturnPath, tableReturnQuery, tableTabBreadcrumb } from '~/utils/tableQuery'
@@ -65,7 +64,6 @@ const availabilityFields = [
 const MANAGED_TYPES = ['Product']
 
 const isComposite = computed(() => product.value?.internal?.composition?.kind === 'composite')
-const activityBreadcrumbTab = shallowRef<{ label: string, icon: string }>()
 const productBreadcrumbTab = computed(() => {
   const query = tableReturnQuery(backPath.value)
   return tableTabBreadcrumb(productCatalogTabs, query.get('tab'), query.get('active') === 'false' ? 'inactive' : 'all')
@@ -83,12 +81,11 @@ useSeoMeta({ title: () => productName.value })
     <template #header>
       <DetailHeader
         title="Detalle del producto"
-        :title-icon="navigationIcons['/productos']"
+        :back="{ to: backPath, label: 'Volver a productos' }"
         :breadcrumbs="[
           { label: 'Productos', icon: 'i-lucide-package', to: '/productos' },
           { ...productBreadcrumbTab, to: backPath },
-          { label: product?.name || 'Detalle' },
-          ...(product && activityBreadcrumbTab ? [activityBreadcrumbTab] : [])
+          { label: product?.name || 'Detalle' }
         ]"
         refresh-label="Actualizar producto desde Siigo"
         :loading="syncing || ['idle', 'pending'].includes(status)"
@@ -235,7 +232,6 @@ useSeoMeta({ title: () => productName.value })
           :product-id="productId"
           :composite="isComposite"
           :role="user?.role"
-          @section-change="activityBreadcrumbTab = $event"
         />
       </template>
     </template>

@@ -120,6 +120,31 @@ const hundredTotal = computed(() => hundred.value?.reduce((sum, item) => sum + M
       <template #change-cell="{ row }">
         <span :class="change(row.original).class">{{ change(row.original).label }}</span>
       </template>
+      <template #record="{ row }">
+        <ListRecordCard
+          :title="row.label"
+          :fields="[
+            { key: 'previous', label: annual ? 'Año anterior' : 'Mes anterior', value: reportCurrency.format(row.previous) },
+            { key: 'change', label: 'Variación', value: change(row).label },
+            { label: 'Porcentaje de la venta', value: share(row.amount) }
+          ]"
+          summary-label="Importe"
+        >
+          <template #title-extra>
+            <div class="mt-2 h-1.5 rounded-full bg-elevated" aria-hidden="true">
+              <div class="h-full rounded-full" :class="row.bar" :style="{ width: width(row.amount) }" />
+            </div>
+          </template>
+          <template #field-value="{ field }">
+            <span :class="field.key === 'change' ? change(row).class : undefined">{{ field.value }}</span>
+          </template>
+          <template #summary>
+            <span :class="row.amount < 0 ? 'text-error' : row.total && row.amount > 0 ? 'text-success' : undefined">
+              {{ reportCurrency.format(row.amount) }}
+            </span>
+          </template>
+        </ListRecordCard>
+      </template>
     </DetailTable>
 
     <div v-if="hundred" class="border-t border-default pt-4">

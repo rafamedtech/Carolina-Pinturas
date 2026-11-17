@@ -44,31 +44,28 @@ function igualacionItems(order: SalesOrderListItem) {
         :actionable="igualacion"
         :aria-label="`${igualacion ? 'Ver' : 'Abrir'} pedido ${order.number} de ${order.customer.name}`"
         :fields="[{ label: 'Cliente', value: order.customer.name, fullWidth: true }]"
-        :summary-label="igualacion ? undefined : 'Total'"
+        :summary-label="igualacion ? 'Igualaciones' : 'Total'"
         :summary-value="currency.format(order.total)"
+        :summary-stacked="igualacion"
         @select="emit('open', order)"
       >
         <template #trailing>
           <OrdersOrderStatusBadge :status="order.status" />
         </template>
         <template v-if="igualacion" #summary>
-          <dl class="border-t border-default pt-3 text-sm">
-            <dt class="text-muted">
-              Igualaciones
-            </dt>
-            <dd v-if="!igualacionItems(order).length" class="text-lg font-semibold text-highlighted">
-              —
-            </dd>
-            <dd
+          <template v-if="!igualacionItems(order).length">
+            —
+          </template>
+          <ul v-else class="space-y-1">
+            <li
               v-for="(item, index) in igualacionItems(order)"
-              v-else
               :key="index"
-              class="flex flex-col text-lg font-semibold text-highlighted"
+              class="flex flex-col"
             >
               <span>{{ item.quantity }} x {{ item.code }}</span>
               <span v-if="item.observations" class="text-sm font-normal text-muted">{{ item.observations }}</span>
-            </dd>
-          </dl>
+            </li>
+          </ul>
         </template>
       </ListRecordCard>
     </template>

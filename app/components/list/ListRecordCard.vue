@@ -12,15 +12,18 @@ const props = withDefaults(defineProps<{
   summaryLabel?: string
   summaryValue?: string | number | null
   summaryColor?: 'neutral' | 'primary'
+  summaryStacked?: boolean
 }>(), { summaryColor: 'neutral' })
 
 defineSlots<{
+  'title-extra'(): unknown
   'field-value'(scope: { field: NonNullable<typeof props.fields>[number] }): unknown
   'summary-leading'(): unknown
   'trailing'(): unknown
   'actions'(): unknown
   'default'(): unknown
   'summary'(): unknown
+  'footer'(): unknown
 }>()
 const emit = defineEmits<{ select: [] }>()
 const interactive = computed(() => Boolean(props.to) || props.actionable)
@@ -34,11 +37,11 @@ const interactive = computed(() => Boolean(props.to) || props.actionable)
     :ui="{ container: 'flex flex-col gap-4 p-4 sm:p-4 lg:flex' }"
   >
     <div class="flex items-start justify-between gap-3">
-      <div class="min-w-0">
+      <div class="min-w-0 flex-1">
         <p v-if="eyebrow" class="text-xs font-medium text-muted">
           {{ eyebrow }}
         </p>
-        <h3 class="text-lg font-semibold break-words text-primary">
+        <h3 class="text-lg font-semibold wrap-anywhere text-primary">
           <ULink
             v-if="titleTo"
             :to="titleTo"
@@ -51,6 +54,7 @@ const interactive = computed(() => Boolean(props.to) || props.actionable)
             {{ title }}
           </template>
         </h3>
+        <slot name="title-extra" />
       </div>
       <div v-if="$slots.trailing || $slots.actions" class="flex shrink-0 items-start gap-2">
         <slot name="trailing" />
@@ -70,7 +74,7 @@ const interactive = computed(() => Boolean(props.to) || props.actionable)
 
     <dl v-if="summaryLabel" class="border-t border-default pt-3 text-sm" :class="{ 'grid grid-cols-2 gap-4': $slots['summary-leading'] }">
       <slot name="summary-leading" />
-      <div :class="$slots['summary-leading'] ? 'min-w-0 text-right' : 'flex items-end justify-between gap-4'">
+      <div :class="$slots['summary-leading'] ? 'min-w-0 text-right' : summaryStacked ? 'space-y-1' : 'flex items-end justify-between gap-4'">
         <dt class="text-muted">
           {{ summaryLabel }}
         </dt>
@@ -82,6 +86,9 @@ const interactive = computed(() => Boolean(props.to) || props.actionable)
       </div>
     </dl>
     <slot v-else name="summary" />
+    <div v-if="$slots.footer" class="relative z-10">
+      <slot name="footer" />
+    </div>
 
     <AppButton
       v-if="interactive"

@@ -40,14 +40,18 @@ const rows = computed(() => {
 })
 const balance = computed(() => payableBalance(rows.value))
 const NuxtLink = resolveComponent('NuxtLink')
+function payablePath(row: PayableRow) {
+  return { path: `/compras/${row.orderId}`, query: { returnTo: returnTo.value } }
+}
+
 const columns: TableColumn<PayableRow>[] = [
-  { id: 'folio', header: 'Factura / orden', cell: ({ row }) => h(NuxtLink, { to: { path: `/compras/${row.original.orderId}`, query: { returnTo: returnTo.value } }, class: 'font-medium text-highlighted underline decoration-muted underline-offset-4 hover:decoration-primary' }, () => `${row.original.folio} / OC-${row.original.orderFolio}`) },
+  { id: 'folio', header: 'Factura / orden', cell: ({ row }) => h(NuxtLink, { to: payablePath(row.original), class: 'font-medium text-highlighted underline decoration-muted underline-offset-4 hover:decoration-primary' }, () => `${row.original.folio} / OC-${row.original.orderFolio}`) },
   { accessorKey: 'providerName', header: 'Proveedor' },
   { accessorKey: 'dueDate', header: 'Vencimiento', cell: ({ row }) => h('div', [h('p', { class: 'tabular-nums' }, formatDate(row.original.dueDate)), h('p', { class: `mt-1 text-xs ${row.original.balance > 0 && row.original.daysUntilDue <= 0 ? 'text-error' : 'text-muted'}` }, payableTiming(row.original))]) },
   { accessorKey: 'amount', header: 'Importe', cell: ({ row }) => h('span', { class: 'tabular-nums' }, payableMoney(row.original.amount)) },
   { id: 'paid', header: 'Abonado', cell: ({ row }) => h('span', { class: 'tabular-nums text-muted' }, payableMoney(row.original.amount - row.original.balance)) },
   { accessorKey: 'balance', header: 'Saldo pendiente', cell: ({ row }) => h('span', { class: 'font-semibold tabular-nums' }, `${payableMoney(row.original.balance)} ${row.original.currencyCode}`) },
-  { id: 'actions', header: 'Gestión', cell: ({ row }) => h(NuxtLink, { 'to': { path: `/compras/${row.original.orderId}`, query: { returnTo: returnTo.value } }, 'class': 'text-sm font-medium text-primary hover:underline', 'aria-label': `Ver compra OC-${row.original.orderFolio}, factura ${row.original.folio}` }, () => 'Ver compra →') }
+  { id: 'actions', header: 'Gestión', cell: ({ row }) => h(NuxtLink, { 'to': payablePath(row.original), 'class': 'text-sm font-medium text-primary hover:underline', 'aria-label': `Ver compra OC-${row.original.orderFolio}, factura ${row.original.folio}` }, () => 'Ver compra →') }
 ]
 const filterValues = useListFilterBindings({ grouped })
 const listConfig = computed<ListLayoutConfig>(() => ({
@@ -143,6 +147,22 @@ watch(status, (value) => {
     </template>
     <template v-if="grouped" #content>
       <PurchasesPayablesProviders :rows="rows" :return-to="returnTo" />
+    </template>
+    <template #record="{ row }">
+      <ListRecordCard
+        :title="`${row.folio} / OC-${row.orderFolio}`"
+        :to="payablePath(row)"
+        :aria-label="`Ver compra OC-${row.orderFolio}, factura ${row.folio}`"
+        :fields="[
+          { label: 'Proveedor', value: row.providerName, fullWidth: true },
+          { label: 'Vencimiento', value: formatDate(row.dueDate) },
+          { label: 'Estado del vencimiento', value: payableTiming(row) },
+          { label: 'Importe', value: payableMoney(row.amount) },
+          { label: 'Abonado', value: payableMoney(row.amount - row.balance) }
+        ]"
+        summary-label="Saldo pendiente"
+        :summary-value="`${payableMoney(row.balance)} ${row.currencyCode}`"
+      />
     </template>
   </ListLayout>
 </template>

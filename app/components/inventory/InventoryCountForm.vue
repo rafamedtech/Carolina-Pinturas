@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { createReusableTemplate, useMediaQuery } from '@vueuse/core'
 import type { InventoryCount } from '#shared/types/inventory'
 import type { InventoryCommand } from '#shared/schemas/inventory'
 import { formatDate } from '~/utils/datetime'
@@ -6,6 +7,11 @@ import { formatDate } from '~/utils/datetime'
 const { canWrite } = useAuth()
 const props = defineProps<{ count: InventoryCount, admin: boolean, busy: boolean, activated?: boolean }>()
 const emit = defineEmits<{ submit: [command: InventoryCommand['command']] }>()
+const desktop = useMediaQuery('(min-width: 48rem)', { ssrWidth: 768 })
+type CountLine = InventoryCount['lines'][number]
+const [DefineAmount, AmountInput] = createReusableTemplate<{ line: CountLine }>()
+const [DefineCost, CostInputs] = createReusableTemplate<{ line: CountLine }>()
+const [DefineRemove, RemoveButton] = createReusableTemplate<{ line: CountLine }>()
 const costs = reactive<Record<string, number | undefined>>({})
 const currencies = reactive<Record<string, 'MXN' | 'USD'>>({})
 const amounts = reactive<Record<string, string>>({})
@@ -46,8 +52,51 @@ function action(value: 'countSubmit' | 'countApply' | 'countRefresh' | 'countCan
       :busy="busy"
       @add="changeProduct('countAdd', $event)"
     />
+    <DefineAmount v-slot="{ line }">
+      <UInput
+        v-model="amounts[line.productId]"
+        :aria-label="`Conteo de ${line.product.name}`"
+        inputmode="decimal"
+        required
+        :disabled="!canWrite || count.status !== 'borrador' || busy"
+        class="w-full md:w-36"
+      />
+    </DefineAmount>
+    <DefineCost v-slot="{ line }">
+      <div class="flex gap-2">
+        <UInputNumber
+          v-model="costs[line.productId]"
+          :aria-label="`Costo unitario de ${line.product.name}`"
+          :min="0"
+          :max="999999999"
+          :step-snapping="false"
+          :format-options="{ maximumFractionDigits: 6 }"
+          :increment="false"
+          :decrement="false"
+          :disabled="!canWrite || count.status !== 'borrador' || busy"
+          placeholder="0.00"
+          class="min-w-0 flex-1 md:w-44"
+        />
+        <USelect
+          v-model="currencies[line.productId]"
+          :items="['MXN', 'USD']"
+          :aria-label="`Moneda de ${line.product.name}`"
+          :disabled="!canWrite || count.status !== 'borrador' || busy"
+        />
+      </div>
+    </DefineCost>
+    <DefineRemove v-slot="{ line }">
+      <UButton
+        icon="i-lucide-x"
+        :aria-label="`Quitar ${line.product.name} del conteo`"
+        color="neutral"
+        variant="ghost"
+        :disabled="busy"
+        @click="changeProduct('countRemove', line.productId)"
+      />
+    </DefineRemove>
     <form class="space-y-4" @submit.prevent="save">
-      <div class="max-h-[50vh] overflow-auto rounded-lg border border-default">
+      <div v-if="desktop" class="max-h-[50vh] overflow-auto rounded-lg border border-default">
         <table class="w-full text-sm">
           <thead class="sticky top-0 bg-elevated text-left">
             <tr>
@@ -70,45 +119,11 @@ function action(value: 'countSubmit' | 'countApply' | 'countRefresh' | 'countCan
               </td><td class="p-3 text-right font-mono">
                 {{ line.expected }}
               </td><td class="p-3">
-                <UInput
-                  v-model="amounts[line.productId]"
-                  :aria-label="`Conteo de ${line.product.name}`"
-                  inputmode="decimal"
-                  required
-                  :disabled="!canWrite || count.status !== 'borrador' || busy"
-                  class="w-36"
-                />
+                <AmountInput :line="line" />
               </td><td v-if="!activated" class="p-3">
-                <div class="flex gap-2">
-                  <UInputNumber
-                    v-model="costs[line.productId]"
-                    :aria-label="`Costo unitario de ${line.product.name}`"
-                    :min="0"
-                    :max="999999999"
-                    :step-snapping="false"
-                    :format-options="{ maximumFractionDigits: 6 }"
-                    :increment="false"
-                    :decrement="false"
-                    :disabled="!canWrite || count.status !== 'borrador' || busy"
-                    placeholder="0.00"
-                    class="w-44"
-                  />
-                  <USelect
-                    v-model="currencies[line.productId]"
-                    :items="['MXN', 'USD']"
-                    :aria-label="`Moneda de ${line.product.name}`"
-                    :disabled="!canWrite || count.status !== 'borrador' || busy"
-                  />
-                </div>
+                <CostInputs :line="line" />
               </td><td v-if="canWrite && count.status === 'borrador'" class="p-3">
-                <UButton
-                  icon="i-lucide-x"
-                  :aria-label="`Quitar ${line.product.name} del conteo`"
-                  color="neutral"
-                  variant="ghost"
-                  :disabled="busy"
-                  @click="changeProduct('countRemove', line.productId)"
-                />
+                <RemoveButton :line="line" />
               </td>
             </tr><tr v-if="!count.lines.length">
               <td :colspan="(count.status === 'borrador' ? 4 : 3) + (activated ? 0 : 1)" class="p-8 text-center text-muted">
@@ -117,7 +132,37 @@ function action(value: 'countSubmit' | 'countApply' | 'countRefresh' | 'countCan
             </tr>
           </tbody>
         </table>
-      </div><UButton
+      </div>
+      <div v-else class="space-y-3">
+        <ListRecordCard
+          v-for="line in count.lines"
+          :key="line.productId"
+          :title="line.product.name"
+          :eyebrow="line.product.code"
+          :fields="[{ label: 'Esperado', value: line.expected }]"
+        >
+          <template v-if="canWrite && count.status === 'borrador'" #actions>
+            <RemoveButton :line="line" />
+          </template>
+          <template #footer>
+            <div class="space-y-3">
+              <UFormField label="Conteo físico">
+                <AmountInput :line="line" />
+              </UFormField>
+              <UFormField v-if="!activated" label="Costo unitario (con impuestos)">
+                <CostInputs :line="line" />
+              </UFormField>
+            </div>
+          </template>
+        </ListRecordCard>
+        <UEmpty
+          v-if="!count.lines.length"
+          title="Sin partidas"
+          description="Agrega los productos que vas a contar. Solo esas partidas formarán parte del conteo."
+          variant="naked"
+        />
+      </div>
+      <UButton
         v-if="canWrite && count.status === 'borrador' && count.lines.length"
         type="submit"
         label="Guardar cantidades"
