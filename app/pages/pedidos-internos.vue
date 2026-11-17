@@ -1,13 +1,10 @@
 <script setup lang="ts">
-const route = useRoute()
-
-await navigateTo({
-  path: '/ventas',
-  query: {
-    ...route.query,
-    view: 'internos'
-  }
-}, { replace: true })
+definePageMeta({
+  middleware: to => navigateTo({
+    path: '/ventas',
+    query: { ...to.query, view: 'internos' }
+  }, { replace: true })
+})
 </script>
 
 <template>

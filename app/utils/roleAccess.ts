@@ -83,6 +83,25 @@ export function canAccessAppPath(role: UserRole, path: string) {
   return true
 }
 
+export function isPublicAppPath(path: string) {
+  return path === '/lista-precios' || path === '/login' || path === '/recuperar-contrasena'
+}
+
+export function sessionRedirect(path: string, role: UserRole | undefined, disabled: boolean) {
+  if (path === '/lista-precios') return
+  if (isPublicAppPath(path)) return role ? homePathForRole(role) : undefined
+  if (!role) return disabled ? '/login?reason=disabled' : '/login'
+  if (!canAccessAppPath(role, path)) return homePathForRole(role)
+
+  const settingsPath = path === '/configuracion' || path.startsWith('/configuracion/')
+  const reportsPath = path === '/reportes' || path.startsWith('/reportes/')
+  const internalOrdersPath = path === '/pedidos-internos' || path.startsWith('/pedidos-internos/')
+
+  if (role !== 'admin' && (settingsPath || (role !== 'consulta' && (reportsPath || internalOrdersPath)))) {
+    return '/'
+  }
+}
+
 export const PRODUCT_MANAGEMENT_ROLES = ['admin'] as const satisfies readonly UserRole[]
 
 export function canManageProducts(role: UserRole | undefined) {

@@ -1,19 +1,20 @@
 <script setup lang="ts">
-const route = useRoute()
-const { user } = useAuth()
+definePageMeta({
+  middleware: (to) => {
+    if (to.query.tab !== 'warehouses' || useAuth().user.value?.role !== 'admin') return
 
-if (route.query.tab === 'warehouses' && user.value?.role === 'admin') {
-  await navigateTo({
-    path: '/configuracion',
-    query: {
-      tab: 'inventory',
-      search: route.query.search,
-      tracking: route.query.tracking,
-      productId: route.query.productId,
-      page: route.query.page
-    }
-  }, { replace: true })
-}
+    return navigateTo({
+      path: '/configuracion',
+      query: {
+        tab: 'inventory',
+        search: to.query.search,
+        tracking: to.query.tracking,
+        productId: to.query.productId,
+        page: to.query.page
+      }
+    }, { replace: true })
+  }
+})
 </script>
 
 <template>

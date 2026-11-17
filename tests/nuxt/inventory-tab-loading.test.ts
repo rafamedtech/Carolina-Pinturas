@@ -5,7 +5,7 @@ import { clearNuxtData } from '#app'
 import type { VueWrapper } from '@vue/test-utils'
 import InventoryDashboard from '~/components/inventory/InventoryDashboard.vue'
 
-mockNuxtImport('useAuth', () => () => ({ user: { value: { role: 'admin' } }, fetchSession: async () => ({ role: 'admin' }) }))
+mockNuxtImport('useAuth', () => () => ({ user: { value: { role: 'admin' } }, disabled: { value: false }, fetchSession: async () => ({ role: 'admin' }) }))
 let stockReads = 0
 registerEndpoint('/api/inventory/summary', () => ({ trackedProducts: 1 }))
 registerEndpoint('/api/inventory/settings', () => ({ enabledAt: null }))
