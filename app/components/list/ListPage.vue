@@ -1,18 +1,18 @@
 <script setup lang="ts">
 import { createReusableTemplate } from '@vueuse/core'
-import type { BreadcrumbItem } from '@nuxt/ui'
 
-defineProps<{
+withDefaults(defineProps<{
   embedded?: boolean
   id: string
   title: string
+  titleIcon?: string
   loading?: boolean
+  showRefresh?: boolean
   error?: boolean
   errorTitle?: string
   errorMessage?: string
   viewsBeforeToolbar?: boolean
-  breadcrumbs?: BreadcrumbItem[]
-}>()
+}>(), { showRefresh: true })
 
 const [DefineBody, ReuseBody] = createReusableTemplate()
 const emit = defineEmits<{ refresh: [] }>()
@@ -29,9 +29,14 @@ defineSlots<{
 
 <template>
   <DefineBody>
-    <slot v-if="viewsBeforeToolbar" name="views" />
-    <slot name="toolbar" />
-    <slot v-if="!viewsBeforeToolbar" name="views" />
+    <div v-if="viewsBeforeToolbar" class="flex min-w-0 flex-col gap-3">
+      <slot name="views" />
+      <slot name="toolbar" />
+    </div>
+    <template v-else>
+      <slot name="toolbar" />
+      <slot name="views" />
+    </template>
     <UAlert
       v-if="error"
       color="warning"
@@ -54,6 +59,7 @@ defineSlots<{
       <div class="flex items-center gap-2">
         <slot name="actions" />
         <UButton
+          v-if="showRefresh"
           label="Actualizar"
           icon="i-lucide-refresh-cw"
           color="neutral"
@@ -66,13 +72,18 @@ defineSlots<{
     </div>
     <ReuseBody />
   </section>
-  <UDashboardPanel v-else :id="id">
+  <UDashboardPanel
+    v-else
+    :id="id"
+    :ui="viewsBeforeToolbar ? { body: ['pt-3 sm:pt-0.5', !$slots.toolbar && 'gap-3 sm:gap-3'] } : undefined"
+  >
     <template #header>
       <DetailHeader
         :title="title"
-        :breadcrumbs="breadcrumbs"
+        :title-icon="titleIcon"
         :refresh-label="`Actualizar ${title.toLowerCase()}`"
         :loading="loading"
+        :show-refresh="showRefresh"
         @refresh="emit('refresh')"
       >
         <template #actions>

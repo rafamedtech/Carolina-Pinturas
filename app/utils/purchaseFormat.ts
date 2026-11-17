@@ -32,3 +32,19 @@ export function purchaseQuantity(value: number) {
 }
 
 export { formatDate as purchaseDateLabel } from './datetime'
+
+export const purchaseListTabs = [
+  { label: 'Todas', value: 'all', icon: 'i-lucide-list' },
+  { label: 'Confirmada', value: 'confirmada', icon: 'i-lucide-circle-check' },
+  { label: 'Liquidada', value: 'liquidada', icon: 'i-lucide-wallet' },
+  { label: 'Vencida', value: 'vencida', icon: 'i-lucide-calendar-x' },
+  { label: 'Borrador', value: 'borrador', icon: 'i-lucide-file-pen-line' },
+  { label: 'Cancelada', value: 'cancelada', icon: 'i-lucide-circle-x' }
+]
+
+export const purchasePayablesTabs = [
+  { label: 'Por pagar', value: 'pendiente', icon: 'i-lucide-clock' },
+  { label: 'Vencidas', value: 'vencida', icon: 'i-lucide-calendar-x' },
+  { label: 'Liquidadas', value: 'liquidada', icon: 'i-lucide-wallet' },
+  { label: 'Todas', value: 'all', icon: 'i-lucide-list' }
+]

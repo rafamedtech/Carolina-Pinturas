@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { purchasePayablesTabs } from '~/utils/purchaseFormat'
 import type { ListLayoutConfig } from '~/types/list'
 import type { TableColumn } from '@nuxt/ui'
 import { tableQueryField, tableQueryText, tableQueryBoolean, tableQueryPage } from '~/utils/tableQuery'
@@ -52,8 +53,7 @@ const filterValues = useListFilterBindings({ grouped })
 const listConfig = computed<ListLayoutConfig>(() => ({
   id: 'purchase-payables', title: 'Cuentas por pagar', empty: 'Sin facturas para estos filtros. Cambia el periodo, la moneda o la búsqueda.',
   search: { placeholder: 'Buscar proveedor, factura u orden' },
-  defaultTab: 'pendiente',
-  tabs: [{ label: 'Por pagar', value: 'pendiente' }, { label: 'Vencidas', value: 'vencida' }, { label: 'Liquidadas', value: 'liquidada' }, { label: 'Todas', value: 'all' }],
+  tabs: purchasePayablesTabs,
   filters: [{ key: 'grouped', label: 'Agrupar por proveedor', type: 'checkbox', defaultValue: false }],
   pagination: grouped.value ? undefined : { mode: 'client', label: 'facturas', pageSize: 25 }
 }))
@@ -89,6 +89,7 @@ watch(status, (value) => {
     :loading="loading"
     :error="Boolean(error)"
     error-title="No se pudieron cargar las cuentas por pagar."
+    :has-extra-filters="period !== 'all' || currency !== 'MXN'"
     @refresh="refresh()"
     @clear="clear"
   >

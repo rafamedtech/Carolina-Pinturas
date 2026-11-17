@@ -45,17 +45,17 @@ describe('layout configurable de listados', () => {
     expect(wrapper.findAllComponents(OrderDatePicker)).toHaveLength(0)
     await wrapper.findAll('button').find(button => button.text() === 'Quitar filtros')!.trigger('click')
     expect(wrapper.emitted('update:search')?.[0]).toEqual([''])
-    expect(wrapper.emitted('update:tab')?.[0]).toEqual(['all'])
+    expect(wrapper.emitted('update:tab')).toBeUndefined()
     expect(wrapper.emitted('update:dateRange')?.[0]).toEqual([null])
     expect(wrapper.emitted('update:filters')?.[0]).toEqual([{ hidden: false, method: 'all' }])
     await wrapper.findAll('button').find(button => button.text() === 'Nuevo registro')!.trigger('click')
     expect(wrapper.emitted('create')).toHaveLength(1)
   })
 
-  it('conserva la pestaña al quitar filtros cuando el listado lo configura', async () => {
+  it('conserva la pestaña activa al quitar filtros', async () => {
     wrapper = await mountSuspended(Layout, {
       props: {
-        embedded: true, config: { ...config, resetTabOnClear: false }, data: [], columns,
+        embedded: true, config, data: [], columns,
         search: 'Pintura', tab: 'active', filters: { hidden: true, method: 'cash' }, page: 2,
         dateRange: { start: parseDate('2026-10-01'), end: parseDate('2026-10-18') }
       }

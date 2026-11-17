@@ -1,4 +1,4 @@
-import type { BreadcrumbItem, ButtonProps, DropdownMenuItem } from '@nuxt/ui'
+import type { ButtonProps, DropdownMenuItem } from '@nuxt/ui'
 
 export type ListFilterValue = string | boolean
 export type ListFilterValues = Record<string, ListFilterValue>
@@ -27,16 +27,13 @@ export interface ListCreateAction {
 }
 
 export interface ListLayoutConfig {
-  breadcrumbs?: BreadcrumbItem[]
   id: string
   title: string
   empty: string
   search?: { placeholder: string }
   dateFilter?: { subject: string }
   filters?: ListFilterDefinition[]
-  tabs?: Array<{ label: string, value: string }>
-  defaultTab?: string
-  resetTabOnClear?: boolean
+  tabs?: Array<{ label: string, value: string, icon?: string }>
   create?: ListCreateAction
   pagination?: {
     mode: 'client' | 'server' | 'external'

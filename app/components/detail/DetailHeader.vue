@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { BreadcrumbItem } from '@nuxt/ui'
 
-withDefaults(defineProps<{ title: string, breadcrumbs?: BreadcrumbItem[], loading?: boolean, refreshLabel?: string, showRefresh?: boolean }>(), { refreshLabel: 'Actualizar', showRefresh: true })
+withDefaults(defineProps<{ title: string, titleIcon?: string, breadcrumbs?: BreadcrumbItem[], loading?: boolean, refreshLabel?: string, showRefresh?: boolean }>(), { refreshLabel: 'Actualizar', showRefresh: true })
 const emit = defineEmits<{ refresh: [] }>()
 </script>
 
@@ -9,6 +9,12 @@ const emit = defineEmits<{ refresh: [] }>()
   <UDashboardNavbar :title="title">
     <template #leading>
       <UDashboardSidebarCollapse />
+      <UIcon
+        v-if="titleIcon"
+        :name="titleIcon"
+        aria-hidden="true"
+        class="size-5 shrink-0 text-muted"
+      />
     </template>
     <template #right>
       <slot name="actions" />
@@ -24,7 +30,5 @@ const emit = defineEmits<{ refresh: [] }>()
       />
     </template>
   </UDashboardNavbar>
-  <UDashboardToolbar v-if="breadcrumbs?.length">
-    <UBreadcrumb :items="breadcrumbs" />
-  </UDashboardToolbar>
+  <DetailBreadcrumbs v-if="breadcrumbs?.length" :items="breadcrumbs" />
 </template>

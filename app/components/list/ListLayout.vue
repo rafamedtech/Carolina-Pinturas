@@ -2,9 +2,10 @@
 import type { TableColumn, TableRow, TabsProps } from '@nuxt/ui'
 import type { SortingState, TableMeta, VisibilityState } from '@tanstack/table-core'
 import type { ListFilterValues, ListLayoutConfig } from '~/types/list'
+import { navigationIconForPath } from '~/utils/navigationIcons'
 import type { OrderDateRange } from '~/types/orders'
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   config: ListLayoutConfig
   data: T[]
   columns: TableColumn<T>[]
@@ -19,8 +20,11 @@ const props = defineProps<{
   toolbarBelowTabs?: boolean
   tabsVariant?: TabsProps['variant']
   tabsFullWidth?: boolean
+  hasExtraFilters?: boolean
   onSelect?: (event: Event, row: TableRow<T>) => void
-}>()
+}>(), { toolbarBelowTabs: undefined })
+const route = useRoute()
+const titleIcon = computed(() => props.config.tabs?.length ? navigationIconForPath(route.path) : undefined)
 const emit = defineEmits<{ refresh: [], create: [], clear: [] }>()
 const search = defineModel<string>('search', { default: '' })
 const dateRange = defineModel<OrderDateRange | null>('dateRange', { default: null })
@@ -37,14 +41,12 @@ const tablePage = computed({
   set: (value) => { if (value !== undefined) page.value = value }
 })
 const hasActiveFilters = computed(() => Boolean(
-  search.value || dateRange.value
-  || (props.config.resetTabOnClear !== false && props.config.tabs?.length && tab.value !== (props.config.defaultTab ?? 'all'))
+  search.value || dateRange.value || props.hasExtraFilters
   || props.config.filters?.some(field => (filters.value[field.key] ?? field.defaultValue) !== field.defaultValue)
 ))
 function clearFilters() {
   search.value = ''
   dateRange.value = null
-  if (props.config.resetTabOnClear !== false) tab.value = props.config.defaultTab ?? 'all'
   filters.value = Object.fromEntries((props.config.filters ?? []).map(field => [field.key, field.defaultValue]))
   page.value = 1
   emit('clear')
@@ -69,9 +71,9 @@ defineSlots<{
   <ListPage
     :id="config.id"
     :title="config.title"
-    :breadcrumbs="config.breadcrumbs"
+    :title-icon="titleIcon"
     :embedded="embedded"
-    :views-before-toolbar="toolbarBelowTabs"
+    :views-before-toolbar="toolbarBelowTabs ?? Boolean(config.tabs?.length)"
     :loading="loading"
     :error="error"
     :error-title="errorTitle"

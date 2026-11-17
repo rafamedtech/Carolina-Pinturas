@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { productCatalogTabs } from '~/utils/productCatalogTabs'
 import { parseDate } from '@internationalized/date'
 import type { OrderDateRange } from '~/types/orders'
 import type { ListLayoutConfig, ListFilterValues } from '~/types/list'
@@ -15,7 +16,7 @@ const router = useRouter()
 
 const { user } = useAuth()
 const productTab = shallowRef('all')
-const productTabs = ['all', 'purchase', 'sale', 'expense', 'composite', 'inactive']
+const productTabs = productCatalogTabs.map(tab => tab.value)
 const filters = ref<Record<string, string>>({})
 const showInactive = shallowRef(false)
 const hideComposite = shallowRef(false)
@@ -176,14 +177,7 @@ const filterValues = computed<ListFilterValues>({
 const listConfig = computed<ListLayoutConfig>(() => ({
   id: 'products', title: 'Productos', empty: 'No hay productos para mostrar.',
   search: { placeholder: 'Buscar en todos los productos' }, dateFilter: { subject: 'productos creados' },
-  tabs: [
-    { label: 'Todos', value: 'all' },
-    { label: 'Compra', value: 'purchase' },
-    { label: 'Venta directa', value: 'sale' },
-    { label: 'Gasto', value: 'expense' },
-    { label: 'Compuestos', value: 'composite' },
-    { label: 'Inactivos', value: 'inactive' }
-  ], defaultTab: 'all',
+  tabs: productCatalogTabs,
   filters: [
     { key: 'show_inactive', label: 'Mostrar inactivos', type: 'checkbox', defaultValue: false },
     { key: 'hide_composite', label: 'Ocultar compuestos', type: 'checkbox', defaultValue: false },

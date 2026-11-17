@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { tableReturnPath } from '~/utils/tableQuery'
+import { customerCatalogTabs } from '~/utils/customerCatalog'
+import { tableReturnPath, tableReturnQuery, tableTabBreadcrumb } from '~/utils/tableQuery'
 import type { SiigoCustomer, SiigoCustomerMutationInput } from '~/types/siigo'
 import { SAT_FISCAL_REGIMES } from '~/utils/satFiscalRegimes'
 import { siigoCustomerPhone, siigoCustomerAddress } from '~/utils/siigoCustomer'
@@ -18,6 +19,9 @@ const backPath = computed(() => tableReturnPath(
   route.query.returnTo,
   isSupplierContext ? '/clientes?view=proveedores' : collectionPath,
   ['/clientes', '/proveedores']
+))
+const customerBreadcrumbTab = computed(() => tableTabBreadcrumb(
+  customerCatalogTabs, tableReturnQuery(backPath.value).get('view'), 'all'
 ))
 const catalogKey = isSupplierContext
   ? 'customers-catalog-request-supplier'
@@ -237,6 +241,14 @@ useSeoMeta({ title: () => fullName.value })
           />
         </template>
       </UDashboardNavbar>
+      <DetailBreadcrumbs
+        v-if="!isSupplierContext"
+        :items="[
+          { label: 'Clientes y proveedores', icon: 'i-lucide-users', to: '/clientes' },
+          { ...customerBreadcrumbTab, to: backPath },
+          { label: fullName }
+        ]"
+      />
     </template>
 
     <template #body>

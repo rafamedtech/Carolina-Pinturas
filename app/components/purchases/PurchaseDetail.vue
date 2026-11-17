@@ -1,12 +1,18 @@
 <script setup lang="ts">
-import { tableReturnPath } from '~/utils/tableQuery'
+import { tableReturnPath, tableReturnQuery, tableTabBreadcrumb } from '~/utils/tableQuery'
 import type { PurchaseView } from '~/types/purchases'
 import { formatMexicoDateTime } from '~/utils/datetime'
-import { purchaseDateLabel, purchaseMoney, purchaseQuantity, purchaseStatus, receiptStatus } from '~/utils/purchaseFormat'
+import { purchaseDateLabel, purchaseMoney, purchaseQuantity, purchaseStatus, purchaseListTabs, purchasePayablesTabs, receiptStatus } from '~/utils/purchaseFormat'
 import { createPurchaseSupplierPdf } from '~/utils/purchaseSupplierPdf'
 
 const route = useRoute()
 const backPath = computed(() => tableReturnPath(route.query.returnTo, '/compras', ['/compras', '/compras/cuentas-por-pagar']))
+const fromPayables = computed(() => backPath.value.startsWith('/compras/cuentas-por-pagar'))
+const purchaseBreadcrumbTab = computed(() => tableTabBreadcrumb(
+  fromPayables.value ? purchasePayablesTabs : purchaseListTabs,
+  tableReturnQuery(backPath.value).get('status'),
+  fromPayables.value ? 'pendiente' : 'all'
+))
 const { canWrite } = useAuth()
 const props = defineProps<{ id: string }>()
 const { data: order, error: loadError, refresh, status: loadStatus } = useFetch<PurchaseView>(`/api/purchases/${props.id}`, { lazy: true, server: false })
@@ -144,6 +150,13 @@ const timeline = computed(() => [...(order.value?.events ?? [])].reverse())
           />
         </template>
       </UDashboardNavbar>
+      <DetailBreadcrumbs
+        :items="[
+          { label: fromPayables ? 'Cuentas por pagar' : 'Compras', icon: 'i-lucide-shopping-bag', to: backPath.split('?')[0] },
+          { ...purchaseBreadcrumbTab, to: backPath },
+          { label: order ? `OC-${order.folio}` : 'Orden de compra' }
+        ]"
+      />
     </template>
 
     <template #body>

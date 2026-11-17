@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { navigationIcons } from '~/utils/navigationIcons'
 import type { NavigationMenuItem } from '@nuxt/ui'
 import type { UserRole } from '~/types/siigo'
 
@@ -33,7 +34,7 @@ const allLinks: AppNavigationItem[] = [{
   }
 }, {
   label: 'Productos',
-  icon: 'i-lucide-package',
+  icon: navigationIcons['/productos'],
   to: '/productos',
   roles: managementRoles,
   onSelect: () => {
@@ -41,13 +42,13 @@ const allLinks: AppNavigationItem[] = [{
   }
 }, {
   label: 'Inventario',
-  icon: 'i-lucide-warehouse',
+  icon: navigationIcons['/inventario'],
   to: '/inventario',
   roles: managementRoles,
   onSelect: () => { open.value = false }
 }, {
   label: 'Clientes y proveedores',
-  icon: 'i-lucide-users',
+  icon: navigationIcons['/clientes'],
   to: '/clientes',
   roles: managementRoles,
   onSelect: () => {
@@ -55,7 +56,7 @@ const allLinks: AppNavigationItem[] = [{
   }
 }, {
   label: 'Pedidos',
-  icon: 'i-lucide-shopping-cart',
+  icon: navigationIcons['/ventas'],
   to: '/ventas',
   roles: orderEntryRoles,
   onSelect: () => {
@@ -71,7 +72,7 @@ const allLinks: AppNavigationItem[] = [{
   }
 }, {
   label: 'Compras',
-  icon: 'i-lucide-package-plus',
+  icon: navigationIcons['/compras'],
   to: '/compras',
   roles: adminRoles,
   onSelect: () => { open.value = false }
@@ -85,7 +86,7 @@ const allLinks: AppNavigationItem[] = [{
   }
 }, {
   label: 'Igualaciones',
-  icon: 'i-lucide-palette',
+  icon: navigationIcons['/igualaciones'],
   to: '/igualaciones',
   roles: [...managementRoles, 'igualaciones'],
   onSelect: () => {

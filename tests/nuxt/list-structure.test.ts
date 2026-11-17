@@ -27,7 +27,7 @@ describe('estructura compartida de listados', () => {
     wrapper = await mountSuspended(defineComponent({
       setup: () => () => h(UDashboardGroup, {}, {
         default: () => h(ListPage, {
-          id: 'list-test', title: 'Productos', error: error.value,
+          id: 'list-test', title: 'Productos', titleIcon: 'i-lucide-package', error: error.value,
           errorMessage: 'No se pudo cargar el catálogo.', onRefresh: refresh
         }, {
           toolbar: () => h('input', { 'aria-label': 'Buscar producto' }),
@@ -37,6 +37,9 @@ describe('estructura compartida de listados', () => {
         })
       })
     }))
+    const title = wrapper.get('h1')
+    expect(title.text()).toBe('Productos')
+    expect(title.element.previousElementSibling?.classList.contains('i-lucide:package')).toBe(true)
     expect(wrapper.text()).toContain('No se pudo cargar el catálogo.')
     expect(wrapper.text()).toContain('Formulario del módulo')
     expect(wrapper.find('input[aria-label="Buscar producto"]').exists()).toBe(true)

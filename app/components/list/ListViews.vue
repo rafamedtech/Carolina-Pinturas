@@ -1,12 +1,12 @@
 <script setup lang="ts">
 import type { TabsProps } from '@nuxt/ui'
 
-const props = defineProps<{
-  items: Array<{ label: string, value: string, icon?: string }>
+const props = withDefaults(defineProps<{
+  items: Array<{ label: string, value: string, icon?: string, description?: string }>
   label: string
   variant?: TabsProps['variant']
   fullWidth?: boolean
-}>()
+}>(), { variant: 'link' })
 
 const model = defineModel<string>({ required: true })
 const selectedIcon = computed(() => props.items.find(item => item.value === model.value)?.icon)
@@ -23,9 +23,10 @@ const selectItems = computed(() => props.items.map(({ label, value, icon }) => (
     class="w-full sm:hidden"
   />
   <DetailTabs
-    v-if="variant === 'link' && fullWidth"
+    v-if="variant === 'link'"
     v-model="model"
     :items="items"
+    :full-width="Boolean(fullWidth)"
     :content="false"
     :aria-label="label"
     class="hidden w-full sm:block"

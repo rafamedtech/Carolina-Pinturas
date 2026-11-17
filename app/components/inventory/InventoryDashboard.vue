@@ -69,10 +69,7 @@ const tabDescriptions: Record<string, string> = {
   movements: 'Entradas, salidas, traspasos y ajustes de inventario.',
   counts: 'Conteos físicos y conciliación de existencias por almacén.'
 }
-const activeView = computed(() => ({
-  title: tabs.value.find(item => item.value === tab.value)?.label || 'Inventario',
-  description: tabDescriptions[tab.value]
-}))
+const activeTabDescription = computed(() => tabDescriptions[tab.value])
 
 const movementOpen = shallowRef(false), countOpen = shallowRef(false), countCreateOpen = shallowRef(false), minimumOpen = shallowRef(false), reverseOpen = shallowRef(false)
 const source = shallowRef<InventoryMovement>(), selectedCount = shallowRef<InventoryCount>(), minimumStock = shallowRef<InventoryStock>(), reversal = shallowRef<InventoryMovement>()
@@ -135,12 +132,8 @@ const dateRange = computed<OrderDateRange | null>({
   }
 })
 const listConfig = computed<ListLayoutConfig>(() => ({
-  id: 'inventory', title: 'Control de inventario', empty: 'Sin registros para estos filtros.', resetTabOnClear: false,
-  breadcrumbs: [
-    { label: 'Inventario', icon: 'i-lucide-warehouse', to: '/inventario' },
-    { label: activeView.value.title }
-  ],
-  search: tab.value === 'summary' ? undefined : { placeholder: 'Buscar código o producto' }, tabs: tabs.value, defaultTab: defaultTab.value,
+  id: 'inventory', title: 'Control de inventario', empty: 'Sin registros para estos filtros.',
+  search: tab.value === 'summary' ? undefined : { placeholder: 'Buscar código o producto' }, tabs: tabs.value,
   dateFilter: ['movements', 'kardex', 'counts'].includes(tab.value) ? { subject: 'movimientos de inventario' } : undefined,
   filters: tab.value === 'summary'
     ? []
@@ -196,13 +189,11 @@ const reservationColumns: TableColumn<Extract<Row, { orderId: string }>>[] = [
     :config="listConfig"
     :data="result?.results ?? []"
     :columns="[]"
-    toolbar-below-tabs
-    tabs-variant="link"
-    tabs-full-width
     :loading="['idle', 'pending'].includes(tab === 'summary' ? summaryStatus : status)"
     :error="tab === 'summary' ? Boolean(summaryError) : Boolean(loadError || warehouseError)"
     :error-message="tab === 'summary' ? (summaryError?.data?.statusMessage || 'No se pudo cargar el resumen de inventario.') : loadError?.data?.statusMessage || (warehouseError ? 'No se pudieron cargar los almacenes.' : undefined)"
     :total-results="result?.pagination?.totalResults"
+    :has-extra-filters="Boolean(productId)"
     @refresh="refreshCurrentTab()"
     @create="createInventoryRecord"
     @clear="clearInventoryFilters"
@@ -223,7 +214,7 @@ const reservationColumns: TableColumn<Extract<Row, { orderId: string }>>[] = [
     </template>
     <template #before>
       <p class="text-base leading-relaxed text-toned">
-        {{ activeView.description }}
+        {{ activeTabDescription }}
       </p>
       <UAlert v-if="error" :title="error" color="error" />
       <div v-if="productId && tab !== 'summary'" class="flex items-center gap-2 text-sm">

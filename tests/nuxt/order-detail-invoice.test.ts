@@ -148,6 +148,18 @@ function menuItems(menu?: VueWrapper): DropdownMenuItem[] {
 }
 
 describe('OrderDetail · facturación', () => {
+  it('muestra las migas de pan de la cotización y enlaza su pestaña', async () => {
+    currentOrder = { ...baseOrder, status: { ...baseOrder.status, key: 'borrador', label: 'Borrador' } }
+    wrapper = await mountSuspended(OrderDetail, { props: { orderId: 'order-invoice' } })
+    await vi.waitFor(() => {
+      const breadcrumb = wrapper!.get('[aria-label="breadcrumb"]')
+      expect(breadcrumb.text()).toContain(baseOrder.number)
+      const tabLink = breadcrumb.get('a[href="/ventas?view=cotizacion"]')
+      expect(tabLink.text()).toBe('Cotización')
+      expect(tabLink.get('[data-slot="linkLeadingIcon"]').classes()).toContain('i-lucide:file-text')
+    })
+  })
+
   it('agrupa asignar factura e impresora en Admin y las retira de Opciones', async () => {
     wrapper = await mountSuspended(OrderDetail, { props: { orderId: 'order-invoice' } })
     await vi.waitFor(() => expect(wrapper?.text()).toContain('Admin'))

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { navigationIcons } from '~/utils/navigationIcons'
 import type { ListLayoutConfig } from '~/types/list'
 import { tableQueryField, tableQueryText, tableQueryRange, tableQuerySorting, tableQueryPage } from '~/utils/tableQuery'
 import { h, resolveComponent } from 'vue'
@@ -7,7 +8,7 @@ import type { SortingState, TableMeta } from '@tanstack/table-core'
 import type { OrderDateRange } from '~/types/orders'
 import type { PurchaseView } from '~/types/purchases'
 import type { CsvColumn } from '~/utils/csv'
-import { purchaseStatus } from '~/utils/purchaseFormat'
+import { purchaseListTabs, purchaseStatus } from '~/utils/purchaseFormat'
 import { formatDate, mexicoToday } from '~/utils/datetime'
 
 const UBadge = resolveComponent('UBadge')
@@ -26,14 +27,6 @@ const { returnTo } = useTableQuery([
   tableQueryField('sort', sorting, tableQuerySorting),
   tableQueryField('page', page, tableQueryPage)
 ], { page, resetOn: [search, status, dateRange] })
-const statusItems = [
-  { label: 'Todas', value: 'all' },
-  { label: 'Confirmada', value: 'confirmada' },
-  { label: 'Liquidada', value: 'liquidada' },
-  { label: 'Vencida', value: 'vencida' },
-  { label: 'Borrador', value: 'borrador' },
-  { label: 'Cancelada', value: 'cancelada' }
-]
 const query = computed(() => ({
   search: search.value || undefined,
   status: status.value === 'all' ? undefined : status.value,
@@ -140,7 +133,7 @@ const columns: TableColumn<PurchaseView>[] = [{
 const { canWrite } = useAuth()
 const listConfig = computed<ListLayoutConfig>(() => ({
   id: 'purchases', title: 'Compras', empty: 'Sin compras para estos filtros.',
-  search: { placeholder: 'Buscar proveedor' }, dateFilter: { subject: 'compras' }, tabs: statusItems,
+  search: { placeholder: 'Buscar proveedor' }, dateFilter: { subject: 'compras' }, tabs: purchaseListTabs,
   create: canWrite.value ? { label: 'Nueva compra', to: { path: '/compras/nueva', query: { returnTo: returnTo.value } } } : undefined,
   pagination: { mode: 'client', label: 'compras', pageSize }
 }))
@@ -173,7 +166,7 @@ const listConfig = computed<ListLayoutConfig>(() => ({
       <UButton
         to="/compras/cuentas-por-pagar"
         label="Cuentas por pagar"
-        icon="i-lucide-wallet"
+        :icon="navigationIcons['/compras/cuentas-por-pagar']"
         aria-label="Cuentas por pagar"
         color="neutral"
         variant="outline"

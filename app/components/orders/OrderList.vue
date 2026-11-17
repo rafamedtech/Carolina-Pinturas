@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { igualacionStatusIcons, orderListTabs } from '~/utils/orderNavigation'
 import type { DropdownMenuItem } from '@nuxt/ui'
 import type { ListLayoutConfig } from '~/types/list'
 import { tableQueryField, tableQueryText, tableQueryPage, tableQueryRange, tableQueryBoolean } from '~/utils/tableQuery'
@@ -221,37 +222,30 @@ function fetchAllOrders() {
   })
 }
 
-const IGUALACION_STATUS_KEYS = ['confirmado', 'surtido', 'en_espera']
 const statusTabItems = computed(() => {
   if (!props.igualacion) {
-    const items = [
-      { label: 'Todos', value: 'all' },
-      { label: 'Cotización', value: 'cotizacion' },
-      { label: 'Mostrador', value: 'mostrador' },
-      { label: 'Vendedor', value: 'vendedor' },
-      { label: 'Pendiente de pago', value: 'pendiente_pago' },
-      { label: 'Entregado', value: 'entregado' },
-      { label: 'Facturación', value: 'facturacion' },
-      { label: 'Cancelado', value: 'cancelado' }
-    ]
+    const items = orderListTabs.filter(item => item.value !== 'internos' || canViewInternal.value)
 
-    if (canViewInternal.value) items.push({ label: 'Internos', value: 'internos' })
     return items
   }
 
-  const list = statuses.value.filter(item => IGUALACION_STATUS_KEYS.includes(item.key))
+  const list = statuses.value.filter(item => Object.hasOwn(igualacionStatusIcons, item.key))
   return [{
     label: 'Todos',
-    value: 'all'
+    value: 'all',
+    icon: 'i-lucide-list'
   }, {
     label: 'Mostrador',
-    value: 'mostrador'
+    value: 'mostrador',
+    icon: 'i-lucide-store'
   }, {
     label: 'Vendedor',
-    value: 'vendedor'
+    value: 'vendedor',
+    icon: 'i-lucide-user-round'
   }, ...list.map(item => ({
     label: item.label,
-    value: item.key
+    value: item.key,
+    icon: igualacionStatusIcons[item.key]
   }))]
 })
 const paymentStatusOptions = [{

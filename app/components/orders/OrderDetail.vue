@@ -11,7 +11,8 @@ import {
   orderPaymentStatusColor,
   orderPaymentStatusLabel
 } from '~/utils/orderPayment'
-import { orderListReturnPath } from '~/utils/orderNavigation'
+import { igualacionStatusIcons, orderListReturnPath, orderListTabs } from '~/utils/orderNavigation'
+import { tableReturnQuery, tableTabBreadcrumb } from '~/utils/tableQuery'
 
 const props = defineProps<{
   orderId: string
@@ -193,6 +194,23 @@ const defaultBackPath = computed(() =>
 const backPath = computed(() =>
   orderListReturnPath(route.query.returnTo, defaultBackPath.value)
 )
+const ordersBreadcrumbPath = computed(() => {
+  if (isQuote.value && defaultBackPath.value === '/ventas' && typeof route.query.returnTo !== 'string') {
+    return '/ventas?view=cotizacion'
+  }
+  return /^\/(ventas|igualaciones)(?:[?#]|$)/.test(backPath.value) ? backPath.value : defaultBackPath.value
+})
+const ordersBreadcrumbTab = computed(() => {
+  const query = tableReturnQuery(ordersBreadcrumbPath.value)
+  if (ordersBreadcrumbPath.value.startsWith('/igualaciones')) {
+    const view = query.get('view')
+    if (view === 'mostrador' || view === 'vendedor') return tableTabBreadcrumb(orderListTabs, view, 'all')
+    const status = statuses.value.find(item => item.key === query.get('status') && Object.hasOwn(igualacionStatusIcons, item.key))
+    if (status) return { label: status.label, icon: igualacionStatusIcons[status.key] }
+    return tableTabBreadcrumb(orderListTabs, 'all', 'all')
+  }
+  return tableTabBreadcrumb(orderListTabs, query.get('view'), 'all')
+})
 const savingChanges = computed(() =>
   savingRepartidor.value || savingStatus.value
 )
@@ -412,6 +430,13 @@ async function convertToPedido() {
           />
         </template>
       </UDashboardNavbar>
+      <DetailBreadcrumbs
+        :items="[
+          { label: ordersBreadcrumbPath.startsWith('/igualaciones') ? 'Igualaciones' : 'Pedidos', icon: 'i-lucide-shopping-cart', to: ordersBreadcrumbPath.split('?')[0] },
+          { ...ordersBreadcrumbTab, to: ordersBreadcrumbPath },
+          { label: order?.number || detailTitle }
+        ]"
+      />
     </template>
 
     <template #body>

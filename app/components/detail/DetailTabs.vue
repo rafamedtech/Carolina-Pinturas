@@ -2,7 +2,8 @@
 withDefaults(defineProps<{
   items: Array<{ label: string, value: string, icon?: string, description?: string }>
   content?: boolean
-}>(), { content: true })
+  fullWidth?: boolean
+}>(), { content: true, fullWidth: true })
 const model = defineModel<string>({ required: true })
 </script>
 
@@ -12,7 +13,9 @@ const model = defineModel<string>({ required: true })
     :items="items"
     :content="content"
     variant="link"
-    :ui="{ list: 'w-full flex-wrap gap-y-1', trigger: 'min-w-0 flex-1 justify-center', content: 'min-w-0' }"
+    :ui="fullWidth
+      ? { list: 'w-full flex-wrap gap-y-1', trigger: 'min-w-0 flex-1 justify-center', content: 'min-w-0' }
+      : { root: 'min-w-0 overflow-x-auto', list: 'mb-0 min-w-max', trigger: 'shrink-0' }"
   >
     <template #default="{ item }">
       <UTooltip v-if="item.description" :text="item.description" :content="{ side: 'top' }">

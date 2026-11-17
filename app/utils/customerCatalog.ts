@@ -1,10 +1,10 @@
 import type { SiigoCustomer, SiigoListResponse } from '~/types/siigo'
 
 export const customerCatalogTabs = [
-  { label: 'Todos', value: 'all' },
-  { label: 'Clientes', value: 'clientes' },
-  { label: 'Proveedores', value: 'proveedores' },
-  { label: 'Requieren factura', value: 'requieren_factura' }
+  { label: 'Todos', value: 'all', icon: 'i-lucide-list' },
+  { label: 'Clientes', value: 'clientes', icon: 'i-lucide-users' },
+  { label: 'Proveedores', value: 'proveedores', icon: 'i-lucide-truck' },
+  { label: 'Requieren factura', value: 'requieren_factura', icon: 'i-lucide-receipt-text' }
 ]
 
 export function customerCatalogRoles(customer: SiigoCustomer) {

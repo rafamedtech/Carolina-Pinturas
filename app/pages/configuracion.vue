@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { navigationIcons } from '~/utils/navigationIcons'
 import { tableQueryField, tableQueryText } from '~/utils/tableQuery'
 
 interface ConnectionStatus { configured: boolean }
@@ -13,29 +14,32 @@ useSeoMeta({ title: 'Configuración' })
 </script>
 
 <template>
-  <UDashboardPanel id="configuration">
-    <template #header>
-      <DetailHeader title="Configuración" :show-refresh="false" />
+  <ListPage
+    id="configuration"
+    title="Configuración"
+    :title-icon="navigationIcons['/configuracion']"
+    :show-refresh="false"
+    views-before-toolbar
+  >
+    <template #views>
+      <ListViews v-model="tab" :items="tabs" label="Sección de configuración" />
     </template>
-    <template #body>
-      <DetailTabs v-model="tab" :items="tabs" :content="false" />
-      <SettingsInventory v-if="tab === 'inventory'" />
-      <template v-else>
-        <SettingsUserPermissions />
-        <DetailCard title="Conexión con Siigo" description="Las credenciales se conservan exclusivamente en las variables de entorno del servidor." icon="i-lucide-plug-zap">
-          <div class="flex items-center justify-between gap-4">
-            <UBadge :color="data?.configured ? 'success' : 'warning'" variant="subtle" size="lg">
-              {{ data?.configured ? 'Configurada' : 'Pendiente' }}
-            </UBadge>
-            <AppButton
-              label="Comprobar"
-              intent="secondary"
-              :loading="status === 'pending'"
-              @click="() => refresh()"
-            />
-          </div>
-        </DetailCard>
-      </template>
+    <SettingsInventory v-if="tab === 'inventory'" />
+    <template v-else>
+      <SettingsUserPermissions />
+      <DetailCard title="Conexión con Siigo" description="Las credenciales se conservan exclusivamente en las variables de entorno del servidor." icon="i-lucide-plug-zap">
+        <div class="flex items-center justify-between gap-4">
+          <UBadge :color="data?.configured ? 'success' : 'warning'" variant="subtle" size="lg">
+            {{ data?.configured ? 'Configurada' : 'Pendiente' }}
+          </UBadge>
+          <AppButton
+            label="Comprobar"
+            intent="secondary"
+            :loading="status === 'pending'"
+            @click="() => refresh()"
+          />
+        </div>
+      </DetailCard>
     </template>
-  </UDashboardPanel>
+  </ListPage>
 </template>

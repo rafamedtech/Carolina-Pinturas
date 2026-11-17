@@ -1,6 +1,8 @@
 <script setup lang="ts">
+import { navigationIcons } from '~/utils/navigationIcons'
+import { productCatalogTabs } from '~/utils/productCatalogTabs'
 import type { DropdownMenuItem } from '@nuxt/ui'
-import { tableReturnPath } from '~/utils/tableQuery'
+import { tableReturnPath, tableReturnQuery, tableTabBreadcrumb } from '~/utils/tableQuery'
 import type { SiigoProduct } from '~/types/siigo'
 import { canManageProducts } from '~/utils/roleAccess'
 
@@ -63,6 +65,11 @@ const availabilityFields = [
 const MANAGED_TYPES = ['Product']
 
 const isComposite = computed(() => product.value?.internal?.composition?.kind === 'composite')
+const activityBreadcrumbTab = shallowRef<{ label: string, icon: string }>()
+const productBreadcrumbTab = computed(() => {
+  const query = tableReturnQuery(backPath.value)
+  return tableTabBreadcrumb(productCatalogTabs, query.get('tab'), query.get('active') === 'false' ? 'inactive' : 'all')
+})
 const productName = computed(() => product.value?.name || 'Detalle de producto')
 const isManaged = computed(() => MANAGED_TYPES.includes(product.value?.type || 'Product'))
 const initialLoading = computed(() => !product.value && ['idle', 'pending'].includes(status.value))
@@ -76,9 +83,12 @@ useSeoMeta({ title: () => productName.value })
     <template #header>
       <DetailHeader
         title="Detalle del producto"
+        :title-icon="navigationIcons['/productos']"
         :breadcrumbs="[
-          { label: 'Productos', icon: 'i-lucide-package', to: backPath },
-          { label: product?.name || 'Detalle' }
+          { label: 'Productos', icon: 'i-lucide-package', to: '/productos' },
+          { ...productBreadcrumbTab, to: backPath },
+          { label: product?.name || 'Detalle' },
+          ...(product && activityBreadcrumbTab ? [activityBreadcrumbTab] : [])
         ]"
         refresh-label="Actualizar producto desde Siigo"
         :loading="syncing || ['idle', 'pending'].includes(status)"
@@ -225,6 +235,7 @@ useSeoMeta({ title: () => productName.value })
           :product-id="productId"
           :composite="isComposite"
           :role="user?.role"
+          @section-change="activityBreadcrumbTab = $event"
         />
       </template>
     </template>
