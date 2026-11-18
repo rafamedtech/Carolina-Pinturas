@@ -1,5 +1,6 @@
 // https://nuxt.com/docs/api/configuration/nuxt-config
 export default defineNuxtConfig({
+  extends: ['@rafamedtech/nuxt-shared'],
   modules: ['@nuxt/eslint', '@nuxt/ui', '@vueuse/nuxt'],
 
   $development: {

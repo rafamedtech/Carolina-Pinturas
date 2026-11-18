@@ -8,3 +8,5 @@ allowBuilds:
   prisma: true
   unrs-resolver: false
   vue-demi: false
+minimumReleaseAgeExclude:
+  - '@rafamedtech/nuxt-shared@0.1.0'
