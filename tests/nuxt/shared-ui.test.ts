@@ -2,8 +2,8 @@
 import { describe, expect, it, vi } from 'vitest'
 import { mountSuspended } from '@nuxt/test-utils/runtime'
 import { defineComponent, h, nextTick, shallowRef } from 'vue'
+import { DetailCard } from '#components'
 import AppButton from '~/components/AppButton.vue'
-import DetailCard from '~/components/detail/DetailCard.vue'
 import DetailFields from '~/components/detail/DetailFields.vue'
 import DetailPageHeader from '~/components/detail/DetailPageHeader.vue'
 

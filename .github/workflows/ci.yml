@@ -23,9 +23,13 @@ jobs:
         with:
           node-version: ${{ matrix.node }}
           cache: pnpm
+          registry-url: https://npm.pkg.github.com
+          scope: '@rafamedtech'
 
       - name: Install dependencies
-        run: pnpm install
+        run: pnpm install --frozen-lockfile
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NUXT_SHARED_READ_TOKEN }}
 
       - name: Lint
         run: pnpm run lint
