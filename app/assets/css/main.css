@@ -1,6 +1,8 @@
 @import "tailwindcss" theme(static);
 @import "@nuxt/ui";
 
+@source "../../../node_modules/@rafamedtech/nuxt-shared/app/components";
+
 @theme inline {
   --color-card: var(--app-card-bg);
 }

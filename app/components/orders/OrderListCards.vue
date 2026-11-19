@@ -26,7 +26,7 @@ function igualacionItems(order: SalesOrderListItem) {
 </script>
 
 <template>
-  <div class="flex flex-col gap-3 md:hidden" :aria-busy="loading">
+  <div class="flex flex-col gap-3 md:hidden">
     <ListLoading v-if="loading" />
 
     <template v-else-if="orders.length">

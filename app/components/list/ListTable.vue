@@ -41,7 +41,7 @@ const tableMeta = computed(() => props.meta ?? {})
 </script>
 
 <template>
-  <div class="min-w-0 shrink-0" :aria-busy="loading">
+  <div class="min-w-0 shrink-0">
     <ListLoading v-if="loading" />
     <div v-else-if="showColumnPicker" class="mb-3 flex justify-end">
       <ListColumnPicker :columns="table?.tableApi?.getAllLeafColumns() ?? []" />

@@ -12,16 +12,17 @@ const props = defineProps<{
   loading?: boolean
 }>()
 const slots = defineSlots<TableSlots<T> & { record?(scope: { row: T }): unknown }>()
-const tableSlotNames = () => Object.keys(slots).filter(name => name !== 'record') as Array<keyof TableSlots<T>>
+const tableSlotNames = () => Object.keys(slots).filter(name => name !== 'record' && name !== 'loading') as Array<keyof TableSlots<T>>
 const columnVisibility = defineModel<VisibilityState>('columnVisibility', { default: () => ({}) })
 const table = useTemplateRef('table')
 defineExpose({ getColumns: () => table.value?.tableApi.getAllLeafColumns() ?? [] })
 </script>
 
 <template>
-  <div v-if="$slots.record" class="min-w-0 md:hidden" :aria-busy="loading">
+  <ListLoading :loading="Boolean(loading)" class="sr-only" />
+  <div v-if="$slots.record" class="min-w-0 md:hidden">
     <slot v-if="loading" name="loading">
-      <ListLoading />
+      <ListLoading :announce="false" />
     </slot>
     <div v-else-if="data.length" class="space-y-3">
       <template v-for="(row, index) in data" :key="getRowId?.(row) ?? index">
@@ -49,6 +50,11 @@ defineExpose({ getColumns: () => table.value?.tableApi.getAllLeafColumns() ?? []
     :class="{ 'hidden md:block': $slots.record }"
     :ui="{ td: 'align-top', empty: 'p-0', ...props.ui }"
   >
+    <template #loading="scope">
+      <slot name="loading" v-bind="scope">
+        <ListLoading :announce="false" />
+      </slot>
+    </template>
     <template v-for="name in tableSlotNames()" #[name]="scope">
       <slot :name="name" v-bind="scope" />
     </template>
