@@ -29,7 +29,7 @@
     "@point-of-sale/receipt-printer-encoder": "^3.0.3",
     "@prisma/adapter-pg": "7.8.0",
     "@prisma/client": "7.8.0",
-    "@rafamedtech/nuxt-shared": "0.4.0",
+    "@rafamedtech/nuxt-shared": "0.5.0",
     "@supabase/ssr": "^0.12.0",
     "@supabase/supabase-js": "^2.110.0",
     "@tanstack/table-core": "^8.21.3",
