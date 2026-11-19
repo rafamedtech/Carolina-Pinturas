@@ -774,20 +774,17 @@ async function convertToPedido() {
       <div
         v-else-if="['idle', 'pending'].includes(status)"
         class="flex flex-col gap-6"
-        role="status"
-        aria-busy="true"
       >
         <div class="flex flex-wrap items-start justify-between gap-4">
           <div class="flex flex-col gap-2">
-            <USkeleton class="h-4 w-24" />
-            <USkeleton class="h-7 w-48" />
-            <USkeleton class="h-4 w-32" />
+            <USkeleton class="motion-reduce:animate-none h-4 w-24" />
+            <USkeleton class="motion-reduce:animate-none h-7 w-48" />
+            <USkeleton class="motion-reduce:animate-none h-4 w-32" />
           </div>
-          <USkeleton class="h-8 w-28 rounded-full" />
+          <USkeleton class="motion-reduce:animate-none h-8 w-28 rounded-full" />
         </div>
-        <USkeleton class="h-40 w-full rounded-lg" />
-        <ListLoading />
-        <span class="sr-only">Cargando pedido…</span>
+        <USkeleton class="motion-reduce:animate-none h-40 w-full rounded-lg" />
+        <ListLoading label="Cargando pedido…" />
       </div>
     </template>
   </UDashboardPanel>

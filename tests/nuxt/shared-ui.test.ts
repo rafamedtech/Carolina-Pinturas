@@ -2,12 +2,55 @@
 import { describe, expect, it, vi } from 'vitest'
 import { mountSuspended } from '@nuxt/test-utils/runtime'
 import { defineComponent, h, nextTick, shallowRef } from 'vue'
-import { DetailCard } from '#components'
+import { DetailCard, ListLoading } from '#components'
 import AppButton from '~/components/AppButton.vue'
 import DetailFields from '~/components/detail/DetailFields.vue'
 import DetailPageHeader from '~/components/detail/DetailPageHeader.vue'
 
 describe('contratos de los componentes compartidos', () => {
+  it('mantiene un anuncio por ciclo aunque haya otro indicador visual', async () => {
+    const loading = shallowRef(false)
+    const label = shallowRef('Cargando registros')
+    const fixture = defineComponent({
+      setup: () => () => h('div', [
+        h(ListLoading, { loading: loading.value, label: label.value, class: 'sr-only' }),
+        loading.value && h(ListLoading, {
+          announce: false,
+          label: label.value,
+          size: 'sm',
+          ui: { root: 'test-root', label: 'test-label', icon: 'test-icon' }
+        })
+      ])
+    })
+    const wrapper = await mountSuspended(fixture)
+    try {
+      const status = wrapper.get('[role="status"]')
+      expect(status.text()).toBe('')
+      loading.value = true
+      await nextTick()
+      expect(status.text()).toBe('')
+      await vi.waitFor(() => expect(status.text()).toBe('Cargando registros'))
+      expect(wrapper.findAll('[role="status"]')).toHaveLength(1)
+      const visual = wrapper.get('.test-root')
+      expect(visual.attributes('aria-hidden')).toBe('true')
+      expect(visual.get('.test-label').text()).toBe('Cargando registros')
+      expect(visual.get('.test-icon').classes()).toEqual(expect.arrayContaining(['size-4', 'motion-safe:animate-spin']))
+
+      label.value = 'Cargando otra página'
+      await nextTick()
+      expect(status.text()).toBe('Cargando registros')
+      loading.value = false
+      await nextTick()
+      expect(status.text()).toBe('')
+      expect(wrapper.find('.test-root').exists()).toBe(false)
+
+      loading.value = true
+      await vi.waitFor(() => expect(status.text()).toBe('Cargando otra página'))
+    } finally {
+      wrapper.unmount()
+    }
+  })
+
   it('reenvía clics y atributos accesibles y respeta el estado disabled', async () => {
     const onClick = vi.fn()
     const wrapper = await mountSuspended(AppButton, {
