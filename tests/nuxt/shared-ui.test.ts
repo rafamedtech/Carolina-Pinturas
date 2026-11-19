@@ -2,9 +2,8 @@
 import { describe, expect, it, vi } from 'vitest'
 import { mountSuspended } from '@nuxt/test-utils/runtime'
 import { defineComponent, h, nextTick, shallowRef } from 'vue'
-import { DetailCard, ListLoading } from '#components'
+import { DetailCard, DetailFields, DetailStatCard, ListLoading } from '#components'
 import AppButton from '~/components/AppButton.vue'
-import DetailFields from '~/components/detail/DetailFields.vue'
 import DetailPageHeader from '~/components/detail/DetailPageHeader.vue'
 
 describe('contratos de los componentes compartidos', () => {
@@ -82,12 +81,66 @@ describe('contratos de los componentes compartidos', () => {
 
   it('preserva cero y datos vacíos y sustituye los valores mientras carga', async () => {
     const wrapper = await mountSuspended(DetailFields, {
-      props: { fields: [{ label: 'Existencias', value: 0 }, { label: 'Referencia', value: '' }] }
+      props: {
+        fields: [
+          { label: 'Existencias', value: 0 },
+          { label: 'Referencia', value: '' },
+          { label: 'Nota', fullWidth: true },
+          { label: 'Código', value: null }
+        ]
+      }
     })
-    expect(wrapper.findAll('dd').map(item => item.text())).toEqual(['0', '—'])
+    expect(wrapper.element.tagName).toBe('DL')
+    expect(wrapper.classes()).toContain('grid-cols-2')
+    expect(wrapper.findAll('dd').map(item => item.text())).toEqual(['0', '—', '—', '—'])
+    expect(wrapper.get('div.col-span-full dt').text()).toBe('Nota')
+    await wrapper.setProps({ columns: 3 })
+    expect(wrapper.classes()).toEqual(expect.arrayContaining(['grid-cols-1', 'sm:grid-cols-3']))
     await wrapper.setProps({ loading: true })
     expect(wrapper.attributes('aria-busy')).toBe('true')
-    expect(wrapper.findAll('dd').map(item => item.text())).toEqual(['', ''])
+    expect(wrapper.findAll('dd').map(item => item.text())).toEqual(['', '', '', ''])
+    expect(wrapper.findAll('dd [class~="motion-reduce:animate-none"]')).toHaveLength(4)
+    wrapper.unmount()
+  })
+
+  it('entrega el campo a los slots de etiqueta y valor', async () => {
+    const wrapper = await mountSuspended(DetailFields, {
+      props: { fields: [{ key: 'stock', label: 'Existencias', value: 0 }] },
+      slots: {
+        label: ({ field }) => `Campo ${field.key}`,
+        value: ({ field }) => `${field.value} pzas`
+      }
+    })
+    expect(wrapper.get('dt').text()).toBe('Campo stock')
+    expect(wrapper.get('dd').text()).toBe('0 pzas')
+    wrapper.unmount()
+  })
+
+  it('mantiene la unidad con un valor personalizado y la oculta durante la carga', async () => {
+    const wrapper = await mountSuspended(DetailStatCard, {
+      props: { title: 'Existencias', value: 0, unit: 'pzas', valueColor: 'primary' },
+      slots: {
+        title: () => 'Existencia física',
+        value: () => h('strong', 'Sin existencias'),
+        default: () => h('p', 'Almacén principal')
+      }
+    })
+    expect(wrapper.text()).toContain('Existencia física')
+    expect(wrapper.get('.tabular-nums.text-primary strong').text()).toBe('Sin existencias')
+    expect(wrapper.get('.ml-1').text()).toBe('pzas')
+    await wrapper.setProps({ loading: true })
+    expect(wrapper.find('[class~="motion-reduce:animate-none"]').exists()).toBe(true)
+    expect(wrapper.text()).not.toContain('Sin existencias')
+    expect(wrapper.text()).not.toContain('pzas')
+    expect(wrapper.get('p').text()).toBe('Almacén principal')
+    wrapper.unmount()
+  })
+
+  it('conserva el cero y muestra el marcador cuando falta el valor', async () => {
+    const wrapper = await mountSuspended(DetailStatCard, { props: { title: 'Existencias', value: 0 } })
+    expect(wrapper.get('.tabular-nums').text()).toBe('0')
+    await wrapper.setProps({ value: undefined })
+    expect(wrapper.get('.tabular-nums').text()).toBe('—')
     wrapper.unmount()
   })
 
