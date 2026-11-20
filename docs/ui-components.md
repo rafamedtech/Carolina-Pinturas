@@ -2,7 +2,7 @@
 
 El detalle de producto (`app/pages/productos/[id]/index.vue`) es la referencia visual: cards sutiles, iconos semánticos, títulos compactos, datos en dos columnas y acciones adaptadas a móvil. Los componentes se autoimportan con los nombres de esta guía.
 
-`DetailCard`, `DetailFields`, `DetailSectionHeading`, `DetailStatCard`, `DetailTable` y `ListLoading` se mantienen en la Nuxt Layer `@rafamedtech/nuxt-shared`.
+`AppButton`, `DetailCard`, `DetailFields`, `DetailSectionHeading`, `DetailStatCard`, `DetailTable` y `ListLoading` se mantienen en la Nuxt Layer `@rafamedtech/nuxt-shared`.
 
 Antes de crear o modificar una pantalla, revisa este catálogo y `app/components/detail`, `app/components/list` y los componentes `App*`. Reutiliza el patrón existente y amplía su contrato cuando sea necesario. Los componentes de presentación reciben props/slots; permisos, consultas y acciones de negocio pertenecen al consumidor.
 

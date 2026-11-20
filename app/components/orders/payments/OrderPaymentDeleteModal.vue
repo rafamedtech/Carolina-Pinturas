@@ -72,16 +72,16 @@ async function deletePayment() {
     </template>
 
     <template #footer>
-      <UButton
+      <AppButton
         label="Conservar pago"
-        color="neutral"
-        variant="outline"
+        intent="secondary"
         :disabled="deleting"
         @click="open = false"
       />
-      <UButton
+      <AppButton
         label="Eliminar pago"
-        color="error"
+        intent="danger"
+        variant="solid"
         icon="i-lucide-trash-2"
         :loading="deleting"
         @click="deletePayment"

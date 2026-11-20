@@ -307,25 +307,24 @@ function onSubmit(event: FormSubmitEvent<Schema>) {
     </template>
 
     <template #footer="{ close }">
-      <UButton
+      <AppButton
         v-if="props.expense"
         label="Eliminar gasto"
         icon="i-lucide-trash-2"
-        color="error"
+        intent="danger"
         variant="subtle"
         class="mr-auto"
         :loading="props.deleting"
         :disabled="props.saving || props.deleting"
         @click="emit('delete')"
       />
-      <UButton
+      <AppButton
         label="Cancelar"
-        color="neutral"
-        variant="outline"
+        intent="secondary"
         :disabled="props.saving || props.deleting"
         @click="close"
       />
-      <UButton
+      <AppButton
         type="submit"
         form="expense-form"
         :label="props.expense ? 'Guardar cambios' : 'Guardar gasto'"

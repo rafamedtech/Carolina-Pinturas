@@ -2,8 +2,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { mountSuspended } from '@nuxt/test-utils/runtime'
 import { defineComponent, h, nextTick, shallowRef } from 'vue'
-import { DetailCard, DetailFields, DetailStatCard, ListLoading } from '#components'
-import AppButton from '~/components/AppButton.vue'
+import { AppButton, DetailCard, DetailFields, DetailStatCard, ListLoading, UButton } from '#components'
 import DetailPageHeader from '~/components/detail/DetailPageHeader.vue'
 
 describe('contratos de los componentes compartidos', () => {
@@ -62,6 +61,50 @@ describe('contratos de los componentes compartidos', () => {
     await wrapper.setProps({ disabled: true })
     expect(wrapper.attributes('disabled')).toBeDefined()
     wrapper.unmount()
+  })
+
+  it.each([
+    [undefined, 'primary', 'solid'],
+    ['primary', 'primary', 'solid'],
+    ['secondary', 'neutral', 'outline'],
+    ['danger', 'error', 'soft'],
+    ['quiet', 'neutral', 'ghost']
+  ] as const)('resuelve la intención %s y prioriza cada opción explícita', async (intent, color, variant) => {
+    const wrapper = await mountSuspended(AppButton, { props: { intent, label: 'Guardar' } })
+    try {
+      const button = wrapper.getComponent(UButton)
+      expect(button.props()).toMatchObject({ color, variant })
+      await wrapper.setProps({ color: 'success' })
+      expect(button.props()).toMatchObject({ color: 'success', variant })
+      await wrapper.setProps({ color: undefined, variant: 'link' })
+      expect(button.props()).toMatchObject({ color, variant: 'link' })
+    } finally {
+      wrapper.unmount()
+    }
+  })
+
+  it('conserva los slots con su contexto y los atributos de envío de formulario', async () => {
+    const wrapper = await mountSuspended(AppButton, {
+      props: { type: 'submit', size: 'sm', label: 'Etiqueta alternativa' },
+      attrs: { 'form': 'expense-form', 'aria-describedby': 'expense-hint' },
+      slots: {
+        leading: ({ ui }) => h('span', { class: ui.leadingIcon() }, 'Antes'),
+        default: () => 'Guardar',
+        trailing: ({ ui }) => h('span', { class: ui.trailingIcon() }, 'Después')
+      }
+    })
+    try {
+      const button = wrapper.get('button')
+      expect(button.attributes()).toMatchObject({
+        'type': 'submit',
+        'form': 'expense-form',
+        'aria-describedby': 'expense-hint'
+      })
+      expect(button.text()).toBe('AntesGuardarDespués')
+      expect(wrapper.getComponent(UButton).props('size')).toBe('sm')
+    } finally {
+      wrapper.unmount()
+    }
   })
 
   it('admite acciones que aparecen después de cargar los datos', async () => {
