@@ -79,8 +79,8 @@ describe('layout configurable de listados', () => {
       slots: { mobile: () => h('p', 'Tarjetas del módulo') }
     })
     expect(wrapper.findAll('[role="status"]')).toHaveLength(1)
-    expect(wrapper.get('[role="status"]').text()).toBe('Cargando')
-    expect(wrapper.find('[role="status"] .animate-spin').exists()).toBe(true)
+    await vi.waitFor(() => expect(wrapper!.get('[role="status"]').text()).toBe('Cargando'))
+    expect(wrapper.findAll('[aria-hidden="true"] [class~="motion-safe:animate-spin"]')).toHaveLength(1)
     expect(wrapper.find('table').exists()).toBe(false)
     expect(wrapper.text()).not.toContain('Tarjetas del módulo')
     await wrapper.setProps({ loading: false, data: [{ id: '1', name: 'Pintura azul' }] })

@@ -2,7 +2,7 @@
 
 El detalle de producto (`app/pages/productos/[id]/index.vue`) es la referencia visual: cards sutiles, iconos semánticos, títulos compactos, datos en dos columnas y acciones adaptadas a móvil. Los componentes se autoimportan con los nombres de esta guía.
 
-`DetailCard`, `DetailSectionHeading`, `ListLoading` y `ListRecordCard` se mantienen en la Nuxt Layer `@rafamedtech/nuxt-shared`.
+`AppButton`, `DetailCard`, `DetailFields`, `DetailSectionHeading`, `DetailStatCard`, `DetailTable`, `ListLoading` y `ListRecordCard` se mantienen en la Nuxt Layer `@rafamedtech/nuxt-shared`.
 
 Antes de crear o modificar una pantalla, revisa este catálogo y `app/components/detail`, `app/components/list` y los componentes `App*`. Reutiliza el patrón existente y amplía su contrato cuando sea necesario. Los componentes de presentación reciben props/slots; permisos, consultas y acciones de negocio pertenecen al consumidor.
 
@@ -20,7 +20,7 @@ Antes de crear o modificar una pantalla, revisa este catálogo y `app/components
 | `ListViews` | Selector en móvil y pestañas `link` alineadas a la izquierda en escritorio. `ListLayout` coloca estas vistas antes de la barra de filtros con separación compacta y conserva la selección al quitar filtros. |
 | `ListLoading` | Indicador de carga con `label`, `size` (`sm`/ `md`/ `lg`), `variant` (`list`/ `table`) y clases `ui.root`, `ui.icon`, `ui.label`. Recibe `loading` para activar el anuncio en una región persistente y `announce` para desactivar el anuncio de una copia visual. |
 | `ListLayout` | Layout de listados. Usa `#record="{ row }"` para renderizar un `ListRecordCard` por fila bajo `md`, con carga y vacío compartidos. Usa `#mobile="{ rows }"` para personalizar la lista completa. Ambos slots reciben las filas de la página y el orden de la tabla. |
-| `DetailTable` | Tabla de detalle con estado vacío, visibilidad de columnas y slots de `UTable`. Props: `data`, `columns`, `empty?`, `getRowId?`, `ui?` (combina con los estilos base); `v-model:column-visibility`; expone `getColumns()`. Su slot opcional `#record="{ row }"` muestra tarjetas bajo `md` y reutiliza la carga y el vacío de la tabla. |
+| `DetailTable` | Tabla de detalle con estado vacío, visibilidad de columnas y slots de `UTable`. Props: `data`, `columns`, `empty?`, `getRowId?`, `loading?`, `ui?` (combina con los estilos base); `v-model:column-visibility`; expone `getColumns()`. Su slot opcional `#record="{ row }"` muestra tarjetas bajo `md` y reutiliza la carga y el vacío de la tabla. |
 | `AppButton` | Botón/enlace basado en `UButton`. Añade `intent` y conserva todas sus props, slots, atributos ARIA y `@click`. `primary` (defecto): primary/solid; `secondary`: neutral/outline; `danger`: error/soft; `quiet`: neutral/ghost. `color`/`variant` explícitos tienen prioridad. El tamaño sigue el tema global. |
 
 ## Ejemplo

@@ -1,3 +1,5 @@
+import { createCurrencyFormatter, reportCurrency } from '@rafamedtech/nuxt-shared/utils'
+
 type BadgeColor = 'neutral' | 'primary' | 'success' | 'warning' | 'error' | 'info'
 
 const PURCHASE_STATUS: Record<string, { label: string, color: BadgeColor, icon: string }> = {
@@ -23,8 +25,15 @@ export const purchaseStatus = (key: string) => PURCHASE_STATUS[key] ?? { label: 
 export const receiptStatus = (key: string) => RECEIPT_STATUS[key] ?? { label: key, color: 'neutral' as const, icon: 'i-lucide-package' }
 export const invoiceStatus = (key: string) => INVOICE_STATUS[key] ?? { label: key, color: 'neutral' as const }
 
-export function purchaseMoney(value: number, currency: string) {
-  return new Intl.NumberFormat('es-MX', { style: 'currency', currency, minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value)
+const purchaseCurrencyOptions = { minimumFractionDigits: 2, maximumFractionDigits: 2 }
+const purchaseUsd = createCurrencyFormatter('USD', purchaseCurrencyOptions)
+
+export function purchaseMoney(value: number | null | undefined, currency: string) {
+  if (value === null || value === undefined) return '—'
+  if (currency === 'MXN') return reportCurrency.format(value)
+  if (currency === 'USD') return purchaseUsd.format(value)
+
+  return createCurrencyFormatter(currency, purchaseCurrencyOptions).format(value)
 }
 
 export function purchaseQuantity(value: number) {

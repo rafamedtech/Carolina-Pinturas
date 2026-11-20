@@ -76,16 +76,16 @@ async function cancelOrder() {
     </template>
 
     <template #footer>
-      <UButton
+      <AppButton
         label="Conservar pedido"
-        color="neutral"
-        variant="outline"
+        intent="secondary"
         :disabled="cancelling"
         @click="open = false"
       />
-      <UButton
+      <AppButton
         label="Cancelar pedido"
-        color="error"
+        intent="danger"
+        variant="solid"
         icon="i-lucide-ban"
         :loading="cancelling"
         @click="cancelOrder"
