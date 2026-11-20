@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { mountSuspended } from '@nuxt/test-utils/runtime'
 import { h } from 'vue'
 import ListRecordCard from '~/components/list/ListRecordCard.vue'
-import AppButton from '~/components/AppButton.vue'
+import { AppButton } from '#components'
 
 describe('card reutilizable de registros móviles', () => {
   it('navega con un enlace nativo y conserva el nombre accesible y los valores cero', async () => {
