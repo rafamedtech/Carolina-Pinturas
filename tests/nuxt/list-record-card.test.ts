@@ -2,8 +2,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { mountSuspended } from '@nuxt/test-utils/runtime'
 import { h } from 'vue'
-import ListRecordCard from '~/components/list/ListRecordCard.vue'
-import AppButton from '~/components/AppButton.vue'
+import { AppButton, ListRecordCard } from '#components'
 
 describe('card reutilizable de registros móviles', () => {
   it('navega con un enlace nativo y conserva el nombre accesible y los valores cero', async () => {
@@ -46,6 +45,28 @@ describe('card reutilizable de registros móviles', () => {
     await button.trigger('click')
     expect(wrapper.emitted('select')).toHaveLength(1)
     expect(wrapper.text()).toContain('2 x BASE')
+    wrapper.unmount()
+  })
+
+  it('mantiene independientes la apertura y los controles de una tarjeta accionable', async () => {
+    const action = vi.fn()
+    const wrapper = await mountSuspended(ListRecordCard, {
+      props: { title: 'Registro', actionable: true },
+      slots: {
+        actions: () => h(AppButton, { label: 'Editar', onClick: action }),
+        footer: () => h('a', { href: '/relacionado' }, 'Ver relacionado')
+      }
+    })
+    const open = wrapper.get('button[aria-label="Abrir Registro"]')
+    const edit = wrapper.get('button:not([aria-label])')
+    expect(open.attributes('type')).toBe('button')
+    expect(wrapper.get('article').attributes('aria-labelledby')).toBe(wrapper.get('h3').attributes('id'))
+    await edit.trigger('click')
+    await wrapper.get('a').trigger('click')
+    expect(action).toHaveBeenCalledTimes(1)
+    expect(wrapper.emitted('select')).toBeUndefined()
+    await open.trigger('click')
+    expect(wrapper.emitted('select')).toHaveLength(1)
     wrapper.unmount()
   })
 
