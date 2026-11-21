@@ -10,6 +10,7 @@ const props = defineProps<{
 
 const { data, status, error, refresh } = useBusinessReports(toRef(props, 'month'), toRef(props, 'view'))
 const annual = computed(() => data.value?.period.mode === 'annual')
+const sectionHeadingUi = { root: 'flex-nowrap', title: 'text-base tracking-tight' }
 const errorMessage = computed(() =>
   error.value?.data?.statusMessage || 'No fue posible generar los reportes del periodo.'
 )
@@ -87,6 +88,7 @@ function plural(count: number, singular: string, pluralLabel: string) {
           title="Ventas"
           marker="bg-primary"
           :amount="data.metrics.sales"
+          :ui="sectionHeadingUi"
         />
         <ReportsSalesChannels :channels="data.salesChannels" :metrics="data.metrics" />
         <!-- Ritmo de venta oculto temporalmente. Para reactivarlo:
@@ -128,6 +130,7 @@ function plural(count: number, singular: string, pluralLabel: string) {
           title="Compras de material"
           marker="bg-violet-500"
           :amount="data.metrics.materialPurchases"
+          :ui="sectionHeadingUi"
         />
         <div class="grid gap-4 xl:grid-cols-3">
           <ReportsRankingCard
@@ -151,6 +154,7 @@ function plural(count: number, singular: string, pluralLabel: string) {
           title="Gastos operativos"
           marker="bg-warning"
           :amount="data.metrics.operatingExpenses"
+          :ui="sectionHeadingUi"
         />
         <ReportsBreakdownCard
           title="Gastos operativos por categoría"
@@ -174,6 +178,7 @@ function plural(count: number, singular: string, pluralLabel: string) {
           title="Cobranza y flujo"
           marker="bg-success"
           :amount="data.metrics.collections"
+          :ui="sectionHeadingUi"
         />
         <div class="grid gap-4 xl:grid-cols-2">
           <ReportsRankingCard
