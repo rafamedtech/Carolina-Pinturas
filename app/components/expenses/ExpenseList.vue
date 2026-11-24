@@ -206,9 +206,9 @@ const listConfig = computed<ListLayoutConfig>(() => ({
     :error-message="expenseErrorMessage"
     :total-results="expenseCatalog.pagination.totalResults"
     :filtered-total="expenseCatalog.filteredTotal"
+    :on-select="canWrite ? (_event, row) => openExpense(row.original) : undefined"
     @refresh="refreshExpenses()"
     @create="openExpense()"
-    @select="(_event, row) => openExpense(row.original)"
   >
     <template #actions>
       <AppCsvExportButton
@@ -219,7 +219,7 @@ const listConfig = computed<ListLayoutConfig>(() => ({
       />
     </template>
     <template #mobile="{ rows }">
-      <ExpensesExpenseListCards :expenses="rows" @select="openExpense" />
+      <ExpensesExpenseListCards :expenses="rows" :can-write="canWrite" @select="openExpense" />
     </template>
     <template #overlays>
       <ExpensesExpenseAddModal
