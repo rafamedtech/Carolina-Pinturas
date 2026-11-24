@@ -2,7 +2,7 @@
 
 El detalle de producto (`app/pages/productos/[id]/index.vue`) es la referencia visual: cards sutiles, iconos semánticos, títulos compactos, datos en dos columnas y acciones adaptadas a móvil. Los componentes se autoimportan con los nombres de esta guía.
 
-`AppButton`, `DetailCard`, `DetailFields`, `DetailHeader`, `DetailPageHeader`, `DetailSectionHeading`, `DetailStatCard`, `DetailTable`, `ListLoading`, `ListRecordCard`, `ReportsBreakdownCard`, `ReportsMonthPace`, `ReportsRankingCard`, `ReportsSalesChannels`, `ReportsSectionHeading` y `ReportsSummaryCards` se mantienen en la Nuxt Layer `@rafamedtech/nuxt-shared`.
+`AppButton`, `DetailCard`, `DetailFields`, `DetailHeader`, `DetailPageHeader`, `DetailSectionHeading`, `DetailStatCard`, `DetailTable`, `ListLoading`, `ListTable`, `ListColumnPicker`, `ListRecordCard`, `ReportsBreakdownCard`, `ReportsMonthPace`, `ReportsRankingCard`, `ReportsSalesChannels`, `ReportsSectionHeading` y `ReportsSummaryCards` se mantienen en la Nuxt Layer `@rafamedtech/nuxt-shared`.
 
 Antes de crear o modificar una pantalla, revisa este catálogo y `app/components/detail`, `app/components/list` y los componentes `App*`. Reutiliza el patrón existente y amplía su contrato cuando sea necesario. Los componentes de presentación reciben props/slots; permisos, consultas y acciones de negocio pertenecen al consumidor.
 
@@ -34,7 +34,8 @@ Antes de crear o modificar una pantalla, revisa este catálogo y `app/components
 | `ListPagination` y `ListCreateButton` | Nuxt Shared presenta el rango, las páginas y el botón de alta. Cada listado configura su total, tamaño de página, permisos y destinos. |
 | `ListViews` | Selector en móvil y pestañas `link` alineadas a la izquierda en escritorio. `ListLayout` coloca estas vistas antes de la barra de filtros con separación compacta y conserva la selección al quitar filtros. |
 | `ListLoading` | Indicador de carga con `label`, `size` (`sm`/ `md`/ `lg`), `variant` (`list`/ `table`) y clases `ui.root`, `ui.icon`, `ui.label`. Recibe `loading` para activar el anuncio en una región persistente y `announce` para desactivar el anuncio de una copia visual. |
-| `ListLayout` | Layout de listados. Usa `#record="{ row }"` para renderizar un `ListRecordCard` por fila bajo `md`, con carga y vacío compartidos. Usa `#mobile="{ rows }"` para personalizar la lista completa. Ambos slots reciben las filas de la página y el orden de la tabla. |
+| `ListTable` | Tabla responsiva de Nuxt Shared. Comparte las filas de la página y su orden entre escritorio y móvil. Expone las columnas al selector externo y acepta paginación local con el modelo `page`. |
+| `ListLayout` | Layout de listados sobre `ListTable`. Usa `#record="{ row }"` para renderizar un `ListRecordCard` por fila bajo `md`, con carga y vacío compartidos. Usa `#mobile="{ rows }"` para personalizar la lista completa. Ambos slots reciben las filas de la página y el orden de la tabla. |
 | `DetailTable` | Tabla de detalle con estado vacío, visibilidad de columnas y slots de `UTable`. Props: `data`, `columns`, `empty?`, `getRowId?`, `loading?`, `ui?` (combina con los estilos base); `v-model:column-visibility`; expone `getColumns()`. Su slot opcional `#record="{ row }"` muestra tarjetas bajo `md` y reutiliza la carga y el vacío de la tabla. |
 | `AppNumberInput` | Campo numérico de Nuxt Shared sobre `UInputNumber`. En compras, cantidad y costo unitario admiten seis decimales sin ajuste al paso. Al borrar el campo, el modelo queda en `undefined`. El costo unitario oculta los botones de incremento y decremento. |
 | `AppPhoneInput` | Campo de Nuxt Shared con un `v-model` de hasta diez dígitos. La edición de cliente usa `format="digits"` y conserva su propio `UFormField` y reglas de validación. |
@@ -45,7 +46,7 @@ Antes de crear o modificar una pantalla, revisa este catálogo y `app/components
 | `UserMenuBase` | Disparador y menú de identidad de Nuxt Shared. `UserMenu` aporta el nombre, rol, icono y grupos de acciones. El submenú de apariencia, el permiso de Configuración y el cierre de sesión pertenecen al adaptador local. |
 | `AuthFormCard` | Tarjeta de Nuxt Shared con ancho adaptable y slot opcional `header`. El adaptador `AuthCard` aporta el encabezado de Carolina Pinturas. Cada página controla su formulario, sus alertas y su navegación. |
 | `MoneyFormFields` | Gastos conectan moneda, tasa e importe a sus modelos de formulario. Pinturas conserva la tasa fija para MXN, moneda como campo `currencyCode` y sus reglas de escala. |
-| `ListResponsive` y `RetryAlert` | `ListLayout` aporta las tarjetas y la tabla, y `ListPage` conecta el reintento a su carga. El listado mantiene los filtros, columnas y paginación locales. |
+| `ListResponsive` y `RetryAlert` | `ListTable` compone tabla y tarjetas. `ListPage` conecta el reintento a la consulta local. El listado mantiene los filtros, columnas y paginación locales. |
 | `CustomerPicker` | Ventas configura opciones, búsqueda y alta de cliente. Conserva la etiqueta de la selección al actualizar las opciones. |
 | `DashboardShell` y `AppErrorPage` | El layout conserva sus enlaces, grupos, permisos y menú. La vista de error presenta el código de Nuxt y la navegación de regreso en español. |
 | `AuthEmailField`, `AuthPasswordFields` y `AuthRecoveryNotice` | Los formularios de recuperación y actualización de contraseña conservan sus esquemas y acciones locales. |

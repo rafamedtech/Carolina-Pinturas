@@ -99,35 +99,33 @@ const lineColumns: TableColumn<InventoryMovement['lines'][number]>[] = [
           </div>
         </div>
       </template>
-      <div class="space-y-3 md:hidden">
-        <ListRecordCard
-          v-for="line in row.lines"
-          :key="line.id"
-          :title="line.productName"
-          :eyebrow="line.productCode"
-          :fields="[
-            { label: 'Almacén', value: line.warehouseName, fullWidth: true },
-            { label: 'Existencia resultante', value: line.balanceAfter }
-          ]"
-          summary-label="Movimiento"
-          :summary-value="`${line.delta.startsWith('-') ? '' : '+'}${line.delta}`"
-        >
-          <template #summary>
-            <span :class="line.delta.startsWith('-') ? 'text-error' : 'text-success'">
-              {{ line.delta.startsWith('-') ? '' : '+' }}{{ line.delta }}
-            </span>
-          </template>
-        </ListRecordCard>
-        <UEmpty v-if="!row.lines.length" title="Sin partidas" variant="naked" />
-      </div>
       <DetailTable
         ref="tables"
         v-model:column-visibility="columnVisibility"
         :data="row.lines"
         :columns="lineColumns"
-        empty="Sin partidas."
-        class="hidden md:block"
-      />
+        :get-row-id="line => line.id"
+        empty="Sin partidas"
+      >
+        <template #record="{ row: line }">
+          <ListRecordCard
+            :title="line.productName"
+            :eyebrow="line.productCode"
+            :fields="[
+              { label: 'Almacén', value: line.warehouseName, fullWidth: true },
+              { label: 'Existencia resultante', value: line.balanceAfter }
+            ]"
+            summary-label="Movimiento"
+            :summary-value="`${line.delta.startsWith('-') ? '' : '+'}${line.delta}`"
+          >
+            <template #summary>
+              <span :class="line.delta.startsWith('-') ? 'text-error' : 'text-success'">
+                {{ line.delta.startsWith('-') ? '' : '+' }}{{ line.delta }}
+              </span>
+            </template>
+          </ListRecordCard>
+        </template>
+      </DetailTable>
     </DetailCard>
     <UEmpty
       v-if="!rows.length"

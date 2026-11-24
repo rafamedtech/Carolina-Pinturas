@@ -270,11 +270,16 @@ const reservationColumns: TableColumn<Extract<Row, { orderId: string }>>[] = [
           variant="naked"
         />
       </div>
-      <div v-else-if="tab === 'reservations'">
-        <div class="space-y-3 md:hidden">
+      <ListTable
+        v-else-if="tab === 'reservations'"
+        ref="reservationsTable"
+        :data="reservationRows"
+        :columns="reservationColumns"
+        :get-row-id="row => `${row.orderId}:${row.productId}`"
+        empty="Sin reservas activas"
+      >
+        <template #record="{ row }">
           <ListRecordCard
-            v-for="row in reservationRows"
-            :key="`${row.orderId}-${row.productId}-${row.warehouse.name}`"
             :title="`Pedido ${row.order.folio}`"
             :title-to="{ path: `/ventas/${row.orderId}`, query: { returnTo } }"
             :fields="[
@@ -285,21 +290,8 @@ const reservationColumns: TableColumn<Extract<Row, { orderId: string }>>[] = [
             :summary-value="row.quantity"
             summary-color="primary"
           />
-          <UEmpty
-            v-if="!reservationRows.length"
-            icon="i-lucide-bookmark"
-            title="Sin reservas activas"
-            variant="naked"
-          />
-        </div>
-        <DetailTable
-          ref="reservationsTable"
-          :data="reservationRows"
-          :columns="reservationColumns"
-          empty="Sin reservas activas."
-          class="hidden md:block"
-        />
-      </div>
+        </template>
+      </ListTable>
     </template>
     <template #overlays>
       <UModal

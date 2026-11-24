@@ -3,7 +3,7 @@ import { createCurrencyFormatter } from '@rafamedtech/nuxt-shared/utils'
 import type { ExpenseRecord } from '~/types/expenses'
 import { paymentMethodLabel } from '~/utils/orderPayment'
 
-defineProps<{ expenses: readonly ExpenseRecord[] }>()
+defineProps<{ expenses: readonly ExpenseRecord[], canWrite: boolean }>()
 const emit = defineEmits<{ select: [expense: ExpenseRecord] }>()
 function formatCurrency(amount: number, currencyCode: string) {
   return createCurrencyFormatter(currencyCode).format(amount)
@@ -18,7 +18,7 @@ function formatCurrency(amount: number, currencyCode: string) {
         :key="expense.id"
         :title="expense.description"
         :eyebrow="formatDate(expense.date)"
-        :aria-label="`${expense.purchasePaymentId ? 'Consultar gasto de compra' : 'Editar gasto'}: ${expense.description}`"
+        :aria-label="canWrite ? `${expense.purchasePaymentId ? 'Consultar gasto de compra' : 'Editar gasto'}: ${expense.description}` : undefined"
         :fields="[
           { label: 'Proveedor', value: expense.provider, fullWidth: true },
           { label: 'Método', value: paymentMethodLabel(expense.paymentMethod) },
@@ -26,7 +26,7 @@ function formatCurrency(amount: number, currencyCode: string) {
         ]"
         summary-label="Importe"
         :summary-value="formatCurrency(expense.amount, expense.currencyCode)"
-        actionable
+        :actionable="canWrite"
         @select="emit('select', expense)"
       />
     </template>
