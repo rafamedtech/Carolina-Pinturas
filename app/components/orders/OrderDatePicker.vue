@@ -1,38 +1,29 @@
 <script setup lang="ts">
 import type { DateValue } from '@internationalized/date'
-import { formatDate } from '~/utils/datetime'
+import { formatDate, MEXICO_TIME_ZONE } from '~/utils/datetime'
 
-const props = withDefaults(defineProps<{
+defineProps<{
   disabled?: boolean
   placeholder?: string
-}>(), {
-  disabled: false,
-  placeholder: 'Seleccionar fecha'
-})
+}>()
 
 const selectedDate = defineModel<DateValue | undefined>({ required: true })
 
-const label = computed(() =>
-  selectedDate.value
-    ? formatDate(selectedDate.value.toString())
-    : props.placeholder
-)
+function formatValue(value: DateValue) {
+  return formatDate(value.toString())
+}
 </script>
 
 <template>
-  <UPopover :content="{ align: 'start' }">
-    <UButton
-      :label="label"
-      icon="i-lucide-calendar"
-      color="neutral"
-      variant="outline"
-      :disabled="props.disabled"
-      block
-      class="justify-start"
-    />
-
-    <template #content>
-      <UCalendar v-model="selectedDate" class="p-2" />
-    </template>
-  </UPopover>
+  <CalendarDatePicker
+    v-model="selectedDate"
+    :time-zone="MEXICO_TIME_ZONE"
+    :format-value="formatValue"
+    :placeholder="placeholder"
+    :disabled="disabled"
+    :close-on-select="false"
+    icon="i-lucide-calendar"
+    block
+    class="justify-start"
+  />
 </template>

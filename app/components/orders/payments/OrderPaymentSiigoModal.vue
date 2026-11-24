@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { createCurrencyFormatter } from '@rafamedtech/nuxt-shared/utils'
 import { formatDate, mexicoToday } from '~/utils/datetime'
 import { siigoReceiptPaymentDateError } from '#shared/utils/siigoReceiptDates'
 import { SIIGO_PAYMENT_METHODS, paymentMethodCfdiCode } from '~/utils/orderPayment'
@@ -145,7 +146,7 @@ watch(open, (isOpen) => {
 }, { immediate: true })
 
 function formatCurrency(value: number) {
-  return new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(value)
+  return createCurrencyFormatter('MXN').format(value)
 }
 
 function onSubmit(event: FormSubmitEvent<Schema>) {

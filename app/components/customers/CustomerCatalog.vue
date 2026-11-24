@@ -3,7 +3,7 @@ import type { ListLayoutConfig } from '~/types/list'
 import { tableQueryField, tableQueryText, tableQueryPage } from '~/utils/tableQuery'
 import type { TableColumn, TableRow } from '@nuxt/ui'
 import type { SiigoCustomer } from '~/types/siigo'
-import type { CsvColumn } from '~/utils/csv'
+import type { CsvColumn } from '@rafamedtech/nuxt-shared/utils'
 import { customerCatalogTabs, customerCatalogRoles, customerCatalogRoleLabel, filterCustomerCatalog } from '~/utils/customerCatalog'
 
 const filter = shallowRef('')

@@ -1,14 +1,15 @@
-import { formatDate } from '../../shared/utils/datetime'
-
-const DAY_MS = 86_400_000
+import { addCalendarDays, calendarDateKeyInTimeZone, calendarDaysInclusive, calendarWeekStart } from '@rafamedtech/nuxt-shared/utils'
+import { MEXICO_TIME_ZONE } from '../../shared/utils/datetime'
 
 export function currentWeekBounds(now = new Date()) {
   // Las columnas de negocio son @db.Date: límites UTC para el día de México.
-  const today = new Date(`${formatDate(now).split('/').reverse().join('-')}T00:00:00.000Z`)
-  const daysSinceMonday = (today.getUTCDay() + 6) % 7
-  const start = new Date(today.getTime() - daysSinceMonday * DAY_MS)
-  const end = new Date(start.getTime() + 7 * DAY_MS)
-  const previousStart = new Date(start.getTime() - 7 * DAY_MS)
-
-  return { start, end, previousStart, elapsedDays: daysSinceMonday + 1, totalDays: 7 }
+  const today = calendarDateKeyInTimeZone(now, MEXICO_TIME_ZONE)
+  const monday = calendarWeekStart(today)
+  return {
+    start: new Date(monday),
+    end: new Date(addCalendarDays(monday, 7)),
+    previousStart: new Date(addCalendarDays(monday, -7)),
+    elapsedDays: calendarDaysInclusive(monday, today),
+    totalDays: 7
+  }
 }

@@ -3,15 +3,25 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { mockNuxtImport, mountSuspended, registerEndpoint } from '@nuxt/test-utils/runtime'
 import { clearNuxtData } from '#app'
 import { getQuery, createError } from 'h3'
+import { defineComponent, h, shallowRef } from 'vue'
+import type { DropdownMenuItem } from '@nuxt/ui'
 import type { VueWrapper } from '@vue/test-utils'
+import { UDashboardGroup, UDropdownMenu } from '#components'
 import ProductCatalog from '~/components/products/ProductCatalog.vue'
+import ProductDetail from '~/pages/productos/[id]/index.vue'
 
-mockNuxtImport('useAuth', () => () => ({ user: { value: { role: 'admin' } }, canWrite: { value: true } }))
+mockNuxtImport('useAuth', () => () => ({
+  user: shallowRef({ role: 'admin' }),
+  canWrite: shallowRef(true),
+  disabled: { value: false },
+  fetchSession: async () => ({ role: 'admin' })
+}))
 const original = { id: 'product-1', code: 'P001', name: 'Pintura local', type: 'Product', active: true, unit: { code: 'H87', name: 'Pieza' } }
 let rows = [original]
 let syncCount = 0
 let readCount = 0
 let detailCount = 0
+let detailSyncCount = 0
 let failSync = false
 registerEndpoint('/api/siigo/products', (event) => {
   if (getQuery(event).refresh === 'true') {
@@ -21,8 +31,9 @@ registerEndpoint('/api/siigo/products', (event) => {
   } else readCount++
   return { results: rows, pagination: { page: 1, page_size: rows.length, total_results: rows.length } }
 })
-registerEndpoint('/api/siigo/products/product-1', () => {
+registerEndpoint('/api/siigo/products/product-1', (event) => {
   detailCount++
+  if (getQuery(event).refresh === 'true') detailSyncCount++
   return original
 })
 const stubs = {
@@ -34,7 +45,7 @@ const stubs = {
 let wrapper: VueWrapper | undefined
 beforeEach(() => {
   rows = [original]
-  syncCount = readCount = detailCount = 0
+  syncCount = readCount = detailCount = detailSyncCount = 0
   failSync = false
   clearNuxtData()
 })
@@ -71,6 +82,35 @@ describe('carga local y actualización explícita del catálogo de productos', (
     expect(card.text()).toContain('Precio')
     expect(card.findAll('a')).toHaveLength(1)
     expect(card.get('a[aria-label="Abrir producto Pintura local"]').attributes('href')).toMatch(/^\/productos\/product-1\?returnTo=/)
+  })
+  it('mantiene regreso filtrado, refresco y acciones móviles en el detalle de producto', async () => {
+    const returnTo = '/productos?tab=inactive&active=false'
+    wrapper = await mountSuspended(defineComponent({
+      setup: () => () => h(UDashboardGroup, {}, { default: () => h(ProductDetail) })
+    }), {
+      route: `/productos/product-1?returnTo=${encodeURIComponent(returnTo)}`,
+      global: {
+        stubs: {
+          InventoryProductStock: true,
+          ProductsProductActivity: true,
+          ProductsProductStatusAction: true
+        }
+      }
+    })
+    await vi.waitFor(() => expect(wrapper?.find('button[aria-label="Acciones del producto"]').exists()).toBe(true))
+    expect(wrapper.get('a[aria-label="Volver a productos"]').attributes('href')).toBe(returnTo)
+    expect(wrapper.get(`nav a[href="${returnTo}"]`).text()).toBe('Inactivos')
+    expect(wrapper.get('button[aria-label="Acciones del producto"]').classes()).toContain('sm:hidden')
+    const dropdown = wrapper.findComponent(UDropdownMenu) as unknown as { props: (key: 'items') => DropdownMenuItem[] }
+    expect(dropdown.props('items')).toMatchObject([
+      { label: 'Duplicar' },
+      { label: 'Desactivar' },
+      { label: 'Editar' }
+    ])
+
+    await wrapper.get('button[aria-label="Actualizar producto desde Siigo"]').trigger('click')
+    await vi.waitFor(() => expect(detailCount).toBe(3))
+    expect(detailSyncCount).toBe(1)
   })
   it('solo sincroniza al pulsar Actualizar y vuelve a salir del estado de carga', async () => {
     wrapper = await mountSuspended(ProductCatalog, { global: { stubs } })

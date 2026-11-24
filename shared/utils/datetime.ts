@@ -1,91 +1,55 @@
-// Una zona fija mantiene iguales las fechas de SSR y del navegador.
+import { calendarDateKeyInTimeZone, createDateFormatters, type DateInput } from '@rafamedtech/nuxt-shared/utils'
+
+export type { DateInput } from '@rafamedtech/nuxt-shared/utils'
+
 export const MEXICO_TIME_ZONE = 'America/Mexico_City'
 
-export type DateInput = string | Date | null | undefined
-
-const dateFormatters = {
-  UTC: new Intl.DateTimeFormat('es-MX', {
-    day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'UTC'
-  }),
-  mexico: new Intl.DateTimeFormat('es-MX', {
-    day: '2-digit', month: '2-digit', year: 'numeric', timeZone: MEXICO_TIME_ZONE
-  })
-}
-const timeFormatter = new Intl.DateTimeFormat('es-MX', {
-  hour: '2-digit', minute: '2-digit', hourCycle: 'h23', timeZone: MEXICO_TIME_ZONE
+const numericDate = { day: '2-digit', month: '2-digit', year: 'numeric' } as const
+const dates = createDateFormatters({
+  timeZone: MEXICO_TIME_ZONE,
+  date: numericDate,
+  dateTime: { ...numericDate, hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }
 })
 
-function parseDisplayDate(value: DateInput) {
-  if (!value) return null
+function normalizeSiigoDate(value: DateInput): DateInput {
+  if (!value) return value
 
-  const dateOnly = typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value)
-  if (typeof value === 'string') {
-    // Rechazar días inexistentes antes de que Date los normalice al mes siguiente.
-    const calendarDate = value.match(/^(\d{4}-\d{2}-\d{2})(?:T|$)/)?.[1]
-    if (calendarDate) {
-      const parsed = new Date(`${calendarDate}T00:00:00.000Z`)
-      if (Number.isNaN(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== calendarDate) return null
-    }
-  }
-
-  // Siigo devuelve timestamps UTC sin Z; nunca usar la zona local del equipo.
+  // Siigo envía timestamps UTC sin Z y usa el año 0001 para fechas ausentes.
   const normalized = typeof value === 'string' && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?$/.test(value)
     ? `${value}Z`
     : value
   const date = normalized instanceof Date ? normalized : new Date(normalized)
-
-  // Siigo usa el año 0001 como centinela cuando falta una fecha real.
-  if (Number.isNaN(date.getTime()) || date.getUTCFullYear() <= 1) return null
-  return { date, formatter: dateOnly ? dateFormatters.UTC : dateFormatters.mexico }
+  return date.getUTCFullYear() <= 1 ? null : normalized
 }
 
-/** DD/MM/AAAA. Las fechas YYYY-MM-DD conservan su día; los timestamps usan la zona de México. */
 export function formatDate(value: DateInput): string {
-  const parsed = parseDisplayDate(value)
-  if (!parsed) return '—'
-
-  const parts = parsed.formatter.formatToParts(parsed.date)
-  const part = (type: Intl.DateTimeFormatPartTypes) => parts.find(item => item.type === type)!.value
-  return `${part('day')}/${part('month')}/${part('year').padStart(4, '0')}`
+  return dates.formatDate(normalizeSiigoDate(value))
 }
 
-/** Nombre del mes y año para selectores de reportes mensuales. */
-export function formatMonth(value: DateInput): string {
-  const parsed = parseDisplayDate(value)
-  if (!parsed) return '—'
-
-  return new Intl.DateTimeFormat('es-MX', {
-    month: 'long',
-    year: 'numeric',
-    timeZone: parsed.formatter.resolvedOptions().timeZone
-  }).format(parsed.date)
-}
-
-/** DD/MM/AAAA, HH:mm para los registros que también necesitan mostrar la hora. */
 export function formatDateTime(value: DateInput): string {
-  const parsed = parseDisplayDate(value)
-  if (!parsed) return '—'
-  if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value)) return formatDate(value)
-  return `${formatDate(value)}, ${timeFormatter.format(parsed.date)}`
+  return dates.formatDateTime(normalizeSiigoDate(value))
 }
 
-/** Rango numérico por defecto; short usa «31 Jul - 4 Ago» para gráficas compactas. */
+export function formatMonth(value: DateInput): string {
+  return dates.formatMonth(normalizeSiigoDate(value))
+}
+
+const shortMonths = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic']
+
+function formatCompactDate(value: DateInput) {
+  const [day, month] = dates.formatDate(value).split('/')
+  return `${Number(day)} ${shortMonths[Number(month) - 1]}`
+}
+
 export function formatDateRange(start: DateInput, end: DateInput, format: 'numeric' | 'short' = 'numeric'): string {
-  const from = formatDate(start)
-  const to = formatDate(end)
-  if (from === '—' || to === '—') return '—'
-  if (format === 'short') {
-    const months = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic']
-    const compact = (value: string) => {
-      const [day, month] = value.split('/')
-      return `${Number(day)} ${months[Number(month) - 1]}`
-    }
-    return from === to ? compact(from) : `${compact(from)} - ${compact(to)}`
-  }
-  return from === to ? from : `${from} – ${to}`
+  const from = normalizeSiigoDate(start)
+  const to = normalizeSiigoDate(end)
+  return format === 'short'
+    ? dates.formatDateRange(from, to, formatCompactDate, ' - ')
+    : dates.formatDateRange(from, to)
 }
 
 // Valor interno para calendarios, filtros, API y base de datos: YYYY-MM-DD.
 export function mexicoToday(): string {
-  return formatDate(new Date()).split('/').reverse().join('-')
+  return calendarDateKeyInTimeZone(new Date(), MEXICO_TIME_ZONE)
 }

@@ -42,6 +42,16 @@ const errorMessage = computed(() =>
   error.value?.data?.statusMessage || 'No fue posible consultar los pagos del pedido.'
 )
 
+const paymentAmounts = computed(() => {
+  if (!context.value || status.value === 'pending' || error.value) return undefined
+
+  return {
+    total: formatCurrency(context.value.orderTotal),
+    paid: formatCurrency(context.value.paidTotal),
+    balance: formatCurrency(context.value.balance)
+  }
+})
+
 function formatCurrency(value: number, currency = 'MXN') {
   return new Intl.NumberFormat('es-MX', {
     style: 'currency',
@@ -160,16 +170,24 @@ async function createPayment(input: CreateOrderPaymentInput) {
 
 <template>
   <div class="space-y-4">
-    <div class="flex justify-end">
-      <UButton
-        v-if="canWrite && context"
-        label="Agregar pago"
-        icon="i-lucide-plus"
-        size="md"
-        :disabled="context.balance <= 0"
-        @click="open = true"
-      />
-    </div>
+    <PaymentSummary
+      v-if="context"
+      :amounts="paymentAmounts"
+      total-label="Pedido"
+      balance-label="Pendiente"
+      balance-color="error"
+      layout="columns"
+    >
+      <template v-if="canWrite" #actions>
+        <AppButton
+          label="Agregar pago"
+          icon="i-lucide-plus"
+          size="md"
+          :disabled="context.balance <= 0"
+          @click="open = true"
+        />
+      </template>
+    </PaymentSummary>
 
     <div v-if="status === 'pending'" class="space-y-3">
       <USkeleton class="h-16 w-full" />
@@ -186,33 +204,6 @@ async function createPayment(input: CreateOrderPaymentInput) {
     />
 
     <template v-else-if="context">
-      <div class="mb-4 grid grid-cols-3 gap-3 rounded-lg bg-elevated p-3 text-sm">
-        <div>
-          <p class="text-muted">
-            Pedido
-          </p>
-          <p class="font-semibold">
-            {{ formatCurrency(context.orderTotal) }}
-          </p>
-        </div>
-        <div>
-          <p class="text-muted">
-            Pagado
-          </p>
-          <p class="font-semibold text-success">
-            {{ formatCurrency(context.paidTotal) }}
-          </p>
-        </div>
-        <div>
-          <p class="text-muted">
-            Pendiente
-          </p>
-          <p class="font-semibold text-error">
-            {{ formatCurrency(context.balance) }}
-          </p>
-        </div>
-      </div>
-
       <ul v-if="context.payments.length" class="divide-y divide-default">
         <li
           v-for="payment in context.payments"

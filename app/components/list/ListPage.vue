@@ -30,13 +30,14 @@ defineSlots<{
 
 <template>
   <DefineContent>
-    <UAlert
+    <RetryAlert
       v-if="error"
       color="warning"
-      variant="subtle"
       :title="errorTitle || `${title} no disponibles`"
       :description="errorMessage"
       icon="i-lucide-database-zap"
+      :loading="loading"
+      @retry="emit('refresh')"
     />
     <slot v-else />
   </DefineContent>

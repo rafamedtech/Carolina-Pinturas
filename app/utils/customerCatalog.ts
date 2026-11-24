@@ -1,3 +1,4 @@
+import { filterBySearchText } from '@rafamedtech/nuxt-shared/utils'
 import type { SiigoCustomer, SiigoListResponse } from '~/types/siigo'
 
 export const customerCatalogTabs = [
@@ -15,17 +16,18 @@ export function customerCatalogRoles(customer: SiigoCustomer) {
 }
 
 export function filterCustomerCatalog(customers: SiigoCustomer[], view: string, search = '') {
-  const value = search.trim().toLowerCase()
-  return customers.filter((customer) => {
+  const matchingView = customers.filter((customer) => {
     const roles = customerCatalogRoles(customer)
     if (view === 'clientes' && !roles.customer) return false
     if (view === 'proveedores' && !roles.supplier) return false
     if (view === 'requieren_factura' && customer.internal?.requires_invoice !== true) return false
-    if (!value) return true
+    return true
+  })
 
+  return filterBySearchText(matchingView, search, (customer) => {
     const name = customer.name?.filter(Boolean).join(' ') || ''
     const email = customer.contacts?.[0]?.email || ''
-    return `${customer.rfc_id || ''} ${name} ${email}`.toLowerCase().includes(value)
+    return [`${customer.rfc_id || ''} ${name} ${email}`]
   })
 }
 

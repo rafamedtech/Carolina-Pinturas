@@ -169,6 +169,22 @@ describe('CustomerEditForm', () => {
     expect(wrapper.emitted('submit')).toBeUndefined()
   })
 
+  it.each([
+    ['+52 (664) 123-4567', '5266412345', '5266412345'],
+    ['', '', undefined]
+  ])('normaliza y envía el teléfono %j', async (input, displayed, phone) => {
+    wrapper = await mountSuspended(CustomerEditForm, { props: { customer } })
+
+    const phoneInput = inputByLabel('Teléfono')
+    await wrapper.find(`#${phoneInput.id}`).setValue(input)
+    expect(phoneInput.value).toBe(displayed)
+
+    await wrapper.find('form').trigger('submit')
+    await vi.waitFor(() => {
+      expect(wrapper?.emitted('submit')?.[0]?.[0]).toMatchObject({ phone })
+    })
+  })
+
   it('habilita guardar únicamente mientras existan cambios', async () => {
     wrapper = await mountSuspended(CustomerEditForm, {
       props: { customer }
@@ -202,11 +218,41 @@ describe('CustomerEditForm', () => {
     const citySelect = selectMenus.find(component => component.props('items')?.length === 5)
     if (!stateSelect || !citySelect) throw new Error('No se encontraron los selectores de ubicación.')
 
+    expect(citySelect.props('modelValue')).toBe('4')
+    expect(siigoMexicoCityOptions('9')).toContainEqual(expect.objectContaining({ value: '4' }))
+
+    stateSelect.vm.$emit('update:modelValue', '2')
+    await nextTick()
+    expect(citySelect.props('modelValue')).toBe('4')
+
     stateSelect.vm.$emit('update:modelValue', '9')
     await nextTick()
 
     expect(citySelect.props('items')).toEqual(siigoMexicoCityOptions('9'))
     expect(citySelect.props('modelValue')).toBe('')
+  })
+
+  it('carga el domicilio de otro cliente sin limpiar la ciudad', async () => {
+    wrapper = await mountSuspended(CustomerEditForm, { props: { customer } })
+
+    await wrapper.setProps({
+      customer: {
+        ...customer,
+        id: '7d679d4c-72d8-4fcc-a78c-cb2360562507',
+        address: {
+          street: 'Otra calle',
+          city: { country_code: 'Mx', state_code: '09', city_code: '004' }
+        }
+      }
+    })
+
+    expect(inputByLabel('Calle').value).toBe('Otra calle')
+    expect(wrapper.text()).toContain('9 · Ciudad de México')
+    const citySelect = wrapper.findAllComponents({ name: 'USelectMenu' })
+      .find(component => component.props('placeholder') === 'Selecciona una ciudad')
+    expect(citySelect?.props('modelValue')).toBe('4')
+    expect(wrapper.findAllComponents({ name: 'UButton' })
+      .find(button => button.props('label') === 'Guardar cambios')?.props('disabled')).toBe(true)
   })
 
   it('exige régimen fiscal y código postal en el modo previo a facturación', async () => {

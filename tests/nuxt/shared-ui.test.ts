@@ -2,10 +2,22 @@
 import { describe, expect, it, vi } from 'vitest'
 import { mountSuspended } from '@nuxt/test-utils/runtime'
 import { defineComponent, h, nextTick, shallowRef } from 'vue'
-import { AppButton, DetailCard, DetailFields, DetailStatCard, ListLoading, UButton } from '#components'
-import DetailPageHeader from '~/components/detail/DetailPageHeader.vue'
+import { AppButton, DetailCard, DetailFields, DetailHeader, DetailPageHeader, DetailStatCard, ListLoading, StatusBadge, UBadge, UButton } from '#components'
 
 describe('contratos de los componentes compartidos', () => {
+  it('renderiza el texto y el icono del estado con el tono y tamaño indicados', async () => {
+    const wrapper = await mountSuspended(StatusBadge, {
+      props: { label: 'En revisión', color: 'warning', icon: 'i-lucide-clock', size: 'sm' }
+    })
+    try {
+      expect(wrapper.text()).toBe('En revisión')
+      expect(wrapper.getComponent(UBadge).props()).toMatchObject({ color: 'warning', size: 'sm', variant: 'subtle' })
+      expect(wrapper.get('[data-slot="leadingIcon"]').attributes('aria-hidden')).toBe('true')
+    } finally {
+      wrapper.unmount()
+    }
+  })
+
   it('mantiene un anuncio por ciclo aunque haya otro indicador visual', async () => {
     const loading = shallowRef(false)
     const label = shallowRef('Cargando registros')
@@ -107,11 +119,44 @@ describe('contratos de los componentes compartidos', () => {
     }
   })
 
-  it('admite acciones que aparecen después de cargar los datos', async () => {
+  it('conserva el regreso, el refresco y los controles del consumidor', async () => {
+    const wrapper = await mountSuspended(DetailHeader, {
+      props: {
+        title: 'Detalle del producto',
+        back: { to: '/productos?tab=inactive', label: 'Volver a productos' },
+        refreshLabel: 'Actualizar producto desde Siigo'
+      },
+      slots: {
+        actions: () => h('button', { 'aria-label': 'Cambiar taller' }),
+        breadcrumbs: () => h('nav', 'Ruta del producto')
+      }
+    })
+    try {
+      expect(wrapper.get('a[aria-label="Volver a productos"]').attributes('href')).toBe('/productos?tab=inactive')
+      expect(wrapper.get('nav').text()).toBe('Ruta del producto')
+      expect(wrapper.find('button[aria-label="Cambiar taller"]').exists()).toBe(true)
+
+      const refresh = wrapper.get('button[aria-label="Actualizar producto desde Siigo"]')
+      expect(refresh.get('[data-slot="label"]').classes()).toEqual(expect.arrayContaining(['hidden', 'sm:inline']))
+      await refresh.trigger('click')
+      expect(wrapper.emitted('refresh')).toEqual([[]])
+      await wrapper.setProps({ loading: true })
+      expect(refresh.attributes('disabled')).toBeDefined()
+      await wrapper.setProps({ showRefresh: false })
+      expect(wrapper.find('button[aria-label="Actualizar producto desde Siigo"]').exists()).toBe(false)
+    } finally {
+      wrapper.unmount()
+    }
+  })
+
+  it('admite acciones móviles y de escritorio que aparecen después de cargar los datos', async () => {
     const ready = shallowRef(false)
     const wrapper = await mountSuspended(defineComponent({
       setup: () => () => h(DetailPageHeader, { title: 'Registro' }, ready.value
-        ? { links: () => h(AppButton, { label: 'Editar', to: '/productos' }) }
+        ? {
+            description: () => h(AppButton, { 'aria-label': 'Acciones del producto', 'class': 'sm:hidden' }),
+            links: () => h(AppButton, { label: 'Editar', to: '/productos' })
+          }
         : {})
     }))
     expect(wrapper.find('a').exists()).toBe(false)
@@ -119,6 +164,8 @@ describe('contratos de los componentes compartidos', () => {
     await nextTick()
     expect(wrapper.get('a').text()).toBe('Editar')
     expect(wrapper.get('a').attributes('href')).toBe('/productos')
+    expect(wrapper.get('[data-slot="links"]').classes()).toEqual(expect.arrayContaining(['hidden', 'sm:flex']))
+    expect(wrapper.get('button[aria-label="Acciones del producto"]').classes()).toContain('sm:hidden')
     wrapper.unmount()
   })
 

@@ -1,133 +1,32 @@
 <script setup lang="ts">
-import { breakpointsTailwind, useBreakpoints } from '@vueuse/core'
-import { today } from '@internationalized/date'
+import type { DateValue } from '@internationalized/date'
+import { useMediaQuery } from '@vueuse/core'
 import type { OrderDateRange } from '~/types/orders'
+import { dateFilterPresets } from '~/utils/dateFilterPresets'
 import { formatDateRange, MEXICO_TIME_ZONE } from '~/utils/datetime'
 
 withDefaults(defineProps<{ subject?: string }>(), { subject: 'pedidos' })
 
-interface PresetRange {
-  label: string
-  days?: number
-  months?: number
-  years?: number
-}
-
 const selectedRange = defineModel<OrderDateRange | null>({ required: true })
+const wideScreen = useMediaQuery('(min-width: 48rem)')
 
-const open = shallowRef(false)
-const draftRange = shallowRef<OrderDateRange | null>(selectedRange.value)
-const breakpoints = useBreakpoints(breakpointsTailwind)
-const isDesktop = breakpoints.greaterOrEqual('sm')
-const presetRanges: PresetRange[] = [
-  { label: 'Últimos 7 días', days: 7 },
-  { label: 'Últimos 14 días', days: 14 },
-  { label: 'Últimos 30 días', days: 30 },
-  { label: 'Últimos 3 meses', months: 3 },
-  { label: 'Últimos 6 meses', months: 6 },
-  { label: 'Último año', years: 1 }
-]
-
-const label = computed(() => {
-  const start = selectedRange.value?.start
-  const end = selectedRange.value?.end
-
-  if (!start || !end) return 'Filtrar por fecha'
-
+function formatRange(start: DateValue, end: DateValue) {
   return formatDateRange(start.toString(), end.toString())
-})
-
-watch(selectedRange, (value) => {
-  draftRange.value = value
-})
-
-function computePresetRange(range: PresetRange) {
-  const end = today(MEXICO_TIME_ZONE)
-  return {
-    start: end.subtract({
-      days: range.days,
-      months: range.months,
-      years: range.years
-    }),
-    end
-  }
-}
-
-function isPresetSelected(range: PresetRange) {
-  const start = selectedRange.value?.start
-  const end = selectedRange.value?.end
-  if (!start || !end) return false
-
-  const preset = computePresetRange(range)
-  return start.compare(preset.start) === 0 && end.compare(preset.end) === 0
-}
-
-function applyRange(value: OrderDateRange) {
-  draftRange.value = value
-  selectedRange.value = value
-  open.value = false
-}
-
-function selectPresetRange(range: PresetRange) {
-  applyRange(computePresetRange(range))
-}
-
-function clearRange() {
-  draftRange.value = null
-  selectedRange.value = null
-  open.value = false
 }
 </script>
 
 <template>
-  <UPopover v-model:open="open" :content="{ align: 'start' }">
-    <UButton
-      :label="label"
-      icon="i-lucide-calendar-range"
-      color="neutral"
-      variant="outline"
-      class="w-full min-w-0 justify-start sm:w-auto"
-      :ui="{ label: 'text-start max-sm:whitespace-normal' }"
-      :aria-label="selectedRange ? `Rango de fechas: ${label}` : `Filtrar ${subject} por rango de fechas`"
-    />
-
-    <template #content>
-      <div class="max-w-[calc(100vw-2rem)] overflow-x-auto">
-        <div class="flex flex-col sm:flex-row">
-          <div class="flex overflow-x-auto border-b border-default p-2 sm:flex-col sm:justify-center sm:border-r sm:border-b-0 sm:py-2">
-            <UButton
-              v-for="range in presetRanges"
-              :key="range.label"
-              :label="range.label"
-              color="neutral"
-              variant="ghost"
-              class="shrink-0 justify-start sm:rounded-none sm:px-4"
-              :class="isPresetSelected(range) ? 'bg-elevated' : 'hover:bg-elevated/50'"
-              @click="selectPresetRange(range)"
-            />
-          </div>
-
-          <UCalendar
-            v-model="draftRange"
-            range
-            class="p-2"
-            :number-of-months="isDesktop ? 2 : 1"
-            @update:valid-model-value="applyRange"
-          />
-        </div>
-
-        <div class="flex justify-end border-t border-default p-2">
-          <UButton
-            label="Limpiar filtro"
-            icon="i-lucide-x"
-            color="neutral"
-            variant="ghost"
-            size="sm"
-            :disabled="!selectedRange"
-            @click="clearRange"
-          />
-        </div>
-      </div>
-    </template>
-  </UPopover>
+  <CalendarRangePicker
+    v-model="selectedRange"
+    :time-zone="MEXICO_TIME_ZONE"
+    :format-range="formatRange"
+    :presets="dateFilterPresets"
+    :number-of-months="wideScreen ? 2 : 1"
+    clear-label="Limpiar filtro"
+    class="w-full min-w-0 justify-start sm:w-auto"
+    :ui="{ label: 'text-start max-sm:whitespace-normal' }"
+    :aria-label="selectedRange?.start && selectedRange.end
+      ? `Rango de fechas: ${formatRange(selectedRange.start, selectedRange.end)}`
+      : `Filtrar ${subject} por rango de fechas`"
+  />
 </template>

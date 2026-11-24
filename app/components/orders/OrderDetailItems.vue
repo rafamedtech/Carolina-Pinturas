@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { createCurrencyFormatter } from '@rafamedtech/nuxt-shared/utils'
 import { formatDateTime } from '~/utils/datetime'
 import { h, resolveComponent } from 'vue'
 import type { TableColumn } from '@nuxt/ui'
@@ -24,10 +25,7 @@ const emit = defineEmits<{
 const UButton = resolveComponent('UButton')
 const toast = useToast()
 
-const currency = computed(() => new Intl.NumberFormat('es-MX', {
-  style: 'currency',
-  currency: props.currencyCode
-}))
+const currency = computed(() => createCurrencyFormatter(props.currencyCode))
 
 const deleteOpen = shallowRef(false)
 const deletingItem = shallowRef<SalesOrderItem | null>(null)

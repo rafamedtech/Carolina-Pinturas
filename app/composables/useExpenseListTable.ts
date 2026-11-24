@@ -1,3 +1,4 @@
+import { createCurrencyFormatter } from '@rafamedtech/nuxt-shared/utils'
 import { tableQueryField, tableQuerySorting } from '~/utils/tableQuery'
 import { formatDate } from '~/utils/datetime'
 import { h } from 'vue'
@@ -11,10 +12,7 @@ export function useExpenseListTable() {
   useTableQuery([tableQueryField('sort', sorting, tableQuerySorting)])
 
   function formatCurrency(amount: number, currencyCode: string) {
-    return new Intl.NumberFormat('es-MX', {
-      style: 'currency',
-      currency: currencyCode
-    }).format(amount)
+    return createCurrencyFormatter(currencyCode).format(amount)
   }
 
   const { sortableHeader } = useListTableColumns<ExpenseRecord>()

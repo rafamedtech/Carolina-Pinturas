@@ -22,4 +22,13 @@ describe('catálogo de ubicaciones de Siigo México', () => {
     expect(normalizeSiigoMexicoCityCode('2', '004')).toBe('4')
     expect(normalizeSiigoMexicoCityCode('2', '6')).toBe('')
   })
+
+  it('conserva los códigos con asterisco de Chiapas al precargar una dirección', () => {
+    const codes = siigoMexicoCityOptions('7').map(city => city.value).filter(code => code.endsWith('*'))
+
+    expect(codes).toEqual(['120*', '121*', '122*', '123*'])
+    expect(normalizeSiigoMexicoCityCode('7', ' 0120* ')).toBe('120*')
+    expect(normalizeSiigoMexicoCityCode('7', '120')).toBe('')
+    expect(normalizeSiigoMexicoCityCode('2', '120*')).toBe('')
+  })
 })

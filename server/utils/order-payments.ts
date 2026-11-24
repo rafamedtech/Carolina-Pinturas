@@ -1,3 +1,4 @@
+import { decimalMoneyBalance } from '@rafamedtech/nuxt-shared/utils'
 import * as z from 'zod'
 import { orderMoney } from '#shared/utils/orderAmounts'
 import type { Prisma, SalesOrderPayment } from '../../generated/prisma/client'
@@ -44,11 +45,11 @@ export function paymentMethodFromCfdi(cfdiCode: string) {
 
 export function paymentStatus(totalPaid: number, orderTotal: number) {
   if (totalPaid <= 0) return 'pendiente_pago'
-  return orderMoney(totalPaid).gte(orderMoney(orderTotal)) ? 'pago_recibido' : 'abonado'
+  return decimalMoneyBalance(orderTotal, totalPaid).lte(0) ? 'pago_recibido' : 'abonado'
 }
 
 export function assertPaymentFitsBalance(amount: number, paidTotal: number, orderTotal: number) {
-  const balance = orderMoney(orderTotal).minus(orderMoney(paidTotal))
+  const balance = decimalMoneyBalance(orderTotal, paidTotal)
   if (orderMoney(amount).gt(balance)) {
     throw createError({
       statusCode: 422,

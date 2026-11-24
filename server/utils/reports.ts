@@ -1,4 +1,6 @@
-const DAY_IN_MS = 86_400_000
+import { addReportGroup, rankReportAmounts, reportPercentage as percentageFromPositiveBase, utcPeriodBounds } from '@rafamedtech/nuxt-shared/utils'
+
+export { reportPercentage as reportMargin, reportPercentageChange } from '@rafamedtech/nuxt-shared/utils'
 
 export function reportNumeric(value: { toString(): string } | number | null | undefined) {
   return value == null ? 0 : Number(value.toString())
@@ -12,18 +14,7 @@ export function reportSalesBeforeTax(order: {
 }
 
 export function reportPercentage(amount: number, total: number) {
-  return total > 0 ? Math.round((amount / total) * 1000) / 10 : 0
-}
-
-// Unlike reportPercentage, a margin can be negative when costs exceed sales.
-export function reportMargin(profit: number, sales: number) {
-  return sales > 0 ? Math.round((profit / sales) * 1000) / 10 : null
-}
-
-export function reportPercentageChange(current: number, previous: number) {
-  return previous !== 0
-    ? Math.round(((current - previous) / Math.abs(previous)) * 1000) / 10
-    : null
+  return percentageFromPositiveBase(amount, total) ?? 0
 }
 
 export function reportDateOnly(value: Date) {
@@ -38,14 +29,12 @@ export function reportMonthBounds(selectedMonth: string | undefined, now = new D
   const [selectedYear, selectedMonthNumber] = selectedMonth?.split('-').map(Number) ?? []
   const year = selectedYear ?? now.getUTCFullYear()
   const month = selectedMonthNumber ? selectedMonthNumber - 1 : now.getUTCMonth()
-  const start = new Date(Date.UTC(year, month, 1))
-  const end = new Date(Date.UTC(year, month + 1, 1))
-  const previousStart = new Date(Date.UTC(year, month - 1, 1))
-  const totalDays = new Date(Date.UTC(year, month + 1, 0)).getUTCDate()
+  const bounds = utcPeriodBounds(year, month + 1)
+  const { start, totalDays } = bounds
   const isCurrentMonth = year === now.getUTCFullYear() && month === now.getUTCMonth()
   const elapsedDays = start > now ? 0 : isCurrentMonth ? Math.min(now.getUTCDate(), totalDays) : totalDays
 
-  return { start, end, previousStart, totalDays, elapsedDays, dayInMs: DAY_IN_MS }
+  return { ...bounds, elapsedDays }
 }
 
 export function reportYearBounds(selectedYear: string | undefined, now = new Date()) {
@@ -54,17 +43,15 @@ export function reportYearBounds(selectedYear: string | undefined, now = new Dat
   }
 
   const year = selectedYear === undefined ? now.getUTCFullYear() : Number(selectedYear)
-  const start = new Date(Date.UTC(year, 0, 1))
-  const end = new Date(Date.UTC(year + 1, 0, 1))
-  const previousStart = new Date(Date.UTC(year - 1, 0, 1))
-  const totalDays = Math.round((end.getTime() - start.getTime()) / DAY_IN_MS)
+  const bounds = utcPeriodBounds(year)
+  const { start, totalDays, dayInMs } = bounds
   const elapsedDays = start > now
     ? 0
     : year === now.getUTCFullYear()
-      ? Math.floor((now.getTime() - start.getTime()) / DAY_IN_MS) + 1
+      ? Math.floor((now.getTime() - start.getTime()) / dayInMs) + 1
       : totalDays
 
-  return { start, end, previousStart, totalDays, elapsedDays, dayInMs: DAY_IN_MS }
+  return { ...bounds, elapsedDays }
 }
 
 // Match the customer-based classification used by the order list.
@@ -94,21 +81,16 @@ export function reportTopDebtors(orders: readonly {
     const outstanding = Math.max(reportNumeric(order.total) - paid, 0)
     if (outstanding <= 0) continue
 
-    const customer = customers.get(order.customerId) ?? {
+    addReportGroup(customers, order.customerId, outstanding, () => ({
       id: order.customerId,
       label: order.customerNameSnapshot,
       detail: 'Saldo pendiente',
       amount: 0,
       count: 0
-    }
-    customer.amount += outstanding
-    customer.count++
+    }))
     totalOutstanding += outstanding
-    customers.set(order.customerId, customer)
   }
 
-  return [...customers.values()]
-    .sort((a, b) => b.amount - a.amount || a.label.localeCompare(b.label))
-    .slice(0, 5)
+  return rankReportAmounts(customers.values(), 5, (a, b) => a.label.localeCompare(b.label))
     .map(customer => ({ ...customer, percentage: reportPercentage(customer.amount, totalOutstanding) }))
 }

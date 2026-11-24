@@ -187,14 +187,13 @@ function selectCounterCustomer() {
           cuando createItem NO es objeto; con objeto sin position explícito
           queda undefined y el ítem nunca se renderiza.
         -->
-        <USelectMenu
+        <CustomerPicker
           v-else
           v-model="customerId"
           v-model:search-term="customerSearchTerm"
           :items="customerOptions"
           :color="customerBalanceColor"
           :highlight="Boolean(customerBalanceColor)"
-          value-key="value"
           :loading="loading"
           :disabled="disabled || props.lockOrderFields"
           :create-item="{ when: 'always', position: 'bottom' }"
@@ -205,7 +204,7 @@ function selectCounterCustomer() {
           <template #create-item-label="{ item }">
             Crear cliente “{{ item }}”
           </template>
-        </USelectMenu>
+        </CustomerPicker>
         <template v-if="!props.counterSale" #hint>
           <UButton
             v-if="counterCustomer && !props.lockOrderFields"

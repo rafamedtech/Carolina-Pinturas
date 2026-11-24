@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { createCurrencyFormatter } from '@rafamedtech/nuxt-shared/utils'
 import { formatDate } from '~/utils/datetime'
 import type { DropdownMenuItem } from '@nuxt/ui'
 import type { OrderStatus, SalesOrderDetail } from '~/types/orders'
@@ -219,10 +220,7 @@ const hasChanges = computed(() =>
   || (mayChangeStatus.value && !statusUnchanged.value)
 )
 
-const currency = computed(() => new Intl.NumberFormat('es-MX', {
-  style: 'currency',
-  currency: order.value?.currencyCode || 'MXN'
-}))
+const currency = computed(() => createCurrencyFormatter(order.value?.currencyCode || 'MXN'))
 const errorMessage = computed(() =>
   error.value?.data?.statusMessage || 'No fue posible cargar el pedido.'
 )

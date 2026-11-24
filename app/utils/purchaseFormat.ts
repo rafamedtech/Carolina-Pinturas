@@ -1,4 +1,4 @@
-import { createCurrencyFormatter, reportCurrency } from '@rafamedtech/nuxt-shared/utils'
+import { formatCurrencyAmount, createNumberFormatter } from '@rafamedtech/nuxt-shared/utils'
 
 type BadgeColor = 'neutral' | 'primary' | 'success' | 'warning' | 'error' | 'info'
 
@@ -26,18 +26,14 @@ export const receiptStatus = (key: string) => RECEIPT_STATUS[key] ?? { label: ke
 export const invoiceStatus = (key: string) => INVOICE_STATUS[key] ?? { label: key, color: 'neutral' as const }
 
 const purchaseCurrencyOptions = { minimumFractionDigits: 2, maximumFractionDigits: 2 }
-const purchaseUsd = createCurrencyFormatter('USD', purchaseCurrencyOptions)
+const quantityFormatter = createNumberFormatter({ maximumFractionDigits: 6 })
 
 export function purchaseMoney(value: number | null | undefined, currency: string) {
-  if (value === null || value === undefined) return '—'
-  if (currency === 'MXN') return reportCurrency.format(value)
-  if (currency === 'USD') return purchaseUsd.format(value)
-
-  return createCurrencyFormatter(currency, purchaseCurrencyOptions).format(value)
+  return formatCurrencyAmount(value, currency, purchaseCurrencyOptions)
 }
 
 export function purchaseQuantity(value: number) {
-  return value.toLocaleString('es-MX', { maximumFractionDigits: 6 })
+  return quantityFormatter.format(value)
 }
 
 export { formatDate as purchaseDateLabel } from './datetime'

@@ -30,8 +30,8 @@ importers:
         specifier: 7.8.0
         version: 7.8.0(prisma@7.8.0(@types/react@19.2.17)(magicast@0.5.3)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(typescript@6.0.3))(typescript@6.0.3)
       '@rafamedtech/nuxt-shared':
-        specifier: 0.7.0
-        version: 0.7.0(@nuxt/ui@4.9.0(ce7a418177e78fefd6f53591207682f3))(nuxt@4.4.8(@babel/plugin-syntax-jsx@7.28.6(@babel/core@7.29.0))(@babel/plugin-syntax-typescript@7.28.6(@babel/core@7.29.0))(@electric-sql/pglite@0.4.1)(@parcel/watcher@2.5.6)(@types/node@26.0.0)(@vue/compiler-sfc@3.5.39)(cac@6.7.14)(db0@0.3.4(@electric-sql/pglite@0.4.1)(mysql2@3.15.3))(esbuild@0.28.0)(eslint@10.5.0(jiti@2.7.0))(ioredis@5.10.1)(lightningcss@1.32.0)(magicast@0.5.3)(mysql2@3.15.3)(optionator@0.9.4)(rollup-plugin-visualizer@7.0.1(rollup@4.60.4))(rollup@4.60.4)(srvx@0.11.15)(terser@5.47.1)(typescript@6.0.3)(vite@7.3.3(@types/node@26.0.0)(jiti@2.7.0)(lightningcss@1.32.0)(terser@5.47.1)(yaml@2.9.0))(vue-tsc@3.3.5(typescript@6.0.3))(yaml@2.9.0))(vue@3.5.38(typescript@6.0.3))
+        specifier: 0.8.0
+        version: 0.8.0(@nuxt/ui@4.9.0(ce7a418177e78fefd6f53591207682f3))(nuxt@4.4.8(@babel/plugin-syntax-jsx@7.28.6(@babel/core@7.29.0))(@babel/plugin-syntax-typescript@7.28.6(@babel/core@7.29.0))(@electric-sql/pglite@0.4.1)(@parcel/watcher@2.5.6)(@types/node@26.0.0)(@vue/compiler-sfc@3.5.39)(cac@6.7.14)(db0@0.3.4(@electric-sql/pglite@0.4.1)(mysql2@3.15.3))(esbuild@0.28.0)(eslint@10.5.0(jiti@2.7.0))(ioredis@5.10.1)(lightningcss@1.32.0)(magicast@0.5.3)(mysql2@3.15.3)(optionator@0.9.4)(rollup-plugin-visualizer@7.0.1(rollup@4.60.4))(rollup@4.60.4)(srvx@0.11.15)(terser@5.47.1)(typescript@6.0.3)(vite@7.3.3(@types/node@26.0.0)(jiti@2.7.0)(lightningcss@1.32.0)(terser@5.47.1)(yaml@2.9.0))(vue-tsc@3.3.5(typescript@6.0.3))(yaml@2.9.0))(vue@3.5.38(typescript@6.0.3))
       '@supabase/ssr':
         specifier: ^0.12.0
         version: 0.12.0(@supabase/supabase-js@2.110.0)
@@ -42,11 +42,11 @@ importers:
         specifier: ^8.21.3
         version: 8.21.3
       '@unovis/ts':
-        specifier: ^1.6.6
-        version: 1.6.6
+        specifier: ^1.6.7
+        version: 1.6.7
       '@unovis/vue':
-        specifier: ^1.6.6
-        version: 1.6.6(@unovis/ts@1.6.6)(vue@3.5.38(typescript@6.0.3))
+        specifier: ^1.6.7
+        version: 1.6.7(@unovis/ts@1.6.7)(vue@3.5.38(typescript@6.0.3))
       '@vueuse/core':
         specifier: ^14.3.0
         version: 14.3.0(vue@3.5.38(typescript@6.0.3))
@@ -1922,8 +1922,8 @@ packages:
       '@types/react':
         optional: true
 
-  '@rafamedtech/nuxt-shared@0.7.0':
-    resolution: {integrity: sha512-RizQv5izKrSUjzHgo9osGPkA5lGZFXm5TRSrLke9UcyXPSeuQXpDOZ/npBqGqUIdxAAv+yUoPfYTl+Em9lwdKQ==, tarball: https://npm.pkg.github.com/download/@rafamedtech/nuxt-shared/0.7.0/870db76ed006953664d772e90090a339e08af2df}
+  '@rafamedtech/nuxt-shared@0.8.0':
+    resolution: {integrity: sha512-eH4fdtKoKZLv8Sq1wH4rxiatdPKo0rIuR+PmsF/jdG3QWwF5/Lf7ySVsHINTHY9qs9gn7npXiDj83+WjAZ7sYA==, tarball: https://npm.pkg.github.com/download/@rafamedtech/nuxt-shared/0.8.0/503fee2257a2821143b071fde16328a0bd9db4b5}
     peerDependencies:
       '@nuxt/ui': ^4.9.0
       nuxt: ^4.4.8
@@ -2965,13 +2965,13 @@ packages:
   '@unovis/graphlibrary@2.2.0-2':
     resolution: {integrity: sha512-HeEzpd/vDyWiIJt0rnh+2ICXUIuF2N0+Z9OJJiKg0DB+eFUcD+bk+9QPhYHwkFwfxdjDA9fHi1DZ/O/bbV58Nw==}
 
-  '@unovis/ts@1.6.6':
-    resolution: {integrity: sha512-i9VJpURi1sycMrTO6MfVRAThVH1Ugmu1olhkStlBGoCzbWvQW016K105AnvpQ3qGzpYkUAaW101ohdatt8yBrw==}
+  '@unovis/ts@1.6.7':
+    resolution: {integrity: sha512-CXmr+EQQyba9vqcyhvc963y06agBvaX0ut+lylTSUo4A/t1YYdrFQFKUULasdVY6Pe+OK5xveZOlJrYDiPOX3A==}
 
-  '@unovis/vue@1.6.6':
-    resolution: {integrity: sha512-2WmSy2JWuoNE6jtV12TMGF4BcXsGF4gkJe1mx2sClVZ6M6s6ByHNmXH2XjLSkKzHitYsHoduPiDFtcb3OBR3iw==}
+  '@unovis/vue@1.6.7':
+    resolution: {integrity: sha512-iyYdwwI8Tm8Kyb3aUvG3GVmId6gcmw8EY2Qbaim1W4uqktDYViFzJXIjLPbNir4ju+ziXmaxM2sfhfEC3t3TYw==}
     peerDependencies:
-      '@unovis/ts': 1.6.6
+      '@unovis/ts': 1.6.7
       vue: ^3
 
   '@unrs/resolver-binding-android-arm-eabi@1.12.2':
@@ -8846,10 +8846,11 @@ snapshots:
     optionalDependencies:
       '@types/react': 19.2.17
 
-  '@rafamedtech/nuxt-shared@0.7.0(@nuxt/ui@4.9.0(ce7a418177e78fefd6f53591207682f3))(nuxt@4.4.8(@babel/plugin-syntax-jsx@7.28.6(@babel/core@7.29.0))(@babel/plugin-syntax-typescript@7.28.6(@babel/core@7.29.0))(@electric-sql/pglite@0.4.1)(@parcel/watcher@2.5.6)(@types/node@26.0.0)(@vue/compiler-sfc@3.5.39)(cac@6.7.14)(db0@0.3.4(@electric-sql/pglite@0.4.1)(mysql2@3.15.3))(esbuild@0.28.0)(eslint@10.5.0(jiti@2.7.0))(ioredis@5.10.1)(lightningcss@1.32.0)(magicast@0.5.3)(mysql2@3.15.3)(optionator@0.9.4)(rollup-plugin-visualizer@7.0.1(rollup@4.60.4))(rollup@4.60.4)(srvx@0.11.15)(terser@5.47.1)(typescript@6.0.3)(vite@7.3.3(@types/node@26.0.0)(jiti@2.7.0)(lightningcss@1.32.0)(terser@5.47.1)(yaml@2.9.0))(vue-tsc@3.3.5(typescript@6.0.3))(yaml@2.9.0))(vue@3.5.38(typescript@6.0.3))':
+  '@rafamedtech/nuxt-shared@0.8.0(@nuxt/ui@4.9.0(ce7a418177e78fefd6f53591207682f3))(nuxt@4.4.8(@babel/plugin-syntax-jsx@7.28.6(@babel/core@7.29.0))(@babel/plugin-syntax-typescript@7.28.6(@babel/core@7.29.0))(@electric-sql/pglite@0.4.1)(@parcel/watcher@2.5.6)(@types/node@26.0.0)(@vue/compiler-sfc@3.5.39)(cac@6.7.14)(db0@0.3.4(@electric-sql/pglite@0.4.1)(mysql2@3.15.3))(esbuild@0.28.0)(eslint@10.5.0(jiti@2.7.0))(ioredis@5.10.1)(lightningcss@1.32.0)(magicast@0.5.3)(mysql2@3.15.3)(optionator@0.9.4)(rollup-plugin-visualizer@7.0.1(rollup@4.60.4))(rollup@4.60.4)(srvx@0.11.15)(terser@5.47.1)(typescript@6.0.3)(vite@7.3.3(@types/node@26.0.0)(jiti@2.7.0)(lightningcss@1.32.0)(terser@5.47.1)(yaml@2.9.0))(vue-tsc@3.3.5(typescript@6.0.3))(yaml@2.9.0))(vue@3.5.38(typescript@6.0.3))':
     dependencies:
       '@internationalized/date': 3.12.2
       '@nuxt/ui': 4.9.0(ce7a418177e78fefd6f53591207682f3)
+      decimal.js: 10.6.0
       nuxt: 4.4.8(@babel/plugin-syntax-jsx@7.28.6(@babel/core@7.29.0))(@babel/plugin-syntax-typescript@7.28.6(@babel/core@7.29.0))(@electric-sql/pglite@0.4.1)(@parcel/watcher@2.5.6)(@types/node@26.0.0)(@vue/compiler-sfc@3.5.39)(cac@6.7.14)(db0@0.3.4(@electric-sql/pglite@0.4.1)(mysql2@3.15.3))(esbuild@0.28.0)(eslint@10.5.0(jiti@2.7.0))(ioredis@5.10.1)(lightningcss@1.32.0)(magicast@0.5.3)(mysql2@3.15.3)(optionator@0.9.4)(rollup-plugin-visualizer@7.0.1(rollup@4.60.4))(rollup@4.60.4)(srvx@0.11.15)(terser@5.47.1)(typescript@6.0.3)(vite@7.3.3(@types/node@26.0.0)(jiti@2.7.0)(lightningcss@1.32.0)(terser@5.47.1)(yaml@2.9.0))(vue-tsc@3.3.5(typescript@6.0.3))(yaml@2.9.0)
       vue: 3.5.38(typescript@6.0.3)
 
@@ -9811,7 +9812,7 @@ snapshots:
     dependencies:
       lodash-es: 4.18.1
 
-  '@unovis/ts@1.6.6':
+  '@unovis/ts@1.6.7':
     dependencies:
       '@emotion/css': 11.13.5
       '@juggle/resize-observer': 3.4.0
@@ -9883,9 +9884,9 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  '@unovis/vue@1.6.6(@unovis/ts@1.6.6)(vue@3.5.38(typescript@6.0.3))':
+  '@unovis/vue@1.6.7(@unovis/ts@1.6.7)(vue@3.5.38(typescript@6.0.3))':
     dependencies:
-      '@unovis/ts': 1.6.6
+      '@unovis/ts': 1.6.7
       vue: 3.5.38(typescript@6.0.3)
 
   '@unrs/resolver-binding-android-arm-eabi@1.12.2':

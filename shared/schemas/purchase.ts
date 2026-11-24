@@ -1,10 +1,14 @@
+import { hasDecimalScale, isIsoCalendarDate } from '@rafamedtech/nuxt-shared/utils'
 import * as z from 'zod'
 
-export const purchaseDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/).refine((s) => {
-  const d = new Date(`${s}T00:00:00Z`)
-  return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === s
-}, 'Fecha inválida.')
-const decimal = (precision: number) => z.number().positive().max(999_999_999).refine(n => Number(n.toFixed(precision)) === n, `Máximo ${precision} decimales.`)
+export const purchaseDate = z.string()
+  .regex(/^\d{4}-\d{2}-\d{2}$/)
+  .refine(isIsoCalendarDate, 'Fecha inválida.')
+
+const decimal = (precision: number) => z.number()
+  .positive()
+  .max(999_999_999)
+  .refine(value => hasDecimalScale(value, precision), `Máximo ${precision} decimales.`)
 export const purchaseDraftSchema = z.object({
   providerId: z.uuid(), date: purchaseDate, currencyCode: z.enum(['MXN', 'USD']),
   vatRate: z.union([z.literal(0), z.literal(8), z.literal(16)]).default(0),

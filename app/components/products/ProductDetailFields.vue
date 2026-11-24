@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { createCurrencyFormatter } from '@rafamedtech/nuxt-shared/utils'
 import type { SiigoProduct } from '~/types/siigo'
 import { formatDateTime } from '~/utils/datetime'
 
@@ -40,7 +41,7 @@ function formatCurrency(value?: number | string, currencyCode = 'MXN') {
   const amount = typeof value === 'string' ? Number(value) : value
   if (amount === undefined || !Number.isFinite(amount)) return '—'
 
-  return new Intl.NumberFormat('es-MX', { style: 'currency', currency: currencyCode, currencyDisplay: 'narrowSymbol' }).format(amount)
+  return createCurrencyFormatter(currencyCode, { currencyDisplay: 'narrowSymbol' }).format(amount)
 }
 
 function formatQuantity(value?: number) {

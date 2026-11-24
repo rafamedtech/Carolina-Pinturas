@@ -1,3 +1,4 @@
+import { createCurrencyFormatter } from '@rafamedtech/nuxt-shared/utils'
 import { UButton, UBadge, NuxtLink, OrdersOrderStatusBadge as OrderStatusBadge } from '#components'
 import { toValue, h } from 'vue'
 import { useLocalStorage } from '@vueuse/core'
@@ -10,7 +11,7 @@ import type { SalesOrderListItem } from '~/types/orders'
 import { orderHasPaymentStatus, orderPaymentStatusColor, orderPaymentStatusLabel } from '~/utils/orderPayment'
 
 export function useOrderListTable(options: { returnTo: MaybeRefOrGetter<string>, igualacion?: boolean, billing?: MaybeRefOrGetter<boolean>, internal?: MaybeRefOrGetter<boolean>, pendingPayment?: MaybeRefOrGetter<boolean>, delivered?: MaybeRefOrGetter<boolean>, columnVisibilityKey?: MaybeRefOrGetter<string>, tab?: MaybeRefOrGetter<string> }) {
-  const currency = new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' })
+  const currency = createCurrencyFormatter('MXN')
   const sorting = ref<SortingState>([])
   useTableQuery([tableQueryField('sort', sorting, tableQuerySorting)])
   const defaultColumnVisibility: VisibilityState = {

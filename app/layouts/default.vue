@@ -120,42 +120,23 @@ const groups = computed(() => [{
 </script>
 
 <template>
-  <UDashboardGroup unit="rem">
-    <UDashboardSidebar
-      id="default"
-      v-model:open="open"
-      collapsible
-      resizable
-      class="bg-elevated/25"
-      :ui="{ footer: 'lg:border-t lg:border-default' }"
-    >
-      <template #header="{ collapsed }">
-        <TeamsMenu :collapsed="collapsed" />
-      </template>
-
-      <template #default="{ collapsed }">
-        <UDashboardSearchButton :collapsed="collapsed" class="bg-transparent ring-default" />
-
-        <UNavigationMenu
-          :collapsed="collapsed"
-          :items="links[0]"
-          orientation="vertical"
-          tooltip
-          popover
-          :ui="{
-            link: 'text-base lg:text-sm',
-            linkLeadingIcon: 'size-6 lg:size-5'
-          }"
-        />
-      </template>
-
-      <template #footer="{ collapsed }">
-        <UserMenu :collapsed="collapsed" />
-      </template>
-    </UDashboardSidebar>
-
-    <UDashboardSearch :groups="groups" />
-
+  <DashboardShell
+    v-model:open="open"
+    sidebar-id="default"
+    sidebar-class="bg-elevated/25"
+    :items="links[0]"
+    :groups="groups"
+    :navigation-ui="{
+      link: 'text-base lg:text-sm',
+      linkLeadingIcon: 'size-6 lg:size-5'
+    }"
+  >
+    <template #header="{ collapsed }">
+      <TeamsMenu :collapsed="collapsed" />
+    </template>
+    <template #footer="{ collapsed }">
+      <UserMenu :collapsed="collapsed" />
+    </template>
     <slot />
-  </UDashboardGroup>
+  </DashboardShell>
 </template>

@@ -6,7 +6,7 @@ import type { TableColumn } from '@nuxt/ui'
 import type { SortingState, TableMeta } from '@tanstack/table-core'
 import type { OrderDateRange } from '~/types/orders'
 import type { PurchaseView } from '~/types/purchases'
-import type { CsvColumn } from '~/utils/csv'
+import { createNumberFormatter, type CsvColumn } from '@rafamedtech/nuxt-shared/utils'
 import { purchaseListTabs, purchaseStatus } from '~/utils/purchaseFormat'
 import { formatDate, mexicoToday } from '~/utils/datetime'
 
@@ -19,11 +19,16 @@ const pageSize = 25
 const search = shallowRef('')
 const status = shallowRef('all')
 const dateRange = shallowRef<OrderDateRange | null>(null)
+const sortableColumns = ['date', 'folio', 'providerName', 'status', 'nextDueDate', 'total', 'balance']
 const { returnTo } = useTableQuery([
   tableQueryField('search', search, tableQueryText()),
   tableQueryField('status', status, tableQueryText('all', ['all', 'confirmada', 'liquidada', 'vencida', 'borrador', 'cancelada'])),
-  tableQueryRange(dateRange),
-  tableQueryField('sort', sorting, tableQuerySorting),
+  tableQueryRange(dateRange, 'date_from', 'date_to'),
+  tableQueryField('sort', sorting, {
+    parse: value => tableQuerySorting.parse(value).filter((entry, index, entries) =>
+      sortableColumns.includes(entry.id) && entries.findIndex(item => item.id === entry.id) === index),
+    serialize: tableQuerySorting.serialize
+  }),
   tableQueryField('page', page, tableQueryPage)
 ], { page, resetOn: [search, status, dateRange] })
 const query = computed(() => ({
@@ -78,11 +83,7 @@ const csvColumns: CsvColumn<PurchaseView>[] = [
 
 const { sortableHeader } = useListTableColumns<PurchaseView>()
 
-const amountFormatter = new Intl.NumberFormat('en-US', {
-  minimumFractionDigits: 2,
-  maximumFractionDigits: 2,
-  useGrouping: true
-})
+const amountFormatter = createNumberFormatter({ minimumFractionDigits: 2, maximumFractionDigits: 2 }, 'en-US')
 
 function purchasePath(order: PurchaseView) {
   return { path: `/compras/${order.id}`, query: { returnTo: returnTo.value } }
@@ -156,12 +157,14 @@ const listConfig = computed<ListLayoutConfig>(() => ({
     :config="listConfig"
     :data="purchases"
     :columns="columns"
+    :has-extra-filters="status !== 'all'"
     :meta="tableMeta"
     :loading="loading"
     :error="Boolean(error)"
     error-title="No se pudieron cargar las compras."
     :error-message="error?.data?.statusMessage"
     @refresh="refresh()"
+    @clear="status = 'all'"
   >
     <template #actions>
       <AppCsvExportButton

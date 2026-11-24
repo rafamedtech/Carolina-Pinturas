@@ -4,13 +4,11 @@ import { mountSuspended } from '@nuxt/test-utils/runtime'
 import { defineComponent, h, ref } from 'vue'
 import type { VueWrapper } from '@vue/test-utils'
 import type { DropdownMenuItem, TableColumn } from '@nuxt/ui'
-import { UDashboardGroup, UDropdownMenu } from '#components'
+import { ListPagination, ListToolbar, UDashboardGroup, UDropdownMenu } from '#components'
 import { useListTableColumns } from '~/composables/useListTableColumns'
 import ListPage from '~/components/list/ListPage.vue'
-import ListToolbar from '~/components/list/ListToolbar.vue'
 import ListViews from '~/components/list/ListViews.vue'
 import ListTable from '~/components/list/ListTable.vue'
-import ListPagination from '~/components/list/ListPagination.vue'
 
 interface CatalogRecord { id: string, name: string }
 const CatalogTable = ListTable<CatalogRecord>

@@ -1,9 +1,10 @@
 <script setup lang="ts">
+import { createCurrencyFormatter } from '@rafamedtech/nuxt-shared/utils'
 import type { PaymentListItem } from '~/types/payments'
 import { paymentMethodLabel } from '~/utils/orderPayment'
 
 defineProps<{ payments: readonly PaymentListItem[], returnTo: string }>()
-const currency = new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' })
+const currency = createCurrencyFormatter('MXN')
 </script>
 
 <template>

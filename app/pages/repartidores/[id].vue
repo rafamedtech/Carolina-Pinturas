@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { createCurrencyFormatter } from '@rafamedtech/nuxt-shared/utils'
 import type { ListLayoutConfig } from '~/types/list'
 import { tableReturnPath } from '~/utils/tableQuery'
 import { formatDate } from '~/utils/datetime'
@@ -14,7 +15,7 @@ const { data: repartidor, status, error, refresh } = useLazyFetch<RepartidorDeta
   { lazy: true, server: false, key: () => `repartidor-${repartidorId.value}` }
 )
 
-const currency = new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' })
+const currency = createCurrencyFormatter('MXN')
 const message = computed(() => error.value?.data?.statusMessage || 'No fue posible cargar el repartidor.')
 
 useSeoMeta({ title: () => repartidor.value?.nombre || 'Detalle del repartidor' })

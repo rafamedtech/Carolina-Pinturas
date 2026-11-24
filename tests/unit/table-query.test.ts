@@ -36,14 +36,16 @@ function table() {
   const search = ref('')
   const status = ref('all')
   const page = ref(1)
+  const sorting = ref<Array<{ id: string, desc: boolean }>>([])
   const range = ref<OrderDateRange | null>(null)
   const state = scope.run(() => useTableQuery([
     tableQueryField('search', search, tableQueryText()),
     tableQueryField('status', status, tableQueryText('all', ['all', 'pending', 'done'])),
     tableQueryRange(range),
+    tableQueryField('order', sorting, tableQuerySorting),
     tableQueryField('page', page, tableQueryPage)
   ], { page, resetOn: [search, status, range] }))!
-  return { search, status, page, range, ...state }
+  return { search, status, page, range, sorting, ...state }
 }
 
 describe('table URL state', () => {
@@ -91,6 +93,38 @@ describe('table URL state', () => {
     grouped.value = true
     await settle()
     expect(router.currentRoute.value.query).toEqual({ search: 'Proveedor', grouped: 'true' })
+  })
+
+  it('restores all persisted state in a fresh list and after browser Back', async () => {
+    const sharedUrl = '/list?search=Azul&status=done&date_from=2026-10-01&date_to=2026-10-13&order=total:desc&page=3'
+    await router.replace(sharedUrl)
+    const state = table()
+    expect(state.search.value).toBe('Azul')
+    expect(state.range.value?.end?.toString()).toBe('2026-10-13')
+    expect(state.sorting.value).toEqual([{ id: 'total', desc: true }])
+    expect(state.page.value).toBe(3)
+
+    await router.push('/detail')
+    router.back()
+    await settle()
+    expect(router.currentRoute.value.fullPath).toBe(sharedUrl)
+    expect(state.returnTo.value).toBe(sharedUrl)
+    expect(state.page.value).toBe(3)
+
+    state.search.value = ''
+    state.status.value = 'all'
+    state.range.value = null
+    await settle()
+    expect(router.currentRoute.value.query).toEqual({ order: 'total:desc' })
+  })
+
+  it('keeps a half-selected date local when clearing a previous range', async () => {
+    await router.replace('/list?date_from=2026-10-01&date_to=2026-10-13&page=3')
+    const state = table()
+    state.range.value = { start: parseDate('2026-11-02'), end: undefined }
+    await settle()
+    expect(router.currentRoute.value.query).toEqual({})
+    expect(state.range.value?.start?.toString()).toBe('2026-11-02')
   })
 
   it('clears defaults and retains date-only days', async () => {

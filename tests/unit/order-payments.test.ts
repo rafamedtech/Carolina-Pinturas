@@ -33,6 +33,7 @@ describe('pagos unificados de pedidos', () => {
     [758.505, [758.5], { orderTotal: 758.51, paidTotal: 758.5, balance: 0.01 }],
     [758.505, [758.51], { orderTotal: 758.51, paidTotal: 758.51, balance: 0 }],
     [1.005, [], { orderTotal: 1.01, paidTotal: 0, balance: 1.01 }],
+    [10, [-0.005, 0.005], { orderTotal: 10, paidTotal: 0, balance: 10 }],
     [10, [11], { orderTotal: 10, paidTotal: 11, balance: 0 }]
   ])('calcula el saldo de %s en centavos sin residuos binarios', (total, amounts, expected) => {
     expect(orderPaymentTotals(total, amounts.map(amount => ({ amount })))).toEqual(expected)
@@ -93,6 +94,12 @@ describe('pagos unificados de pedidos', () => {
     expect(paymentStatus(0, 500)).toBe('pendiente_pago')
     expect(paymentStatus(100, 500)).toBe('abonado')
     expect(paymentStatus(500, 500)).toBe('pago_recibido')
+  })
+
+  it('clasifica por importe pagado aunque existan movimientos', () => {
+    const { paidTotal } = orderPaymentTotals(0, [{ amount: 1 }, { amount: -1 }])
+    expect(paymentStatus(paidTotal, 0)).toBe('pendiente_pago')
+    expect(paymentStatus(-1, 500)).toBe('pendiente_pago')
   })
 
   it('impide registrar más que el saldo pendiente', () => {

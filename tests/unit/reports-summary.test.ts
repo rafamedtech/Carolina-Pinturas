@@ -35,6 +35,20 @@ beforeEach(() => {
 afterEach(() => vi.useRealTimers())
 
 describe('report summary cards', () => {
+  it('switches months at UTC midnight and uses an exclusive query cutoff', async () => {
+    vi.stubGlobal('getQuery', () => ({}))
+    vi.setSystemTime(new Date('2026-01-01T00:00:00Z'))
+    const result = await summary(event)
+    expect(result.period).toMatchObject({ start: '2026-01-01', end: '2026-01-31', elapsedDays: 1, totalDays: 31 })
+    expect(result.dailyMovements.map(day => day.date)).toEqual(['2026-01-01'])
+    expect(mocks.orders).toHaveBeenNthCalledWith(1, expect.objectContaining({
+      where: expect.objectContaining({ orderDate: { gte: new Date('2026-01-01'), lt: new Date('2026-01-02') } })
+    }))
+    expect(mocks.orders).toHaveBeenNthCalledWith(2, expect.objectContaining({
+      where: expect.objectContaining({ orderDate: { gte: new Date('2025-12-01'), lt: new Date('2026-01-01') } })
+    }))
+  })
+
   it('queries the entire selected year and compares it with the previous calendar year', async () => {
     vi.stubGlobal('getQuery', () => ({ view: 'annual', year: '2024' }))
     const result = await summary(event)

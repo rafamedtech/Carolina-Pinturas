@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { createCurrencyFormatter } from '@rafamedtech/nuxt-shared/utils'
 import { productCatalogTabs } from '~/utils/productCatalogTabs'
 import { parseDate } from '@internationalized/date'
 import type { OrderDateRange } from '~/types/orders'
@@ -6,7 +7,7 @@ import type { ListLayoutConfig, ListFilterValues } from '~/types/list'
 import { tableQueryField, tableQueryText, tableQueryPage, tableQueryDate } from '~/utils/tableQuery'
 import type { TableColumn, TableRow } from '@nuxt/ui'
 import type { SiigoProduct } from '~/types/siigo'
-import type { CsvColumn } from '~/utils/csv'
+import type { CsvColumn } from '@rafamedtech/nuxt-shared/utils'
 import { canManageProducts } from '~/utils/roleAccess'
 
 const filter = ref('')
@@ -98,10 +99,7 @@ function formatProductPrice(product: SiigoProduct) {
   const amount = typeof value === 'string' ? Number(value) : value
   if (!Number.isFinite(amount)) return '—'
 
-  return new Intl.NumberFormat('es-MX', {
-    style: 'currency',
-    currency: priceList?.currency_code || 'MXN'
-  }).format(amount)
+  return createCurrencyFormatter(priceList?.currency_code || 'MXN').format(amount)
 }
 
 const csvColumns: CsvColumn<SiigoProduct>[] = [

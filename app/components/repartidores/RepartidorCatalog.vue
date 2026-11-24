@@ -3,7 +3,7 @@ import type { ListLayoutConfig } from '~/types/list'
 import { tableQueryField, tableQueryText, tableQueryPage } from '~/utils/tableQuery'
 import type { TableColumn, TableRow } from '@nuxt/ui'
 import type { Repartidor } from '~/types/orders'
-import type { CsvColumn } from '~/utils/csv'
+import type { CsvColumn } from '@rafamedtech/nuxt-shared/utils'
 
 const { canWrite } = useAuth()
 const filter = ref('')

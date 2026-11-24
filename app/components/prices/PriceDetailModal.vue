@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { createCurrencyFormatter } from '@rafamedtech/nuxt-shared/utils'
 import type { CatalogPrice } from '~/types/catalog'
 
 const open = defineModel<boolean>('open', { default: false })
@@ -27,10 +28,7 @@ const details = computed(() => {
 const formattedPrice = computed(() => {
   if (props.product?.price === null || !props.product) return 'Consultar'
 
-  return new Intl.NumberFormat('es-MX', {
-    style: 'currency',
-    currency: props.product.currency
-  }).format(props.product.price)
+  return createCurrencyFormatter(props.product.currency).format(props.product.price)
 })
 </script>
 

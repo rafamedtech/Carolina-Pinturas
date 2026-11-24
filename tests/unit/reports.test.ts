@@ -7,6 +7,7 @@ import {
   reportSalesChannel,
   reportMonthBounds,
   reportYearBounds,
+  reportMargin,
   reportPercentage,
   reportPercentageChange
 } from '../../server/utils/reports'
@@ -33,6 +34,10 @@ describe('report calculations', () => {
   it('calculates shares and comparisons without dividing by zero', () => {
     expect(reportPercentage(25, 200)).toBe(12.5)
     expect(reportPercentage(25, 0)).toBe(0)
+    expect(reportPercentage(25, -200)).toBe(0)
+    expect(reportMargin(-2, 3)).toBe(-66.7)
+    expect(reportMargin(25, 0)).toBeNull()
+    expect(reportMargin(25, -200)).toBeNull()
     expect(reportPercentageChange(125, 100)).toBe(25)
     expect(reportPercentageChange(100, 0)).toBeNull()
     expect(reportPercentageChange(-50, -100)).toBe(50)
@@ -60,7 +65,7 @@ describe('business report periods', () => {
   })
 
   it('retains months with expenses, collections, or orders even when sales are zero', () => {
-    for (const field of ['expenses', 'collections', 'orderCount', 'netProfit'] as const) {
+    for (const field of ['expenses', 'collections', 'orderCount', 'netProfit', 'counterSales', 'sellerSales', 'internalSales'] as const) {
       const days = annualDays()
       days[5]![field] = field === 'netProfit' ? -10 : 10
       // Five empty months precede June; six empty months follow it.
@@ -81,12 +86,16 @@ describe('business report periods', () => {
   it('groups annual movements by month, preserving expenses and months without activity', () => {
     const empty = { label: '', sales: 0, orderCount: 0, counterSales: 0, sellerSales: 0, internalSales: 0, collections: 0, expenses: 0, netCashFlow: 0, materialPurchases: 0, operatingExpenses: 0, netProfit: 0 }
     const months = reportMonths([
-      { ...empty, date: '2026-01-01', sales: 100, orderCount: 1, collections: 50, netCashFlow: 50, netProfit: 100 },
-      { ...empty, date: '2026-01-02', materialPurchases: 20, operatingExpenses: 10, expenses: 30, netProfit: -30, netCashFlow: -30 },
+      { ...empty, date: '2026-01-01', sales: 100, orderCount: 2, counterSales: 25, sellerSales: 75, collections: 50, netCashFlow: 50, netProfit: 100 },
+      { ...empty, date: '2026-01-02', counterSales: 10, internalSales: 40, materialPurchases: 20, operatingExpenses: 10, expenses: 30, netProfit: -30, netCashFlow: -30 },
       { ...empty, date: '2026-02-01' }
     ])
     expect(months).toHaveLength(2)
-    expect(months[0]).toMatchObject({ start: '2026-01-01', end: '2026-01-02', days: 2, sales: 100, orderCount: 1, expenses: 30, materialPurchases: 20, operatingExpenses: 10, netProfit: 70, netCashFlow: 20 })
+    expect(months[0]).toMatchObject({
+      start: '2026-01-01', end: '2026-01-02', days: 2, sales: 100, orderCount: 2,
+      counterSales: 35, sellerSales: 75, internalSales: 40,
+      expenses: 30, materialPurchases: 20, operatingExpenses: 10, netProfit: 70, netCashFlow: 20
+    })
     expect(months[1]).toMatchObject({ start: '2026-02-01', days: 1, sales: 0 })
     expect(reportMonths([])).toEqual([])
   })
@@ -132,10 +141,10 @@ describe('business report periods', () => {
 describe('customers with outstanding balances', () => {
   it('groups unpaid balances per customer and does not offset debts with overpaid orders', () => {
     const orders = [
-      { customerId: 'a', customerNameSnapshot: 'Cliente A', total: 100, payments: [{ amount: 40 }] },
-      { customerId: 'a', customerNameSnapshot: 'Cliente A', total: 50, payments: [] },
-      { customerId: 'a', customerNameSnapshot: 'Cliente A', total: 20, payments: [{ amount: 40 }] },
       { customerId: 'b', customerNameSnapshot: 'Cliente B', total: 200, payments: [{ amount: 50 }, { amount: 40 }] },
+      { customerId: 'a', customerNameSnapshot: 'Cliente A', total: 100, payments: [{ amount: 40 }] },
+      { customerId: 'a', customerNameSnapshot: 'Nombre posterior', total: 50, payments: [] },
+      { customerId: 'a', customerNameSnapshot: 'Cliente A', total: 20, payments: [{ amount: 40 }] },
       { customerId: 'c', customerNameSnapshot: 'Cliente C', total: 30, payments: [{ amount: 30 }] }
     ]
     expect(reportTopDebtors(orders)).toEqual([

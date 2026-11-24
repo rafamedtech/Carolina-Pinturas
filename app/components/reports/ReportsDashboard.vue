@@ -10,6 +10,21 @@ const props = defineProps<{
 
 const { data, status, error, refresh } = useBusinessReports(toRef(props, 'month'), toRef(props, 'view'))
 const annual = computed(() => data.value?.period.mode === 'annual')
+const salesChannels = computed(() => {
+  const report = data.value
+  if (!report) return []
+
+  const previousAmounts = new Map([
+    ['counter', report.metrics.previousCounterSales],
+    ['seller', report.metrics.previousSellerSales],
+    ['internal', report.metrics.previousInternalSales]
+  ])
+
+  return report.salesChannels.map(channel => ({
+    ...channel,
+    previousAmount: previousAmounts.get(channel.key) ?? 0
+  }))
+})
 const sectionHeadingUi = { root: 'flex-nowrap', title: 'text-base tracking-tight' }
 const errorMessage = computed(() =>
   error.value?.data?.statusMessage || 'No fue posible generar los reportes del periodo.'
@@ -22,39 +37,25 @@ function plural(count: number, singular: string, pluralLabel: string) {
 
 <template>
   <div class="flex w-full flex-col gap-6">
-    <UAlert
+    <RetryAlert
       v-if="error"
       color="warning"
-      variant="subtle"
       title="Reportes no disponibles"
       :description="errorMessage"
       icon="i-lucide-cloud-alert"
-    >
-      <template #actions>
-        <AppButton
-          label="Reintentar"
-          color="warning"
-          variant="soft"
-          size="sm"
-          icon="i-lucide-refresh-cw"
-          @click="() => refresh()"
-        />
-      </template>
-    </UAlert>
+      :loading="status === 'pending'"
+      @retry="refresh()"
+    />
 
     <template v-if="['idle', 'pending'].includes(status)">
       <USkeleton class="h-6 w-48 rounded-md" />
-      <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <USkeleton v-for="index in 4" :key="index" class="h-36 rounded-xl" />
-      </div>
+      <ReportsSkeleton variant="metrics" :count="4" label="Cargando datos del reporte" />
       <div class="grid gap-4 xl:grid-cols-3">
         <USkeleton class="h-80 rounded-lg xl:col-span-2" />
         <USkeleton class="h-80 rounded-lg" />
       </div>
       <USkeleton class="h-96 rounded-lg" />
-      <div class="grid gap-4 xl:grid-cols-3">
-        <USkeleton v-for="index in 3" :key="index" class="h-80 rounded-lg" />
-      </div>
+      <ReportsSkeleton variant="panels" />
     </template>
 
     <template v-else-if="data && !error">
@@ -74,10 +75,10 @@ function plural(count: number, singular: string, pluralLabel: string) {
           {{ data.period.elapsedDays ? `Acumulado al ${formatDate(data.dailyMovements.at(-1)?.date)}.` : 'El año seleccionado aún no inicia.' }}
           Las variaciones se comparan con el año anterior completo.
         </p>
-        <ReportsSummaryCards :metrics="data.metrics" :annual="annual" />
+        <ReportsSummaryCardsAdapter :metrics="data.metrics" :annual="annual" />
         <div class="grid gap-4 xl:grid-cols-3">
           <ReportsProfitStatement :annual="annual" :metrics="data.metrics" class="xl:col-span-2" />
-          <ReportsMonthPace :report="data" />
+          <ReportsMonthPace :period="data.period" :metrics="data.metrics" :ui="{ title: 'text-base' }" />
         </div>
         <ReportsCashFlowChart :data="data.dailyMovements" :annual="annual" />
       </section>
@@ -90,12 +91,13 @@ function plural(count: number, singular: string, pluralLabel: string) {
           :amount="data.metrics.sales"
           :ui="sectionHeadingUi"
         />
-        <ReportsSalesChannels :channels="data.salesChannels" :metrics="data.metrics" />
+        <ReportsSalesChannels :channels="salesChannels" :ui="{ title: 'text-base' }" />
         <!-- Ritmo de venta oculto temporalmente. Para reactivarlo:
         <ReportsPeriodAnalysis :report="data" />
         -->
         <div class="grid gap-4 xl:grid-cols-3">
           <ReportsBreakdownCard
+            :ui="{ title: 'text-base' }"
             title="Ventas por línea"
             description="Línea de producto en Siigo."
             icon="i-lucide-paint-bucket"
@@ -106,6 +108,7 @@ function plural(count: number, singular: string, pluralLabel: string) {
             :count-label="count => plural(count, 'partida', 'partidas')"
           />
           <ReportsRankingCard
+            :ui="{ title: 'text-base' }"
             title="Productos destacados"
             description="Productos con mayor venta del periodo."
             icon="i-lucide-package-open"
@@ -114,6 +117,7 @@ function plural(count: number, singular: string, pluralLabel: string) {
             :count-label="count => `${dashboardNumber.format(count)} uds.`"
           />
           <ReportsRankingCard
+            :ui="{ title: 'text-base' }"
             title="Clientes principales"
             description="Concentración de ventas por cliente."
             icon="i-lucide-users"
@@ -134,6 +138,7 @@ function plural(count: number, singular: string, pluralLabel: string) {
         />
         <div class="grid gap-4 xl:grid-cols-3">
           <ReportsRankingCard
+            :ui="{ title: 'text-base' }"
             title="Proveedores de material"
             :description="`Pagos a proveedores registrados en el ${annual ? 'año' : 'mes'}.`"
             icon="i-lucide-truck"
@@ -157,6 +162,7 @@ function plural(count: number, singular: string, pluralLabel: string) {
           :ui="sectionHeadingUi"
         />
         <ReportsBreakdownCard
+          :ui="{ title: 'text-base' }"
           title="Gastos operativos por categoría"
           description="Renta, nómina, servicios y demás costos de operar, sin compras de material."
           icon="i-lucide-chart-pie"
@@ -182,6 +188,7 @@ function plural(count: number, singular: string, pluralLabel: string) {
         />
         <div class="grid gap-4 xl:grid-cols-2">
           <ReportsRankingCard
+            :ui="{ title: 'text-base' }"
             title="Saldo por cobrar"
             :description="`Saldo vigente de pedidos del ${annual ? 'año' : 'mes'}.`"
             icon="i-lucide-hourglass"
@@ -213,6 +220,7 @@ function plural(count: number, singular: string, pluralLabel: string) {
             </template>
           </ReportsRankingCard>
           <ReportsBreakdownCard
+            :ui="{ title: 'text-base' }"
             title="Cobros por método"
             description="Cómo entra el dinero al negocio."
             icon="i-lucide-wallet-cards"

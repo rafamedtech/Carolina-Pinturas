@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { createCurrencyFormatter } from '@rafamedtech/nuxt-shared/utils'
 import { formatDate } from '~/utils/datetime'
 import type { SalesOrderDetail } from '~/types/orders'
 import { BUSINESS_INFO } from '#shared/utils/businessInfo'
@@ -21,10 +22,7 @@ const { data: order, status, error } = useLazyFetch<SalesOrderDetail>(
 
 const isQuote = computed(() => order.value?.status.key === 'borrador')
 
-const currency = computed(() => new Intl.NumberFormat('es-MX', {
-  style: 'currency',
-  currency: order.value?.currencyCode || 'MXN'
-}))
+const currency = computed(() => createCurrencyFormatter(order.value?.currencyCode || 'MXN'))
 
 function formatCurrency(value: number | undefined) {
   return currency.value.format(value || 0)

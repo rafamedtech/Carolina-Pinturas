@@ -1,6 +1,6 @@
 <script setup lang="ts">
+import { formatSignedReportPercentage } from '@rafamedtech/nuxt-shared/utils'
 import type { ReportMetrics } from '~/types/reports'
-import { dashboardNumber } from '~/utils/dashboardFormatters'
 import { purchaseMoney } from '~/utils/purchaseFormat'
 
 const props = defineProps<{ totals: ReportMetrics['purchaseInvoiceTotals'], annual?: boolean }>()
@@ -30,7 +30,7 @@ const visible = computed(() => {
           <p class="mt-0.5 text-xs text-muted tabular-nums">
             {{ annual ? 'Año anterior' : 'Mes anterior' }} {{ purchaseMoney(total.previousAmount, total.currencyCode) }}
             <template v-if="total.changePercentage !== null">
-              · {{ total.changePercentage > 0 ? '+' : '' }}{{ dashboardNumber.format(total.changePercentage) }}%
+              · {{ formatSignedReportPercentage(total.changePercentage) }}
             </template>
           </p>
         </template>

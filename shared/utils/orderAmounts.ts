@@ -1,8 +1,9 @@
+import { roundDecimalMoney } from '@rafamedtech/nuxt-shared/utils'
 import Decimal from 'decimal.js'
 
 // Importes monetarios en centavos con redondeo decimal, sin errores binarios.
 export function orderMoney(value: Decimal.Value) {
-  return new Decimal(value).toDecimalPlaces(2, Decimal.ROUND_HALF_UP)
+  return roundDecimalMoney(value)
 }
 
 export function orderDiscount(base: Decimal.Value, type: string, value: Decimal.Value) {

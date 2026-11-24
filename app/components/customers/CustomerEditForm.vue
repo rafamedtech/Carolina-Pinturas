@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { FormSubmitEvent } from '@nuxt/ui'
+import { normalizePhone } from '@rafamedtech/nuxt-shared/utils'
 import * as z from 'zod'
 import type { SiigoCustomer, SiigoCustomerMutationInput } from '~/types/siigo'
 import { SAT_FISCAL_REGIMES } from '~/utils/satFiscalRegimes'
@@ -140,7 +141,6 @@ const personTypeOptions = [
   { label: 'Extranjero', value: 'Foreign' }
 ]
 const isPhysical = computed(() => state.personType === 'Physical')
-const cityOptions = computed(() => siigoMexicoCityOptions(state.stateCode))
 const hasChanges = computed(() => JSON.stringify(state) !== initialState.value)
 
 watch(() => [props.customer, props.activeOverride] as const, () => {
@@ -184,27 +184,6 @@ function optional(value: string) {
 
 function optionalNumber(value: string) {
   return value === '' ? undefined : Number(value)
-}
-
-function normalizePhone(value: string | number | null | undefined) {
-  return String(value ?? '').replace(/\D/g, '').slice(0, 10)
-}
-
-function onPhoneInput(event: Event) {
-  const input = event.target
-  if (!(input instanceof HTMLInputElement)) return
-
-  const normalized = normalizePhone(input.value)
-  input.value = normalized
-  state.phone = normalized
-}
-
-function updateStateCode(value: string | undefined) {
-  const stateCode = normalizeSiigoMexicoStateCode(value)
-  if (state.stateCode === stateCode) return
-
-  state.stateCode = stateCode
-  state.cityCode = ''
 }
 
 function onSubmit(event: FormSubmitEvent<Schema>) {
@@ -368,17 +347,12 @@ function onSubmit(event: FormSubmitEvent<Schema>) {
           />
         </UFormField>
         <UFormField label="Teléfono" name="phone">
-          <UInput
-            :model-value="state.phone"
-            type="tel"
-            inputmode="numeric"
-            autocomplete="tel-national"
-            maxlength="10"
+          <AppPhoneInput
+            v-model="state.phone"
+            format="digits"
             pattern="[0-9]{10}"
             placeholder="6641234567"
-            class="w-full"
             :disabled="saving"
-            @input="onPhoneInput"
           />
         </UFormField>
       </div>
@@ -418,29 +392,19 @@ function onSubmit(event: FormSubmitEvent<Schema>) {
             :disabled="saving"
           />
         </UFormField>
-        <UFormField label="Estado" name="stateCode" required>
-          <USelectMenu
-            :model-value="state.stateCode"
-            :items="SIIGO_MEXICO_STATES"
-            value-key="value"
-            :search-input="{ placeholder: 'Buscar por código o estado' }"
-            placeholder="Selecciona un estado"
-            class="w-full"
-            :disabled="saving"
-            @update:model-value="updateStateCode"
-          />
-        </UFormField>
-        <UFormField label="Ciudad" name="cityCode" required>
-          <USelectMenu
-            v-model="state.cityCode"
-            :items="cityOptions"
-            value-key="value"
-            :search-input="{ placeholder: 'Buscar por código o ciudad' }"
-            :placeholder="state.stateCode ? 'Selecciona una ciudad' : 'Selecciona primero un estado'"
-            class="w-full"
-            :disabled="saving || !state.stateCode"
-          />
-        </UFormField>
+        <SiigoMexicoLocationFields
+          v-model:state-code="state.stateCode"
+          v-model:municipality-code="state.cityCode"
+          state-name="stateCode"
+          municipality-name="cityCode"
+          municipality-label="Ciudad"
+          :state-options="SIIGO_MEXICO_STATES"
+          :get-municipalities="siigoMexicoCityOptions"
+          state-search-placeholder="Buscar por código o estado"
+          municipality-search-placeholder="Buscar por código o ciudad"
+          municipality-placeholder="Selecciona una ciudad"
+          :disabled="saving"
+        />
         <UFormField label="Observaciones" name="comments" class="sm:col-span-3">
           <UTextarea
             v-model="state.comments"

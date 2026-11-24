@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { createCurrencyFormatter } from '@rafamedtech/nuxt-shared/utils'
 import { formatDate } from '~/utils/datetime'
 import * as z from 'zod'
 import type { FormSubmitEvent } from '@nuxt/ui'
@@ -186,7 +187,7 @@ const modalPhase = shallowRef<'review' | 'sending' | 'done'>('review')
 const createdOrder = shallowRef<SalesOrderDetail | null>(null)
 const { printTicket, printingTicket } = useTicketPrinter()
 const toast = useToast()
-const currency = new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' })
+const currency = createCurrencyFormatter('MXN')
 const {
   lines,
   total,

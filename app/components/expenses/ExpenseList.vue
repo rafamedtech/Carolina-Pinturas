@@ -1,10 +1,11 @@
 <script setup lang="ts">
+import { createCurrencyFormatter } from '@rafamedtech/nuxt-shared/utils'
 import type { ListLayoutConfig } from '~/types/list'
 import { PAYMENT_METHODS, paymentMethodLabel } from '~/utils/orderPayment'
 import { tableQueryField, tableQueryText, tableQueryPage, tableQueryRange } from '~/utils/tableQuery'
 import type { OrderDateRange } from '~/types/orders'
 import type { CreateExpenseInput, ExpenseListResponse, ExpenseRecord } from '~/types/expenses'
-import type { CsvColumn } from '~/utils/csv'
+import type { CsvColumn } from '@rafamedtech/nuxt-shared/utils'
 import { canViewExpenseCategory, visibleExpenseCategories } from '~/utils/expense'
 
 const { user, canWrite } = useAuth()
@@ -110,10 +111,7 @@ function fetchAllExpenses() {
 }
 
 function formatCurrency(amount: number, currencyCode: string) {
-  return new Intl.NumberFormat('es-MX', {
-    style: 'currency',
-    currency: currencyCode
-  }).format(amount)
+  return createCurrencyFormatter(currencyCode).format(amount)
 }
 
 watch(modalOpen, (isOpen) => {

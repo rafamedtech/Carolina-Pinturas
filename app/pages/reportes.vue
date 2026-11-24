@@ -1,13 +1,13 @@
 <script setup lang="ts">
 import { tableQueryField, tableQueryDate } from '~/utils/tableQuery'
-import { CalendarDate } from '@internationalized/date'
+import { CalendarDate, type DateValue } from '@internationalized/date'
 import ReportsPeriodControls from '~/components/reports/ReportsPeriodControls.vue'
 
 const now = new Date()
 const view = shallowRef<'monthly' | 'annual'>('monthly')
 const title = computed(() => view.value === 'annual' ? 'Reporte anual' : 'Reporte mensual')
 useSeoMeta({ title: () => title.value })
-const selectedMonth = shallowRef(new CalendarDate(now.getFullYear(), now.getMonth() + 1, 1))
+const selectedMonth = shallowRef<DateValue>(new CalendarDate(now.getFullYear(), now.getMonth() + 1, 1))
 const defaultMonth = selectedMonth.value
 useTableQuery([tableQueryField('view', view, {
   parse: value => value === 'annual' ? 'annual' : 'monthly',
@@ -15,11 +15,14 @@ useTableQuery([tableQueryField('view', view, {
 }), tableQueryField('month', selectedMonth, {
   parse: (value) => {
     const date = tableQueryDate.parse(typeof value === 'string' ? `${value}-01` : '')
-    return date ? new CalendarDate(Number(date.slice(0, 4)), Number(date.slice(5, 7)), 1) : defaultMonth
+    if (!date) return defaultMonth
+
+    const year = Number(date.slice(0, 4))
+    return year >= 1000 && year <= 9998 ? new CalendarDate(year, Number(date.slice(5, 7)), 1) : defaultMonth
   },
-  serialize: value => `${value.year}-${String(value.month).padStart(2, '0')}`
+  serialize: value => value.toString().slice(0, 7)
 })])
-const month = computed(() => `${selectedMonth.value.year}-${String(selectedMonth.value.month).padStart(2, '0')}`)
+const month = computed(() => selectedMonth.value.toString().slice(0, 7))
 </script>
 
 <template>

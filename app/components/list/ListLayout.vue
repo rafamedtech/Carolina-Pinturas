@@ -38,7 +38,6 @@ const listTable = useTemplateRef<{
   getColumns: () => Column<T, unknown>[]
   getRows: () => MobileRow[] | undefined
 }>('listTable')
-const moreFiltersOpen = shallowRef(false)
 const pageSize = computed(() => props.config.pagination?.pageSize ?? 25)
 const tablePage = computed({
   get: () => props.config.pagination?.mode === 'client' ? page.value : undefined,
@@ -116,15 +115,20 @@ defineSlots<{
         <template #filters>
           <div v-if="config.dateFilter || config.filters?.length" class="flex min-w-0 gap-2 md:contents">
             <OrdersOrderDateRangePicker v-if="config.dateFilter" v-model="dateRange" :subject="config.dateFilter.subject" />
-            <AppButton
+            <ListFiltersModal
               v-if="config.filters?.length"
-              label="Más filtros"
-              icon="i-lucide-sliders-horizontal"
-              intent="secondary"
-              class="shrink-0 sm:justify-center"
-              :class="config.dateFilter ? 'justify-center' : 'w-full justify-start sm:w-auto'"
-              @click="moreFiltersOpen = true"
-            />
+              :fields="config.filters"
+              :values="filters"
+              @apply="applyFilters"
+            >
+              <AppButton
+                label="Más filtros"
+                icon="i-lucide-sliders-horizontal"
+                intent="secondary"
+                class="shrink-0 sm:justify-center"
+                :class="config.dateFilter ? 'justify-center' : 'w-full justify-start sm:w-auto'"
+              />
+            </ListFiltersModal>
           </div>
         </template>
         <template #actions>
@@ -151,41 +155,44 @@ defineSlots<{
     <ListLoading v-if="loading" />
     <template v-else>
       <slot name="content" :rows="data">
-        <div v-if="$slots.mobile || $slots.record" class="md:hidden">
-          <div v-if="$slots.record && mobileRows.length && mobileSortItems.length" class="mb-3 flex justify-end">
-            <UDropdownMenu :items="mobileSortItems" :content="{ align: 'end' }">
-              <AppButton
-                intent="secondary"
-                label="Ordenar"
-                icon="i-lucide-arrow-up-down"
-                size="sm"
-              />
-            </UDropdownMenu>
-          </div>
-          <slot name="mobile" :rows="mobileRows.map(row => row.original)">
-            <div v-if="mobileRows.length" class="space-y-3">
-              <template v-for="row in mobileRows" :key="row.id">
-                <slot name="record" :row="row.original" />
-              </template>
+        <ListResponsive :rows="data">
+          <template v-if="$slots.mobile || $slots.record" #mobile>
+            <div v-if="$slots.record && mobileRows.length && mobileSortItems.length" class="mb-3 flex justify-end">
+              <UDropdownMenu :items="mobileSortItems" :content="{ align: 'end' }">
+                <AppButton
+                  intent="secondary"
+                  label="Ordenar"
+                  icon="i-lucide-arrow-up-down"
+                  size="sm"
+                />
+              </UDropdownMenu>
             </div>
-            <UEmpty v-else icon="i-lucide-inbox" :title="config.empty" />
-          </slot>
-        </div>
-        <ListTable
-          ref="listTable"
-          :key="config.id"
-          v-model:page="tablePage"
-          v-model:sorting="sorting"
-          v-model:column-visibility="columnVisibility"
-          :data="data"
-          :columns="columns"
-          :page-size="pageSize"
-          :meta="meta"
-          :empty="config.empty"
-          :on-select="onSelect"
-          :show-column-picker="false"
-          :class="{ 'hidden md:block': $slots.mobile || $slots.record }"
-        />
+            <slot name="mobile" :rows="mobileRows.map(row => row.original)">
+              <div v-if="mobileRows.length" class="space-y-3">
+                <template v-for="row in mobileRows" :key="row.id">
+                  <slot name="record" :row="row.original" />
+                </template>
+              </div>
+              <UEmpty v-else icon="i-lucide-inbox" :title="config.empty" />
+            </slot>
+          </template>
+          <template #table>
+            <ListTable
+              ref="listTable"
+              :key="config.id"
+              v-model:page="tablePage"
+              v-model:sorting="sorting"
+              v-model:column-visibility="columnVisibility"
+              :data="data"
+              :columns="columns"
+              :page-size="pageSize"
+              :meta="meta"
+              :empty="config.empty"
+              :on-select="onSelect"
+              :show-column-picker="false"
+            />
+          </template>
+        </ListResponsive>
       </slot>
     </template>
     <template #pagination>
@@ -202,13 +209,6 @@ defineSlots<{
       <slot name="after" />
     </template>
     <template #overlays>
-      <ListFiltersModal
-        v-if="config.filters?.length"
-        v-model:open="moreFiltersOpen"
-        :fields="config.filters"
-        :values="filters"
-        @apply="applyFilters"
-      />
       <slot name="overlays" />
     </template>
   </ListPage>

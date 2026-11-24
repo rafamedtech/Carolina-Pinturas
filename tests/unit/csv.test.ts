@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import type { CsvColumn } from '../../app/utils/csv'
-import { csvFilename, toCsv } from '../../app/utils/csv'
+import type { CsvColumn } from '@rafamedtech/nuxt-shared/utils'
+import { csvFilename, toCsv } from '@rafamedtech/nuxt-shared/utils'
+import { formatDateTime } from '../../app/utils/datetime'
 
 interface Row {
   name: string
@@ -34,7 +35,7 @@ describe('toCsv', () => {
   })
 
   it('exports Date values with the shared date and time format', () => {
-    expect(toCsv([{ key: 'date', label: 'Fecha' }], [{ date: new Date('2026-10-02T18:05:00Z') }]))
+    expect(toCsv([{ key: 'date', label: 'Fecha' }], [{ date: new Date('2026-10-02T18:05:00Z') }], formatDateTime))
       .toBe('Fecha\r\n"02/10/2026, 12:05"')
   })
 })

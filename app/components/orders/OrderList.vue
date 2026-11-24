@@ -1,10 +1,11 @@
 <script setup lang="ts">
+import { normalizeSearchText } from '@rafamedtech/nuxt-shared/utils'
 import { igualacionStatusIcons, orderListTabs } from '~/utils/orderNavigation'
 import type { DropdownMenuItem } from '@nuxt/ui'
 import type { ListLayoutConfig } from '~/types/list'
 import { tableQueryField, tableQueryText, tableQueryPage, tableQueryRange, tableQueryBoolean } from '~/utils/tableQuery'
 import type { OrderDateRange, OrderStatus, SalesOrderListItem, SalesOrderListResponse } from '~/types/orders'
-import type { CsvColumn } from '~/utils/csv'
+import type { CsvColumn } from '@rafamedtech/nuxt-shared/utils'
 import { ORDER_PAYMENT_METHODS, orderHasPaymentStatus, orderPaymentStatusLabel } from '~/utils/orderPayment'
 import { canCreateOrders } from '~/utils/roleAccess'
 
@@ -66,7 +67,7 @@ const hideCancelled = shallowRef(false)
 const hideQuotes = shallowRef(false)
 const hideOrderQueryBoolean = {
   parse: (value: unknown) => value == null ? isPendingPaymentView.value : tableQueryBoolean.parse(value),
-  serialize: (value: boolean) => value ? 'true' : isPendingPaymentView.value ? 'false' : undefined
+  serialize: (value: boolean) => value === isPendingPaymentView.value ? undefined : String(value)
 }
 const dateRange = shallowRef<OrderDateRange | null>(null)
 const page = shallowRef(1)
@@ -99,7 +100,7 @@ watch(canViewInternal, (canView) => {
   if (!canView && selectedTab.value === 'internos') selectedTab.value = 'all'
 })
 
-const debouncedFilter = refDebounced(filter, 300)
+const debouncedFilter = refDebounced(computed(() => normalizeSearchText(filter.value)), 300)
 
 const dateFrom = computed(() => dateRange.value?.start && dateRange.value?.end
   ? dateRange.value.start.toString()
@@ -316,8 +317,8 @@ const listConfig = computed<ListLayoutConfig>(() => ({
   filters: [
     { key: 'paymentStatus', label: 'Estado de pago', type: 'select', defaultValue: 'all', items: paymentStatusOptions },
     { key: 'paymentMethod', label: 'Método de pago', type: 'select', defaultValue: 'all', items: paymentMethodOptions },
-    { key: 'hideCancelled', label: 'Ocultar cancelados', type: 'checkbox', defaultValue: false },
-    { key: 'hideQuotes', label: 'Ocultar cotizaciones', type: 'checkbox', defaultValue: false }
+    { key: 'hideCancelled', label: 'Ocultar cancelados', type: 'checkbox', defaultValue: isPendingPaymentView.value },
+    { key: 'hideQuotes', label: 'Ocultar cotizaciones', type: 'checkbox', defaultValue: isPendingPaymentView.value }
   ],
   create: !props.igualacion && canCreate.value ? { items: newOrderItems.value } : undefined,
   pagination: { mode: 'server', label: props.igualacion ? 'igualaciones' : 'pedidos', pageSize }

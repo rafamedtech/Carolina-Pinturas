@@ -48,23 +48,10 @@ async function onSubmit(event: FormSubmitEvent<UpdatePasswordInput>) {
         icon="i-lucide-circle-alert"
       />
 
-      <UFormField label="Nueva contraseña" name="password">
-        <UInput
-          v-model="state.password"
-          type="password"
-          autocomplete="new-password"
-          class="w-full"
-        />
-      </UFormField>
-
-      <UFormField label="Confirmar contraseña" name="confirmPassword">
-        <UInput
-          v-model="state.confirmPassword"
-          type="password"
-          autocomplete="new-password"
-          class="w-full"
-        />
-      </UFormField>
+      <AuthPasswordFields
+        v-model:password="state.password"
+        v-model:confirmation="state.confirmPassword"
+      />
 
       <UButton
         type="submit"

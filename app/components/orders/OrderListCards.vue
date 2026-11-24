@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { createCurrencyFormatter } from '@rafamedtech/nuxt-shared/utils'
 import { formatDate } from '~/utils/datetime'
 import type { SalesOrderListItem } from '~/types/orders'
 
@@ -15,10 +16,7 @@ const emit = defineEmits<{
   open: [order: SalesOrderListItem]
 }>()
 
-const currency = new Intl.NumberFormat('es-MX', {
-  style: 'currency',
-  currency: 'MXN'
-})
+const currency = createCurrencyFormatter('MXN')
 
 function igualacionItems(order: SalesOrderListItem) {
   return (order.partidas ?? []).filter(item => item.isIgualacion)

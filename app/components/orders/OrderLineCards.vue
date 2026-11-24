@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { createCurrencyFormatter } from '@rafamedtech/nuxt-shared/utils'
 import type { DraftOrderLine } from '~/composables/useOrderDraft'
 import { draftLineTotal } from '~/composables/useOrderDraft'
 import type { OrderDiscountType } from '~/types/orders'
@@ -18,10 +19,7 @@ const emit = defineEmits<{
   'edit-price': [line: DraftOrderLine]
 }>()
 
-const currency = new Intl.NumberFormat('es-MX', {
-  style: 'currency',
-  currency: 'MXN'
-})
+const currency = createCurrencyFormatter('MXN')
 </script>
 
 <template>

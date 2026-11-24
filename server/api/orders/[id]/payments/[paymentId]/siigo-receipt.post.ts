@@ -1,3 +1,4 @@
+import { resolveValidationResult } from '@rafamedtech/nuxt-shared/utils'
 import type { CreateOrderSiigoPaymentInput, OrderPayment } from '~/types/siigo-payments'
 import { siigoReceiptPaymentDateError } from '#shared/utils/siigoReceiptDates'
 import { ORDER_LOGISTICS_ROLES } from '~/utils/roleAccess'
@@ -49,11 +50,12 @@ export default eventHandler(async (event): Promise<OrderPayment> => {
     throw createError({ statusCode: 400, statusMessage: 'Falta el identificador del pedido o del pago.' })
   }
 
-  const parsed = createOrderSiigoReceiptSchema.safeParse(await readBody(event))
+  const validationFallback = 'Revisa los datos de la recepción.'
+  const parsed = resolveValidationResult(createOrderSiigoReceiptSchema.safeParse(await readBody(event)), validationFallback)
   if (!parsed.success) {
     throw createError({
       statusCode: 400,
-      statusMessage: parsed.error.issues[0]?.message || 'Revisa los datos de la recepción.',
+      statusMessage: parsed.message || validationFallback,
       data: parsed.error.flatten()
     })
   }

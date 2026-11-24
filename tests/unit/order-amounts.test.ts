@@ -49,9 +49,17 @@ describe('importes de pedidos', () => {
     expect(orderAmounts([line, line, line], 'porcentaje', 0).total.toNumber()).toBe(0.18)
   })
 
+  it('suma el IVA redondeado por partida de forma independiente', () => {
+    const line = orderLineAmounts(1, 0.05, 8, false)
+    const combinedLine = orderLineAmounts(3, 0.05, 8, false)
+    expect(orderAmounts([line, line, line], 'porcentaje', 0).total.toNumber()).toBe(0.15)
+    expect(combinedLine.total.toNumber()).toBe(0.16)
+  })
+
   it('usa redondeo decimal half-up sin errores binarios', () => {
     expect(orderMoney(1.005).toNumber()).toBe(1.01)
     expect(orderMoney(2.675).toNumber()).toBe(2.68)
+    expect(orderMoney('-1.005').toNumber()).toBe(-1.01)
     const line = orderLineAmounts(1, 1.005, 0, false)
     expect(line.total.toNumber()).toBe(1.01)
   })

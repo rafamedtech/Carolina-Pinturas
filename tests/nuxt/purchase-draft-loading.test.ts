@@ -47,12 +47,30 @@ describe('carga del formulario de compra', () => {
     resolveSuppliers({ results: [{ id: 'supplier-1', name: ['Proveedor de prueba'] }] })
     resolveProducts({ results: [{ id: 'product-1', name: 'Pintura blanca' }] })
     await vi.waitFor(() => expect(wrapper.text()).not.toContain('Cargando catálogos de Siigo…'))
+    const inputs = wrapper.findAll<HTMLInputElement>('[role="spinbutton"]')
+    const cost = inputs.find(input => input.element.value === '20')
+    const quantity = inputs.find(input => input.element.value === '2.5')
+    if (!cost || !quantity) throw new Error('Falta un campo numérico de la partida')
+
+    await cost.setValue('')
+    await cost.trigger('blur')
+    expect(cost.element.value).toBe('')
+    expect(wrapper.text()).toContain('Captura cantidad y costo de cada partida.')
+    await wrapper.get('form').trigger('submit')
+    expect(wrapper.emitted('save')).toBeUndefined()
+
+    await cost.setValue('20.123456')
+    await cost.trigger('blur')
+    await quantity.setValue('2.123456')
+    await quantity.trigger('blur')
+    expect(cost.element.value).toBe('20.123456')
+    expect(quantity.element.value).toBe('2.123456')
     await wrapper.get('textarea').setValue('Notas de la copia')
     await wrapper.get('form').trigger('submit')
 
     expect(wrapper.emitted('save')?.[0]?.[0]).toEqual({
       providerId: 'supplier-1', date: mexicoToday(), currencyCode: 'USD', vatRate: 16,
-      notes: 'Notas de la copia', items: [{ productId: 'product-1', quantity: 2.5, unitCost: 20 }]
+      notes: 'Notas de la copia', items: [{ productId: 'product-1', quantity: 2.123456, unitCost: 20.123456 }]
     })
     expect(source).toEqual(original)
     wrapper.unmount()

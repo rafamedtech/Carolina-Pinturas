@@ -1,3 +1,4 @@
+import { hasDecimalScale, isIsoCalendarDate, isPositiveAmount } from '@rafamedtech/nuxt-shared/utils'
 import * as z from 'zod'
 import type { Expense } from '../../generated/prisma/client'
 import type { ExpenseRecord } from '~/types/expenses'
@@ -7,18 +8,15 @@ import { PAYMENT_METHOD_KEYS } from '~/utils/orderPayment'
 
 const dateSchema = z.string()
   .regex(/^\d{4}-\d{2}-\d{2}$/, 'Usa una fecha con formato AAAA-MM-DD.')
-  .refine((value) => {
-    const date = new Date(`${value}T00:00:00.000Z`)
-    return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value
-  }, 'Selecciona una fecha válida.')
+  .refine(isIsoCalendarDate, 'Selecciona una fecha válida.')
 const amountSchema = z.number()
-  .positive('El importe debe ser mayor a cero.')
+  .refine(isPositiveAmount, 'El importe debe ser mayor a cero.')
   .max(9_999_999_999_999.99)
-  .refine(value => Number(value.toFixed(2)) === value, 'El importe admite máximo dos decimales.')
+  .refine(value => hasDecimalScale(value, 2), 'El importe admite máximo dos decimales.')
 const exchangeRateSchema = z.number()
-  .positive('El tipo de cambio debe ser mayor a cero.')
+  .refine(isPositiveAmount, 'El tipo de cambio debe ser mayor a cero.')
   .max(1_000_000)
-  .refine(value => Number(value.toFixed(6)) === value, 'El tipo de cambio admite máximo seis decimales.')
+  .refine(value => hasDecimalScale(value, 6), 'El tipo de cambio admite máximo seis decimales.')
 
 export const createExpenseSchema = z.object({
   productId: z.uuid().nullish(),

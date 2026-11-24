@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { createCurrencyFormatter, readApiErrorMessage } from '@rafamedtech/nuxt-shared/utils'
 import type { OrderPayment } from '~/types/siigo-payments'
 import { paymentMethodLabel } from '~/utils/orderPayment'
 
@@ -13,16 +14,19 @@ const emit = defineEmits<{
 
 const open = defineModel<boolean>('open', { required: true })
 const deleting = shallowRef(false)
+const errorMessage = ref('')
 const toast = useToast()
 
-const currency = computed(() => new Intl.NumberFormat('es-MX', {
-  style: 'currency',
-  currency: props.payment.currencyCode
-}))
+watch(open, (value) => {
+  if (value) errorMessage.value = ''
+})
+
+const currency = computed(() => createCurrencyFormatter(props.payment.currencyCode))
 
 async function deletePayment() {
   if (deleting.value) return
   deleting.value = true
+  errorMessage.value = ''
 
   try {
     await $fetch(
@@ -38,14 +42,7 @@ async function deletePayment() {
       icon: 'i-lucide-circle-check'
     })
   } catch (fetchError: unknown) {
-    const response = fetchError as { data?: { statusMessage?: string }, message?: string }
-    toast.add({
-      title: 'No se pudo eliminar el pago',
-      description: response.data?.statusMessage || response.message || 'Intenta de nuevo.',
-      color: 'error',
-      icon: 'i-lucide-circle-alert',
-      duration: 8000
-    })
+    errorMessage.value = readApiErrorMessage(fetchError) || 'No se pudo eliminar el pago. Intenta de nuevo.'
   } finally {
     deleting.value = false
   }
@@ -53,15 +50,18 @@ async function deletePayment() {
 </script>
 
 <template>
-  <UModal
+  <DestructiveConfirmModal
     v-model:open="open"
     title="Eliminar pago"
     description="Esta acción es permanente y volverá a calcular el saldo del pedido."
-    :dismissible="!deleting"
-    :close="deleting ? false : undefined"
-    :ui="{ footer: 'justify-end' }"
+    cancel-label="Conservar pago"
+    confirm-label="Eliminar pago"
+    confirm-icon="i-lucide-trash-2"
+    :loading="deleting"
+    :error="errorMessage"
+    @confirm="deletePayment"
   >
-    <template #body>
+    <template #context>
       <UAlert
         color="warning"
         variant="subtle"
@@ -70,22 +70,5 @@ async function deletePayment() {
         :description="`${currency.format(payment.amount)} · ${paymentMethodLabel(payment.paymentMethod)}`"
       />
     </template>
-
-    <template #footer>
-      <AppButton
-        label="Conservar pago"
-        intent="secondary"
-        :disabled="deleting"
-        @click="open = false"
-      />
-      <AppButton
-        label="Eliminar pago"
-        intent="danger"
-        variant="solid"
-        icon="i-lucide-trash-2"
-        :loading="deleting"
-        @click="deletePayment"
-      />
-    </template>
-  </UModal>
+  </DestructiveConfirmModal>
 </template>

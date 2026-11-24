@@ -1,5 +1,6 @@
 import type { PurchaseAction } from '#shared/schemas/purchase'
 import type { PurchaseView } from '~/types/purchases'
+import { readApiErrorMessage } from '@rafamedtech/nuxt-shared/utils'
 
 export function usePurchaseAction(order: () => PurchaseView, saved: (value: PurchaseView) => void) {
   const busy = shallowRef(false)
@@ -18,7 +19,7 @@ export function usePurchaseAction(order: () => PurchaseView, saved: (value: Purc
       saved(result)
       return true
     } catch (e) {
-      error.value = (e as { data?: { statusMessage?: string } }).data?.statusMessage || 'No se pudo completar. Recarga para comprobar el estado antes de cambiar los datos.'
+      error.value = readApiErrorMessage(e, ['data.statusMessage']) || 'No se pudo completar. Recarga para comprobar el estado antes de cambiar los datos.'
       return false
     } finally { busy.value = false }
   }

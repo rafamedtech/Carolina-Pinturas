@@ -1,14 +1,15 @@
 // @vitest-environment nuxt
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { mockNuxtImport, mountSuspended, registerEndpoint } from '@nuxt/test-utils/runtime'
+import { ref } from 'vue'
 import type { VueWrapper } from '@vue/test-utils'
 import OrderPaymentsCard from '~/components/orders/payments/OrderPaymentsCard.vue'
 import type { OrderPaymentContext } from '~/types/siigo-payments'
 
 const { useAuthMock } = vi.hoisted(() => ({
   useAuthMock: vi.fn(() => ({
-    canWrite: { value: true },
-    user: { value: { role: 'admin' } }
+    canWrite: ref(true),
+    user: ref({ role: 'admin' })
   }))
 }))
 mockNuxtImport('useAuth', () => useAuthMock)
@@ -69,6 +70,7 @@ afterEach(() => {
 })
 
 beforeEach(() => {
+  useAuthMock.mockReset()
   context.siigo.assignedInvoiceStamped = false
   context.siigo.assignedInvoice!.stamped = false
   context.siigo.assignedInvoice!.stampStatus = 'Draft'
@@ -103,8 +105,18 @@ describe('OrderPaymentsCard · asignar recepciones existentes', () => {
     expect(buttons.every(button => !button.props('to'))).toBe(true)
     expect(buttons.map(button => button.props('label')).join(' ')).not.toMatch(/timbrar|enlace|Siigo Nube/i)
     expect(wrapper?.findComponent({ name: 'OrderPaymentSiigoModal' }).exists()).toBe(false)
-    // El registro local de abonos sigue disponible y es independiente de Siigo.
-    expect(action('Agregar pago')).toBeDefined()
+    // El botón de abonos locales sigue visible y se desactiva con saldo cero.
+    expect(action('Agregar pago')?.attributes('disabled')).toBeDefined()
+  })
+
+  it('muestra el resumen al rol consulta sin exponer acciones de captura', async () => {
+    useAuthMock.mockReturnValue({ canWrite: ref(false), user: ref({ role: 'consulta' }) })
+    const card = await mountPayments(true)
+
+    expect(card.findAll('dt').map(label => label.text())).toEqual(['Pedido', 'Pagado', 'Pendiente'])
+    expect(card.findAll('dd').map(amount => amount.text())).toEqual(['$110.00', '$110.00', '$0.00'])
+    expect(action('Agregar pago')).toBeUndefined()
+    expect(action('Asignar pago timbrado')).toBeUndefined()
   })
 
   it('no permite asignar mientras la factura sigue en borrador', async () => {

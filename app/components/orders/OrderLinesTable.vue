@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { createCurrencyFormatter } from '@rafamedtech/nuxt-shared/utils'
 import { h, resolveComponent } from 'vue'
 import type { TableColumn } from '@nuxt/ui'
 import OrderLineCards from './OrderLineCards.vue'
@@ -32,7 +33,7 @@ const UButton = resolveComponent('UButton')
 const UInput = resolveComponent('UInput')
 const UInputNumber = resolveComponent('UInputNumber')
 const USelect = resolveComponent('USelect')
-const currency = new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' })
+const currency = createCurrencyFormatter('MXN')
 const tableLines = computed(() => [...props.lines])
 
 function updateObservations(productId: string, value: string) {

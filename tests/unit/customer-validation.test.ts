@@ -101,4 +101,13 @@ describe('createCustomerSchema', () => {
       address: { ...validPhysical.address, postalCode: '123' }
     })).toEqual(expect.arrayContaining(['email', 'phone', 'address.postalCode']))
   })
+
+  it('acepta teléfono omitido o de 7 a 10 dígitos y rechaza valores fuera del rango', () => {
+    for (const phone of [undefined, '1234567', '1234567890']) {
+      expect(createCustomerSchema.safeParse({ ...validPhysical, phone }).success).toBe(true)
+    }
+    for (const phone of ['', '123456', '12345678901', '+526641234567']) {
+      expect(errorPaths({ ...validPhysical, phone })).toContain('phone')
+    }
+  })
 })

@@ -4,7 +4,7 @@ import { ORDER_PAYMENT_METHODS, paymentMethodLabel } from '~/utils/orderPayment'
 import { tableQueryField, tableQueryText, tableQueryPage, tableQueryRange } from '~/utils/tableQuery'
 import type { OrderDateRange } from '~/types/orders'
 import type { PaymentListItem, PaymentListResponse } from '~/types/payments'
-import type { CsvColumn } from '~/utils/csv'
+import type { CsvColumn } from '@rafamedtech/nuxt-shared/utils'
 
 const filter = shallowRef('')
 const paymentMethod = shallowRef('all')

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { createCurrencyFormatter } from '@rafamedtech/nuxt-shared/utils'
 import type { CustomerBalanceSummary } from '#shared/types/customerBalance'
 
 const props = defineProps<{ customerId: string }>()
@@ -37,7 +38,7 @@ const indicator = computed(() => {
   return null
 })
 const detail = computed(() => summary.value
-  ? `Saldo pendiente: ${new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(summary.value.balance)} · Pedidos con saldo: ${summary.value.pendingOrders} · Recientes sin abonos: ${summary.value.recentUnpaidOrders} · Vencidos: ${summary.value.overdueOrders}`
+  ? `Saldo pendiente: ${createCurrencyFormatter('MXN').format(summary.value.balance)} · Pedidos con saldo: ${summary.value.pendingOrders} · Recientes sin abonos: ${summary.value.recentUnpaidOrders} · Vencidos: ${summary.value.overdueOrders}`
   : undefined)
 </script>
 

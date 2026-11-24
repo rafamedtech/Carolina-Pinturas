@@ -9,7 +9,5 @@ const color = computed(() => orderStatusBadgeColor(props.status.color))
 </script>
 
 <template>
-  <UBadge :color="color" variant="subtle">
-    {{ status.label }}
-  </UBadge>
+  <StatusBadge :label="status.label" :color="color" />
 </template>

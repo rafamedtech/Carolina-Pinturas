@@ -1,11 +1,12 @@
 <script setup lang="ts">
+import { createCurrencyFormatter } from '@rafamedtech/nuxt-shared/utils'
 import type { ExpenseRecord } from '~/types/expenses'
 import { paymentMethodLabel } from '~/utils/orderPayment'
 
 defineProps<{ expenses: readonly ExpenseRecord[] }>()
 const emit = defineEmits<{ select: [expense: ExpenseRecord] }>()
 function formatCurrency(amount: number, currencyCode: string) {
-  return new Intl.NumberFormat('es-MX', { style: 'currency', currency: currencyCode }).format(amount)
+  return createCurrencyFormatter(currencyCode).format(amount)
 }
 </script>
 

@@ -7,7 +7,7 @@ import type { OrderDateRange } from '~/types/orders'
 import { tableQueryField, tableQueryText, tableQueryBoolean, tableQueryPage, tableQueryDate } from '~/utils/tableQuery'
 import type { InventoryStock, InventoryWarehouse, InventorySettings, InventoryMovement, InventoryCount, InventoryPage, InventorySummary as InventorySummaryData } from '#shared/types/inventory'
 import type { InventoryCommand } from '#shared/schemas/inventory'
-import type { CsvColumn } from '~/utils/csv'
+import type { CsvColumn } from '@rafamedtech/nuxt-shared/utils'
 import { fetchAllPages } from '~/composables/useCsvExport'
 import { formatDate, mexicoToday } from '~/utils/datetime'
 

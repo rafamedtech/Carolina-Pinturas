@@ -1,3 +1,4 @@
+import { addReportGroup, rankReportAmounts } from '@rafamedtech/nuxt-shared/utils'
 import type { Prisma } from '../../../generated/prisma/client'
 import type {
   BusinessReportSummary,
@@ -227,44 +228,34 @@ export default eventHandler(async (event) => {
     const grouped = new Map<string, { amount: number, count: number }>()
 
     for (const entry of entries) {
-      const key = keyOf(entry)
-      const current = grouped.get(key) ?? { amount: 0, count: 0 }
-      current.amount += amountOf(entry)
-      current.count += 1
-      grouped.set(key, current)
+      addReportGroup(grouped, keyOf(entry), amountOf(entry), () => ({ amount: 0, count: 0 }))
     }
 
-    return [...grouped.entries()]
-      .map(([key, value]) => ({
-        key,
-        label: labelOf(key),
-        ...value,
-        percentage: reportPercentage(value.amount, total)
-      }))
-      .sort((a, b) => b.amount - a.amount)
+    const rows = Array.from(grouped, ([key, value]) => ({
+      key,
+      label: labelOf(key),
+      ...value,
+      percentage: reportPercentage(value.amount, total)
+    }))
+    return rankReportAmounts(rows)
   }
 
   function ranking(
     grouped: Map<string, Omit<ReportRankingItem, 'id' | 'percentage'>>,
     total: number
   ): ReportRankingItem[] {
-    return [...grouped.entries()]
-      .map(([id, value]) => ({ ...value, id, percentage: reportPercentage(value.amount, total) }))
-      .sort((a, b) => b.amount - a.amount)
-      .slice(0, 5)
+    const rows = Array.from(grouped, ([id, value]) => ({ ...value, id, percentage: reportPercentage(value.amount, total) }))
+    return rankReportAmounts(rows, 5)
   }
 
   const materialProviders = new Map<string, Omit<ReportRankingItem, 'id' | 'percentage'>>()
   for (const expense of materialExpenses) {
-    const provider = materialProviders.get(expense.providerId) ?? {
+    addReportGroup(materialProviders, expense.providerId, expenseAmount(expense), () => ({
       label: expense.providerNameSnapshot,
       detail: 'Proveedor',
       amount: 0,
       count: 0
-    }
-    provider.amount += expenseAmount(expense)
-    provider.count += 1
-    materialProviders.set(expense.providerId, provider)
+    }))
   }
 
   const customers = new Map<string, Omit<ReportRankingItem, 'id' | 'percentage'>>()
@@ -274,48 +265,36 @@ export default eventHandler(async (event) => {
 
   for (const order of orders) {
     const orderTotal = reportSalesBeforeTax(order)
-    const customer = customers.get(order.customerId) ?? {
+    addReportGroup(customers, order.customerId, orderTotal, () => ({
       label: order.customerNameSnapshot,
       detail: 'Cliente',
       amount: 0,
       count: 0
-    }
-    customer.amount += orderTotal
-    customer.count += 1
-    customers.set(order.customerId, customer)
+    }))
 
     if (reportSalesChannel(order) !== 'internal') {
-      const seller = sellers.get(order.vendedorEmail) ?? {
+      addReportGroup(sellers, order.vendedorEmail, orderTotal, () => ({
         label: order.vendedorNombre,
         detail: order.vendedorEmail,
         amount: 0,
         count: 0
-      }
-      seller.amount += orderTotal
-      seller.count += 1
-      sellers.set(order.vendedorEmail, seller)
+      }))
     }
 
     const itemsBeforeTax = order.items.reduce((sum, item) => sum + reportNumeric(item.total) - reportNumeric(item.taxAmount), 0)
     // Distribute the order-level discount so product sales reconcile with the order's net sales.
     const itemShare = itemsBeforeTax !== 0 ? orderTotal / itemsBeforeTax : 0
     for (const item of order.items) {
-      const product = products.get(item.productId) ?? {
+      const itemAmount = (reportNumeric(item.total) - reportNumeric(item.taxAmount)) * itemShare
+      addReportGroup(products, item.productId, itemAmount, () => ({
         label: item.productNameSnapshot,
         detail: item.productCodeSnapshot,
         amount: 0,
         count: 0
-      }
-      const itemAmount = (reportNumeric(item.total) - reportNumeric(item.taxAmount)) * itemShare
-      product.amount += itemAmount
-      product.count += reportNumeric(item.quantity)
-      products.set(item.productId, product)
+      }), reportNumeric(item.quantity))
 
       const lineKey = item.product.accountGroupName?.trim() || 'Sin línea'
-      const line = productLines.get(lineKey) ?? { amount: 0, count: 0 }
-      line.amount += itemAmount
-      line.count += 1
-      productLines.set(lineKey, line)
+      addReportGroup(productLines, lineKey, itemAmount, () => ({ amount: 0, count: 0 }))
     }
   }
 
@@ -418,9 +397,9 @@ export default eventHandler(async (event) => {
     topDebtors: reportTopDebtors(orders),
     topCustomers: ranking(customers, sales),
     topProducts: ranking(products, sales),
-    salesByLine: [...productLines.entries()]
-      .map(([key, value]) => ({ key, label: key, ...value, percentage: reportPercentage(value.amount, sales) }))
-      .sort((a, b) => b.amount - a.amount),
+    salesByLine: rankReportAmounts(Array.from(productLines, ([key, value]) => ({
+      key, label: key, ...value, percentage: reportPercentage(value.amount, sales)
+    }))),
     topSellers: ranking(sellers, orders.filter(order => reportSalesChannel(order) !== 'internal').reduce((sum, order) => sum + reportSalesBeforeTax(order), 0))
   }
 

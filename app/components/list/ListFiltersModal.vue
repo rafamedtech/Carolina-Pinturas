@@ -2,50 +2,22 @@
 import type { ListFilterDefinition, ListFilterValues } from '~/types/list'
 
 const props = defineProps<{ fields: ListFilterDefinition[], values: ListFilterValues }>()
-const open = defineModel<boolean>('open', { required: true })
+const open = defineModel<boolean>('open', { default: false })
 const emit = defineEmits<{ apply: [values: ListFilterValues] }>()
-const draft = ref<ListFilterValues>({})
-watch(open, (value) => {
-  if (value) draft.value = {
-    ...Object.fromEntries(props.fields.map(field => [field.key, field.defaultValue])),
-    ...props.values
-  }
-}, { immediate: true })
-function apply() {
-  emit('apply', { ...draft.value })
-  open.value = false
-}
-function reset() {
-  draft.value = Object.fromEntries(props.fields.map(field => [field.key, field.defaultValue]))
-}
+const defaults = computed(() => Object.fromEntries(props.fields.map(field => [field.key, field.defaultValue])))
+const valuesWithDefaults = computed(() => ({ ...defaults.value, ...props.values }))
 </script>
 
 <template>
-  <UModal
+  <ListFiltersDialog
     v-model:open="open"
-    title="Más filtros"
-    description="Refina los registros que quieres consultar."
-    :close="false"
-    :ui="{ footer: 'flex-wrap justify-end' }"
+    :values="valuesWithDefaults"
+    :defaults="defaults"
+    @apply="emit('apply', $event)"
   >
-    <template #body>
-      <ListFilterFields v-model="draft" :fields="fields" />
+    <slot v-if="$slots.default" />
+    <template #fields="{ draft, update }">
+      <ListFilterFields :model-value="draft" :fields="fields" @update:model-value="update" />
     </template>
-    <template #footer>
-      <UButton
-        label="Limpiar filtros"
-        color="neutral"
-        variant="ghost"
-        class="sm:mr-auto"
-        @click="reset"
-      />
-      <UButton
-        label="Cancelar"
-        color="neutral"
-        variant="outline"
-        @click="open = false"
-      />
-      <UButton label="Aplicar filtros" icon="i-lucide-check" @click="apply" />
-    </template>
-  </UModal>
+  </ListFiltersDialog>
 </template>

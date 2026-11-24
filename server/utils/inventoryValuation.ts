@@ -1,11 +1,6 @@
-import Decimal from 'decimal.js'
+import { calculateInventoryValuation } from '@rafamedtech/nuxt-shared/utils'
 import type { InventoryValuation } from '#shared/types/inventory'
 import { usePrisma } from './prisma'
-
-function valuationTotals(totals: Map<string, Decimal>) {
-  return [...totals].sort(([a], [b]) => a.localeCompare(b))
-    .map(([currencyCode, amount]) => ({ currencyCode, amount: amount.toNumber() }))
-}
 
 export async function getInventoryValuation(): Promise<InventoryValuation> {
   const prisma = usePrisma()
@@ -22,30 +17,13 @@ export async function getInventoryValuation(): Promise<InventoryValuation> {
     }
   })
 
-  const inventoryTotals = new Map<string, Decimal>()
-  const productsWithoutCost = new Set<string>()
-  const warehouseValuations = warehouses.map(({ id, code, name, balances }) => {
-    const totals = new Map<string, Decimal>()
-    let missingCosts = 0
-    for (const { productId, quantity, product } of balances) {
-      const { unitCost, costCurrency } = product
-      if (unitCost === null || !costCurrency) {
-        productsWithoutCost.add(productId)
-        missingCosts++
-        continue
-      }
-      const value = new Decimal(quantity.toString()).times(unitCost.toString())
-      totals.set(costCurrency, (totals.get(costCurrency) ?? new Decimal(0)).plus(value))
-    }
-    for (const [currencyCode, amount] of totals) {
-      inventoryTotals.set(currencyCode, (inventoryTotals.get(currencyCode) ?? new Decimal(0)).plus(amount))
-    }
-    return { id, code, name, totals: valuationTotals(totals), productsWithoutCost: missingCosts }
-  })
-
-  return {
-    totals: valuationTotals(inventoryTotals),
-    productsWithoutCost: productsWithoutCost.size,
-    warehouses: warehouseValuations
-  }
+  const locations = warehouses.map(({ id, code, name }) => ({ id, code, name }))
+  const balances = warehouses.flatMap(({ id, balances }) => balances.map(({ productId, quantity, product }) => ({
+    warehouseId: id,
+    productId,
+    quantity: quantity.toString(),
+    unitCost: product.unitCost?.toString() ?? null,
+    costCurrency: product.costCurrency
+  })))
+  return calculateInventoryValuation(locations, balances)
 }

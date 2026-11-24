@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { createCurrencyFormatter } from '@rafamedtech/nuxt-shared/utils'
 import { createReusableTemplate, useMediaQuery } from '@vueuse/core'
 import { mexicoToday } from '~/utils/datetime'
 import Decimal from 'decimal.js'
@@ -37,7 +38,7 @@ const supplierOptions = computed(() => suppliers.value?.results.filter(p => p.ac
 })) ?? [])
 const productsById = computed(() => new Map(products.value?.results.map(p => [p.id, p]) ?? []))
 
-const money = computed(() => new Intl.NumberFormat('es-MX', { style: 'currency', currency: draft.currencyCode, minimumFractionDigits: 2, maximumFractionDigits: 2 }))
+const money = computed(() => createCurrencyFormatter(draft.currencyCode, { minimumFractionDigits: 2, maximumFractionDigits: 2 }))
 const lineTotal = (item: PurchaseDraft['items'][number]) => new Decimal(item.quantity || 0).mul(item.unitCost || 0).toDecimalPlaces(2, Decimal.ROUND_HALF_UP)
 const subtotal = computed(() => draft.items.reduce((s, i) => s.plus(lineTotal(i)), new Decimal(0)).toNumber())
 
@@ -79,12 +80,12 @@ const blocker = computed(() => {
   <form class="flex flex-col gap-4" @submit.prevent="!blocker && emit('save', draft)">
     <DefineCost v-slot="{ item }">
       <UFormField label="Costo unitario (antes de impuestos)" :ui="{ label: 'md:sr-only' }">
-        <UInputNumber
+        <AppNumberInput
           v-model="item.unitCost"
           :min="0"
           :step="1"
           :step-snapping="false"
-          :format-options="{ maximumFractionDigits: 6 }"
+          :maximum-fraction-digits="6"
           :increment="false"
           :decrement="false"
           :color="item.unitCost > 0 ? 'primary' : 'error'"
@@ -97,12 +98,12 @@ const blocker = computed(() => {
     </DefineCost>
     <DefineQuantity v-slot="{ item }">
       <UFormField label="Cantidad" :ui="{ label: 'md:sr-only' }">
-        <UInputNumber
+        <AppNumberInput
           v-model="item.quantity"
           :min="0.000001"
           :step="1"
           :step-snapping="false"
-          :format-options="{ maximumFractionDigits: 6 }"
+          :maximum-fraction-digits="6"
           :disabled="busy"
           size="sm"
           class="w-full"
@@ -182,23 +183,23 @@ const blocker = computed(() => {
             />
           </UFormField>
           <UFormField label="Cantidad" class="min-w-0">
-            <UInputNumber
+            <AppNumberInput
               v-model="picker.quantity"
               :min="0.000001"
               :step="1"
               :step-snapping="false"
-              :format-options="{ maximumFractionDigits: 6 }"
+              :maximum-fraction-digits="6"
               :disabled="busy"
               class="w-full"
             />
           </UFormField>
           <UFormField label="Costo unitario (antes de impuestos)" class="min-w-0">
-            <UInputNumber
+            <AppNumberInput
               v-model="picker.unitCost"
               :min="0"
               :step="1"
               :step-snapping="false"
-              :format-options="{ maximumFractionDigits: 6 }"
+              :maximum-fraction-digits="6"
               :increment="false"
               :decrement="false"
               :disabled="busy"

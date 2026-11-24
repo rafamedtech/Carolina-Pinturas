@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { createCurrencyFormatter } from '@rafamedtech/nuxt-shared/utils'
 import { purchaseTotals } from '#shared/utils/purchaseTotals'
 
 const props = defineProps<{ subtotal: number, currencyCode: 'MXN' | 'USD', busy: boolean }>()
@@ -8,7 +9,7 @@ const vatOptions = [
   { label: '16%', value: 16 },
   { label: '0%', value: 0 }
 ]
-const money = computed(() => new Intl.NumberFormat('es-MX', { style: 'currency', currency: props.currencyCode, minimumFractionDigits: 2, maximumFractionDigits: 2 }))
+const money = computed(() => createCurrencyFormatter(props.currencyCode, { minimumFractionDigits: 2, maximumFractionDigits: 2 }))
 const totals = computed(() => purchaseTotals(props.subtotal, vatRate.value))
 </script>
 

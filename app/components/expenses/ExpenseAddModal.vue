@@ -117,7 +117,7 @@ function initialState(): Schema {
   }
 }
 
-const state = reactive<Schema>(initialState())
+const state = reactive<Omit<Schema, 'amount' | 'exchangeRate'> & { amount?: number, exchangeRate?: number }>(initialState())
 const expenseDate = computed<DateValue | undefined>({
   get: () => state.date ? parseDate(state.date) : undefined,
   set: (value) => { state.date = value?.toString() ?? '' }
@@ -245,38 +245,22 @@ function onSubmit(event: FormSubmitEvent<Schema>) {
           </p>
         </UFormField>
 
-        <UFormField name="currencyCode" label="Tipo de moneda" required>
-          <USelect
-            v-model="state.currencyCode"
-            :items="currencyItems"
-            value-key="value"
-            class="w-full"
-          />
-        </UFormField>
-
-        <UFormField
-          name="exchangeRate"
-          label="Tipo de cambio"
-          :hint="isMexicanPeso ? 'Fijo para MXN' : undefined"
-          required
-        >
-          <UInputNumber
-            v-model="state.exchangeRate"
-            :min="0.0001"
-            :step="0.0001"
-            :disabled="isMexicanPeso"
-            class="w-full"
-          />
-        </UFormField>
-
-        <UFormField name="amount" label="Importe" required>
-          <UInputNumber
-            v-model="state.amount"
-            :min="0.01"
-            :step="0.01"
-            class="w-full"
-          />
-        </UFormField>
+        <MoneyFormFields
+          v-model:currency="state.currencyCode"
+          v-model:rate="state.exchangeRate"
+          v-model:amount="state.amount"
+          :currencies="currencyItems"
+          currency-name="currencyCode"
+          currency-label="Tipo de moneda"
+          :rate-hint="isMexicanPeso ? 'Fijo para MXN' : undefined"
+          :rate-disabled="isMexicanPeso"
+          rate-required
+          :rate-min="0.0001"
+          :rate-step="0.0001"
+          snap-amount
+          :format-amount="false"
+          :disabled="saving || deleting"
+        />
 
         <UFormField name="paymentMethod" label="Método de pago" required>
           <USelect

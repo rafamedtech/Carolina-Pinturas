@@ -69,6 +69,11 @@ const productBreadcrumbTab = computed(() => {
   return tableTabBreadcrumb(productCatalogTabs, query.get('tab'), query.get('active') === 'false' ? 'inactive' : 'all')
 })
 const productName = computed(() => product.value?.name || 'Detalle de producto')
+const breadcrumbs = computed(() => [
+  { label: 'Productos', icon: 'i-lucide-package', to: '/productos' },
+  { ...productBreadcrumbTab.value, to: backPath.value },
+  { label: product.value?.name || 'Detalle' }
+])
 const isManaged = computed(() => MANAGED_TYPES.includes(product.value?.type || 'Product'))
 const initialLoading = computed(() => !product.value && ['idle', 'pending'].includes(status.value))
 const message = computed(() => error.value?.data?.statusMessage || 'No fue posible cargar el producto.')
@@ -82,15 +87,14 @@ useSeoMeta({ title: () => productName.value })
       <DetailHeader
         title="Detalle del producto"
         :back="{ to: backPath, label: 'Volver a productos' }"
-        :breadcrumbs="[
-          { label: 'Productos', icon: 'i-lucide-package', to: '/productos' },
-          { ...productBreadcrumbTab, to: backPath },
-          { label: product?.name || 'Detalle' }
-        ]"
         refresh-label="Actualizar producto desde Siigo"
         :loading="syncing || ['idle', 'pending'].includes(status)"
         @refresh="syncProduct"
-      />
+      >
+        <template #breadcrumbs>
+          <DetailBreadcrumbs :items="breadcrumbs" />
+        </template>
+      </DetailHeader>
     </template>
 
     <template #body>

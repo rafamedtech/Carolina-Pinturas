@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { createCurrencyFormatter } from '@rafamedtech/nuxt-shared/utils'
 import { formatDate } from '~/utils/datetime'
 import * as z from 'zod'
 import type { FormSubmitEvent } from '@nuxt/ui'
@@ -54,7 +55,7 @@ watch(open, async (isOpen) => {
 }, { immediate: true, flush: 'sync' })
 
 function formatCurrency(value: number) {
-  return new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(value)
+  return createCurrencyFormatter('MXN').format(value)
 }
 
 async function onSubmit(event: FormSubmitEvent<Schema>) {

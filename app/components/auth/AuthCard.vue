@@ -11,7 +11,7 @@ defineSlots<{
 
 <template>
   <main class="min-h-screen bg-default flex items-center justify-center p-6">
-    <UCard class="w-full max-w-md" :ui="{ header: 'p-6 sm:px-7', body: 'p-6 sm:px-7' }">
+    <AuthFormCard class="bg-default">
       <template #header>
         <div class="flex items-center gap-3">
           <div class="size-10 rounded-lg bg-primary/10 text-primary flex items-center justify-center">
@@ -29,6 +29,6 @@ defineSlots<{
       </template>
 
       <slot />
-    </UCard>
+    </AuthFormCard>
   </main>
 </template>

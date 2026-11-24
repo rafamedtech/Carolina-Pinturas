@@ -29,13 +29,10 @@ async function onSubmit(event: FormSubmitEvent<PasswordRecoveryInput>) {
 <template>
   <AuthCard title="Recuperar contraseña" description="Te enviaremos un enlace de acceso">
     <div class="space-y-5">
-      <UAlert
+      <AuthRecoveryNotice
         v-if="sent"
-        color="success"
-        variant="subtle"
-        title="Revisa tu correo"
-        description="Si el correo pertenece a un usuario habilitado, recibirás instrucciones para cambiar la contraseña."
-        icon="i-lucide-mail-check"
+        compact
+        description="Si el correo pertenece a un usuario habilitado, recibirás instrucciones para cambiar tu contraseña."
       />
 
       <UForm
@@ -45,14 +42,7 @@ async function onSubmit(event: FormSubmitEvent<PasswordRecoveryInput>) {
         class="space-y-5"
         @submit="onSubmit"
       >
-        <UFormField label="Correo" name="email">
-          <UInput
-            v-model="state.email"
-            type="email"
-            autocomplete="email"
-            class="w-full"
-          />
-        </UFormField>
+        <AuthEmailField v-model="state.email" label="Correo" />
 
         <UButton
           type="submit"

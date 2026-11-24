@@ -51,6 +51,30 @@ describe('persistencia de gastos', () => {
     }).success).toBe(false)
   })
 
+  it('conserva los límites, las escalas y los mensajes de gastos', () => {
+    const input = { ...validExpense, currencyCode: 'USD' }
+    expect(createExpenseSchema.safeParse({ ...input, date: '2024-02-29', amount: 0.01, exchangeRate: 0.000001 }).success).toBe(true)
+    expect(createExpenseSchema.safeParse({ ...input, amount: 9_999_999_999_999.99, exchangeRate: 1_000_000 }).success).toBe(true)
+
+    const cases = [
+      [{ amount: 0 }, 'El importe debe ser mayor a cero.'],
+      [{ amount: 0.001 }, 'El importe admite máximo dos decimales.'],
+      [{ amount: 10_000_000_000_000 }, 'Too big: expected number to be <=9999999999999.99'],
+      [{ exchangeRate: -1 }, 'El tipo de cambio debe ser mayor a cero.'],
+      [{ exchangeRate: 0.0000001 }, 'El tipo de cambio admite máximo seis decimales.'],
+      [{ exchangeRate: 1_000_000.01 }, 'Too big: expected number to be <=1000000'],
+      [{ date: '2026-02-29' }, 'Selecciona una fecha válida.'],
+      [{ date: '31/08/2026' }, 'Usa una fecha con formato AAAA-MM-DD.']
+    ] as const
+    for (const [fields, message] of cases) {
+      expect(createExpenseSchema.safeParse({ ...input, ...fields }).error?.issues[0]?.message).toBe(message)
+    }
+
+    for (const amount of ['12.50', Number.NaN, Infinity]) {
+      expect(createExpenseSchema.safeParse({ ...input, amount }).success).toBe(false)
+    }
+  })
+
   it('convierte decimales y fechas de Prisma a la vista pública', () => {
     const expense = {
       id: '299fb710-70ba-4847-a8eb-5fc9ef050fb4',
