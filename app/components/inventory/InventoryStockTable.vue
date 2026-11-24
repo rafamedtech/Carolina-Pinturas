@@ -30,7 +30,7 @@ const columns = computed<TableColumn<InventoryStock>[]>(() => [
 </script>
 
 <template>
-  <DetailTable
+  <ListTable
     ref="table"
     :data="rows"
     :columns="columns"
@@ -75,5 +75,5 @@ const columns = computed<TableColumn<InventoryStock>[]>(() => [
         </template>
       </ListRecordCard>
     </template>
-  </DetailTable>
+  </ListTable>
 </template>

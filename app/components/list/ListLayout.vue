@@ -1,5 +1,5 @@
 <script setup lang="ts" generic="T">
-import type { DropdownMenuItem, TableColumn, TableRow, TabsProps } from '@nuxt/ui'
+import type { TableColumn, TableRow, TabsProps } from '@nuxt/ui'
 import type { Column, SortingState, TableMeta, VisibilityState } from '@tanstack/table-core'
 import type { ListFilterValues, ListLayoutConfig } from '~/types/list'
 import { navigationIconForPath } from '~/utils/navigationIcons'
@@ -33,32 +33,12 @@ const tab = defineModel<string>('tab', { default: 'all' })
 const page = defineModel<number>('page', { default: 1 })
 const sorting = defineModel<SortingState>('sorting', { default: () => [] })
 const columnVisibility = defineModel<VisibilityState>('columnVisibility', { default: () => ({}) })
-type MobileRow = Pick<TableRow<T>, 'id' | 'original'>
-const listTable = useTemplateRef<{
-  getColumns: () => Column<T, unknown>[]
-  getRows: () => MobileRow[] | undefined
-}>('listTable')
+const listTable = useTemplateRef<{ getColumns: () => Column<T, unknown>[] }>('listTable')
 const pageSize = computed(() => props.config.pagination?.pageSize ?? 25)
 const tablePage = computed({
   get: () => props.config.pagination?.mode === 'client' ? page.value : undefined,
   set: (value) => { if (value !== undefined) page.value = value }
 })
-const mobileRows = computed(() => {
-  const rows = listTable.value?.getRows()
-  if (rows) return rows
-  const start = ((tablePage.value ?? 1) - 1) * pageSize.value
-  return (tablePage.value === undefined ? props.data : props.data.slice(start, start + pageSize.value))
-    .map((original, index) => ({ id: String(start + index), original }))
-})
-const mobileSortItems = computed<DropdownMenuItem[]>(() => (listTable.value?.getColumns() ?? []).flatMap((column) => {
-  const label = (column.columnDef.header as { columnLabel?: string } | undefined)?.columnLabel
-  if (!label || !column.getCanSort()) return []
-  return {
-    label,
-    icon: column.getIsSorted() === 'asc' ? 'i-lucide-arrow-up' : column.getIsSorted() === 'desc' ? 'i-lucide-arrow-down' : 'i-lucide-arrow-up-down',
-    onSelect: () => column.toggleSorting()
-  }
-}))
 const hasActiveFilters = computed(() => Boolean(
   search.value || dateRange.value || props.hasExtraFilters
   || props.config.filters?.some(field => (filters.value[field.key] ?? field.defaultValue) !== field.defaultValue)
@@ -155,44 +135,27 @@ defineSlots<{
     <ListLoading v-if="loading" />
     <template v-else>
       <slot name="content" :rows="data">
-        <ListResponsive :rows="data">
-          <template v-if="$slots.mobile || $slots.record" #mobile>
-            <div v-if="$slots.record && mobileRows.length && mobileSortItems.length" class="mb-3 flex justify-end">
-              <UDropdownMenu :items="mobileSortItems" :content="{ align: 'end' }">
-                <AppButton
-                  intent="secondary"
-                  label="Ordenar"
-                  icon="i-lucide-arrow-up-down"
-                  size="sm"
-                />
-              </UDropdownMenu>
-            </div>
-            <slot name="mobile" :rows="mobileRows.map(row => row.original)">
-              <div v-if="mobileRows.length" class="space-y-3">
-                <template v-for="row in mobileRows" :key="row.id">
-                  <slot name="record" :row="row.original" />
-                </template>
-              </div>
-              <UEmpty v-else icon="i-lucide-inbox" :title="config.empty" />
-            </slot>
+        <ListTable
+          ref="listTable"
+          :key="config.id"
+          v-model:page="tablePage"
+          v-model:sorting="sorting"
+          v-model:column-visibility="columnVisibility"
+          :data="data"
+          :columns="columns"
+          :page-size="pageSize"
+          :meta="meta"
+          :empty="config.empty"
+          :on-select="onSelect"
+          :show-mobile-sort="Boolean($slots.record)"
+        >
+          <template v-if="$slots.mobile" #mobile="{ rows }">
+            <slot name="mobile" :rows="rows" />
           </template>
-          <template #table>
-            <ListTable
-              ref="listTable"
-              :key="config.id"
-              v-model:page="tablePage"
-              v-model:sorting="sorting"
-              v-model:column-visibility="columnVisibility"
-              :data="data"
-              :columns="columns"
-              :page-size="pageSize"
-              :meta="meta"
-              :empty="config.empty"
-              :on-select="onSelect"
-              :show-column-picker="false"
-            />
+          <template v-else-if="$slots.record" #record="{ row }">
+            <slot name="record" :row="row" />
           </template>
-        </ListResponsive>
+        </ListTable>
       </slot>
     </template>
     <template #pagination>

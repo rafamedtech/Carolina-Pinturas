@@ -4,11 +4,10 @@ import { mountSuspended } from '@nuxt/test-utils/runtime'
 import { defineComponent, h, ref } from 'vue'
 import type { VueWrapper } from '@vue/test-utils'
 import type { DropdownMenuItem, TableColumn } from '@nuxt/ui'
-import { ListPagination, ListToolbar, UDashboardGroup, UDropdownMenu } from '#components'
-import { useListTableColumns } from '~/composables/useListTableColumns'
+import { ListPagination, ListTable, ListToolbar, UDashboardGroup, UDropdownMenu } from '#components'
+import { useListTableColumns } from '#imports'
 import ListPage from '~/components/list/ListPage.vue'
 import ListViews from '~/components/list/ListViews.vue'
-import ListTable from '~/components/list/ListTable.vue'
 
 interface CatalogRecord { id: string, name: string }
 const CatalogTable = ListTable<CatalogRecord>
@@ -85,12 +84,12 @@ describe('estructura compartida de listados', () => {
     expect(wrapper.text()).not.toContain('Clave')
     await wrapper.findAll('tbody tr')[0]!.trigger('click')
     expect(select.mock.calls[0]?.[1].original).toEqual(rows[1])
-    await wrapper.setProps({ loading: true })
+    await wrapper.setProps({ data: [], loading: true })
     expect(wrapper.findAll('[role="status"]')).toHaveLength(1)
-    await vi.waitFor(() => expect(wrapper!.get('[role="status"]').text()).toBe('Cargando'))
-    expect(wrapper.findAll('[aria-hidden="true"] [class~="motion-safe:animate-spin"]')).toHaveLength(1)
-    expect(wrapper.find('table').exists()).toBe(false)
-    await wrapper.setProps({ loading: false })
+    await vi.waitFor(() => expect(wrapper!.get('[role="status"]').text()).toBe('Cargando datos…'))
+    expect(wrapper.findAll('[data-slot="loading"] [class~="motion-safe:animate-spin"]')).toHaveLength(1)
+    expect(wrapper.findAll('tbody tr').some(row => row.text().includes('Azul'))).toBe(false)
+    await wrapper.setProps({ data: rows, loading: false })
     expect(wrapper.find('[role="status"]').exists()).toBe(false)
     expect(wrapper.findAll('tbody tr').map(row => row.text())).toEqual(['Azul', 'Blanco'])
     await wrapper.setProps({ data: [] })
@@ -101,15 +100,18 @@ describe('estructura compartida de listados', () => {
     const rows = Array.from({ length: 53 }, (_, index) => ({ id: String(index), name: String(53 - index).padStart(2, '0') }))
     const columns: TableColumn<CatalogRecord>[] = [{ accessorKey: 'name', header: 'Nombre' }]
     wrapper = await mountSuspended(CatalogTable, {
-      props: { data: [], columns, empty: 'Sin productos', page: 3, pageSize: 25, loading: true, sorting: [{ id: 'name', desc: false }] }
+      props: { data: [], columns, empty: 'Sin productos', page: 3, pageSize: 25, loading: true, sorting: [{ id: 'name', desc: false }] },
+      slots: { record: '<p data-record>{{ params.row.name }}</p>' }
     })
     expect(wrapper.emitted('update:page')).toBeUndefined()
     await wrapper.setProps({ data: rows, loading: false })
     expect(wrapper.findAll('tbody tr').map(row => row.text())).toEqual(['51', '52', '53'])
+    expect(wrapper.findAll('[data-record]').map(row => row.text())).toEqual(['51', '52', '53'])
     await wrapper.setProps({ data: rows.slice(0, 26) })
     expect(wrapper.emitted('update:page')?.[0]).toEqual([2])
     await wrapper.setProps({ page: 2 })
     expect(wrapper.findAll('tbody tr')).toHaveLength(1)
+    expect(wrapper.findAll('[data-record]').map(row => row.text())).toEqual(['53'])
     // Without a page model the API's current rows are never paginated again.
     wrapper.unmount()
     wrapper = await mountSuspended(CatalogTable, { props: { data: rows, columns, empty: 'Sin productos' } })
@@ -120,7 +122,7 @@ describe('estructura compartida de listados', () => {
     const { sortableHeader } = useListTableColumns<CatalogRecord>()
     wrapper = await mountSuspended(CatalogTable, {
       props: {
-        data: [{ id: '1', name: 'Azul' }], empty: 'Sin productos',
+        data: [{ id: '1', name: 'Azul' }], empty: 'Sin productos', showColumnPicker: true,
         columns: [{ accessorKey: 'id', header: 'Clave' }, { accessorKey: 'name', header: sortableHeader('Nombre') }],
         columnVisibility: { id: false }
       }
