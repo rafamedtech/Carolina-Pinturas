@@ -52,7 +52,7 @@ function historyNote(entry: SalesOrderStatusHistoryItem, index: number) {
       <p v-if="historyNote(entry, index)" class="text-sm">
         {{ historyNote(entry, index) }}
       </p>
-      <p class="text-xs text-muted">
+      <p class="text-sm text-muted">
         {{ entry.changedBy.name }} · {{ formatDateTime(entry.changedAt) }}
       </p>
     </li>

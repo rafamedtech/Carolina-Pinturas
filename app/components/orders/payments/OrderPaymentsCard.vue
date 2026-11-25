@@ -212,7 +212,7 @@ async function createPayment(input: CreateOrderPaymentInput) {
         >
           <div>
             <div class="flex flex-wrap items-center gap-2">
-              <p class="font-medium text-primary">
+              <p class="text-sm font-medium text-primary">
                 {{ formatDate(payment.paymentDate) }}
               </p>
               <UTooltip

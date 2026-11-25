@@ -18,7 +18,7 @@ const selectItems = computed(() => props.items.map(({ label, value, icon }) => (
     v-model="model"
     :icon="selectedIcon"
     :items="selectItems"
-    :ui="variant === 'link' && fullWidth ? { base: 'py-2', value: 'text-lg font-semibold text-highlighted' } : undefined"
+    :ui="variant === 'link' && fullWidth ? { base: 'py-2', value: 'font-semibold text-highlighted' } : undefined"
     :aria-label="label"
     class="w-full sm:hidden"
   />

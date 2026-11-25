@@ -25,7 +25,7 @@ const hasSales = computed(() => props.weeks.some(week => week.sales !== 0 || wee
             {{ annual ? formatMonth(week.start) : `Semana ${index + 1}` }}
             <span v-if="!annual && week.days < 7" class="ml-1 text-xs font-normal text-muted">· {{ week.days }} {{ week.days === 1 ? 'día' : 'días' }}</span>
           </p>
-          <p class="mt-1 text-xs text-muted">
+          <p class="mt-1 text-sm text-muted">
             {{ formatDateRange(week.start, week.end) }}
           </p>
         </div>
