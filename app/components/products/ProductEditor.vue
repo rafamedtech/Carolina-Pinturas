@@ -90,7 +90,7 @@ useSeoMeta({ title })
 <template>
   <UDashboardPanel id="product-editor">
     <template #header>
-      <UDashboardNavbar :title="title">
+      <DashboardNavbar :title="title">
         <template #leading>
           <UButton
             :to="back"
@@ -100,7 +100,7 @@ useSeoMeta({ title })
             variant="ghost"
           />
         </template>
-      </UDashboardNavbar>
+      </DashboardNavbar>
     </template>
     <template #body>
       <UAlert v-if="!allowed" title="Solo administradores pueden gestionar productos." color="warning" />

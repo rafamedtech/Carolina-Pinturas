@@ -669,7 +669,7 @@ function submitReview(intent: OrderReviewSubmissionIntent) {
 <template>
   <UDashboardPanel id="new-order">
     <template #header>
-      <UDashboardNavbar :title="pageTitle">
+      <DashboardNavbar :title="pageTitle">
         <template #leading>
           <UButton
             :to="cancelPath"
@@ -679,7 +679,7 @@ function submitReview(intent: OrderReviewSubmissionIntent) {
             :aria-label="isEditing ? `Volver al detalle ${documentOf}` : 'Volver a ventas'"
           />
         </template>
-      </UDashboardNavbar>
+      </DashboardNavbar>
     </template>
 
     <template #body>

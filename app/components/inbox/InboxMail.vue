@@ -47,7 +47,7 @@ function onSubmit() {
 
 <template>
   <UDashboardPanel id="inbox-2">
-    <UDashboardNavbar :title="mail.subject" :toggle="false">
+    <DashboardNavbar :title="mail.subject" :toggle="false" :title-icon="false">
       <template #leading>
         <UButton
           icon="i-lucide-x"
@@ -79,7 +79,7 @@ function onSubmit() {
           />
         </UDropdownMenu>
       </template>
-    </UDashboardNavbar>
+    </DashboardNavbar>
 
     <div class="flex flex-col sm:flex-row justify-between gap-1 p-4 sm:px-6 border-b border-default">
       <div class="flex items-start gap-4 sm:my-1.5">

@@ -39,7 +39,7 @@ async function save(draft: PurchaseDraft) {
 <template>
   <UDashboardPanel id="new-purchase">
     <template #header>
-      <UDashboardNavbar title="Nueva compra">
+      <DashboardNavbar title="Nueva compra">
         <template #leading>
           <UButton
             :to="cancelTo"
@@ -49,7 +49,7 @@ async function save(draft: PurchaseDraft) {
             aria-label="Volver a compras"
           />
         </template>
-      </UDashboardNavbar>
+      </DashboardNavbar>
     </template><template #body>
       <UAlert
         v-if="error"

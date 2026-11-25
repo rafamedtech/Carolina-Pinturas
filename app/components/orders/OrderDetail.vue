@@ -405,7 +405,7 @@ async function convertToPedido() {
 <template>
   <UDashboardPanel id="order-detail">
     <template #header>
-      <UDashboardNavbar :title="detailTitle">
+      <DashboardNavbar :title="detailTitle">
         <template #leading>
           <UButton
             :to="backPath"
@@ -427,7 +427,7 @@ async function convertToPedido() {
             @click="() => refresh()"
           />
         </template>
-      </UDashboardNavbar>
+      </DashboardNavbar>
       <DetailBreadcrumbs
         :items="[
           { label: ordersBreadcrumbPath.startsWith('/igualaciones') ? 'Igualaciones' : 'Pedidos', icon: 'i-lucide-shopping-cart', to: ordersBreadcrumbPath.split('?')[0] },
