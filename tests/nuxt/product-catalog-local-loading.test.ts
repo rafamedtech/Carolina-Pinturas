@@ -63,6 +63,29 @@ describe('carga local y actualización explícita del catálogo de productos', (
     expect(syncCount).toBe(0)
     expect(detailCount).toBe(0)
   })
+  it('muestra las flechas desde el inicio y ordena por precio antes de paginar', async () => {
+    rows = Array.from({ length: 26 }, (_, index) => ({
+      ...original,
+      id: `product-${index + 1}`,
+      code: `P${index + 1}`,
+      name: `Pintura ${index + 1}`,
+      prices: [{ currency_code: 'MXN', price_list: [{ position: 1, value: index + 1 }] }]
+    }))
+    wrapper = await mountSuspended(defineComponent({
+      setup: () => () => h(UDashboardGroup, {}, { default: () => h(ProductCatalog) })
+    }))
+    await vi.waitFor(() => expect(wrapper?.findAll('tbody tr')).toHaveLength(25))
+
+    const headers = wrapper.findAll('thead button')
+    expect(headers.map(button => button.text())).toEqual([
+      'Código', 'Producto', 'Marca', 'Grupo', 'Disponible interno', 'Precio'
+    ])
+    expect(wrapper.findAll('thead [data-slot="trailingIcon"]')).toHaveLength(headers.length)
+    expect(wrapper.get('tbody tr').text()).toContain('Pintura 1')
+
+    await wrapper.get('thead button[aria-label^="Precio, sin ordenar"]').trigger('click')
+    expect(wrapper.get('tbody tr').text()).toContain('Pintura 26')
+  })
   it('muestra el producto en la tarjeta móvil compartida con un enlace al detalle', async () => {
     wrapper = await mountSuspended(ProductCatalog, {
       global: {

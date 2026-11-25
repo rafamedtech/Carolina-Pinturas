@@ -1,6 +1,6 @@
 // @vitest-environment nuxt
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { mountSuspended } from '@nuxt/test-utils/runtime'
+import { mountSuspended, registerEndpoint } from '@nuxt/test-utils/runtime'
 import { defineComponent, h, ref } from 'vue'
 import type { VueWrapper } from '@vue/test-utils'
 import type { DropdownMenuItem, TableColumn } from '@nuxt/ui'
@@ -8,6 +8,7 @@ import { DetailTable, ListPagination, ListTable, ListToolbar, UDashboardGroup, U
 import { useListTableColumns } from '#imports'
 import ListPage from '~/components/list/ListPage.vue'
 import ListViews from '~/components/list/ListViews.vue'
+import RepartidorCatalog from '~/components/repartidores/RepartidorCatalog.vue'
 
 interface CatalogRecord { id: string, name: string }
 const CatalogTable = ListTable<CatalogRecord>
@@ -156,6 +157,24 @@ describe('estructura compartida de listados', () => {
     wrapper.unmount()
     wrapper = await mountSuspended(CatalogTable, { props: { data: rows, columns, empty: 'Sin productos' } })
     expect(wrapper.findAll('tbody tr')).toHaveLength(53)
+  })
+
+  it('muestra las flechas de Repartidores y ordena por pedidos entregados', async () => {
+    registerEndpoint('/api/repartidores', () => [
+      { id: 'ana', nombre: 'Ana', telefono: null, activo: true, esMostrador: false, deliveredCount: 2 },
+      { id: 'luis', nombre: 'Luis', telefono: '6641234567', activo: true, esMostrador: false, deliveredCount: 10 }
+    ])
+    wrapper = await mountSuspended(defineComponent({
+      setup: () => () => h(UDashboardGroup, {}, { default: () => h(RepartidorCatalog) })
+    }))
+    await vi.waitFor(() => expect(wrapper?.findAll('tbody tr')).toHaveLength(2))
+
+    expect(wrapper.findAll('thead button').map(button => button.text())).toEqual([
+      'Nombre', 'Teléfono', 'Pedidos entregados', 'Estado'
+    ])
+    expect(wrapper.findAll('thead [data-slot="trailingIcon"]')).toHaveLength(4)
+    await wrapper.get('thead button[aria-label^="Pedidos entregados, sin ordenar"]').trigger('click')
+    expect(wrapper.get('tbody tr').text()).toContain('Luis')
   })
 
   it('personaliza columnas con etiquetas legibles y conserva al menos una visible', async () => {

@@ -84,22 +84,22 @@ const filteredProducts = computed(() => {
     `${product.code} ${product.name}`.toLocaleLowerCase().includes(normalizedFilter.value)
   )
 })
-const products = computed(() => {
-  const offset = (page.value - 1) * pageSize
-  return filteredProducts.value.slice(offset, offset + pageSize)
-})
-
-function formatProductPrice(product: SiigoProduct) {
+function productPrice(product: SiigoProduct) {
   const priceList = product.prices?.find(price => price.price_list?.some(item => item.position === 1)) ?? product.prices?.[0]
   const value = priceList?.price_list?.find(item => item.position === 1)?.value
     ?? priceList?.price_list?.[0]?.value
 
-  if (value === undefined || value === null) return '—'
+  if (value === undefined || value === null) return undefined
 
   const amount = typeof value === 'string' ? Number(value) : value
-  if (!Number.isFinite(amount)) return '—'
+  if (!Number.isFinite(amount)) return undefined
 
-  return createCurrencyFormatter(priceList?.currency_code || 'MXN').format(amount)
+  return { amount, currency: priceList?.currency_code || 'MXN' }
+}
+
+function formatProductPrice(product: SiigoProduct) {
+  const price = productPrice(product)
+  return price ? createCurrencyFormatter(price.currency).format(price.amount) : '—'
 }
 
 const csvColumns: CsvColumn<SiigoProduct>[] = [
@@ -121,24 +121,34 @@ const columns: TableColumn<SiigoProduct>[] = [{
   header: 'Producto'
 }, {
   id: 'brand',
+  accessorFn: product => product.additional_fields?.brand || undefined,
   header: 'Marca',
   cell: ({ row }) => row.original.additional_fields?.brand || '—'
 }, {
   id: 'account_group',
+  accessorFn: product => product.account_group?.name || undefined,
   header: 'Grupo',
   cell: ({ row }) => row.original.account_group?.name || '—'
 }, {
   id: 'inventory',
+  accessorFn: (product) => {
+    const available = product.internal?.inventory?.available
+    if (product.internal?.composition?.kind === 'composite' || available == null) return undefined
+    const amount = Number(available)
+    return Number.isFinite(amount) ? amount : undefined
+  },
   header: 'Disponible interno',
+  sortUndefined: 'last',
   cell: ({ row }) => row.original.internal?.composition?.kind === 'composite' ? 'Según componentes' : row.original.internal?.inventory?.available ?? '—'
 }, {
   id: 'price',
+  accessorFn: product => productPrice(product)?.amount,
   header: 'Precio',
+  sortUndefined: 'last',
   cell: ({ row }) => h('span', { class: 'text-primary font-semibold' }, formatProductPrice(row.original))
 }]
 
 const message = computed(() => error.value?.data?.statusMessage || 'No fue posible cargar el catálogo.')
-const totalProducts = computed(() => filteredProducts.value.length)
 
 function productPath(product: SiigoProduct) {
   return { path: `/productos/${encodeURIComponent(product.id)}`, query: { returnTo: returnTo.value } }
@@ -186,7 +196,7 @@ const listConfig = computed<ListLayoutConfig>(() => ({
     { key: 'hide_out_of_stock', label: 'Ocultar sin existencias', type: 'checkbox', defaultValue: false }
   ],
   create: canManageProducts(user.value?.role) ? { label: 'Nuevo producto', to: { path: '/productos/nuevo', query: { returnTo: returnTo.value } } } : undefined,
-  pagination: { mode: 'external', label: 'productos', pageSize }
+  pagination: { mode: 'client', label: 'productos', pageSize }
 }))
 </script>
 
@@ -198,13 +208,12 @@ const listConfig = computed<ListLayoutConfig>(() => ({
     v-model:page="page"
     :tab="productTab"
     :config="listConfig"
-    :data="products"
+    :data="filteredProducts"
     :columns="columns"
     :loading="loading"
     :error="Boolean(error)"
     error-title="Catálogo no disponible"
     :error-message="message"
-    :total-results="totalProducts"
     @update:tab="selectProductTab"
     @refresh="refresh"
     @select="openProduct"

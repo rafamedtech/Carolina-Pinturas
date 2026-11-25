@@ -38,11 +38,11 @@ const columns: TableColumn<Repartidor>[] = [{
   accessorKey: 'nombre',
   header: 'Nombre'
 }, {
-  id: 'telefono',
+  accessorKey: 'telefono',
   header: 'Teléfono',
   cell: ({ row }) => row.original.telefono || '—'
 }, {
-  id: 'deliveredCount',
+  accessorKey: 'deliveredCount',
   header: 'Pedidos entregados',
   cell: ({ row }) => row.original.deliveredCount
 }, {
