@@ -44,22 +44,27 @@ const columns = computed<TableColumn<SiigoCustomer>[]>(() => [{
   cell: ({ row }) => row.getValue('rfc_id') || '—'
 }, {
   id: 'name',
+  accessorFn: row => row.name?.filter(Boolean).join(' '),
   header: 'Nombre',
   cell: ({ row }) => row.original.name?.filter(Boolean).join(' ') || '—'
 }, {
   id: 'role',
+  accessorFn: customerCatalogRoleLabel,
   header: 'Tipo',
   cell: ({ row }) => customerCatalogRoleLabel(row.original)
 }, {
   id: 'requires_invoice',
+  accessorFn: row => row.internal?.requires_invoice === true,
   header: 'Requiere factura',
   cell: ({ row }) => row.original.internal?.requires_invoice === true ? 'Sí' : 'No'
 }, {
   id: 'email',
+  accessorFn: row => row.contacts?.[0]?.email,
   header: 'Correo',
   cell: ({ row }) => row.original.contacts?.[0]?.email || '—'
 }, {
   id: 'phone',
+  accessorFn: row => row.phones?.map(phone => phone.number).filter(Boolean).join(', '),
   header: 'Teléfono',
   cell: ({ row }) => row.original.phones?.map(phone => phone.number).filter(Boolean).join(', ') || '—'
 }, {

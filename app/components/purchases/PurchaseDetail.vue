@@ -468,7 +468,6 @@ const timeline = computed(() => [...(order.value?.events ?? [])].reverse())
             :data="order.items"
             :columns="printColumns"
             :get-row-id="item => item.id"
-            :sorting-options="{ enableSorting: false }"
             class="overflow-visible border-y-0"
             :ui="{ base: 'w-full border-collapse text-left', thead: 'border-b border-black', tbody: 'divide-y divide-gray-300', th: 'px-0 py-2 text-black', td: 'px-0 py-2 text-black', separator: 'hidden' }"
           >

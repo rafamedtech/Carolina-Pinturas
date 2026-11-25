@@ -16,6 +16,12 @@ const [DefineRemove, RemoveButton] = createReusableTemplate<{ line: CountLine }>
 const costs = reactive<Record<string, number | undefined>>({})
 const currencies = reactive<Record<string, 'MXN' | 'USD'>>({})
 const amounts = reactive<Record<string, string>>({})
+const tableLines = computed(() => props.count.lines.map(line => ({
+  ...line,
+  counted: amounts[line.productId]?.trim() || null,
+  unitCost: costs[line.productId]?.toString(),
+  costCurrency: currencies[line.productId]
+})))
 watch(() => props.count, (c, previous) => {
   const oldLines = new Map(previous?.id === c.id ? previous.lines.map(l => [l.productId, l]) : [])
   for (const key of Object.keys(amounts)) if (!c.lines.some(l => l.productId === key)) Reflect.deleteProperty(amounts, key)
@@ -36,9 +42,21 @@ const columns = computed<TableColumn<CountLine>[]>(() => {
       cell: ({ row }) => row.original.expected,
       meta: { class: { th: 'text-right', td: 'text-right font-mono' } }
     },
-    { id: 'counted', header: 'Conteo físico' }
+    {
+      id: 'counted',
+      accessorFn: line => line.counted !== null && Number.isFinite(Number(line.counted)) ? Number(line.counted) : undefined,
+      header: 'Conteo físico',
+      sortUndefined: 'last'
+    }
   ]
-  if (!props.activated) columns.push({ id: 'cost', header: 'Costo unitario (con impuestos)' })
+  if (!props.activated) columns.push({
+    id: 'cost',
+    accessorFn: line => line.unitCost == null ? undefined : Number(line.unitCost),
+    header: 'Costo unitario (con impuestos)',
+    sortUndefined: 'last',
+    sortingFn: (a, b, id) => (a.original.costCurrency || 'MXN').localeCompare(b.original.costCurrency || 'MXN')
+      || a.getValue<number>(id) - b.getValue<number>(id)
+  })
   if (canWrite.value && props.count.status === 'borrador') columns.push({ id: 'actions', header: 'Acciones', meta: { class: { th: 'sr-only' } } })
   return columns
 })
@@ -115,7 +133,7 @@ function action(value: 'countSubmit' | 'countApply' | 'countRefresh' | 'countCan
     <form class="space-y-4" @submit.prevent="save">
       <DetailTable
         v-if="desktop"
-        :data="count.lines"
+        :data="tableLines"
         :columns="columns"
         :get-row-id="line => line.productId"
         sticky

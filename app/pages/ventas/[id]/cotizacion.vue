@@ -371,7 +371,6 @@ watch([status, order], () => {
         :data="order.items"
         :columns="itemColumns"
         :get-row-id="item => item.id"
-        :sorting-options="{ enableSorting: false }"
         class="items overflow-visible border-y-0"
         :ui="{ base: 'w-full border-collapse', thead: 'border-0', tbody: 'divide-none', separator: 'hidden' }"
       >
@@ -392,9 +391,9 @@ watch([status, order], () => {
           :columns="totalColumns"
           :meta="totalMeta"
           :get-row-id="row => row.id"
-          :sorting-options="{ enableSorting: false }"
+          :row-pinning="{ bottom: ['total'] }"
           class="totals overflow-visible border-y-0"
-          :ui="{ base: 'w-full border-collapse', thead: 'sr-only', tbody: 'divide-none', separator: 'hidden' }"
+          :ui="{ base: 'w-full border-collapse', thead: 'print:sr-only', tbody: 'divide-none', separator: 'hidden' }"
         />
       </div>
 

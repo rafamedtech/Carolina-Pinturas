@@ -6,9 +6,6 @@ useSeoMeta({ title: 'Inicio' })
   <UDashboardPanel id="home">
     <template #header>
       <UDashboardNavbar title="Inicio">
-        <template #leading>
-          <UDashboardSidebarCollapse />
-        </template>
         <template #right>
           <UBadge
             label="Semana en curso"

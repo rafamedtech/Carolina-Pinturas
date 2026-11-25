@@ -38,7 +38,7 @@ const columns: TableColumn<DashboardRecentOrder>[] = [{
   header: 'Cliente',
   cell: ({ row }) => h('span', { class: 'line-clamp-1' }, row.original.customerName)
 }, {
-  id: 'paymentStatus',
+  accessorKey: 'paymentStatus',
   header: 'Estado de pago',
   cell: ({ row }) => h(UBadge, {
     label: paymentStatusLabel(row.original.paymentStatus),
@@ -47,6 +47,7 @@ const columns: TableColumn<DashboardRecentOrder>[] = [{
   })
 }, {
   id: 'status',
+  accessorFn: row => row.status.label,
   header: 'Estado',
   cell: ({ row }) => h(OrderStatusBadge, { status: row.original.status })
 }, {
