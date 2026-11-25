@@ -630,7 +630,7 @@ async function convertToPedido() {
                 <dt class="text-sm text-muted">
                   Fecha de entrega
                 </dt>
-                <dd class="mt-1 font-medium">
+                <dd class="mt-1 text-sm font-medium">
                   {{ formatDate(order.promisedDate) }}
                 </dd>
               </div>
@@ -638,7 +638,7 @@ async function convertToPedido() {
                 <dt class="text-sm text-muted">
                   Fecha de pago
                 </dt>
-                <dd class="mt-1 font-medium">
+                <dd class="mt-1 text-sm font-medium">
                   {{ formatDate(order.paymentDate) }}
                 </dd>
               </div>

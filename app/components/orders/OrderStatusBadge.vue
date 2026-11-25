@@ -9,5 +9,5 @@ const color = computed(() => orderStatusBadgeColor(props.status.color))
 </script>
 
 <template>
-  <StatusBadge :label="status.label" :color="color" />
+  <StatusBadge :label="status.label" :color="color" class="max-md:text-sm" />
 </template>

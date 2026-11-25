@@ -42,7 +42,7 @@ const lineColumns: TableColumn<InventoryMovement['lines'][number]>[] = [
       <template #header>
         <div class="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between lg:gap-8">
           <div class="shrink-0 space-y-2">
-            <p class="text-xs font-medium text-muted">
+            <p class="text-sm font-medium text-muted">
               {{ formatDate(row.date) }}
             </p>
             <div class="flex flex-wrap items-center gap-2">
