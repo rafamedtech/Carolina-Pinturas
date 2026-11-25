@@ -172,10 +172,10 @@ function clearInventoryFilters() {
 
 const NuxtLink = resolveComponent('NuxtLink')
 const reservationColumns: TableColumn<Extract<Row, { orderId: string }>>[] = [
-  { id: 'order', header: 'Pedido', cell: ({ row }) => h(NuxtLink, { to: { path: `/ventas/${row.original.orderId}`, query: { returnTo: returnTo.value } }, class: 'text-primary underline' }, () => String(row.original.order.folio)) },
-  { id: 'product', header: 'Producto', cell: ({ row }) => `${row.original.product.code} · ${row.original.product.name}` },
-  { id: 'warehouse', header: 'Almacén', cell: ({ row }) => row.original.warehouse.name },
-  { accessorKey: 'quantity', header: 'Reservado' }
+  { id: 'order', accessorFn: row => row.order.folio, header: 'Pedido', cell: ({ row }) => h(NuxtLink, { to: { path: `/ventas/${row.original.orderId}`, query: { returnTo: returnTo.value } }, class: 'text-primary underline' }, () => String(row.original.order.folio)) },
+  { id: 'product', header: 'Producto', accessorFn: row => `${row.product.code} · ${row.product.name}` },
+  { id: 'warehouse', header: 'Almacén', accessorFn: row => row.warehouse.name },
+  { id: 'quantity', accessorFn: row => Number(row.quantity), header: 'Reservado', cell: ({ row }) => row.original.quantity }
 ]
 </script>
 

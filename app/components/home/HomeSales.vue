@@ -51,7 +51,8 @@ const columns: TableColumn<DashboardRecentOrder>[] = [{
   cell: ({ row }) => h(OrderStatusBadge, { status: row.original.status })
 }, {
   accessorKey: 'total',
-  header: () => h('div', { class: 'text-right' }, 'Total'),
+  header: 'Total',
+  meta: { class: { th: 'text-right' } },
   cell: ({ row }) => h(
     'div',
     { class: 'text-right font-medium' },

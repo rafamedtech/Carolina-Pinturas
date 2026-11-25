@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import type { TableColumn } from '@nuxt/ui'
 import { tableReturnPath, tableReturnQuery, tableTabBreadcrumb } from '~/utils/tableQuery'
 import type { PurchaseView } from '~/types/purchases'
 import { formatMexicoDateTime } from '~/utils/datetime'
@@ -46,6 +47,14 @@ function print() {
 }
 
 const money = (value: number) => purchaseMoney(value, order.value?.currencyCode ?? 'MXN')
+const printAmountClass = { class: { th: 'text-right', td: 'text-right' } }
+const printColumns: TableColumn<PurchaseView['items'][number]>[] = [
+  { accessorKey: 'code', header: 'Código' },
+  { accessorKey: 'name', header: 'Producto' },
+  { accessorKey: 'quantity', header: 'Cantidad', cell: ({ row }) => purchaseQuantity(row.original.quantity), meta: printAmountClass },
+  { accessorKey: 'unitCost', header: 'Costo unitario', cell: ({ row }) => money(row.original.unitCost), meta: printAmountClass },
+  { accessorKey: 'total', header: 'Importe', cell: ({ row }) => money(row.original.total), meta: printAmountClass }
+]
 const status = computed(() => purchaseStatus(order.value?.status ?? ''))
 const receipt = computed(() => receiptStatus(order.value?.receiptStatus ?? ''))
 const isDraft = computed(() => order.value?.status === 'borrador')
@@ -455,38 +464,16 @@ const timeline = computed(() => [...(order.value?.events ?? [])].reverse())
             </p>
             <p>{{ order.providerName }}{{ order.providerRfc ? ` · RFC ${order.providerRfc}` : '' }}</p>
           </div>
-          <table class="w-full border-collapse text-left">
-            <thead>
-              <tr class="border-b border-black">
-                <th class="py-2">
-                  Código
-                </th><th class="py-2">
-                  Producto
-                </th><th class="py-2 text-right">
-                  Cantidad
-                </th><th class="py-2 text-right">
-                  Costo unitario
-                </th><th class="py-2 text-right">
-                  Importe
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="item in order.items" :key="item.id" class="border-b border-gray-300">
-                <td class="py-2">
-                  {{ item.code }}
-                </td><td class="py-2">
-                  {{ item.name }}
-                </td><td class="py-2 text-right">
-                  {{ purchaseQuantity(item.quantity) }}
-                </td><td class="py-2 text-right">
-                  {{ money(item.unitCost) }}
-                </td><td class="py-2 text-right">
-                  {{ money(item.total) }}
-                </td>
-              </tr>
-            </tbody>
-          </table>
+          <DetailTable
+            :data="order.items"
+            :columns="printColumns"
+            :get-row-id="item => item.id"
+            :sorting-options="{ enableSorting: false }"
+            class="overflow-visible border-y-0"
+            :ui="{ base: 'w-full border-collapse text-left', thead: 'border-b border-black', tbody: 'divide-y divide-gray-300', th: 'px-0 py-2 text-black', td: 'px-0 py-2 text-black', separator: 'hidden' }"
+          >
+            <template #empty />
+          </DetailTable>
           <p class="text-right">
             Subtotal: {{ money(order.subtotal) }} {{ order.currencyCode }}
           </p>
