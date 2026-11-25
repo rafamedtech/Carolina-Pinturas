@@ -45,11 +45,11 @@ function payablePath(row: PayableRow) {
 }
 
 const columns: TableColumn<PayableRow>[] = [
-  { id: 'folio', header: 'Factura / orden', cell: ({ row }) => h(NuxtLink, { to: payablePath(row.original), class: 'font-medium text-highlighted underline decoration-muted underline-offset-4 hover:decoration-primary' }, () => `${row.original.folio} / OC-${row.original.orderFolio}`) },
+  { accessorKey: 'folio', header: 'Factura / orden', cell: ({ row }) => h(NuxtLink, { to: payablePath(row.original), class: 'font-medium text-highlighted underline decoration-muted underline-offset-4 hover:decoration-primary' }, () => `${row.original.folio} / OC-${row.original.orderFolio}`) },
   { accessorKey: 'providerName', header: 'Proveedor' },
   { accessorKey: 'dueDate', header: 'Vencimiento', cell: ({ row }) => h('div', [h('p', { class: 'tabular-nums' }, formatDate(row.original.dueDate)), h('p', { class: `mt-1 text-xs ${row.original.balance > 0 && row.original.daysUntilDue <= 0 ? 'text-error' : 'text-muted'}` }, payableTiming(row.original))]) },
   { accessorKey: 'amount', header: 'Importe', cell: ({ row }) => h('span', { class: 'tabular-nums' }, payableMoney(row.original.amount)) },
-  { id: 'paid', header: 'Abonado', cell: ({ row }) => h('span', { class: 'tabular-nums text-muted' }, payableMoney(row.original.amount - row.original.balance)) },
+  { id: 'paid', accessorFn: row => row.amount - row.balance, header: 'Abonado', cell: ({ getValue }) => h('span', { class: 'tabular-nums text-muted' }, payableMoney(getValue<number>())) },
   { accessorKey: 'balance', header: 'Saldo pendiente', cell: ({ row }) => h('span', { class: 'font-semibold tabular-nums' }, `${payableMoney(row.original.balance)} ${row.original.currencyCode}`) },
   { id: 'actions', header: 'Gestión', cell: ({ row }) => h(NuxtLink, { 'to': payablePath(row.original), 'class': 'text-sm font-medium text-primary hover:underline', 'aria-label': `Ver compra OC-${row.original.orderFolio}, factura ${row.original.folio}` }, () => 'Ver compra →') }
 ]

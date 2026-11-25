@@ -7,6 +7,7 @@ import type { DraftOrderLine } from '~/composables/useOrderDraft'
 import { draftLineTotal } from '~/composables/useOrderDraft'
 import type { OrderDiscountType } from '~/types/orders'
 import { DISCOUNT_TYPE_OPTIONS } from '~/utils/orderDiscount'
+import { orderLineAmounts } from '#shared/utils/orderAmounts'
 
 const props = defineProps<{
   lines: readonly DraftOrderLine[]
@@ -126,6 +127,10 @@ const columns: TableColumn<DraftOrderLine>[] = [{
   ])
 }, {
   id: 'discount',
+  accessorFn: row => orderLineAmounts(
+    row.quantity, row.unitPrice, row.taxPercentages ?? row.taxPercentage,
+    row.taxIncluded, row.discountType, row.discountValue
+  ).discountAmount.toNumber(),
   header: 'Descuento',
   meta: { class: { th: 'text-right' } },
   cell: ({ row }) => h('div', { class: 'flex items-center justify-end gap-1' }, [

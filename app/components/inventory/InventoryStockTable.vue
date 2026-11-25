@@ -20,7 +20,16 @@ const columns = computed<TableColumn<InventoryStock>[]>(() => [
   { id: 'quantity', accessorFn: row => Number(row.quantity), header: 'Existencia física', meta: numeric, cell: ({ row }) => row.original.quantity },
   { id: 'reserved', accessorFn: row => Number(row.reserved), header: 'Reservado', meta: numeric, cell: ({ row }) => row.original.reserved },
   { id: 'available', accessorFn: row => Number(row.available), header: 'Disponible', meta: numeric, cell: ({ row }) => h('div', { class: row.original.low ? 'font-semibold text-warning' : 'font-semibold text-primary' }, [row.original.available, row.original.low ? h('span', { class: 'block text-xs' }, 'Bajo mínimo') : null]) },
-  { id: 'cost', header: 'Costo unitario', meta: numeric, cell: ({ row }) => unitCost(row.original) },
+  {
+    id: 'cost',
+    accessorFn: row => row.unitCost == null ? undefined : Number(row.unitCost),
+    header: 'Costo unitario',
+    sortUndefined: 'last',
+    sortingFn: (a, b, id) => (a.original.costCurrency || 'MXN').localeCompare(b.original.costCurrency || 'MXN')
+      || a.getValue<number>(id) - b.getValue<number>(id),
+    meta: numeric,
+    cell: ({ row }) => unitCost(row.original)
+  },
   { id: 'minimum', accessorFn: row => Number(row.minimum), header: 'Mínimo', meta: numeric, cell: ({ row }) => row.original.minimum },
   { id: 'actions', header: 'Acciones', cell: ({ row }) => h('div', { class: 'flex justify-end gap-1' }, [
     h(UButton, { label: 'Kardex', size: 'sm', variant: 'ghost', color: 'neutral', onClick: () => emit('kardex', row.original) }),

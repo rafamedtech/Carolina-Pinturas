@@ -24,15 +24,15 @@ const columns: TableColumn<RepartidorDelivery>[] = [{
   accessorKey: 'number',
   header: 'Pedido'
 }, {
-  id: 'customerName',
+  accessorKey: 'customerName',
   header: 'Cliente',
   cell: ({ row }) => row.original.customerName
 }, {
-  id: 'orderDate',
+  accessorKey: 'orderDate',
   header: 'Fecha',
   cell: ({ row }) => formatDate(row.original.orderDate)
 }, {
-  id: 'total',
+  accessorKey: 'total',
   header: 'Total',
   cell: ({ row }) => currency.format(row.original.total)
 }]
