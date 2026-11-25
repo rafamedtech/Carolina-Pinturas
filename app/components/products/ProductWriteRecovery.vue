@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import type { ProductContext, ProductInput } from '~/types/siigo-products'
+import type { TableColumn } from '@nuxt/ui'
+import type { ProductContext, ProductInput, ProductWriteDifference } from '~/types/siigo-products'
 import type { SiigoProduct } from '~/types/siigo'
 
 const props = defineProps<{ operationId: string, context: ProductContext, failureMessage?: string }>()
@@ -46,6 +47,26 @@ const labels: Record<string, string> = {
   additional_fields: 'Marca y código de barras', taxes: 'Impuestos', prices: 'Precios', availability: 'Disponibilidad interna', composition: 'Composición interna'
 }
 const pendingFields = computed(() => review.value ? Object.entries(review.value.input).map(([field, value]) => ({ field, label: labels[field] || field, value: display(field, value) })) : [])
+const differenceColumns: TableColumn<ProductWriteDifference>[] = [
+  {
+    id: 'field',
+    header: 'Campo',
+    accessorFn: difference => labels[difference.field] || difference.field,
+    meta: { class: { td: 'font-medium' } }
+  },
+  {
+    id: 'actual',
+    header: 'Actual en Siigo',
+    accessorFn: difference => display(difference.field, difference.actual),
+    meta: { class: { td: 'min-w-36 max-w-sm whitespace-pre-wrap wrap-anywhere text-muted' } }
+  },
+  {
+    id: 'expected',
+    header: 'Cambios pendientes',
+    accessorFn: difference => display(difference.field, difference.expected),
+    meta: { class: { td: 'min-w-36 max-w-sm whitespace-pre-wrap wrap-anywhere font-medium' } }
+  }
+]
 function display(field: string, value: unknown): string {
   if (value === undefined || value === null || value === '') return 'Sin valor'
   if (typeof value === 'boolean') return value ? 'Sí' : 'No'
@@ -118,37 +139,15 @@ function display(field: string, value: unknown): string {
           </template>
         </ListRecordCard>
       </section>
-      <div v-if="review?.differences.length" class="hidden overflow-x-auto rounded-lg border border-default md:block">
-        <table class="w-full text-left text-sm">
-          <caption class="sr-only">
-            Comparación de cambios pendientes con los datos actuales de Siigo
-          </caption>
-          <thead class="bg-elevated/50 text-muted">
-            <tr>
-              <th class="p-3 font-medium">
-                Campo
-              </th><th class="p-3 font-medium">
-                Actual en Siigo
-              </th><th class="p-3 font-medium">
-                Cambios pendientes
-              </th>
-            </tr>
-          </thead>
-          <tbody class="divide-y divide-default">
-            <tr v-for="difference in review.differences" :key="difference.field">
-              <th scope="row" class="p-3 align-top font-medium">
-                {{ labels[difference.field] || difference.field }}
-              </th>
-              <td class="min-w-36 max-w-sm whitespace-pre-wrap break-words p-3 align-top text-muted">
-                {{ display(difference.field, difference.actual) }}
-              </td>
-              <td class="min-w-36 max-w-sm whitespace-pre-wrap break-words p-3 align-top font-medium">
-                {{ display(difference.field, difference.expected) }}
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
+      <DetailTable
+        v-if="review?.differences.length"
+        :data="review.differences"
+        :columns="differenceColumns"
+        :get-row-id="difference => difference.field"
+        caption="Comparación de cambios pendientes con los datos actuales de Siigo"
+        class="hidden overflow-x-auto rounded-lg border border-default md:block"
+        :ui="{ caption: 'sr-only', thead: 'bg-elevated/50', th: 'p-3 font-medium', td: 'p-3 align-top' }"
+      />
       <details v-if="review" class="rounded-lg border border-default" :open="['unavailable', 'missing', 'closed'].includes(review.status)">
         <summary class="cursor-pointer p-3 text-sm font-medium">
           Cambios conservados

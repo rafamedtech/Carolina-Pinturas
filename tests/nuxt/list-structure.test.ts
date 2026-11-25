@@ -4,7 +4,7 @@ import { mountSuspended } from '@nuxt/test-utils/runtime'
 import { defineComponent, h, ref } from 'vue'
 import type { VueWrapper } from '@vue/test-utils'
 import type { DropdownMenuItem, TableColumn } from '@nuxt/ui'
-import { ListPagination, ListTable, ListToolbar, UDashboardGroup, UDropdownMenu } from '#components'
+import { DetailTable, ListPagination, ListTable, ListToolbar, UDashboardGroup, UDropdownMenu } from '#components'
 import { useListTableColumns } from '#imports'
 import ListPage from '~/components/list/ListPage.vue'
 import ListViews from '~/components/list/ListViews.vue'
@@ -94,6 +94,46 @@ describe('estructura compartida de listados', () => {
     expect(wrapper.findAll('tbody tr').map(row => row.text())).toEqual(['Azul', 'Blanco'])
     await wrapper.setProps({ data: [] })
     expect(wrapper.text()).toContain('Sin productos')
+  })
+
+  it.each([
+    ['ListTable', CatalogTable],
+    ['DetailTable', DetailTable<CatalogRecord>]
+  ] as const)('%s ordena por defecto y respeta las columnas de orden fijo', async (_, component) => {
+    const columns: TableColumn<CatalogRecord>[] = [
+      { accessorFn: row => row.name, header: 'Nombre' },
+      { accessorKey: 'id', header: 'Clave', enableSorting: false },
+      { id: 'actions', header: 'Acciones' }
+    ]
+    wrapper = await mountSuspended(component, {
+      props: { data: [{ id: 'b', name: 'Blanco' }, { id: 'a', name: 'Azul' }], columns },
+      slots: { 'Nombre-cell': '<span data-name>{{ params.row.original.name }}</span>' }
+    })
+
+    const header = () => wrapper!.get('thead button')
+    const names = () => wrapper!.findAll('[data-name]').map(cell => cell.text())
+    expect(wrapper.findAll('thead button')).toHaveLength(1)
+    expect(header().attributes('aria-label')).toContain('sin ordenar')
+    expect(names()).toEqual(['Blanco', 'Azul'])
+    await header().trigger('click')
+    expect(header().attributes('aria-label')).toContain('Nombre, ascendente')
+    expect(names()).toEqual(['Azul', 'Blanco'])
+    await header().trigger('click')
+    expect(header().attributes('aria-label')).toContain('Nombre, descendente')
+    expect(names()).toEqual(['Blanco', 'Azul'])
+    await header().trigger('click')
+    expect(header().attributes('aria-label')).toContain('sin ordenar')
+
+    wrapper.unmount()
+    wrapper = await mountSuspended(component, {
+      props: {
+        data: [{ id: 'b', name: 'Blanco' }, { id: 'a', name: 'Azul' }],
+        columns,
+        sortingOptions: { enableSorting: false }
+      }
+    })
+    expect(wrapper.find('thead button').exists()).toBe(false)
+    expect(wrapper.get('tbody tr').text()).toContain('Blanco')
   })
 
   it('pagina catálogos completos después de ordenar y ajusta la página si disminuyen los resultados', async () => {

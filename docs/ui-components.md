@@ -52,6 +52,8 @@ Antes de crear o modificar una pantalla, revisa este catálogo y `app/components
 | `AuthEmailField`, `AuthPasswordFields` y `AuthRecoveryNotice` | Los formularios de recuperación y actualización de contraseña conservan sus esquemas y acciones locales. |
 | `ReportsSkeleton` | Cuadrículas y paneles de carga. La vista controla qué secciones presenta y anuncia la carga una vez. |
 
+Las columnas con un encabezado de texto y un valor definido por `accessorKey` o `accessorFn` incluyen flechas de ordenamiento en `ListTable` y `DetailTable`. Para tablas con orden fijo, como los documentos imprimibles, usa `:sorting-options="{ enableSorting: false }"`.
+
 ## Ejemplo
 
 ```vue

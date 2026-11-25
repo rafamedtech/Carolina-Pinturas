@@ -77,6 +77,7 @@ const columns: TableColumn<DraftOrderLine>[] = [{
   header: 'Producto'
 }, {
   id: 'unit',
+  accessorFn: row => row.unit.name || row.unit.code,
   header: 'Unidad',
   cell: ({ row }) => row.original.unit.name || row.original.unit.code || '—'
 }, {
@@ -92,7 +93,8 @@ const columns: TableColumn<DraftOrderLine>[] = [{
   })
 }, {
   accessorKey: 'quantity',
-  header: () => h('div', { class: 'text-right' }, 'Cantidad'),
+  header: 'Cantidad',
+  meta: { class: { th: 'text-right' } },
   cell: ({ row }) => h(UInputNumber, {
     'modelValue': row.original.quantity,
     'min': 0.01,
@@ -107,7 +109,8 @@ const columns: TableColumn<DraftOrderLine>[] = [{
   })
 }, {
   accessorKey: 'unitPrice',
-  header: () => h('div', { class: 'text-right' }, 'Precio unitario'),
+  header: 'Precio unitario',
+  meta: { class: { th: 'text-right' } },
   cell: ({ row }) => h('div', { class: 'flex items-center justify-end gap-1' }, [
     h('span', currency.format(row.original.unitPrice)),
     props.editablePrices
@@ -123,7 +126,8 @@ const columns: TableColumn<DraftOrderLine>[] = [{
   ])
 }, {
   id: 'discount',
-  header: () => h('div', { class: 'text-right' }, 'Descuento'),
+  header: 'Descuento',
+  meta: { class: { th: 'text-right' } },
   cell: ({ row }) => h('div', { class: 'flex items-center justify-end gap-1' }, [
     h(USelect, {
       'modelValue': row.original.discountType,
@@ -150,7 +154,9 @@ const columns: TableColumn<DraftOrderLine>[] = [{
   ])
 }, {
   id: 'total',
-  header: () => h('div', { class: 'text-right' }, 'Importe'),
+  accessorFn: draftLineTotal,
+  header: 'Importe',
+  meta: { class: { th: 'text-right' } },
   cell: ({ row }) => h('div', { class: 'text-right font-medium' }, currency.format(draftLineTotal(row.original)))
 }, {
   id: 'actions',
@@ -195,20 +201,15 @@ const columns: TableColumn<DraftOrderLine>[] = [{
       @edit-price="openPriceEdit"
     />
 
-    <UTable
-      :data="tableLines"
-      :columns="columns"
-      :empty="`Agrega productos para iniciar ${props.quoteMode ? 'la cotización' : 'el pedido'}.`"
-      class="hidden md:block"
-      :ui="{
-        base: 'table-fixed border-separate border-spacing-0',
-        thead: '[&>tr]:bg-elevated/50 [&>tr]:after:content-none',
-        tbody: '[&>tr]:last:[&>td]:border-b-0',
-        th: 'py-2 first:rounded-l-lg last:rounded-r-lg border-y border-default first:border-l last:border-r',
-        td: 'border-b border-default',
-        separator: 'h-0'
-      }"
-    />
+    <div class="hidden md:block">
+      <ListTable
+        :data="tableLines"
+        :columns="columns"
+        :get-row-id="row => row.productId"
+        :empty="`Agrega productos para iniciar ${props.quoteMode ? 'la cotización' : 'el pedido'}.`"
+        :ui="{ base: 'table-fixed border-separate border-spacing-0' }"
+      />
+    </div>
 
     <template #footer>
       <div class="flex flex-col gap-3 sm:ms-auto sm:max-w-sm">

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import type { TableColumn, TableProps } from '@nuxt/ui'
 import { createCurrencyFormatter } from '@rafamedtech/nuxt-shared/utils'
 import { formatDate } from '~/utils/datetime'
 import type { SalesOrderDetail } from '~/types/orders'
@@ -30,6 +31,34 @@ function formatTaxLabel(tax: SalesOrderDetail['taxBreakdown'][number]) {
   const name = tax.name.replace(/\s*\d+(?:[.,]\d+)?\s*%\s*$/u, '').trim()
   return `${name || 'Impuesto'} (${tax.percentage}%)`
 }
+
+const numericCell = { class: { th: 'c-num', td: 'c-num' } }
+const itemColumns: TableColumn<SalesOrderDetail['items'][number]>[] = [
+  { accessorKey: 'code', header: 'Código', meta: { class: { th: 'c-code', td: 'c-code' } } },
+  { accessorKey: 'name', header: 'Concepto' },
+  { accessorKey: 'quantity', header: 'Cant.', meta: numericCell },
+  { accessorKey: 'unitPrice', header: 'P. unitario', cell: ({ row }) => formatCurrency(row.original.unitPrice), meta: numericCell },
+  { accessorKey: 'total', header: 'Importe', cell: ({ row }) => formatCurrency(row.original.total), meta: numericCell }
+]
+
+type TotalRow = { id: string, label: string, amount: number }
+const totalColumns: TableColumn<TotalRow>[] = [
+  { accessorKey: 'label', header: 'Concepto', meta: { class: { td: 't-label' } } },
+  { accessorKey: 'amount', header: 'Importe', cell: ({ row }) => formatCurrency(row.original.amount), meta: { class: { td: 't-value' } } }
+]
+const totalMeta: TableProps<TotalRow>['meta'] = {
+  class: { tr: row => row.original.id === 'total' ? 't-grand' : '' }
+}
+const totals = computed<TotalRow[]>(() => {
+  const value = order.value
+  if (!value) return []
+
+  const rows = [{ id: 'subtotal', label: 'Subtotal', amount: value.subtotal }]
+  if (value.discountTotal > 0) rows.push({ id: 'discount', label: 'Descuento', amount: -value.discountTotal })
+  value.taxBreakdown.forEach((tax, index) => rows.push({ id: `tax-${index}`, label: formatTaxLabel(tax), amount: tax.amount }))
+  rows.push({ id: 'total', label: 'Total', amount: value.total })
+  return rows
+})
 
 const quoteExpiryDate = computed(() => {
   if (!order.value?.orderDate) return null
@@ -338,46 +367,16 @@ watch([status, order], () => {
         </p>
       </section>
 
-      <table class="items">
-        <thead>
-          <tr>
-            <th class="c-code">
-              Código
-            </th>
-            <th class="c-name">
-              Concepto
-            </th>
-            <th class="c-num">
-              Cant.
-            </th>
-            <th class="c-num">
-              P. unitario
-            </th>
-            <th class="c-num">
-              Importe
-            </th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-for="item in order.items" :key="item.id">
-            <td class="c-code">
-              {{ item.code }}
-            </td>
-            <td class="c-name">
-              {{ item.name }}
-            </td>
-            <td class="c-num">
-              {{ item.quantity }}
-            </td>
-            <td class="c-num">
-              {{ formatCurrency(item.unitPrice) }}
-            </td>
-            <td class="c-num">
-              {{ formatCurrency(item.total) }}
-            </td>
-          </tr>
-        </tbody>
-      </table>
+      <DetailTable
+        :data="order.items"
+        :columns="itemColumns"
+        :get-row-id="item => item.id"
+        :sorting-options="{ enableSorting: false }"
+        class="items overflow-visible border-y-0"
+        :ui="{ base: 'w-full border-collapse', thead: 'border-0', tbody: 'divide-none', separator: 'hidden' }"
+      >
+        <template #empty />
+      </DetailTable>
 
       <div class="totals-wrap">
         <section v-if="order.observations" class="doc-notes">
@@ -388,45 +387,15 @@ watch([status, order], () => {
             {{ order.observations }}
           </p>
         </section>
-        <table class="totals">
-          <tbody>
-            <tr>
-              <td class="t-label">
-                Subtotal
-              </td>
-              <td class="t-value">
-                {{ formatCurrency(order.subtotal) }}
-              </td>
-            </tr>
-            <tr v-if="order.discountTotal > 0">
-              <td class="t-label">
-                Descuento
-              </td>
-              <td class="t-value">
-                -{{ formatCurrency(order.discountTotal) }}
-              </td>
-            </tr>
-            <tr
-              v-for="tax in order.taxBreakdown"
-              :key="`${tax.name}-${tax.percentage}`"
-            >
-              <td class="t-label">
-                {{ formatTaxLabel(tax) }}
-              </td>
-              <td class="t-value">
-                {{ formatCurrency(tax.amount) }}
-              </td>
-            </tr>
-            <tr class="t-grand">
-              <td class="t-label">
-                Total
-              </td>
-              <td class="t-value">
-                {{ formatCurrency(order.total) }}
-              </td>
-            </tr>
-          </tbody>
-        </table>
+        <DetailTable
+          :data="totals"
+          :columns="totalColumns"
+          :meta="totalMeta"
+          :get-row-id="row => row.id"
+          :sorting-options="{ enableSorting: false }"
+          class="totals overflow-visible border-y-0"
+          :ui="{ base: 'w-full border-collapse', thead: 'sr-only', tbody: 'divide-none', separator: 'hidden' }"
+        />
       </div>
 
       <footer class="doc-foot">
@@ -530,11 +499,10 @@ watch([status, order], () => {
 
 .items {
   width: 100%;
-  border-collapse: collapse;
   margin-top: 24px;
 }
 
-.items th {
+.items :deep(th) {
   background: #f3f4f6;
   text-align: left;
   font-size: 11px;
@@ -545,18 +513,19 @@ watch([status, order], () => {
   border-bottom: 1px solid #d1d5db;
 }
 
-.items td {
+.items :deep(td) {
   padding: 8px 10px;
   border-bottom: 1px solid #e5e7eb;
   vertical-align: top;
+  color: inherit;
 }
 
-.c-num {
+.items :deep(.c-num) {
   text-align: right;
   white-space: nowrap;
 }
 
-.c-code {
+.items :deep(.c-code) {
   white-space: nowrap;
   color: #374151;
 }
@@ -573,29 +542,29 @@ watch([status, order], () => {
   width: 260px;
   flex-shrink: 0;
   margin-left: auto;
-  border-collapse: collapse;
   break-inside: avoid;
 }
 
-.totals td {
+.totals :deep(td) {
   padding: 6px 10px;
+  color: inherit;
 }
 
-.t-label {
+.totals :deep(.t-label) {
   color: #6b7280;
 }
 
-.t-value {
+.totals :deep(.t-value) {
   text-align: right;
   font-weight: 600;
 }
 
-.t-grand td {
+.totals :deep(.t-grand td) {
   border-top: 2px solid #111827;
   font-size: 15px;
 }
 
-.t-grand .t-label {
+.totals :deep(.t-grand .t-label) {
   color: #111827;
   font-weight: 700;
 }

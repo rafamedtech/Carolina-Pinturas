@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import type { TableColumn } from '@nuxt/ui'
 import { createReusableTemplate, useMediaQuery } from '@vueuse/core'
 import type { InventoryCount } from '#shared/types/inventory'
 import type { InventoryCommand } from '#shared/schemas/inventory'
@@ -25,6 +26,22 @@ watch(() => props.count, (c, previous) => {
     if (!old || old.costCurrency !== l.costCurrency) currencies[l.productId] = l.costCurrency === 'USD' ? 'USD' : 'MXN'
   }
 }, { immediate: true })
+const columns = computed<TableColumn<CountLine>[]>(() => {
+  const columns: TableColumn<CountLine>[] = [
+    { id: 'product', accessorFn: line => `${line.product.code} · ${line.product.name}`, header: 'Producto' },
+    {
+      id: 'expected',
+      accessorFn: line => Number(line.expected),
+      header: 'Esperado',
+      cell: ({ row }) => row.original.expected,
+      meta: { class: { th: 'text-right', td: 'text-right font-mono' } }
+    },
+    { id: 'counted', header: 'Conteo físico' }
+  ]
+  if (!props.activated) columns.push({ id: 'cost', header: 'Costo unitario (con impuestos)' })
+  if (canWrite.value && props.count.status === 'borrador') columns.push({ id: 'actions', header: 'Acciones', meta: { class: { th: 'sr-only' } } })
+  return columns
+})
 const closed = computed(() => !canWrite.value || ['aplicado', 'cancelado'].includes(props.count.status))
 const productIds = computed(() => props.count.lines.map(l => l.productId))
 const unsaved = computed(() => props.count.lines.some(l => (amounts[l.productId] ?? '') !== (l.counted ?? '') || (!props.activated && ((costs[l.productId] === undefined ? null : String(costs[l.productId])) !== (l.unitCost ?? null) || (l.unitCost && currencies[l.productId] !== l.costCurrency)))))
@@ -96,43 +113,30 @@ function action(value: 'countSubmit' | 'countApply' | 'countRefresh' | 'countCan
       />
     </DefineRemove>
     <form class="space-y-4" @submit.prevent="save">
-      <div v-if="desktop" class="max-h-[50vh] overflow-auto rounded-lg border border-default">
-        <table class="w-full text-sm">
-          <thead class="sticky top-0 bg-elevated text-left">
-            <tr>
-              <th class="p-3">
-                Producto
-              </th><th class="p-3 text-right">
-                Esperado
-              </th><th class="p-3">
-                Conteo físico
-              </th><th v-if="!activated" class="p-3">
-                Costo unitario (con impuestos)
-              </th><th v-if="canWrite && count.status === 'borrador'" class="p-3">
-                <span class="sr-only">Acciones</span>
-              </th>
-            </tr>
-          </thead><tbody class="divide-y divide-default">
-            <tr v-for="line in count.lines" :key="line.productId">
-              <td class="p-3">
-                {{ line.product.code }} · {{ line.product.name }}
-              </td><td class="p-3 text-right font-mono">
-                {{ line.expected }}
-              </td><td class="p-3">
-                <AmountInput :line="line" />
-              </td><td v-if="!activated" class="p-3">
-                <CostInputs :line="line" />
-              </td><td v-if="canWrite && count.status === 'borrador'" class="p-3">
-                <RemoveButton :line="line" />
-              </td>
-            </tr><tr v-if="!count.lines.length">
-              <td :colspan="(count.status === 'borrador' ? 4 : 3) + (activated ? 0 : 1)" class="p-8 text-center text-muted">
-                Agrega los productos que vas a contar. Solo esas partidas formarán parte del conteo.
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
+      <DetailTable
+        v-if="desktop"
+        :data="count.lines"
+        :columns="columns"
+        :get-row-id="line => line.productId"
+        sticky
+        class="max-h-[50vh] overflow-auto rounded-lg border border-default"
+        :ui="{ thead: 'bg-elevated', td: 'p-3', th: 'p-3' }"
+      >
+        <template #counted-cell="{ row }">
+          <AmountInput :line="row.original" />
+        </template>
+        <template #cost-cell="{ row }">
+          <CostInputs :line="row.original" />
+        </template>
+        <template #actions-cell="{ row }">
+          <RemoveButton :line="row.original" />
+        </template>
+        <template #empty>
+          <p class="p-8 text-center text-muted">
+            Agrega los productos que vas a contar. Solo esas partidas formarán parte del conteo.
+          </p>
+        </template>
+      </DetailTable>
       <div v-else class="space-y-3">
         <ListRecordCard
           v-for="line in count.lines"

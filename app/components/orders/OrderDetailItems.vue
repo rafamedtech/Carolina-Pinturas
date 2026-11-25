@@ -225,7 +225,8 @@ const columns: TableColumn<SalesOrderItem>[] = [{
   ])
 }, {
   accessorKey: 'quantity',
-  header: () => h('div', { class: 'text-right' }, 'Cantidad'),
+  header: 'Cantidad',
+  meta: { class: { th: 'text-right' } },
   cell: ({ row }) => h('div', { class: 'flex items-center justify-end gap-1' }, [
     h('span', String(row.original.quantity)),
     props.editable && props.amountsEditable && props.quantityEditable !== false
@@ -241,11 +242,13 @@ const columns: TableColumn<SalesOrderItem>[] = [{
   ])
 }, {
   id: 'unit',
+  accessorFn: row => row.unit.name || row.unit.code,
   header: 'Unidad',
   cell: ({ row }) => row.original.unit.name || row.original.unit.code || '—'
 }, {
   accessorKey: 'unitPrice',
-  header: () => h('div', { class: 'text-right' }, 'Precio unitario'),
+  header: 'Precio unitario',
+  meta: { class: { th: 'text-right' } },
   cell: ({ row }) => h('div', { class: 'flex items-center justify-end gap-1' }, [
     h('span', currency.value.format(row.original.unitPrice)),
     props.editable && props.amountsEditable
@@ -271,7 +274,8 @@ const columns: TableColumn<SalesOrderItem>[] = [{
   ])
 }, {
   accessorKey: 'total',
-  header: () => h('div', { class: 'text-right' }, 'Total'),
+  header: 'Total',
+  meta: { class: { th: 'text-right' } },
   cell: ({ row }) => h(
     'div',
     { class: 'text-right font-medium text-primary' },
@@ -387,8 +391,9 @@ const columns: TableColumn<SalesOrderItem>[] = [{
       </div>
     </div>
 
-    <UTable
+    <DetailTable
       :data="tableItems"
+      :get-row-id="row => row.id"
       :columns="columns"
       empty="El pedido no tiene partidas."
       class="hidden md:block"
@@ -399,7 +404,7 @@ const columns: TableColumn<SalesOrderItem>[] = [{
           <OrdersOrderItemComposition :item="row.original" />
         </div>
       </template>
-    </UTable>
+    </DetailTable>
 
     <OrdersOrderItemDeleteModal
       v-if="deletable && deletingItem"

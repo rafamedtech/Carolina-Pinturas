@@ -25,10 +25,10 @@ function movementType(type: string) {
   return movementTypes[type] ?? { label: type.replaceAll('_', ' ').replace(/^./, letter => letter.toUpperCase()), color: 'neutral' as const }
 }
 const lineColumns: TableColumn<InventoryMovement['lines'][number]>[] = [
-  { id: 'product', header: 'Producto', cell: ({ row }) => `${row.original.productCode} · ${row.original.productName}` },
+  { id: 'product', header: 'Producto', accessorFn: row => `${row.productCode} · ${row.productName}` },
   { accessorKey: 'warehouseName', header: 'Almacén' },
-  { accessorKey: 'delta', header: 'Movimiento', cell: ({ row }) => h('span', { class: row.original.delta.startsWith('-') ? 'text-error font-mono' : 'text-success font-mono' }, `${row.original.delta.startsWith('-') ? '' : '+'}${row.original.delta}`) },
-  { accessorKey: 'balanceAfter', header: 'Existencia resultante' }
+  { id: 'delta', accessorFn: row => Number(row.delta), header: 'Movimiento', cell: ({ row }) => h('span', { class: row.original.delta.startsWith('-') ? 'text-error font-mono' : 'text-success font-mono' }, `${row.original.delta.startsWith('-') ? '' : '+'}${row.original.delta}`) },
+  { id: 'balanceAfter', accessorFn: row => Number(row.balanceAfter), header: 'Existencia resultante', cell: ({ row }) => row.original.balanceAfter }
 ]
 </script>
 

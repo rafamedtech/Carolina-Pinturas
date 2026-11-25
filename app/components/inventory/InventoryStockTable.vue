@@ -15,13 +15,13 @@ function unitCost(row: InventoryStock) {
 
 const numeric = { class: { th: 'text-right', td: 'text-right tabular-nums' } }
 const columns = computed<TableColumn<InventoryStock>[]>(() => [
-  { id: 'product', header: 'Producto', cell: ({ row }) => h('div', [h('p', { class: 'font-medium text-highlighted' }, row.original.name), h('p', { class: 'text-xs text-muted' }, `${row.original.code} · ${row.original.unit || 'Unidad'}`)]) },
+  { id: 'product', accessorFn: row => row.name, header: 'Producto', cell: ({ row }) => h('div', [h('p', { class: 'font-medium text-highlighted' }, row.original.name), h('p', { class: 'text-xs text-muted' }, `${row.original.code} · ${row.original.unit || 'Unidad'}`)]) },
   { accessorKey: 'warehouse', header: 'Almacén' },
-  { accessorKey: 'quantity', header: 'Existencia física', meta: numeric },
-  { accessorKey: 'reserved', header: 'Reservado', meta: numeric },
-  { accessorKey: 'available', header: 'Disponible', meta: numeric, cell: ({ row }) => h('div', { class: row.original.low ? 'font-semibold text-warning' : 'font-semibold text-primary' }, [row.original.available, row.original.low ? h('span', { class: 'block text-xs' }, 'Bajo mínimo') : null]) },
+  { id: 'quantity', accessorFn: row => Number(row.quantity), header: 'Existencia física', meta: numeric, cell: ({ row }) => row.original.quantity },
+  { id: 'reserved', accessorFn: row => Number(row.reserved), header: 'Reservado', meta: numeric, cell: ({ row }) => row.original.reserved },
+  { id: 'available', accessorFn: row => Number(row.available), header: 'Disponible', meta: numeric, cell: ({ row }) => h('div', { class: row.original.low ? 'font-semibold text-warning' : 'font-semibold text-primary' }, [row.original.available, row.original.low ? h('span', { class: 'block text-xs' }, 'Bajo mínimo') : null]) },
   { id: 'cost', header: 'Costo unitario', meta: numeric, cell: ({ row }) => unitCost(row.original) },
-  { accessorKey: 'minimum', header: 'Mínimo', meta: numeric },
+  { id: 'minimum', accessorFn: row => Number(row.minimum), header: 'Mínimo', meta: numeric, cell: ({ row }) => row.original.minimum },
   { id: 'actions', header: 'Acciones', cell: ({ row }) => h('div', { class: 'flex justify-end gap-1' }, [
     h(UButton, { label: 'Kardex', size: 'sm', variant: 'ghost', color: 'neutral', onClick: () => emit('kardex', row.original) }),
     props.admin ? h(UButton, { label: 'Mínimo', size: 'sm', variant: 'ghost', onClick: () => emit('minimum', row.original) }) : null
