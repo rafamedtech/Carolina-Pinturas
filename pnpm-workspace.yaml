@@ -9,4 +9,4 @@ allowBuilds:
   unrs-resolver: false
   vue-demi: false
 minimumReleaseAgeExclude:
-  - '@rafamedtech/nuxt-shared@0.9.0'
+  - '@rafamedtech/nuxt-shared@0.10.0'
