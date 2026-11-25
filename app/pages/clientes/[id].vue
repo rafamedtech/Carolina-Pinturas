@@ -219,7 +219,7 @@ useSeoMeta({ title: () => fullName.value })
 <template>
   <UDashboardPanel id="customer-detail">
     <template #header>
-      <UDashboardNavbar :title="`Detalle del ${entityLabelLower}`">
+      <DashboardNavbar :title="`Detalle del ${entityLabelLower}`">
         <template #leading>
           <UButton
             :to="backPath"
@@ -240,7 +240,7 @@ useSeoMeta({ title: () => fullName.value })
             @click="() => refresh()"
           />
         </template>
-      </UDashboardNavbar>
+      </DashboardNavbar>
       <DetailBreadcrumbs
         v-if="!isSupplierContext"
         :items="[

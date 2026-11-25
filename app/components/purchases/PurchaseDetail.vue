@@ -98,7 +98,7 @@ const timeline = computed(() => [...(order.value?.events ?? [])].reverse())
 <template>
   <UDashboardPanel id="purchase-detail">
     <template #header>
-      <UDashboardNavbar :title="order ? `OC-${order.folio}` : 'Compra'">
+      <DashboardNavbar :title="order ? `OC-${order.folio}` : 'Compra'">
         <template #leading>
           <UButton
             :to="backPath"
@@ -158,7 +158,7 @@ const timeline = computed(() => [...(order.value?.events ?? [])].reverse())
             @click="downloadWithoutPrices"
           />
         </template>
-      </UDashboardNavbar>
+      </DashboardNavbar>
       <DetailBreadcrumbs
         :items="[
           { label: fromPayables ? 'Cuentas por pagar' : 'Compras', icon: 'i-lucide-shopping-bag', to: backPath.split('?')[0] },

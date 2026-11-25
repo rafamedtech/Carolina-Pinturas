@@ -5,7 +5,7 @@ useSeoMeta({ title: 'Inicio' })
 <template>
   <UDashboardPanel id="home">
     <template #header>
-      <UDashboardNavbar title="Inicio">
+      <DashboardNavbar title="Inicio">
         <template #right>
           <UBadge
             label="Semana en curso"
@@ -14,7 +14,7 @@ useSeoMeta({ title: 'Inicio' })
             variant="subtle"
           />
         </template>
-      </UDashboardNavbar>
+      </DashboardNavbar>
     </template>
 
     <template #body>

@@ -51,7 +51,7 @@ const deliveryConfig: ListLayoutConfig = { id: 'driver-deliveries', title: 'Pedi
 <template>
   <UDashboardPanel id="repartidor-detail">
     <template #header>
-      <UDashboardNavbar :title="repartidor?.nombre || 'Detalle del repartidor'">
+      <DashboardNavbar :title="repartidor?.nombre || 'Detalle del repartidor'">
         <template #leading>
           <UButton
             :to="backPath"
@@ -71,7 +71,7 @@ const deliveryConfig: ListLayoutConfig = { id: 'driver-deliveries', title: 'Pedi
             @click="() => refresh()"
           />
         </template>
-      </UDashboardNavbar>
+      </DashboardNavbar>
     </template>
 
     <template #body>
