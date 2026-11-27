@@ -27,7 +27,7 @@ Red: `server/utils/ticket-printer.ts` (direcciones permitidas) · Bluetooth/nave
 - siigo_customers: is_internal_order_customer · siigo_products: account_group_name, unit_cost, cost_currency
 - expenses: id, expense_date, category, amount, exchange_rate, provider_name_snapshot, purchase_payment_id
 - inventory_warehouses: id, code, name · inventory_balances: warehouse_id, product_id, quantity
-Fuente: `CVRTRANSPORT/server/utils/carolina-{reports,inventory}.ts`.
+Fuente: `CVRTRANSPORT/server/utils/carolina-{reports,inventory}.ts`. Contrato verificado en CI: `tests/contracts/cvr-carolina.json` + `tests/unit/cvr-carolina-contract.test.ts`.
 
 ## Capa `@rafamedtech/nuxt-shared`
 Componentes Detail*/List*/Reports*/Auth*/App*, catálogo Siigo México (`2/4` en selector, `02/004` en payload). Ver `nuxt-shared/docs/CODEMAPS/`.
