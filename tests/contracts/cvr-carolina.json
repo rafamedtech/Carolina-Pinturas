@@ -1,0 +1,20 @@
+{
+  "$comment": "Contrato de lectura de CVRTRANSPORT sobre la base de Carolina Pinturas (siigo-pinturas). Fuente canónica: este archivo. Copia exacta en siigo-pinturas/tests/contracts/cvr-carolina.json. tests/carolina-contract.test.ts exige que coincida con las consultas de server/utils/carolina-*.ts; siigo-pinturas valida la copia contra prisma/schema.prisma.",
+  "tables": {
+    "expenses": ["amount", "category", "exchange_rate", "expense_date", "id", "provider_name_snapshot", "purchase_payment_id"],
+    "inventory_balances": ["product_id", "quantity", "warehouse_id"],
+    "inventory_warehouses": ["code", "id", "name"],
+    "sales_order_items": ["id", "order_id", "product_name_snapshot", "quantity", "tax_amount", "total"],
+    "sales_order_payments": ["amount", "id", "order_id", "payment_date", "payment_method"],
+    "sales_orders": ["customer_id", "customer_name_snapshot", "id", "order_date", "status_key", "tax_total", "total"],
+    "siigo_customers": ["is_internal_order_customer"],
+    "siigo_products": ["account_group_name", "cost_currency", "unit_cost"]
+  },
+  "relations": [
+    { "table": "inventory_balances", "column": "product_id", "references": "siigo_products" },
+    { "table": "sales_order_items", "column": "order_id", "references": "sales_orders" },
+    { "table": "sales_order_items", "column": "product_id", "references": "siigo_products" },
+    { "table": "sales_order_payments", "column": "order_id", "references": "sales_orders" },
+    { "table": "sales_orders", "column": "customer_id", "references": "siigo_customers" }
+  ]
+}

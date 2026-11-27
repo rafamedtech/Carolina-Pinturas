@@ -36,3 +36,6 @@ jobs:
 
       - name: Typecheck
         run: pnpm run typecheck
+
+      - name: CVR read contract
+        run: pnpm exec vitest run tests/unit/cvr-carolina-contract.test.ts
