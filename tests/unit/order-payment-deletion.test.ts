@@ -8,6 +8,9 @@ const mocks = vi.hoisted(() => {
       findUnique: vi.fn(),
       update: vi.fn()
     },
+    auditEvent: {
+      create: vi.fn()
+    },
     salesOrderPayment: {
       findFirst: vi.fn(),
       delete: vi.fn(),
@@ -42,7 +45,8 @@ describe('eliminación de pagos', () => {
         id: 'payment-1',
         provider: 'local',
         externalStatus: 'not_applicable',
-        siigoVoucherId: null
+        siigoVoucherId: null,
+        paymentDate: new Date('2026-08-01T00:00:00.000Z')
       })
       .mockResolvedValueOnce({
         paymentMethod: 'transferencia',
@@ -72,6 +76,27 @@ describe('eliminación de pagos', () => {
         version: { increment: 1 }
       }
     })
+  })
+
+  it('registra en la bitácora la foto del pago antes de eliminarlo', async () => {
+    await deleteOrderPayment('order-1', 'payment-1', admin)
+
+    expect(mocks.tx.auditEvent.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        entityType: 'sales_order_payment',
+        entityId: 'payment-1',
+        action: 'delete',
+        actorId: admin.id,
+        actorEmail: admin.email,
+        actorRole: 'admin',
+        effectiveDate: new Date('2026-08-01T00:00:00.000Z'),
+        sourceType: 'sales_order',
+        sourceId: 'order-1',
+        snapshot: expect.objectContaining({ id: 'payment-1', provider: 'local' })
+      })
+    })
+    expect(mocks.tx.auditEvent.create.mock.invocationCallOrder[0])
+      .toBeLessThan(mocks.tx.salesOrderPayment.delete.mock.invocationCallOrder[0]!)
   })
 
   it('limpia método y fecha cuando se elimina el último pago', async () => {

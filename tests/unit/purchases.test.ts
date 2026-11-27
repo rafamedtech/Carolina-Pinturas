@@ -73,9 +73,16 @@ describe('reglas de compras', () => {
     expect(() => assertReceipt(items, receipts, [{ itemId: id, quantity: 1 }, { itemId: id, quantity: 1 }])).toThrow()
     expect(() => assertReceipt(items, [{ ...receipts[0]!, voidedAt: new Date() }], [{ itemId: id, quantity: 10 }])).not.toThrow()
   })
-  it.each(['mostrador', 'vendedor', 'repartidor', 'igualaciones'] as const)('bloquea navegación para %s', (role) => {
+  it.each(['vendedor', 'repartidor', 'igualaciones'] as const)('bloquea navegación para %s', (role) => {
     expect(canAccessAppPath(role, '/compras')).toBe(false)
+    expect(canAccessAppPath(role, `/compras/${id}`)).toBe(false)
     expect(canAccessAppPath(role, '/compras/cuentas-por-pagar')).toBe(false)
     expect(canAccessAppPath('admin', '/compras/nueva')).toBe(true)
+  })
+  it('mostrador entra a compras y al detalle para recibir, pero no crea ni ve cuentas por pagar', () => {
+    expect(canAccessAppPath('mostrador', '/compras')).toBe(true)
+    expect(canAccessAppPath('mostrador', `/compras/${id}`)).toBe(true)
+    expect(canAccessAppPath('mostrador', '/compras/nueva')).toBe(false)
+    expect(canAccessAppPath('mostrador', '/compras/cuentas-por-pagar')).toBe(false)
   })
 })

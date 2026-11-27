@@ -1,9 +1,12 @@
 <script setup lang="ts">
 import Decimal from 'decimal.js'
 import type { InventoryStock, InventoryPage } from '#shared/types/inventory'
+import { canViewPurchaseFinancials } from '~/utils/roleAccess'
 
 const props = defineProps<{ productId: string }>()
 const requestFetch = useRequestFetch()
+const { user } = useAuth()
+const showCosts = computed(() => canViewPurchaseFinancials(user.value?.role))
 const { data: stocks, error, status } = useAsyncData(
   () => `product-warehouse-stocks-${props.productId}`,
   async () => {
@@ -48,7 +51,7 @@ const warehouseFields = computed(() => {
     { label: 'Existencia física', value: row.quantity },
     { label: 'Reservado', value: row.reserved },
     { label: 'Mínimo', value: row.minimum },
-    { label: 'Costo unitario', value: row.unitCost ? `${new Decimal(row.unitCost).toFixed(2)} ${row.costCurrency || ''}` : 'Sin costo' }
+    ...(showCosts.value ? [{ label: 'Costo unitario', value: row.unitCost ? `${new Decimal(row.unitCost).toFixed(2)} ${row.costCurrency || ''}` : 'Sin costo' }] : [])
   ]
 })
 function warehouseColor(row: InventoryStock) {

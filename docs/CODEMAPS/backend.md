@@ -11,6 +11,7 @@ Nitro (`server/`). Sesión: `server/middleware/supabase-session.ts` renueva cook
   ENT = ORDER_ENTRY_ROLES (admin, mostrador, vendedor, repartidor)
   LOG = ORDER_LOGISTICS_ROLES (admin, mostrador, vendedor)
   PROD = PRODUCT_MANAGEMENT_ROLES (admin)
+  PURCHASE_RECEIPT_ROLES (admin, mostrador) — `canManagePurchases` (admin), `canReceivePurchases`, `canViewPurchaseFinancials` (admin, consulta)
   INVR / INVW = INVENTORY_READ_ROLES (admin, mostrador, vendedor) / INVENTORY_WRITE_ROLES (admin, mostrador) — `server/utils/inventory.ts`
 - Rutas con `requireUser` aplican el permiso fino dentro de `orders.ts` (estados editables por rol, `canEditOrderRemision`, etc.).
 
@@ -56,11 +57,13 @@ GET  /api/products/[id]/cost → PROD → product-costs · /activity → por sec
 GET  /api/siigo/customers · /[id] · POST · PUT /[id] · PATCH /[id]/invoice-requirement · POST /sync → ENT → siigo-customers, siigo-customer-sync, siigo-customer-import
 PATCH /api/siigo/customers/[id]/roles → LOG → siigo-customer-repository
 
-### Compras — `purchases.ts`, `purchase-domain.ts`
-GET|POST /api/purchases · GET /api/purchases/[id] · POST /api/purchases/[id]/actions → admin → (recepciones → inventory.receiveInventory; pagos → expenses)
+### Compras — `purchases.ts`, `purchase-domain.ts`, `purchase-visibility.ts`
+POST /api/purchases → admin
+GET /api/purchases · GET /api/purchases/[id] → admin, mostrador (`purchaseViewForRole`: mostrador sin costos, facturas ni abonos)
+POST /api/purchases/[id]/actions → admin; mostrador solo `receive` → (recepciones → inventory.receiveInventory; pagos → expenses)
 
 ### Inventario — `inventory.ts` (500 l)
-GET  /api/inventory/[resource] → INVR (counts/movements: INVW) → listInventory
+GET  /api/inventory/[resource] → INVR (counts/movements: INVW) → listInventory (`inventoryForRole`: sin costos salvo admin/consulta)
 POST /api/inventory/actions → INVW → executeInventory (movimientos, conteos, traspasos, almacenes)
 GET  /api/inventory/summary → admin,consulta
 GET  /api/inventory/valuation → admin → inventoryValuation
@@ -76,6 +79,7 @@ Siigo API: siigo.ts (OAuth en memoria, `siigoRequest`), siigo-errors, siigo-cata
 Pedidos: orders, order-validation (Zod), order-payments, order-recipe-units, customer-balance, customer-validation
 Productos: managed-products, stored-products, product-catalog-persistence, product-compositions (recetas), product-costs, product-images (Supabase Storage), product-activity, product-unit
 Compras/inventario: purchases, purchase-domain, inventory, inventoryValuation
+Bitácora: audit (`recordAuditEvent` → `audit_events`, misma transacción; borrado de cobros, edición/borrado de gastos). Matriz: `docs/permisos.md`
 Otros: expenses, repartidores, repartidor-validation, reports, dashboard-period, ticket-printer, prisma, supabase, auth
 
 ## shared/

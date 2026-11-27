@@ -1,12 +1,13 @@
 // @vitest-environment nuxt
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { mountSuspended } from '@nuxt/test-utils/runtime'
+import { mockNuxtImport, mountSuspended } from '@nuxt/test-utils/runtime'
 import { flushPromises } from '@vue/test-utils'
 import { clearNuxtData } from '#app'
 import InventoryMovementForm from '~/components/inventory/InventoryMovementForm.vue'
 import type { InventoryMovement, InventoryProduct } from '#shared/types/inventory'
 
-const mocks = vi.hoisted(() => ({ fetchAllPages: vi.fn() }))
+const mocks = vi.hoisted(() => ({ fetchAllPages: vi.fn(), role: { value: 'admin' } }))
+mockNuxtImport('useAuth', () => () => ({ user: { value: { role: mocks.role.value } } }))
 vi.mock('~/composables/useCsvExport', () => ({ fetchAllPages: mocks.fetchAllPages }))
 const product: InventoryProduct = { id: 'product-1', code: 'P-1', name: 'Pintura blanca', unit: 'Unidad', enabled: true, version: 1, initialUnitCost: '12.123456', initialCostCurrency: 'USD' }
 const search = {
@@ -19,6 +20,7 @@ const mountForm = (source?: InventoryMovement, activated = false) => mountSuspen
 beforeEach(() => {
   clearNuxtData('inventory-movement-products')
   mocks.fetchAllPages.mockReset()
+  mocks.role.value = 'admin'
 })
 
 describe('apertura del formulario de movimientos', () => {
@@ -70,6 +72,18 @@ describe('apertura del formulario de movimientos', () => {
     await cost.trigger('blur')
     await wrapper.get('form').trigger('submit')
     expect(wrapper.emitted('submit')?.[0]?.[0]).toMatchObject({ type: 'entrada', lines: [{ unitCost: '25.123456', costCurrency: 'MXN' }] })
+    wrapper.unmount()
+  })
+
+  it('mostrador registra entradas sin ver ni capturar costos', async () => {
+    mocks.role.value = 'mostrador'
+    mocks.fetchAllPages.mockResolvedValue([{ ...product, initialUnitCost: null, initialCostCurrency: null }])
+    const wrapper = await mountForm(undefined, true)
+    await flushPromises()
+    await wrapper.get('[data-testid="search"]').trigger('click')
+    await wrapper.findAll('button').find(b => b.text() === 'Agregar producto')!.trigger('click')
+    expect(wrapper.find('input[aria-label="Costo unitario de P-1 · Pintura blanca"]').exists()).toBe(false)
+    expect(wrapper.text()).not.toContain('Costo unitario')
     wrapper.unmount()
   })
 

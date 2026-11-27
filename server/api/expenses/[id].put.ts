@@ -6,6 +6,7 @@ import { siigoCustomerName } from '~/utils/siigoCustomer'
 import { requireRole } from '../../utils/auth'
 import { createExpenseSchema, expenseView, validateExpenseProduct } from '../../utils/expenses'
 import { usePrisma } from '../../utils/prisma'
+import { lockForAudit, recordAuditEvent } from '../../utils/audit'
 import { getSiigoCustomerDetail } from '../../utils/siigo-customer-detail'
 import { siigoCustomerPersistenceState } from '../../utils/siigo-customers'
 
@@ -76,23 +77,38 @@ export default eventHandler(async (event): Promise<ExpenseRecord> => {
   const providerPayload = JSON.parse(
     JSON.stringify(siigoCustomerPersistenceState(siigoProvider))
   ) as Prisma.InputJsonValue
-  const expense = await prisma.expense.update({
-    where: { id: existing.id },
-    data: {
-      productId: parsed.data.productId ?? null,
-      expenseDate: new Date(`${parsed.data.date}T00:00:00.000Z`),
-      category: parsed.data.category,
-      description: parsed.data.description,
-      providerId: provider.id,
-      providerNameSnapshot: providerName,
-      providerRfcSnapshot: siigoProvider.rfc_id || null,
-      providerPayload,
-      currencyCode: parsed.data.currencyCode,
-      exchangeRate: parsed.data.exchangeRate,
-      amount: parsed.data.amount,
-      paymentMethod: parsed.data.paymentMethod,
-      notes: parsed.data.notes || null
+  const expense = await prisma.$transaction(async (tx) => {
+    const previous = await lockForAudit(tx, 'expense', existing.id, () => tx.expense.findUnique({ where: { id: existing.id } }))
+    if (previous.purchasePaymentId) {
+      throw createError({ statusCode: user.role === 'admin' ? 409 : 404, statusMessage: user.role === 'admin' ? 'Gestiona este gasto desde Compras.' : 'El gasto no existe.' })
     }
+    const updated = await tx.expense.update({
+      where: { id: existing.id },
+      data: {
+        productId: parsed.data.productId ?? null,
+        expenseDate: new Date(`${parsed.data.date}T00:00:00.000Z`),
+        category: parsed.data.category,
+        description: parsed.data.description,
+        providerId: provider.id,
+        providerNameSnapshot: providerName,
+        providerRfcSnapshot: siigoProvider.rfc_id || null,
+        providerPayload,
+        currencyCode: parsed.data.currencyCode,
+        exchangeRate: parsed.data.exchangeRate,
+        amount: parsed.data.amount,
+        paymentMethod: parsed.data.paymentMethod,
+        notes: parsed.data.notes || null
+      }
+    })
+    await recordAuditEvent(tx, user, {
+      entityType: 'expense',
+      entityId: existing.id,
+      action: 'update',
+      snapshot: previous,
+      changes: updated,
+      effectiveDate: updated.expenseDate
+    })
+    return updated
   })
 
   return expenseView(expense)

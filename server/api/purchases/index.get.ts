@@ -3,10 +3,12 @@ import { purchaseDate } from '#shared/schemas/purchase'
 import { requireRole } from '../../utils/auth'
 import { usePrisma } from '../../utils/prisma'
 import { purchaseInclude, purchaseView } from '../../utils/purchases'
+import { purchaseViewForRole } from '../../utils/purchase-visibility'
+import { PURCHASE_RECEIPT_ROLES } from '~/utils/roleAccess'
 
 const filters = z.object({ search: z.string().max(200).optional(), dateFrom: purchaseDate.optional(), dateTo: purchaseDate.optional(), status: z.enum(['borrador', 'confirmada', 'liquidada', 'vencida', 'cancelada']).optional() })
 export default eventHandler(async (event) => {
-  await requireRole(event, ['admin'])
+  const user = await requireRole(event, PURCHASE_RECEIPT_ROLES)
   const parsed = filters.safeParse(getQuery(event))
   if (!parsed.success) throw createError({ statusCode: 400, statusMessage: 'Filtros inválidos.' })
   const q = parsed.data
@@ -17,6 +19,6 @@ export default eventHandler(async (event) => {
     ...(storedStatus ? { status: storedStatus } : {}),
     date: { ...(q.dateFrom ? { gte: new Date(q.dateFrom) } : {}), ...(q.dateTo ? { lte: new Date(q.dateTo) } : {}) }
   }, include: purchaseInclude, orderBy: [{ date: 'desc' }, { folio: 'desc' }] })
-  const results = rows.map(purchaseView)
+  const results = rows.map(row => purchaseViewForRole(purchaseView(row), user.role))
   return { results: q.status ? results.filter(order => order.status === q.status) : results }
 })

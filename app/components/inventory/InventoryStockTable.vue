@@ -2,12 +2,16 @@
 import type { TableColumn } from '@nuxt/ui'
 import { purchaseMoney } from '~/utils/purchaseFormat'
 import type { InventoryStock } from '#shared/types/inventory'
+import { canViewPurchaseFinancials } from '~/utils/roleAccess'
 
 const props = defineProps<{ rows: InventoryStock[], admin?: boolean }>()
 const emit = defineEmits<{ minimum: [row: InventoryStock], kardex: [row: InventoryStock] }>()
 const table = useTemplateRef('table')
 defineExpose({ getColumns: () => table.value?.getColumns() ?? [] })
 const UButton = resolveComponent('UButton')
+const { user } = useAuth()
+// El costo unitario es el último costo de compra: solo admin y consulta lo ven.
+const showCosts = computed(() => canViewPurchaseFinancials(user.value?.role))
 function unitCost(row: InventoryStock) {
   const currency = row.costCurrency || 'MXN'
   return row.unitCost ? `${purchaseMoney(Number(row.unitCost), currency)} ${currency}` : 'Sin costo'
@@ -20,16 +24,18 @@ const columns = computed<TableColumn<InventoryStock>[]>(() => [
   { id: 'quantity', accessorFn: row => Number(row.quantity), header: 'Existencia física', meta: numeric, cell: ({ row }) => row.original.quantity },
   { id: 'reserved', accessorFn: row => Number(row.reserved), header: 'Reservado', meta: numeric, cell: ({ row }) => row.original.reserved },
   { id: 'available', accessorFn: row => Number(row.available), header: 'Disponible', meta: numeric, cell: ({ row }) => h('div', { class: row.original.low ? 'font-semibold text-warning' : 'font-semibold text-primary' }, [row.original.available, row.original.low ? h('span', { class: 'block text-xs' }, 'Bajo mínimo') : null]) },
-  {
-    id: 'cost',
-    accessorFn: row => row.unitCost == null ? undefined : Number(row.unitCost),
-    header: 'Costo unitario',
-    sortUndefined: 'last',
-    sortingFn: (a, b, id) => (a.original.costCurrency || 'MXN').localeCompare(b.original.costCurrency || 'MXN')
-      || a.getValue<number>(id) - b.getValue<number>(id),
-    meta: numeric,
-    cell: ({ row }) => unitCost(row.original)
-  },
+  ...(showCosts.value
+    ? [{
+      id: 'cost',
+      accessorFn: row => row.unitCost == null ? undefined : Number(row.unitCost),
+      header: 'Costo unitario',
+      sortUndefined: 'last',
+      sortingFn: (a, b, id) => (a.original.costCurrency || 'MXN').localeCompare(b.original.costCurrency || 'MXN')
+        || a.getValue<number>(id) - b.getValue<number>(id),
+      meta: numeric,
+      cell: ({ row }) => unitCost(row.original)
+    } satisfies TableColumn<InventoryStock>]
+    : []),
   { id: 'minimum', accessorFn: row => Number(row.minimum), header: 'Mínimo', meta: numeric, cell: ({ row }) => row.original.minimum },
   { id: 'actions', header: 'Acciones', cell: ({ row }) => h('div', { class: 'flex justify-end gap-1' }, [
     h(UButton, { label: 'Kardex', size: 'sm', variant: 'ghost', color: 'neutral', onClick: () => emit('kardex', row.original) }),
@@ -54,7 +60,7 @@ const columns = computed<TableColumn<InventoryStock>[]>(() => [
           { label: 'Almacén', value: row.warehouse, fullWidth: true },
           { label: 'Existencia física', value: row.quantity },
           { label: 'Reservado', value: row.reserved },
-          { label: 'Costo unitario', value: unitCost(row) },
+          ...(showCosts ? [{ label: 'Costo unitario', value: unitCost(row) }] : []),
           { label: 'Mínimo', value: row.minimum }
         ]"
         summary-label="Disponible"

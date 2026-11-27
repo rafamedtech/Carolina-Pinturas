@@ -9,6 +9,7 @@ import PurchaseList from '~/components/purchases/PurchaseList.vue'
 
 mockNuxtImport('useAuth', () => () => ({
   canWrite: false,
+  user: { value: { role: 'admin' } },
   disabled: { value: false },
   fetchSession: async () => ({ role: 'admin' })
 }))

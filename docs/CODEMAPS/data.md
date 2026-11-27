@@ -29,5 +29,8 @@ Expense (expenses) → provider, product?, purchasePayment?, createdByUser
 InventorySettings (activación) · InventoryWarehouse · InventoryProduct (control interno) · InventoryBalance (warehouse+product) · InventoryReservation · InventoryMovement (origin_key, reversión, devoluciones) → InventoryMovementLine · InventoryCount → InventoryCountLine · InventoryEvent
 Salida de stock al pasar pedido a `en_camino`/`entregado` (`inventory.syncOrderInventory`).
 
+## Bitácora
+AuditEvent (audit_events) — solo inserción (trigger inmutable), RLS sin acceso público: entidad, acción, actor (id, email, rol), motivo, fecha efectiva, origen, foto previa y cambios. Ver `docs/permisos.md`.
+
 ## Tablas leídas por CVR (contrato)
 sales_orders, sales_order_items, sales_order_payments, siigo_customers, siigo_products, expenses, inventory_balances, inventory_warehouses — columnas en `integraciones.md`. Cualquier migración que las renombre/elimine requiere cambio coordinado en CVRTRANSPORT. Contrato exacto en `tests/contracts/cvr-carolina.json` (copia del canónico de CVRTRANSPORT); `tests/unit/cvr-carolina-contract.test.ts` lo valida contra `prisma/schema.prisma` y corre en CI.

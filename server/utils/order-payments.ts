@@ -5,6 +5,7 @@ import type { Prisma, SalesOrderPayment } from '../../generated/prisma/client'
 import type { AppUser, UserRole } from '~/types/siigo'
 import type { OrderPayment } from '~/types/siigo-payments'
 import { canDeletePaymentRecord, PAYMENT_FORM_KEYS, SIIGO_PAYMENT_METHODS } from '~/utils/orderPayment'
+import { recordAuditEvent } from './audit'
 
 const PAYMENT_DELETE_TRANSACTION_OPTIONS = {
   isolationLevel: 'Serializable' as const,
@@ -97,6 +98,14 @@ export async function deleteOrderPayment(orderId: string, paymentId: string, use
       })
     }
 
+    await recordAuditEvent(tx, user, {
+      entityType: 'sales_order_payment',
+      entityId: payment.id,
+      action: 'delete',
+      snapshot: payment,
+      effectiveDate: payment.paymentDate,
+      source: { type: 'sales_order', id: orderId }
+    })
     await tx.salesOrderPayment.delete({ where: { id: payment.id } })
 
     const totals = await tx.salesOrderPayment.aggregate({
