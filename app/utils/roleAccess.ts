@@ -13,6 +13,12 @@ export const ORDER_LOGISTICS_ROLES = [
   'vendedor'
 ] as const satisfies readonly UserRole[]
 
+/** Roles que consultan compras y registran recepciones (CVR-02). */
+export const PURCHASE_RECEIPT_ROLES = [
+  'admin',
+  'mostrador'
+] as const satisfies readonly UserRole[]
+
 export const OPERATIONAL_ROLES = [
   ...ORDER_ENTRY_ROLES,
   'igualaciones'
@@ -70,7 +76,10 @@ export function canAccessAppPath(role: UserRole, path: string) {
   if (role === 'consulta') {
     return !(/^\/configuracion(?:\/|$)/.test(path) || /\/(nuevo(?:-pedido)?|nueva(?:-cotizacion)?|editar)(?:\/|$)/.test(path))
   }
-  if (path === '/compras' || path.startsWith('/compras/')) return role === 'admin'
+  if (path === '/compras' || path.startsWith('/compras/')) {
+    const receiptPath = path === '/compras' || /^\/compras\/[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(path)
+    return receiptPath ? canReceivePurchases(role) : canManagePurchases(role)
+  }
   if (role === 'igualaciones') {
     const isOrderDetail = /^\/ventas\/[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(path)
     return path === '/igualaciones' || isOrderDetail
@@ -114,7 +123,7 @@ export function canWriteData(role: UserRole | undefined) {
 
 export const USER_ROLE_OPTIONS = [
   { value: 'consulta', label: 'Solo consulta', description: 'Puede consultar la información de todos los módulos. No puede agregar, modificar ni eliminar registros.' },
-  { value: 'mostrador', label: 'Mostrador', description: 'Gestiona pedidos, cobros, clientes, gastos y operaciones de inventario.' },
+  { value: 'mostrador', label: 'Mostrador', description: 'Gestiona pedidos, cobros, clientes, gastos, operaciones de inventario y recepciones de compra.' },
   { value: 'vendedor', label: 'Vendedor', description: 'Gestiona pedidos, cobros, clientes y gastos. Consulta inventario.' },
   { value: 'repartidor', label: 'Repartidor', description: 'Accede a pedidos y actualiza las entregas asignadas.' },
   { value: 'igualaciones', label: 'Igualaciones', description: 'Consulta la cola de igualaciones y actualiza su preparación.' }
@@ -122,4 +131,19 @@ export const USER_ROLE_OPTIONS = [
 
 export function canReadAllData(role: UserRole | undefined) {
   return role === 'admin' || role === 'consulta'
+}
+
+/** Crear, editar, confirmar o cancelar compras; facturas y abonos a proveedor. */
+export function canManagePurchases(role: UserRole | undefined) {
+  return role === 'admin'
+}
+
+/** Consultar compras y registrar recepciones. Anular una recepción es de admin. */
+export function canReceivePurchases(role: UserRole | undefined) {
+  return PURCHASE_RECEIPT_ROLES.includes(role as typeof PURCHASE_RECEIPT_ROLES[number])
+}
+
+/** Costos, facturas, saldos y abonos de compra. Mostrador recibe sin ver importes. */
+export function canViewPurchaseFinancials(role: UserRole | undefined) {
+  return canReadAllData(role)
 }

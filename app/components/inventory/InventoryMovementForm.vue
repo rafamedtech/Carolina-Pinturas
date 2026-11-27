@@ -3,6 +3,7 @@ import type { InventoryWarehouse, InventoryProduct, InventoryReturnSource } from
 import type { InventoryCommand } from '#shared/schemas/inventory'
 import { fetchAllPages } from '~/composables/useCsvExport'
 import { mexicoToday } from '~/utils/datetime'
+import { canViewPurchaseFinancials } from '~/utils/roleAccess'
 
 const props = defineProps<{ warehouses: InventoryWarehouse[], activated: boolean, admin: boolean, busy: boolean, source?: InventoryReturnSource }>()
 const emit = defineEmits<{ submit: [command: InventoryCommand['command']] }>()
@@ -32,7 +33,11 @@ function add() {
   form.lines.push({ productId: selected.value, quantity: '', unitCost: (form.type === 'inicial' ? product?.initialUnitCost : product?.unitCost) ?? undefined, costCurrency: ((form.type === 'inicial' ? product?.initialCostCurrency : product?.costCurrency) as 'MXN' | 'USD') ?? 'MXN' })
   selected.value = ''
 }
-const showCosts = computed(() => !props.source && ['inicial', 'entrada'].includes(form.type))
+const { user } = useAuth()
+// El inventario inicial exige costo; en entradas solo lo ve y captura quien ve costos de compra
+// (el servidor solo lo usa si el producto aún no tiene costo).
+const showCosts = computed(() => !props.source && (form.type === 'inicial'
+  || (form.type === 'entrada' && canViewPurchaseFinancials(user.value?.role))))
 function hasRegisteredCost(productId: string) {
   return form.type === 'entrada' && Boolean(enabledProducts.value.find(p => p.id === productId)?.unitCost)
 }
@@ -133,7 +138,7 @@ const warehouseOptions = computed(() => props.warehouses.filter(w => w.active).m
       <p v-if="form.type === 'inicial' && !source" class="text-sm text-muted">
         Captura el costo unitario con impuestos. Se usará hasta recibir una compra y debe coincidir en todos los almacenes.
       </p>
-      <p v-if="form.type === 'entrada' && !source" class="text-sm text-muted">
+      <p v-if="form.type === 'entrada' && showCosts" class="text-sm text-muted">
         Se muestra el último costo registrado con impuestos. Si el producto no tiene costo, puedes capturarlo junto con su moneda.
       </p>
       <ul class="divide-y divide-default">

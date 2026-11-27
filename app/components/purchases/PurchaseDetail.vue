@@ -5,6 +5,7 @@ import type { PurchaseView } from '~/types/purchases'
 import { formatMexicoDateTime } from '~/utils/datetime'
 import { purchaseDateLabel, purchaseMoney, purchaseQuantity, purchaseStatus, purchaseListTabs, purchasePayablesTabs, receiptStatus } from '~/utils/purchaseFormat'
 import { createPurchaseSupplierPdf } from '~/utils/purchaseSupplierPdf'
+import { canManagePurchases, canViewPurchaseFinancials } from '~/utils/roleAccess'
 
 const route = useRoute()
 const backPath = computed(() => tableReturnPath(route.query.returnTo, '/compras', ['/compras', '/compras/cuentas-por-pagar']))
@@ -14,7 +15,9 @@ const purchaseBreadcrumbTab = computed(() => tableTabBreadcrumb(
   tableReturnQuery(backPath.value).get('status'),
   fromPayables.value ? 'pendiente' : 'all'
 ))
-const { canWrite } = useAuth()
+const { canWrite, user } = useAuth()
+// Mostrador consulta y recibe; costos, facturas y edición quedan con admin.
+const canManage = computed(() => canWrite.value && canManagePurchases(user.value?.role))
 const props = defineProps<{ id: string }>()
 const { data: order, error: loadError, refresh, status: loadStatus } = useFetch<PurchaseView>(`/api/purchases/${props.id}`, { lazy: true, server: false })
 const { busy, error, run } = usePurchaseAction(() => order.value!, (value) => {
@@ -58,13 +61,15 @@ const printColumns: TableColumn<PurchaseView['items'][number]>[] = [
 const status = computed(() => purchaseStatus(order.value?.status ?? ''))
 const receipt = computed(() => receiptStatus(order.value?.receiptStatus ?? ''))
 const isDraft = computed(() => order.value?.status === 'borrador')
+// El rol decide desde el primer render; la bandera del servidor es el respaldo.
+const showFinancials = computed(() => canViewPurchaseFinancials(user.value?.role) && !order.value?.financialsHidden)
 const received = computed(() => {
   const items = order.value?.items ?? []
   const ordered = items.reduce((s, i) => s + i.quantity, 0)
   const done = items.reduce((s, i) => s + i.received, 0)
   return { ordered, done, percent: ordered ? Math.min(100, Math.round(done / ordered * 100)) : 0 }
 })
-const canCancel = computed(() => canWrite.value && Boolean(order.value)
+const canCancel = computed(() => canManage.value && Boolean(order.value)
   && order.value!.status !== 'cancelada'
   && !order.value!.receipts.some(r => !r.voidedAt)
   && !order.value!.invoices.some(i => !i.voidedAt))
@@ -93,6 +98,9 @@ function eventReason(detail: unknown) {
   return detail && typeof detail === 'object' && 'reason' in detail ? String(detail.reason) : ''
 }
 const timeline = computed(() => [...(order.value?.events ?? [])].reverse())
+const itemGrid = computed(() => showFinancials.value
+  ? 'md:grid-cols-[minmax(0,1fr)_8rem_8rem_9rem_8rem]'
+  : 'md:grid-cols-[minmax(0,1fr)_8rem_8rem]')
 </script>
 
 <template>
@@ -118,7 +126,7 @@ const timeline = computed(() => [...(order.value?.events ?? [])].reverse())
         </template>
         <template #right>
           <UButton
-            v-if="order"
+            v-if="order && canManage"
             :to="{ path: '/compras/nueva', query: { duplicar: order.id, returnTo: backPath } }"
             label="Duplicar"
             icon="i-lucide-copy"
@@ -139,6 +147,7 @@ const timeline = computed(() => [...(order.value?.events ?? [])].reverse())
             @click="refresh()"
           />
           <UButton
+            v-if="showFinancials"
             label="Imprimir"
             icon="i-lucide-printer"
             aria-label="Imprimir orden"
@@ -203,7 +212,7 @@ const timeline = computed(() => [...(order.value?.events ?? [])].reverse())
                   <span class="inline-flex items-center gap-1"><UIcon name="i-lucide-coins" class="size-4" />{{ order.currencyCode }}</span>
                 </div>
               </div>
-              <div v-if="isDraft && canWrite" class="flex flex-col gap-2 sm:flex-row">
+              <div v-if="isDraft && canManage" class="flex flex-col gap-2 sm:flex-row">
                 <UButton
                   v-if="canCancel"
                   label="Cancelar orden"
@@ -224,8 +233,8 @@ const timeline = computed(() => [...(order.value?.events ?? [])].reverse())
               </div>
             </div>
 
-            <div v-if="!isDraft" class="mt-5 grid grid-cols-2 gap-3 border-t border-default pt-5 lg:grid-cols-4">
-              <div>
+            <div v-if="!isDraft" class="mt-5 grid grid-cols-2 gap-3 border-t border-default pt-5" :class="showFinancials ? 'lg:grid-cols-4' : ''">
+              <div v-if="showFinancials">
                 <p class="text-sm text-muted">
                   Total de la orden
                 </p>
@@ -233,7 +242,7 @@ const timeline = computed(() => [...(order.value?.events ?? [])].reverse())
                   {{ money(order.total) }}
                 </p>
               </div>
-              <div>
+              <div v-if="showFinancials">
                 <p class="text-sm text-muted">
                   Facturado
                 </p>
@@ -244,7 +253,7 @@ const timeline = computed(() => [...(order.value?.events ?? [])].reverse())
                   {{ order.invoiced > order.total ? '+' : '' }}{{ money(order.invoiced - order.total) }} vs. orden
                 </p>
               </div>
-              <div>
+              <div v-if="showFinancials">
                 <p class="text-sm text-muted">
                   Saldo por pagar
                 </p>
@@ -278,7 +287,7 @@ const timeline = computed(() => [...(order.value?.events ?? [])].reverse())
           </UCard>
 
           <PurchasesPurchaseDraftForm
-            v-if="isDraft && canWrite"
+            v-if="isDraft && canManage"
             :key="order.version"
             :order="order"
             :busy="busy"
@@ -286,7 +295,7 @@ const timeline = computed(() => [...(order.value?.events ?? [])].reverse())
           />
 
           <div class="grid gap-4 lg:items-start" :class="isDraft ? '' : 'lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]'">
-            <div v-if="!isDraft || !canWrite" class="flex min-w-0 flex-col gap-4">
+            <div v-if="!isDraft || !canManage" class="flex min-w-0 flex-col gap-4">
               <UCard :ui="{ body: 'p-0 sm:p-0' }">
                 <template #header>
                   <div class="flex items-center justify-between gap-3">
@@ -298,14 +307,17 @@ const timeline = computed(() => [...(order.value?.events ?? [])].reverse())
                         {{ order.items.length }} {{ order.items.length === 1 ? 'producto' : 'productos' }}
                       </p>
                     </div>
-                    <p class="text-right text-sm text-muted">
+                    <p v-if="showFinancials" class="text-right text-sm text-muted">
                       Total
                       <span class="ms-2 text-base font-semibold text-primary tabular-nums">{{ money(order.total) }}</span>
                     </p>
                   </div>
                 </template>
-                <div class="hidden gap-3 border-b border-default bg-elevated/50 px-4 py-2 text-xs font-medium text-muted uppercase md:grid md:grid-cols-[minmax(0,1fr)_8rem_8rem_9rem_8rem]">
-                  <span>Producto</span><span class="text-right">Cantidad</span><span class="text-right">Recibido</span><span class="text-right">Costo unitario</span><span class="text-right">Importe</span>
+                <div class="hidden gap-3 border-b border-default bg-elevated/50 px-4 py-2 text-xs font-medium text-muted uppercase md:grid" :class="itemGrid">
+                  <span>Producto</span><span class="text-right">Cantidad</span><span class="text-right">Recibido</span>
+                  <template v-if="showFinancials">
+                    <span class="text-right">Costo unitario</span><span class="text-right">Importe</span>
+                  </template>
                 </div>
                 <div class="space-y-3 p-4 md:hidden">
                   <ListRecordCard
@@ -316,10 +328,10 @@ const timeline = computed(() => [...(order.value?.events ?? [])].reverse())
                     :fields="[
                       { label: 'Cantidad', value: purchaseQuantity(item.quantity) },
                       { key: 'received', label: 'Recibido', value: purchaseQuantity(item.received) },
-                      { label: 'Costo unitario', value: money(item.unitCost) }
+                      ...(showFinancials ? [{ label: 'Costo unitario', value: money(item.unitCost) }] : [])
                     ]"
-                    summary-label="Importe"
-                    :summary-value="money(item.total)"
+                    :summary-label="showFinancials ? 'Importe' : undefined"
+                    :summary-value="showFinancials ? money(item.total) : undefined"
                   >
                     <template #field-value="{ field }">
                       <span :class="field.key === 'received' ? (item.received >= item.quantity ? 'text-success' : item.received > 0 ? 'text-warning' : 'text-muted') : undefined">
@@ -332,7 +344,8 @@ const timeline = computed(() => [...(order.value?.events ?? [])].reverse())
                   <li
                     v-for="item in order.items"
                     :key="item.id"
-                    class="grid grid-cols-2 gap-x-3 gap-y-1 px-4 py-3 text-sm md:grid-cols-[minmax(0,1fr)_8rem_8rem_9rem_8rem] md:items-center"
+                    class="grid grid-cols-2 gap-x-3 gap-y-1 px-4 py-3 text-sm md:items-center"
+                    :class="itemGrid"
                   >
                     <div class="col-span-2 min-w-0 md:col-span-1">
                       <p class="truncate font-medium text-highlighted">
@@ -348,15 +361,17 @@ const timeline = computed(() => [...(order.value?.events ?? [])].reverse())
                     <p class="tabular-nums md:text-right" :class="item.received >= item.quantity ? 'text-success' : item.received > 0 ? 'text-warning' : 'text-muted'">
                       {{ purchaseQuantity(item.received) }}
                     </p>
-                    <p class="tabular-nums md:text-right">
-                      {{ money(item.unitCost) }}
-                    </p>
-                    <p class="font-medium tabular-nums md:text-right">
-                      {{ money(item.total) }}
-                    </p>
+                    <template v-if="showFinancials">
+                      <p class="tabular-nums md:text-right">
+                        {{ money(item.unitCost) }}
+                      </p>
+                      <p class="font-medium tabular-nums md:text-right">
+                        {{ money(item.total) }}
+                      </p>
+                    </template>
                   </li>
                 </ul>
-                <template #footer>
+                <template v-if="showFinancials" #footer>
                   <div class="flex flex-col gap-2 sm:ms-auto sm:max-w-sm">
                     <div class="flex items-center justify-between gap-4 text-sm">
                       <span class="text-muted">Subtotal</span>
@@ -375,7 +390,7 @@ const timeline = computed(() => [...(order.value?.events ?? [])].reverse())
               </UCard>
 
               <PurchasesPurchaseReceipts :order="order" @saved="order = $event" />
-              <PurchasesPurchaseInvoices :order="order" @saved="order = $event" />
+              <PurchasesPurchaseInvoices v-if="showFinancials" :order="order" @saved="order = $event" />
             </div>
 
             <div class="flex min-w-0 flex-col gap-4">
@@ -444,7 +459,7 @@ const timeline = computed(() => [...(order.value?.events ?? [])].reverse())
           </div>
         </div>
 
-        <section class="purchase-print hidden space-y-4 text-sm print:block">
+        <section v-if="showFinancials" class="purchase-print hidden space-y-4 text-sm print:block">
           <div class="flex items-start justify-between">
             <div>
               <h1 class="text-2xl font-semibold">

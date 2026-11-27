@@ -9,11 +9,13 @@ import type { PurchaseView } from '~/types/purchases'
 import { createNumberFormatter, type CsvColumn } from '@rafamedtech/nuxt-shared/utils'
 import { purchaseListTabs, purchaseStatus } from '~/utils/purchaseFormat'
 import { formatDate, mexicoToday } from '~/utils/datetime'
+import { canManagePurchases, canViewPurchaseFinancials } from '~/utils/roleAccess'
 
 const UBadge = resolveComponent('UBadge')
 const NuxtLink = resolveComponent('NuxtLink')
 const sorting = ref<SortingState>([])
 
+const { canWrite, user } = useAuth()
 const page = shallowRef(1)
 const pageSize = 25
 const search = shallowRef('')
@@ -22,7 +24,9 @@ const dateRange = shallowRef<OrderDateRange | null>(null)
 const sortableColumns = ['date', 'folio', 'providerName', 'status', 'nextDueDate', 'total', 'balance']
 const { returnTo } = useTableQuery([
   tableQueryField('search', search, tableQueryText()),
-  tableQueryField('status', status, tableQueryText('all', ['all', 'confirmada', 'liquidada', 'vencida', 'borrador', 'cancelada'])),
+  tableQueryField('status', status, tableQueryText('all', canViewPurchaseFinancials(user.value?.role)
+    ? ['all', 'confirmada', 'liquidada', 'vencida', 'borrador', 'cancelada']
+    : ['all', 'confirmada', 'borrador', 'cancelada'])),
   tableQueryRange(dateRange, 'date_from', 'date_to'),
   tableQueryField('sort', sorting, {
     parse: value => tableQuerySorting.parse(value).filter((entry, index, entries) =>
@@ -97,7 +101,7 @@ function formatAmount(amount: number, currencyCode: string, colorClass = '') {
   return h('div', { class: ['text-right font-semibold', colorClass] }, amountLabel(amount, currencyCode))
 }
 
-const columns: TableColumn<PurchaseView>[] = [{
+const allColumns: TableColumn<PurchaseView>[] = [{
   accessorKey: 'date',
   header: sortableHeader('Fecha'),
   cell: ({ row }) => formatDate(row.original.date)
@@ -138,11 +142,18 @@ const columns: TableColumn<PurchaseView>[] = [{
     row.original.balance === 0 ? 'text-success' : row.original.status === 'vencida' ? 'text-error' : ''
   )
 }]
-const { canWrite } = useAuth()
+// Mostrador ve compras para recibir mercancía, sin vencimientos ni importes.
+const showFinancials = computed(() => canViewPurchaseFinancials(user.value?.role))
+const financialKeys = new Set(['nextDueDate', 'total', 'balance', 'currencyCode'])
+const columns = computed(() => showFinancials.value
+  ? allColumns
+  : allColumns.filter(column => !financialKeys.has(String(column.id ?? ('accessorKey' in column ? column.accessorKey : '')))))
+const visibleCsvColumns = computed(() => showFinancials.value ? csvColumns : csvColumns.filter(column => !financialKeys.has(column.key)))
 const listConfig = computed<ListLayoutConfig>(() => ({
   id: 'purchases', title: 'Compras', empty: 'Sin compras para estos filtros.',
-  search: { placeholder: 'Buscar proveedor' }, dateFilter: { subject: 'compras' }, tabs: purchaseListTabs,
-  create: canWrite.value ? { label: 'Nueva compra', to: { path: '/compras/nueva', query: { returnTo: returnTo.value } } } : undefined,
+  search: { placeholder: 'Buscar proveedor' }, dateFilter: { subject: 'compras' },
+  tabs: showFinancials.value ? purchaseListTabs : purchaseListTabs.filter(tab => tab.value !== 'liquidada' && tab.value !== 'vencida'),
+  create: canWrite.value && canManagePurchases(user.value?.role) ? { label: 'Nueva compra', to: { path: '/compras/nueva', query: { returnTo: returnTo.value } } } : undefined,
   pagination: { mode: 'client', label: 'compras', pageSize }
 }))
 </script>
@@ -169,11 +180,12 @@ const listConfig = computed<ListLayoutConfig>(() => ({
     <template #actions>
       <AppCsvExportButton
         filename="compras"
-        :columns="csvColumns"
+        :columns="visibleCsvColumns"
         :rows="purchases"
         :disabled="loading"
       />
       <UButton
+        v-if="showFinancials"
         to="/compras/cuentas-por-pagar"
         label="Cuentas por pagar"
         icon="i-lucide-wallet"
@@ -190,11 +202,13 @@ const listConfig = computed<ListLayoutConfig>(() => ({
         :to="purchasePath(row)"
         :fields="[
           { label: 'Proveedor', value: row.providerName, fullWidth: true },
-          { label: 'Próximo vencimiento', value: formatDate(nextInvoiceDueDate(row)) },
-          { label: 'Saldo pendiente', value: amountLabel(row.balance, row.currencyCode) }
+          ...(showFinancials ? [
+            { label: 'Próximo vencimiento', value: formatDate(nextInvoiceDueDate(row)) },
+            { label: 'Saldo pendiente', value: amountLabel(row.balance, row.currencyCode) }
+          ] : [])
         ]"
-        summary-label="Total"
-        :summary-value="amountLabel(row.total, row.currencyCode)"
+        :summary-label="showFinancials ? 'Total' : undefined"
+        :summary-value="showFinancials ? amountLabel(row.total, row.currencyCode) : undefined"
       >
         <template #trailing>
           <UBadge

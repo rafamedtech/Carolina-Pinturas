@@ -41,4 +41,6 @@ export interface PurchaseView {
   receipts: Array<{ warehouseId?: string | null, warehouseName?: string | null, inventoryMovements?: Array<{ id: string, folio: number, type: string }>, id: string, date: string, voidedAt: string | null, voidReason: string | null, items: Array<{ itemId: string, quantity: number }> }>
   invoices: PurchaseInvoiceView[]
   events: Array<{ id: string, action: string, createdBy: string, createdAt: string, detail: unknown }>
+  /** El servidor ocultó costos, facturas y abonos para el rol actual (importes en cero). */
+  financialsHidden?: boolean
 }

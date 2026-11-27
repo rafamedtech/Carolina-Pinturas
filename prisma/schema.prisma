@@ -835,3 +835,25 @@ model InventoryEvent {
 
   @@map("inventory_events")
 }
+
+model AuditEvent {
+  id            String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  entityType    String    @map("entity_type") @db.VarChar(64)
+  entityId      String    @map("entity_id")
+  action        String    @db.VarChar(32)
+  actorId       String?   @map("actor_id") @db.Uuid
+  actorEmail    String    @map("actor_email")
+  actorRole     String    @map("actor_role") @db.VarChar(32)
+  reason        String?
+  effectiveDate DateTime? @map("effective_date") @db.Date
+  sourceType    String?   @map("source_type") @db.VarChar(64)
+  sourceId      String?   @map("source_id")
+  snapshot      Json      @db.JsonB
+  changes       Json?     @db.JsonB
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([entityType, entityId, createdAt], map: "audit_events_entity_idx")
+  @@index([sourceType, sourceId], map: "audit_events_source_idx")
+  @@index([createdAt], map: "audit_events_created_at_idx")
+  @@map("audit_events")
+}

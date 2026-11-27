@@ -2,6 +2,7 @@
 import { navigationIcons } from '~/utils/navigationIcons'
 import type { NavigationMenuItem } from '@nuxt/ui'
 import type { UserRole } from '~/types/siigo'
+import { PURCHASE_RECEIPT_ROLES } from '~/utils/roleAccess'
 
 interface AppNavigationItem {
   label: string
@@ -74,7 +75,7 @@ const allLinks: AppNavigationItem[] = [{
   label: 'Compras',
   icon: navigationIcons['/compras'],
   to: '/compras',
-  roles: adminRoles,
+  roles: PURCHASE_RECEIPT_ROLES,
   onSelect: () => { open.value = false }
 }, {
   label: 'Gastos',

@@ -1,6 +1,7 @@
 import { canViewExpenseCategory } from '~/utils/expense'
 import { ORDER_LOGISTICS_ROLES } from '~/utils/roleAccess'
 import { requireRole } from '../../utils/auth'
+import { lockForAudit, recordAuditEvent } from '../../utils/audit'
 import { usePrisma } from '../../utils/prisma'
 
 export default eventHandler(async (event) => {
@@ -19,7 +20,18 @@ export default eventHandler(async (event) => {
     throw createError({ statusCode: 403, statusMessage: 'No tienes permiso para eliminar este gasto.' })
   }
 
-  await prisma.expense.delete({ where: { id: expense.id } })
+  await prisma.$transaction(async (tx) => {
+    const previous = await lockForAudit(tx, 'expense', expense.id, () => tx.expense.findUnique({ where: { id: expense.id } }))
+    if (previous.purchasePaymentId) throw createError({ statusCode: 404, statusMessage: 'El gasto no existe.' })
+    await recordAuditEvent(tx, user, {
+      entityType: 'expense',
+      entityId: previous.id,
+      action: 'delete',
+      snapshot: previous,
+      effectiveDate: previous.expenseDate
+    })
+    await tx.expense.delete({ where: { id: previous.id } })
+  })
   setResponseStatus(event, 204)
   return null
 })

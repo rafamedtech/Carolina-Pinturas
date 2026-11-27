@@ -3,8 +3,10 @@ import type { InventorySettings } from '#shared/types/inventory'
 import { mexicoToday } from '~/utils/datetime'
 import type { PurchaseView } from '~/types/purchases'
 import { purchaseDateLabel, purchaseQuantity, receiptStatus } from '~/utils/purchaseFormat'
+import { canManagePurchases } from '~/utils/roleAccess'
 
-const { canWrite } = useAuth()
+const { canWrite, user } = useAuth()
+const canVoidReceipt = computed(() => canManagePurchases(user.value?.role))
 const props = defineProps<{ order: PurchaseView }>()
 const emit = defineEmits<{ saved: [order: PurchaseView] }>()
 const { busy, error, run } = usePurchaseAction(() => props.order, value => emit('saved', value))
@@ -165,7 +167,7 @@ async function voidReceipt(reason: string) {
               />
             </div>
             <UButton
-              v-if="canWrite && !receipt.voidedAt"
+              v-if="canVoidReceipt && !receipt.voidedAt"
               label="Anular"
               icon="i-lucide-undo-2"
               color="error"

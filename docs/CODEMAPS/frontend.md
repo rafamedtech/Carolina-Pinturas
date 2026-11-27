@@ -2,7 +2,7 @@
 # Frontend — siigo-pinturas
 
 Nuxt 4 `app/`. Módulos: `@nuxt/ui`, `@vueuse/nuxt`, `@nuxt/eslint`; Supabase vía `app/plugins/supabase.client.ts`; capa `@rafamedtech/nuxt-shared`.
-Guardas: `app/middleware/auth.global.ts` + `useAuth()` + `roleAccess.canAccessAppPath` (repartidor → solo /ventas; igualaciones → /igualaciones y detalle; /compras solo admin; consulta sin rutas de alta/edición ni /configuracion). Públicas: /lista-precios, /login, /recuperar-contrasena.
+Guardas: `app/middleware/auth.global.ts` + `useAuth()` + `roleAccess.canAccessAppPath` (repartidor → solo /ventas; igualaciones → /igualaciones y detalle; /compras y su detalle: admin y mostrador (recepciones); /compras/nueva y /compras/cuentas-por-pagar solo admin; consulta sin rutas de alta/edición ni /configuracion). Públicas: /lista-precios, /login, /recuperar-contrasena.
 Patrón: páginas finas que montan un componente de módulo. Listados con `ListPage`/`ListLayout`/`ListViews` locales (`app/components/list`) + `useTableQuery` (estado en URL). Guía: `docs/listados.md`, `docs/ui-components.md`.
 
 ## Páginas → componente raíz → API
