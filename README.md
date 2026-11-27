@@ -22,6 +22,10 @@ Los módulos configuran `ListLayout` para compartir buscador, fechas, filtros,
 pestañas, Nuevo, tabla, spinner de carga y paginación con Nuxt UI.
 Consulta [la guía de composición](docs/listados.md) para adaptar un módulo nuevo.
 
+## Estructura
+
+Mapas de rutas, páginas, modelos e integraciones (incluidas las tablas que lee CVR): [`docs/CODEMAPS/`](docs/CODEMAPS/).
+
 ## Configuración local
 
 ```bash
