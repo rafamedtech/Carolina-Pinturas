@@ -4,7 +4,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Overview
 
-Internal admin panel for Carolina Pinturas (Siigo México dealer). Nuxt 4 + Nuxt UI 4 SSR app. **Siigo is the source of truth for products and customers** (read-only, server-side only); **internal orders live in PostgreSQL/Supabase via Prisma** with full historical snapshots. Siigo México has no orders resource — creating/changing an order only writes to Postgres, never creates invoices or fiscal documents in Siigo.
+Internal admin panel for Carolina Pinturas (Siigo México dealer). Nuxt 4 + Nuxt UI 4 SSR app. **Siigo is the source of truth for products and customers** (server-side only; products are mirrored to `siigo_products`, product writes (admin) and customer create/update (order-entry roles) go back to Siigo); **internal orders live in PostgreSQL/Supabase via Prisma** with full historical snapshots. Siigo México has no orders resource — creating/changing an order only writes to Postgres. Siigo invoices and payment receipts are created only through their explicit routes and only when `NUXT_SIIGO_INVOICE_WRITES_ENABLED` (invoices, `siigo-invoices.ts`) / `NUXT_SIIGO_FISCAL_WRITES_ENABLED` (receipts, `siigo-vouchers.ts`) allow it; both default to `false`.
+
+**Code maps:** read `docs/CODEMAPS/` (routes with role guards, pages, models, integrations, tables read by CVRTRANSPORT) before exploring the code.
 
 Spanish is the product language: routes, DB fields, roles, and user-facing strings are Spanish. Match that when adding code.
 
@@ -45,7 +47,7 @@ pnpm db:lint        # supabase db lint --local
 
 ### Roles & access control — `app/utils/roleAccess.ts`
 
-Five roles: `admin`, `mostrador`, `vendedor`, `repartidor`, `igualaciones`. This file is the single source of role→permission logic (who can create orders, which order statuses each role may set/edit, per-role home path, per-role path access). **Change permissions here, not scattered across components/routes.** Server routes must independently enforce with `requireRole` — client checks are UX only.
+Six roles: `admin`, `mostrador`, `vendedor`, `repartidor`, `igualaciones`, `consulta` (read-only across modules; `requireRole` lets it through on GET/HEAD for data routes). This file is the single source of role→permission logic (who can create orders, which order statuses each role may set/edit, per-role home path, per-role path access). **Change permissions here, not scattered across components/routes.** Server routes must independently enforce with `requireRole` — client checks are UX only.
 
 ### Siigo integration — `server/utils/siigo.ts`
 
