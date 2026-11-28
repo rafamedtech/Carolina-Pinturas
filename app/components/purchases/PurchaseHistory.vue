@@ -61,11 +61,14 @@ const columns: TableColumn<PurchaseHistoryRow>[] = [{
   header: 'Orden',
   cell: ({ row }) => h(NuxtLink, { to: purchasePath(row.original.orderId), class: 'font-semibold text-primary underline' }, () => `OC-${row.original.folio}`)
 }, {
-  accessorKey: 'providerName', header: 'Proveedor'
+  accessorKey: 'providerName',
+  header: 'Proveedor',
+  // Razones sociales largas empujaban costo e importe fuera de la vista en escritorio.
+  cell: ({ row }) => h('p', { class: 'max-w-56 whitespace-normal' }, row.original.providerName)
 }, {
   accessorKey: 'name',
   header: 'Producto',
-  cell: ({ row }) => h('div', { class: 'min-w-48' }, [
+  cell: ({ row }) => h('div', { class: 'min-w-48 max-w-72 whitespace-normal' }, [
     h('p', { class: 'font-medium' }, row.original.name),
     h('p', { class: 'text-xs text-muted' }, row.original.code || 'Sin código')
   ])
@@ -147,7 +150,8 @@ const optionsLoading = computed(() => loading.value && !options.value.products.l
       />
     </template>
     <template #before>
-      <div class="grid gap-3 sm:grid-cols-2">
+      <!-- shrink-0: el cuerpo del panel es flex en columna con altura fija y comprimía estos bloques en móvil. -->
+      <div class="grid shrink-0 gap-3 sm:grid-cols-2">
         <UFormField label="Producto">
           <USelectMenu
             v-model="selectedProduct"
@@ -182,6 +186,7 @@ const optionsLoading = computed(() => loading.value && !options.value.products.l
         variant="subtle"
         icon="i-lucide-badge-check"
         title="Última compra del producto"
+        class="shrink-0"
         :description="`OC-${latest.folio} · ${formatDate(latest.date)} · ${latest.providerName} · ${money(latest.unitCost, latest.currencyCode)} por unidad`"
       />
     </template>
