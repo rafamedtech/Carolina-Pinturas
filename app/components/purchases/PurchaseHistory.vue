@@ -54,6 +54,8 @@ const money = (value: string, currencyCode: string) => `$${amount.format(Number(
 const units = (value: string, unit: string | null) => unit ? `${quantity.format(Number(value))} ${unit}` : quantity.format(Number(value))
 const purchasePath = (orderId: string) => ({ path: `/compras/${orderId}`, query: { returnTo: returnTo.value } })
 
+// `columnLabel` da nombre a la columna en «Personalizar columnas»; sin él se muestra su identificador.
+const rightHeader = (label: string) => Object.assign(() => h('div', { class: 'text-right' }, label), { columnLabel: label })
 // El servidor pagina y ordena de lo más reciente a lo más antiguo; ordenar en la tabla solo reordenaría la página visible.
 const columns: TableColumn<PurchaseHistoryRow>[] = ([{
   accessorKey: 'date', header: 'Fecha', cell: ({ row }) => formatDate(row.original.date)
@@ -74,15 +76,15 @@ const columns: TableColumn<PurchaseHistoryRow>[] = ([{
     h('p', { class: 'text-xs text-muted' }, row.original.code || 'Sin código')
   ])
 }, {
-  accessorKey: 'quantity', header: () => h('div', { class: 'text-right' }, 'Cantidad'), cell: ({ row }) => h('div', { class: 'text-right' }, units(row.original.quantity, row.original.unit))
+  accessorKey: 'quantity', header: rightHeader('Cantidad'), cell: ({ row }) => h('div', { class: 'text-right' }, units(row.original.quantity, row.original.unit))
 }, {
   accessorKey: 'pending',
-  header: () => h('div', { class: 'text-right' }, 'Pendiente'),
+  header: rightHeader('Pendiente'),
   cell: ({ row }) => h('div', { class: ['text-right', Number(row.original.pending) > 0 ? 'text-warning' : 'text-success'] }, units(row.original.pending, row.original.unit))
 }, {
-  accessorKey: 'unitCost', header: () => h('div', { class: 'text-right' }, 'Costo unitario'), cell: ({ row }) => h('div', { class: 'text-right font-semibold' }, money(row.original.unitCost, row.original.currencyCode))
+  accessorKey: 'unitCost', header: rightHeader('Costo unitario'), cell: ({ row }) => h('div', { class: 'text-right font-semibold' }, money(row.original.unitCost, row.original.currencyCode))
 }, {
-  accessorKey: 'total', header: () => h('div', { class: 'text-right' }, 'Importe'), cell: ({ row }) => h('div', { class: 'text-right' }, money(row.original.total, row.original.currencyCode))
+  accessorKey: 'total', header: rightHeader('Importe'), cell: ({ row }) => h('div', { class: 'text-right' }, money(row.original.total, row.original.currencyCode))
 }, {
   accessorKey: 'isLatest',
   header: 'Última',
