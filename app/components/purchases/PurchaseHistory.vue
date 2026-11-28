@@ -54,7 +54,8 @@ const money = (value: string, currencyCode: string) => `$${amount.format(Number(
 const units = (value: string, unit: string | null) => unit ? `${quantity.format(Number(value))} ${unit}` : quantity.format(Number(value))
 const purchasePath = (orderId: string) => ({ path: `/compras/${orderId}`, query: { returnTo: returnTo.value } })
 
-const columns: TableColumn<PurchaseHistoryRow>[] = [{
+// El servidor pagina y ordena de lo más reciente a lo más antiguo; ordenar en la tabla solo reordenaría la página visible.
+const columns: TableColumn<PurchaseHistoryRow>[] = ([{
   accessorKey: 'date', header: 'Fecha', cell: ({ row }) => formatDate(row.original.date)
 }, {
   accessorKey: 'folio',
@@ -64,7 +65,7 @@ const columns: TableColumn<PurchaseHistoryRow>[] = [{
   accessorKey: 'providerName',
   header: 'Proveedor',
   // Razones sociales largas empujaban costo e importe fuera de la vista en escritorio.
-  cell: ({ row }) => h('p', { class: 'max-w-56 whitespace-normal' }, row.original.providerName)
+  cell: ({ row }) => h('p', { class: 'min-w-36 max-w-56 whitespace-normal' }, row.original.providerName)
 }, {
   accessorKey: 'name',
   header: 'Producto',
@@ -84,9 +85,10 @@ const columns: TableColumn<PurchaseHistoryRow>[] = [{
   accessorKey: 'total', header: () => h('div', { class: 'text-right' }, 'Importe'), cell: ({ row }) => h('div', { class: 'text-right' }, money(row.original.total, row.original.currencyCode))
 }, {
   accessorKey: 'isLatest',
-  header: 'Última compra',
-  cell: ({ row }) => row.original.isLatest ? h(UBadge, { color: 'primary', variant: 'soft', icon: 'i-lucide-badge-check' }, () => 'Última') : null
-}]
+  header: 'Última',
+  // Solo icono en escritorio para que costo e importe quepan sin desplazar la tabla.
+  cell: ({ row }) => row.original.isLatest ? h(UBadge, { 'color': 'primary', 'variant': 'soft', 'icon': 'i-lucide-badge-check', 'aria-label': 'Última compra del producto', 'title': 'Última compra del producto' }) : null
+}] satisfies TableColumn<PurchaseHistoryRow>[]).map(column => ({ ...column, enableSorting: false }))
 
 const csvColumns: CsvColumn<PurchaseHistoryRow>[] = [
   { key: 'date', label: 'Fecha', value: row => formatDate(row.date) },
