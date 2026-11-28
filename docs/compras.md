@@ -1,6 +1,6 @@
 # Compras internas
 
-Módulo `/compras`, exclusivo de administradores. Siigo aporta catálogo y validación vigente de proveedores/productos. Órdenes, recepciones, facturas del proveedor, abonos e historial permanecen en PostgreSQL. Las recepciones no actualizan existencias en Siigo.
+Módulo `/compras`. El administrador crea, confirma y cancela órdenes y registra facturas y abonos. Mostrador consulta las compras sin importes y registra recepciones (CVR-02; matriz en `docs/permisos.md`). Siigo aporta el catálogo y la validación vigente de proveedores y productos. Órdenes, recepciones, facturas del proveedor, abonos e historial permanecen en PostgreSQL. Las recepciones suman existencias en el inventario interno (`inventory.receiveInventory`), no en Siigo.
 
 ## Puesta en servicio
 
@@ -13,7 +13,7 @@ Para persistir IVA, aplicar también `supabase/migrations/20261012231526_purchas
 ## Operación
 
 1. Crear borrador con proveedor Supplier activo, productos vigentes y costos unitarios antes de impuestos. El formulario permite seleccionar IVA de 0%, 8% o 16%. La orden guarda subtotal, tasa e importe de IVA y total con IVA; estos valores se conservan al editar y confirmar y se muestran en detalle e impresión. El servidor calcula los importes a partir de las partidas, con redondeo a dos decimales. Guardar cambios antes de confirmar; confirmar congela proveedor y partidas. Las órdenes anteriores conservan sus costos y total originales, con IVA registrado en 0%; no se infiere el impuesto histórico.
-2. Registrar recepciones completas o parciales. Actualizar existencias manualmente en Siigo.
+2. Registrar recepciones completas o parciales en un almacén activo. La recepción, su movimiento de inventario, el saldo del almacén y el costo vigente se guardan en la misma transacción; si algo falla no queda nada a medias. No se puede recibir más de lo pendiente por partida.
 3. Capturar cada factura del proveedor con folio, importe real y vencimiento. Puede registrarse antes de recibir mercancía. La aplicación muestra diferencias entre importe ordenado y facturado.
 4. Registrar abonos únicamente contra una factura vigente. Cada abono genera un gasto por el mismo importe y moneda, con su tipo de cambio a MXN; registrar la factura no genera gasto.
 5. Para corregir, anular abono con motivo: elimina su gasto vinculado, conserva pago e historial y restaura saldo. No se editan gastos vinculados desde Gastos. Facturas sin pagos vigentes pueden editarse o anularse. Recepciones anuladas dejan de contar como recibidas.
@@ -28,12 +28,14 @@ Desde el detalle, **Duplicar** abre una nueva compra con proveedor, moneda, IVA,
 - `GET /api/purchases/:id`: detalle, saldos e historial.
 - `POST /api/purchases`: `{ requestId, draft }`.
 - `POST /api/purchases/:id/actions`: `{ requestId, version, command }`; esquemas en `shared/schemas/purchase.ts`.
+- `GET /api/purchases/items`: historial por partida de órdenes confirmadas (liquidadas y vencidas incluidas; sin borradores ni canceladas), con filtros `productId`, `providerId`, `dateFrom`, `dateTo`, `page` y `page_size` (25 por defecto, máximo 100). `options=false` omite las opciones de los filtros (exportación CSV). Cada fila trae costo unitario, moneda, cantidad, recibido, pendiente e `isLatest` (partida de la compra confirmada más reciente del producto, sin importar filtros). Con `productId` devuelve `latest` (última compra y costo). Solo admin y `consulta` en lectura, porque muestra costos. Página: `/compras/historial`.
 
-Todas las escrituras sobre una orden adquieren el mismo bloqueo transaccional mediante actualización condicional de versión. Repetir una solicitud idéntica devuelve el estado actual; reutilizar su UUID con datos distintos produce conflicto. Consultas Siigo ocurren antes de abrir la transacción. No existen llamadas de escritura a Siigo.
+Todas las escrituras sobre una orden adquieren el mismo bloqueo transaccional mediante actualización condicional de versión. Repetir una solicitud idéntica devuelve el estado actual; reutilizar su UUID con datos distintos produce conflicto. En una recepción, reenviar el mismo `requestId` (doble clic o reintento de red; `usePurchaseAction` conserva el UUID mientras el comando y la versión no cambian) agrega cero unidades, y otra solicitud con la versión anterior se rechaza sin tocar el almacén. Consultas Siigo ocurren antes de abrir la transacción. No existen llamadas de escritura a Siigo.
 
 ## Validación
 
 - `pnpm test`: pruebas unitarias, autorización y regresiones del proyecto.
+- `INVENTORY_TEST_DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:55322/postgres pnpm test:inventory-db`: crea y elimina una base temporal en el PostgreSQL local. Incluye los escenarios de CVR-04: 4 de 10 recibidas (saldo +4, 6 pendientes), reintento idéntico y versión obsoleta (+0), recepción fallida sin cambios y filtros e indicador de última compra del historial.
 - `PURCHASE_TEST_DATABASE_URL=postgresql://USUARIO@127.0.0.1:55439/postgres pnpm test:purchases-db`: siete escenarios contra PostgreSQL desechable con esquema migrado; Siigo simulado. El runner rechaza destinos fuera de localhost y puerto 55439. No usa `DATABASE_URL` ni credenciales Siigo. Crea y limpia sus registros de prueba.
 - `pnpm lint`, `pnpm typecheck`, `pnpm db:validate`, `pnpm build`.
 

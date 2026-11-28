@@ -57,10 +57,11 @@ GET  /api/products/[id]/cost → PROD → product-costs · /activity → por sec
 GET  /api/siigo/customers · /[id] · POST · PUT /[id] · PATCH /[id]/invoice-requirement · POST /sync → ENT → siigo-customers, siigo-customer-sync, siigo-customer-import
 PATCH /api/siigo/customers/[id]/roles → LOG → siigo-customer-repository
 
-### Compras — `purchases.ts`, `purchase-domain.ts`, `purchase-visibility.ts`
+### Compras — `purchases.ts`, `purchase-domain.ts`, `purchase-visibility.ts`, `purchase-history.ts`
 POST /api/purchases → admin
 GET /api/purchases · GET /api/purchases/[id] → admin, mostrador (`purchaseViewForRole`: mostrador sin costos, facturas ni abonos)
 POST /api/purchases/[id]/actions → admin; mostrador solo `receive` → (recepciones → inventory.receiveInventory; pagos → expenses)
+GET /api/purchases/items → admin (consulta lee) → purchase_items de órdenes confirmadas: filtros producto/proveedor/periodo, recibido/pendiente, `isLatest`, `latest` (CVR-04)
 
 ### Inventario — `inventory.ts` (500 l)
 GET  /api/inventory/[resource] → INVR (counts/movements: INVW) → listInventory (`inventoryForRole`: sin costos salvo admin/consulta)
@@ -78,7 +79,7 @@ GET  /api/reports/summary → admin → reports (sales_orders, payments, expense
 Siigo API: siigo.ts (OAuth en memoria, `siigoRequest`), siigo-errors, siigo-catalog (caché), siigo-products, siigo-product-sat, siigo-product-sync, siigo-persistence (upsert local), siigo-customers*, siigo-order-customer, siigo-invoices, siigo-invoice-reconciliation, siigo-vouchers
 Pedidos: orders, order-validation (Zod), order-payments, order-recipe-units, customer-balance, customer-validation
 Productos: managed-products, stored-products, product-catalog-persistence, product-compositions (recetas), product-costs, product-images (Supabase Storage), product-activity, product-unit
-Compras/inventario: purchases, purchase-domain, inventory, inventoryValuation
+Compras/inventario: purchases, purchase-domain, purchase-history, inventory, inventoryValuation
 Bitácora: audit (`recordAuditEvent` → `audit_events`, misma transacción; borrado de cobros, edición/borrado de gastos). Matriz: `docs/permisos.md`
 Otros: expenses, repartidores, repartidor-validation, reports, dashboard-period, ticket-printer, prisma, supabase, auth
 
