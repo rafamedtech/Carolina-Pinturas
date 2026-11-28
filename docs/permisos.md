@@ -14,6 +14,7 @@ C = consulta · R = registra · A = autoriza o revierte · — = sin acceso
 | Compras: crear, editar, confirmar, cancelar | R/A | — | — | — | — | C |
 | Compras: consultar y **registrar recepciones** | R | R (sin costos ni facturas) | — | — | — | C |
 | Compras: anular recepción | A | — | — | — | — | — |
+| Compras: historial por partida con costos (`/compras/historial`) | R | — | — | — | — | C |
 | Facturas y abonos a proveedor, cuentas por pagar | R/A | — | — | — | — | C |
 | Inventario: movimientos, conteos, traspasos | R/A | R | C | — | — | C |
 | Catálogo de productos y precios | R/A | — | — | — | — | C |

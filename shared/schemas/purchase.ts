@@ -34,3 +34,16 @@ export const purchaseCreateSchema = z.object({ requestId: z.uuid(), draft: purch
 export type PurchaseDraft = z.infer<typeof purchaseDraftSchema>
 export type PurchaseAction = z.infer<typeof purchaseActionSchema>
 export type PurchaseCommand = z.infer<typeof purchaseCommandSchema>
+
+/** Filtros del historial de compras por partida (CVR-04). */
+export const purchaseHistoryFiltersSchema = z.object({
+  productId: z.uuid().optional(),
+  providerId: z.uuid().optional(),
+  dateFrom: purchaseDate.optional(),
+  dateTo: purchaseDate.optional(),
+  page: z.coerce.number().int().min(1).max(1000).default(1),
+  page_size: z.coerce.number().int().min(1).max(100).default(25),
+  // La exportación CSV recorre todas las páginas y no necesita las opciones de los filtros.
+  options: z.stringbool().default(true)
+}).refine(v => !v.dateFrom || !v.dateTo || v.dateFrom <= v.dateTo, 'El periodo es inválido.')
+export type PurchaseHistoryFilters = z.infer<typeof purchaseHistoryFiltersSchema>

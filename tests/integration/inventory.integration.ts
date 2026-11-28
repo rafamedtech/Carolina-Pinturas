@@ -23,6 +23,7 @@ vi.stubGlobal('createError', createError)
 const { executeInventory, listInventory, orderInventoryView, orderReturnContext } = await import('../../server/utils/inventory')
 const { createOrder, updateOrder, updateOrderStatus, updateOrderItemQuantity } = await import('../../server/utils/orders')
 const { createPurchase, mutatePurchase } = await import('../../server/utils/purchases')
+const { listPurchaseHistory } = await import('../../server/utils/purchase-history')
 const { persistProductCatalog } = await import('../../server/utils/product-catalog-persistence')
 const { saveManagedProduct, recoverProductWrite, retryProductWrite, reviewProductWrite } = await import('../../server/utils/managed-products')
 const { attachProductCompositions, validateComposition } = await import('../../server/utils/product-compositions')
@@ -401,6 +402,92 @@ suite('inventario: PostgreSQL aislado, sin conexión Siigo', () => {
     await act({ action: 'voidReceipt', id: receipt.id, reason: 'Corrección de recepción' })
     expect((await balance(id)).quantity.toString()).toBe('0')
     expect(purchase.invoices).toHaveLength(0)
+  })
+  it('CVR-04: recibir 4 de 10 suma 4 y deja 6; repetir suma cero; una recepción fallida no altera pendiente ni saldo', async () => {
+    const id = await product()
+    mocks.supplier.mockResolvedValue(customer)
+    const p = await db.siigoProduct.findUniqueOrThrow({ where: { id } })
+    mocks.product.mockResolvedValue({ id, code: p.code, name: p.name, active: true })
+    let purchase = await createPurchase({ requestId: randomUUID(), draft: { vatRate: 0, providerId: customer.id, date: today, currencyCode: 'MXN', notes: '', items: [{ productId: id, quantity: 10, unitCost: 10 }] } }, user)
+    purchase = await mutatePurchase(purchase.id, { requestId: randomUUID(), version: purchase.version, command: { action: 'confirm' } }, user)
+    const itemId = purchase.items[0]!.id
+    const state = async () => {
+      const [row, receipts, movements] = await Promise.all([
+        db.purchaseOrder.findUniqueOrThrow({ where: { id: purchase.id }, select: { version: true } }),
+        db.purchaseReceipt.count({ where: { orderId: purchase.id, voidedAt: null } }),
+        db.inventoryMovement.count({ where: { receipt: { orderId: purchase.id } } })
+      ])
+      const received = await db.purchaseReceiptItem.aggregate({ where: { itemId, receipt: { voidedAt: null } }, _sum: { quantity: true } })
+      return { version: row.version, receipts, movements, stock: (await balance(id)).quantity.toString(), pending: new Decimal(10).minus(received._sum.quantity?.toString() ?? 0).toString() }
+    }
+
+    const input = { requestId: randomUUID(), version: purchase.version, command: { action: 'receive' as const, warehouseId: a, date: today, items: [{ itemId, quantity: 4 }] } }
+    purchase = await mutatePurchase(purchase.id, input, user)
+    const afterFirst = await state()
+    expect(afterFirst).toMatchObject({ stock: '4', pending: '6', receipts: 1, movements: 1 })
+    expect(purchase.items[0]!.received).toBe(4)
+    // Reintento idéntico (doble clic o red): devuelve el estado actual sin otra entrada.
+    const retried = await mutatePurchase(purchase.id, input, user)
+    expect(retried.receipts).toHaveLength(1)
+    expect(await state()).toEqual(afterFirst)
+    // Otra solicitud con la versión anterior choca con el bloqueo optimista y agrega cero.
+    await expect(mutatePurchase(purchase.id, { ...input, requestId: randomUUID() }, user)).rejects.toThrow('La compra cambió')
+    expect(await state()).toEqual(afterFirst)
+
+    // Fallos dentro de la transacción: almacén inexistente (tras crear la recepción) y exceso sobre lo pendiente.
+    const missing = randomUUID()
+    await expect(mutatePurchase(purchase.id, { requestId: randomUUID(), version: purchase.version, command: { action: 'receive', warehouseId: missing, date: today, items: [{ itemId, quantity: 3 }] } }, user)).rejects.toThrow('almacén activo')
+    await expect(mutatePurchase(purchase.id, { requestId: randomUUID(), version: purchase.version, command: { action: 'receive', warehouseId: a, date: today, items: [{ itemId, quantity: 7 }] } }, user)).rejects.toThrow('supera la cantidad pendiente')
+    expect(await state()).toEqual(afterFirst)
+    expect(await db.purchaseReceipt.count({ where: { orderId: purchase.id } })).toBe(1)
+
+    purchase = await mutatePurchase(purchase.id, { requestId: randomUUID(), version: purchase.version, command: { action: 'receive', warehouseId: a, date: today, items: [{ itemId, quantity: 6 }] } }, user)
+    expect(await state()).toMatchObject({ stock: '10', pending: '0', receipts: 2, movements: 2 })
+    expect(purchase.receiptStatus).toBe('completa')
+  })
+  it('CVR-04: el historial lista partidas confirmadas con costo, pendiente y última compra, filtrable por producto, proveedor y periodo', async () => {
+    const id = await product()
+    const otherProvider = { id: randomUUID(), name: ['Proveedor historial'], type: 'Supplier', active: true }
+    await db.siigoCustomer.create({ data: { id: otherProvider.id, name: otherProvider.name, displayName: otherProvider.name[0]!, type: 'Supplier', isSupplier: true, active: true, rawPayload: {} } })
+    const p = await db.siigoProduct.findUniqueOrThrow({ where: { id } })
+    mocks.product.mockResolvedValue({ id, code: p.code, name: p.name, active: true })
+    async function purchaseOf(provider: typeof customer, date: string, unitCost: number, confirm = true) {
+      mocks.supplier.mockResolvedValue(provider)
+      const draft = await createPurchase({ requestId: randomUUID(), draft: { vatRate: 0, providerId: provider.id, date, currencyCode: 'MXN', notes: '', items: [{ productId: id, quantity: 10, unitCost }] } }, user)
+      return confirm ? mutatePurchase(draft.id, { requestId: randomUUID(), version: draft.version, command: { action: 'confirm' } }, user) : draft
+    }
+    const older = await purchaseOf(customer, '2026-09-01', 9.5)
+    const olderReceived = await mutatePurchase(older.id, { requestId: randomUUID(), version: older.version, command: { action: 'receive', warehouseId: a, date: today, items: [{ itemId: older.items[0]!.id, quantity: 4 }] } }, user)
+    const newer = await purchaseOf(otherProvider, '2026-10-01', 11.25)
+    await purchaseOf(customer, '2026-10-02', 99, false)
+    const filters = { productId: id, page: 1, page_size: 25, options: true }
+
+    const all = await listPurchaseHistory(filters)
+    expect(all.results.map(row => row.orderId)).toEqual([newer.id, older.id])
+    expect(all.results[0]).toMatchObject({ providerName: 'Proveedor historial', unitCost: '11.25', currencyCode: 'MXN', isLatest: true, pending: '10' })
+    expect(all.results[1]).toMatchObject({ unitCost: '9.5', received: '4', pending: '6', isLatest: false })
+    expect(all.latest).toMatchObject({ orderId: newer.id, unitCost: '11.25', providerName: 'Proveedor historial' })
+    expect(all.options.products.some(option => option.value === id)).toBe(true)
+    expect(all.options.providers.map(option => option.value)).toEqual(expect.arrayContaining([customer.id, otherProvider.id]))
+
+    const byProvider = await listPurchaseHistory({ ...filters, providerId: customer.id })
+    expect(byProvider.results.map(row => row.orderId)).toEqual([older.id])
+    // La última compra no depende de los filtros: la partida anterior no se marca como última.
+    expect(byProvider.results[0]!.isLatest).toBe(false)
+    expect(byProvider.latest?.orderId).toBe(newer.id)
+    const byPeriod = await listPurchaseHistory({ ...filters, dateFrom: '2026-09-01', dateTo: '2026-09-30' })
+    expect(byPeriod.results.map(row => row.orderId)).toEqual([older.id])
+    expect((await listPurchaseHistory({ ...filters, dateFrom: '2026-11-01' })).results).toEqual([])
+    expect((await listPurchaseHistory({ page: 1, page_size: 25, options: false, providerId: otherProvider.id })).pagination.totalResults).toBe(1)
+
+    // Cancelar la compra vigente la saca del historial y la última compra vuelve a la anterior.
+    await mutatePurchase(newer.id, { requestId: randomUUID(), version: newer.version, command: { action: 'cancel', reason: 'Prueba de historial' } }, user)
+    const afterCancel = await listPurchaseHistory(filters)
+    expect(afterCancel.results.map(row => row.orderId)).toEqual([older.id])
+    expect(afterCancel.results[0]!.isLatest).toBe(true)
+    // Una recepción anulada deja de contar como recibida.
+    await mutatePurchase(older.id, { requestId: randomUUID(), version: olderReceived.version, command: { action: 'voidReceipt', id: olderReceived.receipts[0]!.id, reason: 'Prueba de historial' } }, user)
+    expect((await listPurchaseHistory(filters)).results[0]).toMatchObject({ received: '0', pending: '10' })
   })
   it('rechaza anular entradas consumidas/reservadas; traspasos y reversiones son atómicos', async () => {
     const id = await product()

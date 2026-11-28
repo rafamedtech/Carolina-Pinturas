@@ -2,7 +2,7 @@
 # Frontend — siigo-pinturas
 
 Nuxt 4 `app/`. Módulos: `@nuxt/ui`, `@vueuse/nuxt`, `@nuxt/eslint`; Supabase vía `app/plugins/supabase.client.ts`; capa `@rafamedtech/nuxt-shared`.
-Guardas: `app/middleware/auth.global.ts` + `useAuth()` + `roleAccess.canAccessAppPath` (repartidor → solo /ventas; igualaciones → /igualaciones y detalle; /compras y su detalle: admin y mostrador (recepciones); /compras/nueva y /compras/cuentas-por-pagar solo admin; consulta sin rutas de alta/edición ni /configuracion). Públicas: /lista-precios, /login, /recuperar-contrasena.
+Guardas: `app/middleware/auth.global.ts` + `useAuth()` + `roleAccess.canAccessAppPath` (repartidor → solo /ventas; igualaciones → /igualaciones y detalle; /compras y su detalle: admin y mostrador (recepciones); /compras/nueva, /compras/cuentas-por-pagar y /compras/historial solo admin; consulta sin rutas de alta/edición ni /configuracion). Públicas: /lista-precios, /login, /recuperar-contrasena.
 Patrón: páginas finas que montan un componente de módulo. Listados con `ListPage`/`ListLayout`/`ListViews` locales (`app/components/list`) + `useTableQuery` (estado en URL). Guía: `docs/listados.md`, `docs/ui-components.md`.
 
 ## Páginas → componente raíz → API
@@ -19,7 +19,7 @@ Patrón: páginas finas que montan un componente de módulo. Listados con `ListP
 /productos/[id] → ProductDetailFields, InventoryProductStock, ProductActivity
 /productos/nuevo, /productos/[id]/editar → ProductsProductEditor (useProductMutation, useProductWriteRecovery)
 /lista-precios → PricesPriceCatalog (pública) → /api/catalog/prices
-/compras → PurchasesPurchaseList · /compras/nueva → PurchaseDraftForm · /compras/[id] → PurchaseDetail · /compras/cuentas-por-pagar → PurchasePayables (usePurchaseAction)
+/compras → PurchasesPurchaseList · /compras/nueva → PurchaseDraftForm · /compras/[id] → PurchaseDetail · /compras/cuentas-por-pagar → PurchasePayables (usePurchaseAction) · /compras/historial → PurchaseHistory (partidas, costo, última compra)
 /inventario → InventoryDashboard (useInventoryAction) → /api/inventory/*
 /pagos → PaymentsPaymentList (usePaymentListTable) → /api/payments
 /gastos → ExpensesExpenseList (useExpenseListTable) → /api/expenses
@@ -36,7 +36,7 @@ orders/payments/: OrderPaymentsCard, OrderPaymentsModal, OrderPaymentSiigoModal,
 orders/siigo/: OrderSiigoInvoiceCard, OrderSiigoInvoiceModal, OrderInvoiceCustomerModal, OrderHistoricalInvoiceModal
 customers/: CustomerCatalog, CustomerEditForm, CustomerInvoiceRequirement, CustomerOrdersTable, CustomerRolesCard, AddModal, DeleteModal
 products/: ProductCatalog, ProductEditor, ProductForm, Product{General,Price,Availability,Composition,Brand,Image}Fields, ProductDetailFields, ProductActivity(+Table), ProductPurchaseCost, ProductSearch, ProductStatusAction, ProductWriteRecovery, SatPicker
-purchases/: PurchaseList, PurchaseDraftForm, PurchaseDraftTotals, PurchaseDetail, PurchaseReceipts, PurchaseInvoice(s), PurchasePayables, PayablesOverview, PayablesProviders, PurchaseDate, PurchaseReasonModal
+purchases/: PurchaseList, PurchaseDraftForm, PurchaseDraftTotals, PurchaseDetail, PurchaseReceipts, PurchaseInvoice(s), PurchasePayables, PurchaseHistory, PayablesOverview, PayablesProviders, PurchaseDate, PurchaseReasonModal
 inventory/: InventoryDashboard, InventoryStockTable, InventoryMovementForm, InventoryMovementsTable, InventoryRecentMovements, InventoryCountForm, InventoryCountProductPicker, InventoryWarehouseForm, InventoryWarehousePicker, InventoryOrderStock, InventoryProductStock, InventorySummary(+Metrics), InventoryValuation
 home/: HomeDashboard, HomeStats, HomeSales, HomeChart, HomeBreakdowns, HomeTopProducts, HomePeriodSelect, HomeDateRangePicker, HomeMonthPicker
 reports/: ReportsDashboard, ReportsPeriodControls, ReportsPeriodAnalysis, ReportsPaceComparison, ReportsWeeklySales, ReportsProfitStatement, ReportsCashFlowChart.client, ReportsExpenseDetails, ReportsPurchaseInvoices, ReportsSummaryCardsAdapter

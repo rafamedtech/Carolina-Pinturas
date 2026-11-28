@@ -194,6 +194,16 @@ const listConfig = computed<ListLayoutConfig>(() => ({
         variant="outline"
         :ui="{ label: 'hidden sm:inline' }"
       />
+      <UButton
+        v-if="showFinancials"
+        to="/compras/historial"
+        label="Historial"
+        icon="i-lucide-history"
+        aria-label="Historial de compras por partida"
+        color="neutral"
+        variant="outline"
+        :ui="{ label: 'hidden sm:inline' }"
+      />
     </template>
     <template #record="{ row }">
       <ListRecordCard
